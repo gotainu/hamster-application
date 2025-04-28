@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:hamster_project/services/openai_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class FuncSearchScreen extends StatefulWidget {
   const FuncSearchScreen({super.key});
@@ -13,14 +14,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   String _responseText = '';
   bool _isLoading = false;
 
-  // OpenAI API キーは環境変数から取得（安全な管理を推奨）
-  final String _apiKey = const String.fromEnvironment('OPENAI_API_KEY');
-
-  // OpenAIService のインスタンスを生成
-  late final OpenAIService _openAIService = OpenAIService(apiKey: _apiKey);
-
   Future<void> _sendMessage(String message) async {
-    // すでにロード中の場合は何もしない
     if (_isLoading) return;
 
     setState(() {
@@ -29,10 +23,22 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     });
 
     try {
-      final answer = await _openAIService.sendMessage(message);
-      setState(() {
-        _responseText = answer;
-      });
+      final uri = Uri.parse(
+          //'http://10.0.2.2:8000/search?query=${Uri.encodeQueryComponent(message)}');
+          'http://192.168.0.30:8000/search?query=${Uri.encodeQueryComponent(message)}');
+      final response = await http.get(uri);
+
+      if (response.statusCode == 200) {
+        final decoded = utf8.decode(response.bodyBytes);
+        final body = json.decode(decoded);
+        setState(() {
+          _responseText = body['result'] ?? '回答が取得できませんでした。';
+        });
+      } else {
+        setState(() {
+          _responseText = 'エラー: ステータスコード ${response.statusCode}';
+        });
+      }
     } catch (e) {
       setState(() {
         _responseText = 'エラー: $e';
@@ -53,15 +59,13 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('AI質問機能'),
-      ),
+      appBar: AppBar(title: const Text('AI質問機能')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
             const Text(
-              'Go/hamsterチャンネルで８年間蓄積したハムスター飼育のノウハウを学習させたAIが、'
+              'YouTubeチャンネル動画のシナリオをRAGで読み込ませて、OpenAIのLLMで返答します。つまり８年分のノウハウを学習させたAIが、'
               'あなたの質問に回答します。飼育に関する質問を入力してください:',
               style: TextStyle(fontSize: 16),
             ),
@@ -74,7 +78,6 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            // 送信ボタン
             ElevatedButton(
               onPressed: () {
                 final message = _controller.text.trim();
