@@ -12,8 +12,11 @@ class FuncSearchScreen extends StatefulWidget {
 class _FuncSearchScreenState extends State<FuncSearchScreen> {
   final TextEditingController _controller = TextEditingController();
   String _responseText = '';
-  List<String> _chunks = []; // 取得したチャンクを格納する変数を用意
+  List<String> _chunks = [];
   bool _isLoading = false;
+
+  // デバッグ用: チャンク＋スコア表示
+  List<Map<String, dynamic>> _debugChunks = [];
 
   Future<void> _sendMessage(String message) async {
     if (_isLoading) return;
@@ -21,29 +24,31 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     setState(() {
       _isLoading = true;
       _responseText = '';
-      _chunks = []; // 以前のチャンクをクリア
+      _chunks = [];
     });
 
     try {
-      // ここは、エミュレータではなく実機／同一ネットワークからアクセスする際の IP を指定
-      //   実機: 192.168.0.30:8000
-      //   エミュレータ: 10.0.2.2:8000
       final uri = Uri.parse(
-          'http://192.168.0.30:8000/search?query=${Uri.encodeComponent(message)}');
+          'http://10.0.2.2:8000/search?query=${Uri.encodeQueryComponent(message)}');
       final resp = await http.get(uri);
 
       if (resp.statusCode == 200) {
-        // サーバから返ってきた JSON は「リスト」なので List<dynamic> としてデコード
-        final List<dynamic> decoded = json.decode(utf8.decode(resp.bodyBytes));
-
-        // decoded[0] が回答テキスト (String)、decoded[1] がチャンク一覧 (List<dynamic>)
-        setState(() {
-          _responseText = decoded[0] as String;
-
-          // List<dynamic> を List<String> にキャストして _chunks に格納
-          final List<dynamic> rawChunks = decoded[1] as List<dynamic>;
-          _chunks = rawChunks.map((e) => e.toString()).toList();
-        });
+        // Listで返る場合に対応
+        final decoded = json.decode(utf8.decode(resp.bodyBytes));
+        if (decoded is List && decoded.length >= 2) {
+          setState(() {
+            _responseText = decoded[0] as String;
+            _chunks = (decoded[1] as List<dynamic>).cast<String>();
+          });
+        } else if (decoded is String) {
+          setState(() {
+            _responseText = decoded;
+          });
+        } else {
+          setState(() {
+            _responseText = 'エラー: 予期しないレスポンス形式';
+          });
+        }
       } else {
         setState(() {
           _responseText = 'エラー: ステータスコード ${resp.statusCode}';
@@ -58,6 +63,137 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  // デバッグ用: /debug_search の呼び出し
+  Future<void> _debugSearch(String message) async {
+    setState(() {
+      _debugChunks = [];
+    });
+    try {
+      final uri = Uri.parse(
+          'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(message)}&top_k=10');
+      final resp = await http.get(uri);
+
+      if (resp.statusCode == 200) {
+        final decoded = json.decode(utf8.decode(resp.bodyBytes));
+        // /debug_search の戻り値 {"matches": [...]}
+        List<Map<String, dynamic>> chunks = [];
+        if (decoded is Map && decoded['matches'] is List) {
+          for (final item in decoded['matches']) {
+            if (item is Map) {
+              // 必ずscore, id, textキーが存在するとは限らないので安全に
+              chunks.add({
+                'score': item['score'] ?? 0.0,
+                'id': item['id'] ?? '',
+                'text': item['text'] ?? '',
+              });
+            }
+          }
+        }
+        setState(() {
+          _debugChunks = chunks;
+        });
+        _showDebugChunksDialog();
+      } else {
+        setState(() {
+          _debugChunks = [];
+        });
+        _showErrorDialog('デバッグ用チャンク取得に失敗しました: ステータスコード${resp.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _debugChunks = [];
+      });
+      _showErrorDialog('デバッグ用チャンク取得に失敗: $e');
+    }
+  }
+
+  void _showDebugChunksDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return DefaultTabController(
+          length: _debugChunks.length,
+          child: AlertDialog(
+            title: const Text('検索チャンク一覧'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 420,
+              child: _debugChunks.isEmpty
+                  ? const Text('チャンクが見つかりませんでした。')
+                  : Column(
+                      children: [
+                        TabBar(
+                          isScrollable: true,
+                          labelColor: Theme.of(context).primaryColor,
+                          unselectedLabelColor: Colors.grey,
+                          tabs: List.generate(
+                            _debugChunks.length,
+                            (i) => Tab(text: 'チャンク${i + 1}'),
+                          ),
+                        ),
+                        Expanded(
+                          child: TabBarView(
+                            children: _debugChunks.map((chunk) {
+                              return SingleChildScrollView(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 16.0),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'score: ${chunk['score']?.toStringAsFixed(4) ?? "??"}',
+                                        style: const TextStyle(
+                                            fontSize: 14, color: Colors.grey),
+                                      ),
+                                      Text(
+                                        'id: ${chunk['id'] ?? "??"}',
+                                        style: const TextStyle(
+                                            fontSize: 13, color: Colors.grey),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        chunk['text'] ?? '',
+                                        style: const TextStyle(fontSize: 16),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('閉じる'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('エラー'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -75,12 +211,10 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
         child: Column(
           children: [
             const Text(
-              'YouTubeチャンネル動画のシナリオをRAGで読み込ませて、OpenAIのLLMで返答します。'
-              'つまり８年分のノウハウを学習させたAIが、あなたの質問に回答します。飼育に関する質問を入力してください:',
+              'YouTubeチャンネル動画のシナリオをRAGで読み込ませて、OpenAIのLLMで返答します。つまり８年分のノウハウを学習させたAIが、あなたの質問に回答します。飼育に関する質問を入力してください:',
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 8),
-            // ─── 質問入力部 ────────────────────────────────────────────────
             TextField(
               controller: _controller,
               decoration: const InputDecoration(
@@ -92,7 +226,9 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
             ElevatedButton(
               onPressed: () {
                 final message = _controller.text.trim();
-                if (message.isNotEmpty) _sendMessage(message);
+                if (message.isNotEmpty) {
+                  _sendMessage(message);
+                }
               },
               child: _isLoading
                   ? const Row(
@@ -113,62 +249,26 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
                   : const Text('送信'),
             ),
             const SizedBox(height: 16),
-            // ─── 回答表示部 ────────────────────────────────────────────────
             Expanded(
               child: Scrollbar(
                 thumbVisibility: true,
                 child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 回答テキスト
-                      Text(
-                        _responseText,
-                        style: const TextStyle(fontSize: 16),
-                      ),
-
-                      const SizedBox(height: 16),
-                      // “チャンクを確認” ボタンは、チャンクが 1 件以上あるときだけ表示
-                      if (_chunks.isNotEmpty)
-                        ElevatedButton(
-                          onPressed: () {
-                            // チャンク一覧をダイアログなどで表示
-                            showDialog(
-                              context: context,
-                              builder: (context) {
-                                return AlertDialog(
-                                  title: const Text('取得されたチャンク一覧'),
-                                  content: SizedBox(
-                                    width: double.maxFinite,
-                                    child: ListView.builder(
-                                      shrinkWrap: true,
-                                      itemCount: _chunks.length,
-                                      itemBuilder: (ctx, i) {
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 4.0),
-                                          child: Text('- ' + _chunks[i]),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(),
-                                      child: const Text('閉じる'),
-                                    )
-                                  ],
-                                );
-                              },
-                            );
-                          },
-                          child: const Text('チャンクを確認'),
-                        ),
-                    ],
+                  child: Text(
+                    _responseText,
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
               ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                final message = _controller.text.trim();
+                if (message.isNotEmpty) {
+                  _debugSearch(message);
+                }
+              },
+              child: const Text('チャンクを確認'),
             ),
           ],
         ),
