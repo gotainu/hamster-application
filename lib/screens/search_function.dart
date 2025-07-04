@@ -1,6 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
+
+class ChatMessage {
+  final String content;
+  final bool isUser;
+  final List<String>? chunks;
+  final String? originalQuery;
+  ChatMessage({
+    required this.content,
+    required this.isUser,
+    this.chunks,
+    this.originalQuery,
+  });
+}
 
 class FuncSearchScreen extends StatefulWidget {
   const FuncSearchScreen({super.key});
@@ -10,54 +25,79 @@ class FuncSearchScreen extends StatefulWidget {
 }
 
 class _FuncSearchScreenState extends State<FuncSearchScreen> {
-  final TextEditingController _controller = TextEditingController();
-  String _responseText = '';
-  List<String> _chunks = [];
+  final TextEditingController _textController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  String? _userImageUrl;
 
-  // デバッグ用: チャンク＋スコア表示
-  List<Map<String, dynamic>> _debugChunks = [];
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserImage();
+  }
 
-  Future<void> _sendMessage(String message) async {
-    if (_isLoading) return;
+  Future<void> _fetchUserImage() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final docSnapshot =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    setState(() {
+      _userImageUrl = docSnapshot.data()?['imageUrl'];
+    });
+  }
+
+  Future<List<String>> _fetchAIResponse(String userMessage) async {
+    final url = Uri.parse(
+        'http://192.168.0.30:8000/search?query=${Uri.encodeQueryComponent(userMessage)}');
+    final res = await http.get(url);
+    if (res.statusCode == 200) {
+      final decoded = json.decode(utf8.decode(res.bodyBytes));
+      if (decoded is List && decoded.length >= 2) {
+        final answer = decoded[0] as String;
+        final chunks = (decoded[1] as List<dynamic>).cast<String>();
+        return [answer, ...chunks];
+      } else if (decoded is String) {
+        return [decoded];
+      } else {
+        throw Exception('予期しないレスポンス');
+      }
+    }
+    throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
+  }
+
+  void _handleSend() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty || _isLoading) return;
 
     setState(() {
+      _messages.add(ChatMessage(content: text, isUser: true));
       _isLoading = true;
-      _responseText = '';
-      _chunks = [];
+      _messages.add(ChatMessage(content: '...', isUser: false)); // Placeholder
     });
+    _textController.clear();
+    _scrollToBottom();
 
     try {
-      final uri = Uri.parse(
-          'http://10.0.2.2:8000/search?query=${Uri.encodeQueryComponent(message)}');
-      final resp = await http.get(uri);
+      final result = await _fetchAIResponse(text);
+      final aiAnswer = result[0];
+      final aiChunks = result.sublist(1);
 
-      if (resp.statusCode == 200) {
-        // Listで返る場合に対応
-        final decoded = json.decode(utf8.decode(resp.bodyBytes));
-        if (decoded is List && decoded.length >= 2) {
-          setState(() {
-            _responseText = decoded[0] as String;
-            _chunks = (decoded[1] as List<dynamic>).cast<String>();
-          });
-        } else if (decoded is String) {
-          setState(() {
-            _responseText = decoded;
-          });
-        } else {
-          setState(() {
-            _responseText = 'エラー: 予期しないレスポンス形式';
-          });
-        }
-      } else {
-        setState(() {
-          _responseText = 'エラー: ステータスコード ${resp.statusCode}';
-        });
-      }
+      setState(() {
+        _messages.removeLast(); // placeholder削除
+        _messages.add(ChatMessage(
+            content: aiAnswer,
+            isUser: false,
+            chunks: aiChunks,
+            originalQuery: text));
+      });
+      _scrollToBottom();
     } catch (e) {
       setState(() {
-        _responseText = 'エラー: $e';
+        _messages.removeLast();
+        _messages.add(ChatMessage(content: 'エラー: $e', isUser: false));
       });
+      _scrollToBottom();
     } finally {
       setState(() {
         _isLoading = false;
@@ -65,131 +105,192 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     }
   }
 
-  // デバッグ用: /debug_search の呼び出し
-  Future<void> _debugSearch(String message) async {
-    setState(() {
-      _debugChunks = [];
-    });
-    try {
-      final uri = Uri.parse(
-          'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(message)}&top_k=10');
-      final resp = await http.get(uri);
-
-      if (resp.statusCode == 200) {
-        final decoded = json.decode(utf8.decode(resp.bodyBytes));
-        // /debug_search の戻り値 {"matches": [...]}
-        List<Map<String, dynamic>> chunks = [];
-        if (decoded is Map && decoded['matches'] is List) {
-          for (final item in decoded['matches']) {
-            if (item is Map) {
-              // 必ずscore, id, textキーが存在するとは限らないので安全に
-              chunks.add({
-                'score': item['score'] ?? 0.0,
-                'id': item['id'] ?? '',
-                'text': item['text'] ?? '',
-              });
-            }
-          }
-        }
-        setState(() {
-          _debugChunks = chunks;
-        });
-        _showDebugChunksDialog();
-      } else {
-        setState(() {
-          _debugChunks = [];
-        });
-        _showErrorDialog('デバッグ用チャンク取得に失敗しました: ステータスコード${resp.statusCode}');
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-    } catch (e) {
-      setState(() {
-        _debugChunks = [];
-      });
-      _showErrorDialog('デバッグ用チャンク取得に失敗: $e');
+    });
+  }
+
+  Future<void> _showDebugChunksDialog(String query) async {
+    final uri = Uri.parse(
+        'http://192.168.0.30:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
+    final resp = await http.get(uri);
+
+    if (resp.statusCode == 200) {
+      final decoded = json.decode(utf8.decode(resp.bodyBytes));
+      final List<Map<String, dynamic>> chunks =
+          (decoded['matches'] as List).map((item) {
+        return {
+          'score': item['score'] ?? 0.0,
+          'id': item['id'] ?? '',
+          'text': item['text'] ?? '',
+        };
+      }).toList();
+      showDialog(
+        context: context,
+        builder: (context) {
+          return DefaultTabController(
+            length: chunks.length,
+            child: AlertDialog(
+              title: const Text('検索チャンク一覧'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 420,
+                child: Column(
+                  children: [
+                    TabBar(
+                      isScrollable: true,
+                      tabs: List.generate(
+                          chunks.length, (i) => Tab(text: 'チャンク${i + 1}')),
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: chunks.map((chunk) {
+                          return SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('score: ${chunk['score']}'),
+                                Text('id: ${chunk['id']}'),
+                                SizedBox(height: 8),
+                                Text(chunk['text']),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('閉じる'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
     }
   }
 
-  void _showDebugChunksDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return DefaultTabController(
-          length: _debugChunks.length,
-          child: AlertDialog(
-            title: const Text('検索チャンク一覧'),
-            content: SizedBox(
-              width: double.maxFinite,
-              height: 420,
-              child: _debugChunks.isEmpty
-                  ? const Text('チャンクが見つかりませんでした。')
-                  : Column(
-                      children: [
-                        TabBar(
-                          isScrollable: true,
-                          labelColor: Theme.of(context).primaryColor,
-                          unselectedLabelColor: Colors.grey,
-                          tabs: List.generate(
-                            _debugChunks.length,
-                            (i) => Tab(text: 'チャンク${i + 1}'),
-                          ),
-                        ),
-                        Expanded(
-                          child: TabBarView(
-                            children: _debugChunks.map((chunk) {
-                              return SingleChildScrollView(
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 16.0),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'score: ${chunk['score']?.toStringAsFixed(4) ?? "??"}',
-                                        style: const TextStyle(
-                                            fontSize: 14, color: Colors.grey),
-                                      ),
-                                      Text(
-                                        'id: ${chunk['id'] ?? "??"}',
-                                        style: const TextStyle(
-                                            fontSize: 13, color: Colors.grey),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        chunk['text'] ?? '',
-                                        style: const TextStyle(fontSize: 16),
-                                      ),
-                                    ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('AI質問チャット')),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.all(12),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                return Row(
+                  mainAxisAlignment: msg.isUser
+                      ? MainAxisAlignment.end
+                      : MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (!msg.isUser)
+                      const CircleAvatar(child: Icon(Icons.smart_toy)),
+                    if (!msg.isUser) const SizedBox(width: 8),
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: msg.isUser
+                                  ? Colors.blueAccent
+                                  : Colors.grey[200],
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: msg.content == '...'
+                                ? const SizedBox(
+                                    width: 30,
+                                    child: LinearProgressIndicator(
+                                      backgroundColor: Colors.transparent,
+                                      color: Colors.grey,
+                                    ),
+                                  )
+                                : Text(
+                                    msg.content,
+                                    style: TextStyle(
+                                      color: msg.isUser
+                                          ? Colors.white
+                                          : Colors.black,
+                                    ),
                                   ),
-                                ),
-                              );
-                            }).toList(),
                           ),
-                        ),
-                      ],
+                          if (!msg.isUser &&
+                              msg.content != '...' &&
+                              msg.originalQuery != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: SizedBox(
+                                width: 160,
+                                child: OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    side: BorderSide(
+                                        color: Theme.of(context).primaryColor),
+                                  ),
+                                  onPressed: () => _showDebugChunksDialog(
+                                      msg.originalQuery!),
+                                  child: const Text('チャンクを確認'),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
+                    if (msg.isUser) const SizedBox(width: 8),
+                    if (msg.isUser)
+                      CircleAvatar(
+                        backgroundImage: _userImageUrl != null
+                            ? NetworkImage(_userImageUrl!)
+                            : null,
+                        child:
+                            _userImageUrl == null ? Icon(Icons.person) : null,
+                      ),
+                  ],
+                );
+              },
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('閉じる'),
-              ),
-            ],
           ),
-        );
-      },
-    );
-  }
-
-  void _showErrorDialog(String message) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('エラー'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('閉じる'),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    decoration: const InputDecoration(
+                        hintText: '質問を入力してください', border: OutlineInputBorder()),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  onPressed: _handleSend,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -198,81 +299,8 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _textController.dispose();
+    _scrollController.dispose();
     super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('AI質問機能')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            const Text(
-              'YouTubeチャンネル動画のシナリオをRAGで読み込ませて、OpenAIのLLMで返答します。つまり８年分のノウハウを学習させたAIが、あなたの質問に回答します。飼育に関する質問を入力してください:',
-              style: TextStyle(fontSize: 16),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _controller,
-              decoration: const InputDecoration(
-                hintText: '質問を入力...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: () {
-                final message = _controller.text.trim();
-                if (message.isNotEmpty) {
-                  _sendMessage(message);
-                }
-              },
-              child: _isLoading
-                  ? const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Text('送信中...'),
-                      ],
-                    )
-                  : const Text('送信'),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Scrollbar(
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  child: Text(
-                    _responseText,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                final message = _controller.text.trim();
-                if (message.isNotEmpty) {
-                  _debugSearch(message);
-                }
-              },
-              child: const Text('チャンクを確認'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
