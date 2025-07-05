@@ -105,7 +105,7 @@ class TabsScreenState extends State<TabsScreen> {
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.search),
+            icon: Icon(Icons.smart_toy),
             label: 'さがす',
           ),
           BottomNavigationBarItem(
