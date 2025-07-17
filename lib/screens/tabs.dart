@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hamster_project/screens/pet_profile_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
-
-// 他のタブで表示する画面もインポートするならここで行う
 import 'package:hamster_project/screens/search_function.dart';
 import 'package:hamster_project/screens/func_b.dart';
 import 'package:hamster_project/screens/mypage_func.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
+import 'package:hamster_project/theme/app_theme.dart';
 
 class TabsScreen extends StatefulWidget {
   const TabsScreen({super.key});
@@ -17,16 +16,12 @@ class TabsScreen extends StatefulWidget {
 }
 
 class TabsScreenState extends State<TabsScreen> {
-  // 選択中のタブを管理するためのインデックス
   int selectedIndex = 0;
-
-  // 表示したい画面をまとめたリスト
   late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    // HomeScreen に onTabSelected コールバックを渡す
     _pages = [
       HomeScreen(
         onTabSelected: (index) {
@@ -41,18 +36,14 @@ class TabsScreenState extends State<TabsScreen> {
     ];
   }
 
-  // タブアイコンをタップした時の処理
   void _onTabSelected(int index) {
     setState(() {
       selectedIndex = index;
     });
   }
 
-  // Drawer から呼び出す各画面への遷移処理
   void _setScreen(String identifier) {
-    // Drawer を閉じる
     Navigator.of(context).pop();
-
     if (identifier == 'settings') {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (ctx) => const SettingScreen()),
@@ -61,14 +52,13 @@ class TabsScreenState extends State<TabsScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(builder: (ctx) => const PetProfileScreen()),
       );
-    } else {
-      // その他の場合は何もしない
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // タブ毎のタイトル
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     final titles = [
       'Home',
       'さがす',
@@ -77,25 +67,32 @@ class TabsScreenState extends State<TabsScreen> {
     ];
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(titles[selectedIndex]),
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Theme.of(context).colorScheme.primaryContainer,
-                Theme.of(context).colorScheme.primaryContainer.withOpacity(0.9),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+        title: Text(
+          titles[selectedIndex],
+          style: Theme.of(context).textTheme.titleLarge,
         ),
+        centerTitle: true,
+        backgroundColor: Colors.transparent, // ← 背景を完全透明に
+        elevation: 0,
+        // flexibleSpaceは完全削除（グラデはbodyで行う！）
       ),
       drawer: MainDrawer(
         onSelectScreen: _setScreen,
       ),
-      body: _pages[selectedIndex],
+      // ===== グラデ背景はbodyで統一！ =====
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
+        ),
+        width: double.infinity,
+        height: double.infinity,
+        child: SafeArea(
+          top: false, // AppBarの裏まで伸ばす
+          child: _pages[selectedIndex],
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: _onTabSelected,
@@ -117,9 +114,10 @@ class TabsScreenState extends State<TabsScreen> {
             label: 'マイページ',
           ),
         ],
-        selectedItemColor: const Color.fromARGB(255, 58, 102, 183),
+        selectedItemColor: AppTheme.accent,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent, // グラデ背景を活かす
+        elevation: 0,
       ),
     );
   }

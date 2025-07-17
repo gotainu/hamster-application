@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hamster_project/theme/app_theme.dart';
 
 class BreedingEnvironmentEditScreen extends StatefulWidget {
   const BreedingEnvironmentEditScreen({super.key});
@@ -14,15 +15,14 @@ class _BreedingEnvironmentEditScreenState
     extends State<BreedingEnvironmentEditScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // 入力項目を保持する変数（全て文字列として保持）
   String? _cageWidth;
   String? _cageDepth;
   String? _beddingThickness;
   String? _wheelDiameter;
-  String _temperatureControl = 'エアコン'; // 初期値
+  String _temperatureControl = 'エアコン';
   String? _accessories;
 
-  bool _isLoading = false; // 保存中フラグ
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -30,11 +30,9 @@ class _BreedingEnvironmentEditScreenState
     _fetchExistingData();
   }
 
-  /// Firestoreから既存の飼育環境情報を取得し、フォームの初期値にセットする
   Future<void> _fetchExistingData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-
     final docSnapshot =
         await FirebaseFirestore.instance.collection('users').doc(uid).get();
     if (!docSnapshot.exists) return;
@@ -52,18 +50,14 @@ class _BreedingEnvironmentEditScreenState
     }
   }
 
-  /// フォーム保存処理
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       _formKey.currentState?.save();
-
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
-
       setState(() {
         _isLoading = true;
       });
-
       final envData = {
         'cageWidth': _cageWidth,
         'cageDepth': _cageDepth,
@@ -73,16 +67,11 @@ class _BreedingEnvironmentEditScreenState
         'accessories': _accessories,
         'updatedAt': FieldValue.serverTimestamp(),
       };
-
       try {
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'breedingEnvironment': envData,
         }, SetOptions(merge: true));
-
-        // 非同期処理後にウィジェットがまだマウントされているか確認
         if (!mounted) return;
-
-        // 保存成功 → SnackBar で完了メッセージ表示
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -90,8 +79,6 @@ class _BreedingEnvironmentEditScreenState
             duration: Duration(seconds: 2),
           ),
         );
-
-        // 2秒後にオーバーレイを解除し、前画面に戻る
         Future.delayed(const Duration(seconds: 2), () {
           if (!mounted) return;
           setState(() {
@@ -113,121 +100,180 @@ class _BreedingEnvironmentEditScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgGradient =
+        isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
+
     return Scaffold(
+      backgroundColor: Colors.transparent, // グラデ背景に透過
       appBar: AppBar(
         title: const Text('飼育環境を編集'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // ケージの横幅
-                  TextFormField(
-                    initialValue: _cageWidth,
-                    decoration: const InputDecoration(
-                      labelText: 'ケージの横幅 (cm)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '横幅を入力してください';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) => _cageWidth = value,
-                  ),
-                  const SizedBox(height: 16),
-                  // ケージの奥行き
-                  TextFormField(
-                    initialValue: _cageDepth,
-                    decoration: const InputDecoration(
-                      labelText: 'ケージの奥行き (cm)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '奥行きを入力してください';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) => _cageDepth = value,
-                  ),
-                  const SizedBox(height: 16),
-                  // 床材の嵩
-                  TextFormField(
-                    initialValue: _beddingThickness,
-                    decoration: const InputDecoration(
-                      labelText: '床材の嵩 (cm)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '床材の嵩を入力してください';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) => _beddingThickness = value,
-                  ),
-                  const SizedBox(height: 16),
-                  // 車輪の直径
-                  TextFormField(
-                    initialValue: _wheelDiameter,
-                    decoration: const InputDecoration(
-                      labelText: '車輪の直径 (cm)',
-                    ),
-                    keyboardType: TextInputType.number,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '車輪の直径を入力してください';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) => _wheelDiameter = value,
-                  ),
-                  const SizedBox(height: 16),
-                  // ケージの温度管理方法
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(
-                      labelText: 'ケージの温度管理方法',
-                    ),
-                    value: _temperatureControl,
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'エアコン',
-                        child: Text('エアコン'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'その他のグッズ',
-                        child: Text('その他のグッズ'),
+          // グラデーション背景
+          Container(
+            decoration: BoxDecoration(
+              gradient: bgGradient,
+            ),
+          ),
+          // メインフォーム
+          Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(18),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.cardInnerDark
+                        : AppTheme.cardInnerLight,
+                    borderRadius: BorderRadius.circular(32),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.accent.withOpacity(0.22),
+                        blurRadius: 36,
+                        spreadRadius: 0,
+                        offset: const Offset(0, 16),
                       ),
                     ],
-                    onChanged: (value) {
-                      setState(() {
-                        _temperatureControl = value!;
-                      });
-                    },
-                    onSaved: (value) => _temperatureControl = value!,
                   ),
-                  const SizedBox(height: 16),
-                  // その他のグッズ類（自由記述）
-                  TextFormField(
-                    initialValue: _accessories,
-                    decoration: const InputDecoration(
-                      labelText: 'その他のグッズ類',
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        Icon(Icons.eco, color: AppTheme.accent, size: 38),
+                        const SizedBox(height: 14),
+                        Text(
+                          '飼育環境フォーム',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 24),
+                        // --- 以下フォーム項目 ---
+                        TextFormField(
+                          initialValue: _cageWidth,
+                          decoration: const InputDecoration(
+                            labelText: 'ケージの横幅 (cm)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '横幅を入力してください';
+                            }
+                            return null;
+                          },
+                          onSaved: (value) => _cageWidth = value,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _cageDepth,
+                          decoration: const InputDecoration(
+                            labelText: 'ケージの奥行き (cm)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '奥行きを入力してください';
+                            }
+                            return null;
+                          },
+                          onSaved: (value) => _cageDepth = value,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _beddingThickness,
+                          decoration: const InputDecoration(
+                            labelText: '床材の嵩 (cm)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '床材の嵩を入力してください';
+                            }
+                            return null;
+                          },
+                          onSaved: (value) => _beddingThickness = value,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _wheelDiameter,
+                          decoration: const InputDecoration(
+                            labelText: '車輪の直径 (cm)',
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return '車輪の直径を入力してください';
+                            }
+                            return null;
+                          },
+                          onSaved: (value) => _wheelDiameter = value,
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'ケージの温度管理方法',
+                          ),
+                          value: _temperatureControl,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'エアコン',
+                              child: Text('エアコン'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'その他のグッズ',
+                              child: Text('その他のグッズ'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _temperatureControl = value!;
+                            });
+                          },
+                          onSaved: (value) => _temperatureControl = value!,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _accessories,
+                          decoration: const InputDecoration(
+                            labelText: 'その他のグッズ類',
+                          ),
+                          maxLines: 3,
+                          onSaved: (value) => _accessories = value,
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: Icon(Icons.save, color: AppTheme.accent),
+                            label: const Text('設定を保存'),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              textStyle: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                              backgroundColor: AppTheme.accent,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              elevation: 1,
+                            ),
+                            onPressed: _submitForm,
+                          ),
+                        ),
+                      ],
                     ),
-                    maxLines: 3,
-                    onSaved: (value) => _accessories = value,
                   ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _submitForm,
-                    child: const Text('設定を保存'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

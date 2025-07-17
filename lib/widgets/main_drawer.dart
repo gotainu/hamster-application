@@ -10,34 +10,77 @@ class MainDrawer extends StatelessWidget {
     return Drawer(
       child: Column(
         children: [
-          DrawerHeader(
-            padding: const EdgeInsets.all(20),
+          // DrawerHeader → Container＋Stackで完全カスタム
+          Container(
+            height: 108,
+            width: double.infinity,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Theme.of(context).colorScheme.primaryContainer,
+                  Theme.of(context).colorScheme.primary.withOpacity(0.9),
                   Theme.of(context)
                       .colorScheme
                       .primaryContainer
-                      .withOpacity(0.9),
+                      .withOpacity(0.7),
+                  Colors.transparent
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.menu_book_sharp,
-                  size: 55,
-                  color: Theme.of(context).colorScheme.primary,
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color:
+                      Theme.of(context).colorScheme.primary.withOpacity(0.15),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  'その他のオプション？',
-                  style: Theme.of(context).textTheme.titleMedium!.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+              ],
+            ),
+            child: Stack(
+              children: [
+                // ガラス風ぼかしのデコ
+                Positioned(
+                  right: 0,
+                  top: 16,
+                  child: Container(
+                    width: 68,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.13),
+                          Colors.transparent,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                  ),
+                ),
+                // メインロゴ＋プロジェクト名
+                Align(
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.pets, color: Colors.white, size: 36),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Hamster Project',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.97),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

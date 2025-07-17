@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-
 import 'package:hamster_project/widgets/user_image_picker.dart';
+import 'package:hamster_project/theme/app_theme.dart';
 
 class PetProfileEditScreen extends StatefulWidget {
   const PetProfileEditScreen({super.key});
@@ -15,13 +15,12 @@ class PetProfileEditScreen extends StatefulWidget {
 
 class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   final _formKey = GlobalKey<FormState>();
-
   File? _pickedImageFile;
   String _hamsterName = '';
   DateTime? _birthday;
   String _selectedSpecies = 'シリアン';
   String? _selectedColor;
-  bool _isLoading = false; // 保存中かどうかのフラグ
+  bool _isLoading = false;
 
   final List<String> _speciesList = [
     'シリアン',
@@ -30,7 +29,6 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     'チャイニーズ',
     'キャンベル',
   ];
-
   final Map<String, List<String>> _colorOptionsMap = {
     'シリアン': ['キンクマ', 'ゴールデン', 'アルビノ'],
     'ジャンガリアン': ['ノーマル', 'ブルーサファイア', 'パールホワイト', 'スノーホワイト', 'プディング', 'アルビノ'],
@@ -103,7 +101,6 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
       _formKey.currentState?.save();
-
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
@@ -119,7 +116,6 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      // 画像アップロード処理（画像が選択されていれば）
       if (_pickedImageFile != null) {
         try {
           final ref = FirebaseStorage.instance
@@ -157,10 +153,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
           ),
         );
 
-        // 2秒後に画面を戻す
         Future.delayed(const Duration(seconds: 2), () {
-          // 画像アップロード後や Firestore 書き込み後に、ウィジェットがまだマウントされているかを確認
-          // もしウィジェットが破棄されていた場合、これ以上 context を使った操作を行わない
           if (!mounted) return;
           setState(() {
             _isLoading = false;
@@ -182,102 +175,158 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final colorList = _colorOptionsMap[_selectedSpecies]!;
     if (_selectedColor == null || !colorList.contains(_selectedColor)) {
       _selectedColor = null;
     }
 
+    final bgGradient =
+        isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
+
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('ペットプロフィール編集'),
+        title: Text(
+          'ペットプロフィール編集',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // 画像ピッカー
-                  UserImagePicker(onPickImage: _pickImage),
-                  const SizedBox(height: 16),
-                  // 名前
-                  TextFormField(
-                    initialValue: _hamsterName,
-                    decoration: const InputDecoration(labelText: 'ハムスターの名前'),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '名前を入力してください';
-                      }
-                      return null;
-                    },
-                    onSaved: (value) => _hamsterName = value!,
-                  ),
-                  const SizedBox(height: 16),
-                  // 生年月日
-                  TextFormField(
-                    controller: _birthdayController,
-                    readOnly: true,
-                    decoration: const InputDecoration(
-                      labelText: '生年月日',
-                      suffixIcon: Icon(Icons.calendar_today),
+          // グラデ背景
+          Container(decoration: BoxDecoration(gradient: bgGradient)),
+          // 中央の編集フォームカード
+          Center(
+            child: SingleChildScrollView(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 480),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 30, vertical: 38),
+                decoration: BoxDecoration(
+                  color:
+                      isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accent.withOpacity(0.19),
+                      blurRadius: 36,
+                      offset: const Offset(0, 16),
                     ),
-                    onTap: _pickBirthday,
-                    validator: (value) {
-                      if (_birthday == null) {
-                        return '生年月日を選択してください';
-                      }
-                      return null;
-                    },
+                  ],
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 画像ピッカー
+                      UserImagePicker(onPickImage: _pickImage),
+                      const SizedBox(height: 18),
+                      // 名前
+                      TextFormField(
+                        initialValue: _hamsterName,
+                        decoration:
+                            const InputDecoration(labelText: 'ハムスターの名前'),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return '名前を入力してください';
+                          }
+                          return null;
+                        },
+                        onSaved: (value) => _hamsterName = value!,
+                      ),
+                      const SizedBox(height: 18),
+                      // 生年月日
+                      TextFormField(
+                        controller: _birthdayController,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: '生年月日',
+                          suffixIcon: Icon(Icons.calendar_today),
+                        ),
+                        onTap: _pickBirthday,
+                        validator: (value) {
+                          if (_birthday == null) {
+                            return '生年月日を選択してください';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      // 種類
+                      DropdownButtonFormField<String>(
+                        decoration:
+                            const InputDecoration(labelText: 'ハムスターの種類'),
+                        value: _selectedSpecies,
+                        items: _speciesList.map((species) {
+                          return DropdownMenuItem(
+                            value: species,
+                            child: Text(
+                              species,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedSpecies = value!;
+                            _selectedColor = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 18),
+                      // 毛色
+                      DropdownButtonFormField<String>(
+                        decoration: const InputDecoration(labelText: '毛色'),
+                        value: _selectedColor,
+                        items: colorList.map((c) {
+                          return DropdownMenuItem(
+                            value: c,
+                            child: Text(
+                              c,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedColor = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return '毛色を選択してください';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 22),
+                      ElevatedButton(
+                        onPressed: _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 36, vertical: 16),
+                          backgroundColor: AppTheme.accent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                        child: Text(
+                          '設定を保存',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                  ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  // 種類
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'ハムスターの種類'),
-                    value: _selectedSpecies,
-                    items: _speciesList.map((species) {
-                      return DropdownMenuItem(
-                        value: species,
-                        child: Text(species),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedSpecies = value!;
-                        _selectedColor = null;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  // 毛色
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: '毛色'),
-                    value: _selectedColor,
-                    items: colorList.map((c) {
-                      return DropdownMenuItem(
-                        value: c,
-                        child: Text(c),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedColor = value;
-                      });
-                    },
-                    validator: (value) {
-                      if (value == null) {
-                        return '毛色を選択してください';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _submitForm,
-                    child: const Text('設定を保存'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),

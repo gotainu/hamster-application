@@ -6,8 +6,8 @@ import 'firebase_options.dart';
 import 'package:hamster_project/screens/auth.dart';
 import 'package:hamster_project/screens/splash.dart';
 import 'package:hamster_project/screens/tabs.dart';
+import 'package:hamster_project/theme/app_theme.dart'; // ← 追加
 
-// MyAppをStatefulWidgetにして、themeModeを管理
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -19,7 +19,6 @@ void main() async {
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
-  // of(BuildContext context) で MyAppState を取り出せるようにする
   static MyAppState of(BuildContext context) {
     return context.findAncestorStateOfType<MyAppState>()!;
   }
@@ -29,8 +28,7 @@ class MyApp extends StatefulWidget {
 }
 
 class MyAppState extends State<MyApp> {
-  // ON/OFFのみなので、とりあえずデフォルトはライトモード
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.dark; // デフォルトをダークに変更
 
   void setThemeMode(ThemeMode mode) {
     setState(() {
@@ -44,19 +42,9 @@ class MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Hamster Breeding',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 78, 95, 228),
-        ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 78, 95, 228),
-          brightness: Brightness.dark,
-        ),
-      ),
-      themeMode: _themeMode, // ライト/ダークの切り替え
+      theme: AppTheme.lightTheme, // ←ライトテーマも指定したい場合は作成
+      darkTheme: AppTheme.darkTheme, // ← 変更
+      themeMode: _themeMode,
       home: StreamBuilder(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (ctx, snapshot) {
@@ -64,7 +52,6 @@ class MyAppState extends State<MyApp> {
             return const SplashScreen();
           }
           if (snapshot.hasData) {
-            // ログイン済みならTabsScreenへ
             return const TabsScreen();
           }
           return const AuthScreen();
