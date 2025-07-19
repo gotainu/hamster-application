@@ -38,7 +38,6 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _userImageUrl;
-  bool _showDescriptionCard = true; // ← 追加
 
   // ドットアニメ用
   int _dotCount = 1;
@@ -46,11 +45,10 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
   final List<Map<String, String>> _conversationHistory = [];
 
-// 1. 新しいステート変数を追加
+  bool _showDescriptionCard = true;
   double _cardOpacity = 1.0;
   Offset _cardOffset = Offset.zero;
 
-// 2. フォーカス時にOpacityを0にする（即setStateし、少し遅れて実際に_card表示を消す）
   @override
   void initState() {
     super.initState();
@@ -60,14 +58,6 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
         setState(() {
           _cardOpacity = 0.0;
           _cardOffset = const Offset(0, -0.15); // 上にスライド
-        });
-        // 300ms後に完全に消す
-        Future.delayed(const Duration(milliseconds: 350), () {
-          if (mounted) {
-            setState(() {
-              _showDescriptionCard = false;
-            });
-          }
         });
       }
     });
@@ -84,7 +74,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   }
 
   Future<List<String>> _fetchAIResponseWithHistory(String userMessage) async {
-    final url = Uri.parse('http://192.168.0.30:8000/chat');
+    final url = Uri.parse('http://10.0.2.2:8000/chat');
     final List<String> history =
         _messages.where((msg) => msg.isUser).map((msg) => msg.content).toList();
     final requestBody = json.encode({
@@ -184,7 +174,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
   Future<void> _showDebugChunksDialog(String query) async {
     final uri = Uri.parse(
-        'http://192.168.0.30:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
+        'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
     final resp = await http.get(uri);
 
     if (resp.statusCode == 200) {
@@ -349,78 +339,91 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // AnimatedSwitcherをAnimatedContainerで高さ調整して置き換える
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: _showDescriptionCard ? null : 0,
-                padding: _showDescriptionCard
-                    ? const EdgeInsets.fromLTRB(16, 16, 16, 8)
-                    : EdgeInsets.zero,
-                child: SingleChildScrollView(
-                  child: Opacity(
-                    opacity: _showDescriptionCard ? 1.0 : 0.0,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppTheme.cardInnerDark
-                            : AppTheme.cardInnerLight,
-                        borderRadius: BorderRadius.circular(32),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.accent.withOpacity(0.23),
-                            blurRadius: 24,
-                            offset: const Offset(0, 12),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 18, vertical: 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.chat_bubble_outline,
-                                    color: Colors.blue, size: 28),
-                                SizedBox(width: 10),
-                                Text(
-                                  "AI質問チャット",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 22,
-                                  ),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 400),
+                child: _showDescriptionCard
+                    ? AnimatedOpacity(
+                        key: const ValueKey('descCard'),
+                        opacity: _cardOpacity,
+                        duration: const Duration(milliseconds: 400),
+                        onEnd: () {
+                          // アニメ終了時に完全に非表示
+                          if (_cardOpacity == 0.0 && mounted) {
+                            setState(() {
+                              _showDescriptionCard = false;
+                            });
+                          }
+                        },
+                        child: AnimatedSlide(
+                          offset: _cardOffset,
+                          duration: const Duration(milliseconds: 400),
+                          child: Container(
+                            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppTheme.cardInnerDark
+                                  : AppTheme.cardInnerLight,
+                              borderRadius: BorderRadius.circular(32),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppTheme.accent.withOpacity(0.23),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 12),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 10),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTheme.cardInnerDark.withOpacity(0.88)
-                                    : AppTheme.cardInnerLight.withOpacity(0.92),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                'YouTubeチャンネルで紹介した内容を学習したAIにチャットで相談することができます。\nまた、AIが返答の際に引用した内容も「チャンクを確認」ボタンから確認できます。',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 18, vertical: 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Row(
+                                    children: [
+                                      Icon(Icons.chat_bubble_outline,
+                                          color: Colors.blue, size: 28),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        "AI質問チャット",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 22,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
                                       color: isDark
-                                          ? AppTheme.cardTextColor
-                                          : AppTheme.lightText
-                                              .withOpacity(0.88),
-                                      height: 1.6,
+                                          ? AppTheme.cardInnerDark
+                                              .withOpacity(0.88)
+                                          : AppTheme.cardInnerLight
+                                              .withOpacity(0.92),
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
+                                    child: Text(
+                                      'YouTubeチャンネルで紹介した内容を学習したAIにチャットで相談することができます。\nまた、AIが返答の際に引用した内容も「チャンクを確認」ボタンから確認できます。',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: isDark
+                                                ? AppTheme.cardTextColor
+                                                : AppTheme.lightText
+                                                    .withOpacity(0.88),
+                                            height: 1.6,
+                                          ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
+                      )
+                    : const SizedBox.shrink(),
               ),
               Expanded(
                 child: ListView.builder(
