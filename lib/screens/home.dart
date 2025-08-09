@@ -55,7 +55,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        Icon(Icons.pets, color: AppTheme.accent, size: 42),
+                        const Icon(Icons.pets, color: AppTheme.accent, size: 42),
                         const SizedBox(height: 12),
                         Text(
                           "Welcome!",
@@ -73,13 +73,13 @@ class HomeScreen extends StatelessWidget {
                         const SizedBox(height: 24),
                         _HomeMenuButton(
                           icon: Icons.search,
-                          label: "さがす",
+                          label: "AIに相談",
                           onTap: () => onTabSelected(1),
                         ),
                         const SizedBox(height: 16),
                         _HomeMenuButton(
                           icon: Icons.star_border,
-                          label: "機能B",
+                          label: "走った記録",
                           onTap: () => onTabSelected(2),
                         ),
                         const SizedBox(height: 16),

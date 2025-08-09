@@ -35,7 +35,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode(); // ← 追加
-  List<ChatMessage> _messages = [];
+  final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   String? _userImageUrl;
 
@@ -74,7 +74,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   }
 
   Future<List<String>> _fetchAIResponseWithHistory(String userMessage) async {
-    final url = Uri.parse('http://10.0.2.2:8000/chat');
+    final url = Uri.parse('http://192.168.0.30:8000/chat');
     final List<String> history =
         _messages.where((msg) => msg.isUser).map((msg) => msg.content).toList();
     final requestBody = json.encode({
@@ -101,7 +101,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   void _startDotTimer() {
     _dotTimer?.cancel();
     _dotCount = 1;
-    _dotTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+    _dotTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
       setState(() {
         _dotCount = _dotCount % 3 + 1;
       });
@@ -174,7 +174,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
   Future<void> _showDebugChunksDialog(String query) async {
     final uri = Uri.parse(
-        'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
+        'http://192.168.0.30:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
     final resp = await http.get(uri);
 
     if (resp.statusCode == 200) {

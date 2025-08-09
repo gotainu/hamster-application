@@ -13,25 +13,26 @@ class FuncMyPageScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        title: Text(
-          'マイページ',
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
-            },
-            icon: Icon(
-              Icons.exit_to_app,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ],
-      ),
+      appBar: null,
+      // appBar: AppBar(
+      //   title: Text(
+      //     'マイページ',
+      //     style: Theme.of(context).textTheme.titleLarge,
+      //   ),
+      //   backgroundColor: Colors.transparent,
+      //   elevation: 0,
+      //   actions: [
+      //     IconButton(
+      //       onPressed: () {
+      //         FirebaseAuth.instance.signOut();
+      //       },
+      //       icon: Icon(
+      //         Icons.exit_to_app,
+      //         color: Theme.of(context).colorScheme.primary,
+      //       ),
+      //     ),
+      //   ],
+      // ),
       body: Stack(
         children: [
           // グラデーション背景
@@ -56,7 +57,7 @@ class FuncMyPageScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.person, color: AppTheme.accent, size: 44),
+                  const Icon(Icons.person, color: AppTheme.accent, size: 44),
                   const SizedBox(height: 20),
                   Text(
                     'ようこそ、マイページへ！',

@@ -71,11 +71,10 @@ class AppTheme {
     brightness: Brightness.dark,
     fontFamily: 'NotoSans',
     scaffoldBackgroundColor: darkBg,
-    colorScheme: ColorScheme.dark(
-      primary: const Color.fromARGB(122, 73, 125, 246),
+    colorScheme: const ColorScheme.dark(
+      primary: Color.fromARGB(122, 73, 125, 246),
       secondary: Colors.white,
       surface: darkCard,
-      background: darkBg,
     ),
     cardColor: Colors.transparent, // ← カードもグラデで描くのでtransparent
     appBarTheme: const AppBarTheme(
@@ -88,7 +87,7 @@ class AppTheme {
           fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
       bodyMedium: TextStyle(fontSize: 16, color: Colors.white70),
     ),
-    inputDecorationTheme: InputDecorationTheme(
+    inputDecorationTheme: const InputDecorationTheme(
       filled: true,
       fillColor: Color(0xFF24273B),
       border: OutlineInputBorder(
@@ -98,7 +97,7 @@ class AppTheme {
       hintStyle: TextStyle(color: Colors.white38),
       contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: Colors.transparent, // グラデ用
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(24))),
@@ -118,19 +117,18 @@ class AppTheme {
     brightness: Brightness.light,
     fontFamily: 'NotoSans',
     scaffoldBackgroundColor: lightBg,
-    colorScheme: ColorScheme.light(
-      primary: const Color.fromARGB(139, 73, 125, 246),
+    colorScheme: const ColorScheme.light(
+      primary: Color.fromARGB(139, 73, 125, 246),
       secondary: Colors.black87,
       surface: lightCard,
-      background: lightBg,
     ),
     cardColor: Colors.transparent, // グラデで描く
-    appBarTheme: AppBarTheme(
+    appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
       foregroundColor: lightText,
-      iconTheme: const IconThemeData(color: accent),
-      titleTextStyle: const TextStyle(
+      iconTheme: IconThemeData(color: accent),
+      titleTextStyle: TextStyle(
         color: lightText,
         fontSize: 22,
         fontWeight: FontWeight.bold,
@@ -151,7 +149,7 @@ class AppTheme {
       hintStyle: TextStyle(color: lightText.withOpacity(0.4)),
       contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
     ),
-    cardTheme: const CardTheme(
+    cardTheme: const CardThemeData(
       color: Colors.transparent,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(24))),

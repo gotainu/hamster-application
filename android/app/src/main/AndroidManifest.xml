@@ -1,6 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.hamster_project_tmp">
     <application
-        android:label="hamster_project"
+        android:label="hamster_project_tmp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

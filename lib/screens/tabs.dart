@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hamster_project/screens/pet_profile_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
 import 'package:hamster_project/screens/search_function.dart';
-import 'package:hamster_project/screens/func_b.dart';
-import 'package:hamster_project/screens/mypage_func.dart';
+import 'package:hamster_project/screens/graph_function.dart';
+import 'package:hamster_project/screens/mypage_function.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/theme/app_theme.dart';
@@ -31,7 +31,7 @@ class TabsScreenState extends State<TabsScreen> {
         },
       ),
       const FuncSearchScreen(),
-      const FuncBScreen(),
+      const GraphFunctionScreen(),
       const FuncMyPageScreen(),
     ];
   }
@@ -61,8 +61,8 @@ class TabsScreenState extends State<TabsScreen> {
 
     final titles = [
       'Home',
-      'さがす',
-      'FuncB',
+      'AIに相談',
+      '走った記録',
       'マイページ',
     ];
 
@@ -103,11 +103,11 @@ class TabsScreenState extends State<TabsScreen> {
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.smart_toy),
-            label: 'さがす',
+            label: 'AIに相談',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.cake_sharp),
-            label: 'FuncB',
+            label: '走った記録',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.account_circle_outlined),

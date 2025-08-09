@@ -68,7 +68,7 @@ class MainDrawer extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.pets, color: Colors.white, size: 36),
+                      const Icon(Icons.pets, color: Colors.white, size: 36),
                       const SizedBox(height: 8),
                       Text(
                         'Hamster Project',

@@ -94,10 +94,10 @@ class _ShiningBorderPainter extends CustomPainter {
 
     // Oura風ブルーグラデ
     final colors = [
-      Color(0xFF5897F8),
-      Color(0xFFA66BFF),
-      Color(0xFF1DE9B6),
-      Color(0xFF5897F8),
+      const Color(0xFF5897F8),
+      const Color(0xFFA66BFF),
+      const Color(0xFF1DE9B6),
+      const Color(0xFF5897F8),
     ];
     final sweepGradient = SweepGradient(
       colors: colors,
