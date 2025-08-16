@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>プロフィール写真の撮影に使用します。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>プロフィール写真の選択に使用します。</string>
 </dict>
 </plist>

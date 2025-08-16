@@ -1,11 +1,7 @@
-<manifest package="com.example.hamster_project" xmlns:android="http://schemas.android.com/apk/res/android">
-    <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Android 13+ でギャラリーを直接読む場合に備え（Photo Picker を使うなら不要なことも） -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Android 12以下をサポートしているなら -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="35" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.hamster_project_tmp">
     <application
-        android:label="hamster_project"
+        android:label="hamster_project_tmp"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

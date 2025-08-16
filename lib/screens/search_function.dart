@@ -34,10 +34,13 @@ class FuncSearchScreen extends StatefulWidget {
 class _FuncSearchScreenState extends State<FuncSearchScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _focusNode = FocusNode(); // ← 追加
+  final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+
+  // ユーザーのメインペット画像URL（users/{uid}/pet_profiles/main_pet.imageUrl）
   String? _userImageUrl;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _avatarSub;
 
   // ドットアニメ用
   int _dotCount = 1;
@@ -52,29 +55,49 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchUserImage();
+    _listenUserAvatar(); // ← ここで購読開始
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
         setState(() {
           _cardOpacity = 0.0;
-          _cardOffset = const Offset(0, -0.15); // 上にスライド
+          _cardOffset = const Offset(0, -0.15);
         });
       }
     });
   }
 
-  Future<void> _fetchUserImage() async {
+  Widget _aiAvatar() => const CircleAvatar(
+        radius: 30,
+        backgroundImage: AssetImage('assets/images/roi.png'),
+        backgroundColor: Colors.transparent,
+      );
+
+  /// users/{uid}/pet_profiles/main_pet をリアルタイム購読して imageUrl を反映
+  void _listenUserAvatar() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final docSnapshot =
-        await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    setState(() {
-      _userImageUrl = docSnapshot.data()?['imageUrl'];
+
+    final docRef = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('pet_profiles')
+        .doc('main_pet');
+
+    _avatarSub = docRef.snapshots().listen((snap) {
+      final url = snap.data()?['imageUrl'] as String?;
+      if (mounted) {
+        setState(() {
+          _userImageUrl = (url != null && url.isNotEmpty) ? url : null;
+        });
+      }
+    }, onError: (_) {
+      // 失敗時はデフォルトアイコンに戻す
+      if (mounted) setState(() => _userImageUrl = null);
     });
   }
 
   Future<List<String>> _fetchAIResponseWithHistory(String userMessage) async {
-    final url = Uri.parse('http://192.168.0.30:8000/chat');
+    final url = Uri.parse('http://10.0.2.2:8000/chat');
     final List<String> history =
         _messages.where((msg) => msg.isUser).map((msg) => msg.content).toList();
     final requestBody = json.encode({
@@ -174,7 +197,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
   Future<void> _showDebugChunksDialog(String query) async {
     final uri = Uri.parse(
-        'http://192.168.0.30:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
+        'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
     final resp = await http.get(uri);
 
     if (resp.statusCode == 200) {
@@ -242,8 +265,9 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircleAvatar(
-              radius: 30, child: Icon(Icons.smart_toy, size: 45)),
+          _aiAvatar(),
+          // const CircleAvatar(
+          //     radius: 30, child: Icon(Icons.smart_toy, size: 45)),
           const SizedBox(width: 8),
           Flexible(
             child: Container(
@@ -276,10 +300,11 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!msg.isUser) ...[
-              const CircleAvatar(
-                radius: 30,
-                child: Icon(Icons.smart_toy, size: 45),
-              ),
+              // const CircleAvatar(
+              //   radius: 30,
+              //   child: Icon(Icons.smart_toy, size: 45),
+              // ),
+              _aiAvatar(),
               const SizedBox(width: 18),
             ],
             Flexible(
@@ -347,7 +372,6 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
                         opacity: _cardOpacity,
                         duration: const Duration(milliseconds: 400),
                         onEnd: () {
-                          // アニメ終了時に完全に非表示
                           if (_cardOpacity == 0.0 && mounted) {
                             setState(() {
                               _showDescriptionCard = false;
@@ -448,7 +472,7 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
                 child: AnimatedShiningBorder(
                   borderRadius: 22,
                   borderWidth: 2.5,
-                  active: _focusNode.hasFocus, // フォーカス時だけキラッと
+                  active: _focusNode.hasFocus,
                   child: Row(
                     children: [
                       Expanded(
@@ -488,8 +512,10 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
   void dispose() {
     _textController.dispose();
     _scrollController.dispose();
-    _focusNode.dispose(); // ← 忘れずにdispose
+    _focusNode.dispose();
     _dotTimer?.cancel();
+    _avatarSub?.cancel(); // ← 購読解除
+    _avatarSub = null;
     super.dispose();
   }
 }
