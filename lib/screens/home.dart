@@ -1,6 +1,9 @@
+// lib/screens/home.dart
 import 'package:flutter/material.dart';
 import 'package:hamster_project/widgets/shine_border.dart';
 import 'package:hamster_project/theme/app_theme.dart';
+// ★ FuncB を直接開くルート用に追加
+import 'package:hamster_project/screens/func_b.dart';
 
 class HomeScreen extends StatelessWidget {
   final void Function(int) onTabSelected;
@@ -18,9 +21,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       appBar: null,
       body: Container(
-        decoration: BoxDecoration(
-          gradient: gradient,
-        ),
+        decoration: BoxDecoration(gradient: gradient),
         width: double.infinity,
         height: double.infinity,
         child: Column(
@@ -33,7 +34,7 @@ class HomeScreen extends StatelessWidget {
                 child: AnimatedShiningBorder(
                   borderRadius: 32,
                   borderWidth: 2.5,
-                  active: true, // ←常にシャインしたい場合
+                  active: true, // ←常にシャイン
                   child: Container(
                     width: 600,
                     constraints: const BoxConstraints(maxWidth: 600),
@@ -55,7 +56,8 @@ class HomeScreen extends StatelessWidget {
                     ),
                     child: Column(
                       children: [
-                        const Icon(Icons.pets, color: AppTheme.accent, size: 42),
+                        const Icon(Icons.pets,
+                            color: AppTheme.accent, size: 42),
                         const SizedBox(height: 12),
                         Text(
                           "Welcome!",
@@ -71,18 +73,45 @@ class HomeScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 24),
+
+                        // ① AI チャット
                         _HomeMenuButton(
                           icon: Icons.search,
                           label: "AIに相談",
                           onTap: () => onTabSelected(1),
                         ),
                         const SizedBox(height: 16),
+
+                        // ② 走った記録（既存のタブ遷移はそのまま維持）
                         _HomeMenuButton(
-                          icon: Icons.star_border,
-                          label: "走った記録",
+                          icon: Icons.show_chart_outlined,
+                          label: "走った記録（タブで開く）",
                           onTap: () => onTabSelected(2),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+
+                        // ③ 同じ“走った記録”を別画面としてダイレクト起動（タブ構成に依存しない保険ルート）
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.accent,
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const FuncBScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.open_in_new),
+                            label: const Text("走った記録を直接開く（別画面）"),
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // ④ マイページ
                         _HomeMenuButton(
                           icon: Icons.person_2_outlined,
                           label: "マイページ",
@@ -150,11 +179,13 @@ class _HomeMenuButton extends StatelessWidget {
           children: [
             Icon(icon, color: AppTheme.accent),
             const SizedBox(width: 12),
-            Text(label,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodyLarge
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyLarge
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
       ),
