@@ -1,0 +1,29 @@
+// firestore.rules
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+
+      match /integrations/switchbot {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId); // meterDeviceId の更新
+      }
+
+      match /integrations/switchbot_secrets/{docId} {
+        allow read, write: if false; // クライアント完全不可
+      }
+
+      match /switchbot_readings/{ts} {
+        allow read: if isOwner(userId);
+        allow write: if false; // Functions(Admin SDK)のみ
+      }
+    }
+  }
+}

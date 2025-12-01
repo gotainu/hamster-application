@@ -171,6 +171,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
 // X軸：期間ごとの最適化（ラベルが消えないように調整）
+  // ignore: unused_element
   DateTimeAxis _xAxisForRange(_Range r) {
     switch (r) {
       case _Range.h24:

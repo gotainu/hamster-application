@@ -30,7 +30,7 @@ class UserImagePicker extends StatefulWidget {
 class _UserImagePickerState extends State<UserImagePicker> {
   final _picker = ImagePicker();
 
-  File? _pickedFile;        // 端末から新規に選んだ（or 撮った）画像
+  File? _pickedFile; // 端末から新規に選んだ（or 撮った）画像
   String? _networkImageUrl; // 既存のダウンロードURL
 
   @override
@@ -187,11 +187,11 @@ class _UserImagePickerState extends State<UserImagePicker> {
             CircleAvatar(
               radius: radius,
               backgroundImage: provider,
+              backgroundColor:
+                  Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
               child: provider == null
                   ? Icon(Icons.pets, size: radius * 0.75, color: Colors.white70)
                   : null,
-              backgroundColor:
-                  Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
             ),
             // 右下の鉛筆ボタン
             Positioned(

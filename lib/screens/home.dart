@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:hamster_project/widgets/shine_border.dart';
 import 'package:hamster_project/theme/app_theme.dart';
+import 'package:hamster_project/screens/switchbot_setup.dart';
 // ★ FuncB を直接開くルート用に追加
 import 'package:hamster_project/screens/func_b.dart';
 
@@ -108,7 +109,19 @@ class HomeScreen extends StatelessWidget {
                             label: const Text("走った記録を直接開く（別画面）"),
                           ),
                         ),
+                        const SizedBox(height: 12),
 
+                        // ③.5 SwitchBot 連携設定（新規）
+                        _HomeMenuButton(
+                          icon: Icons.link,
+                          label: "SwitchBot 連携設定",
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                  builder: (_) => const SwitchbotSetupScreen()),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 12),
 
                         // ④ マイページ
