@@ -1,1 +1,31 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"hamster-breeding-app","appId":"1:797691641198:android:d62cacb562d47c4e6b557f","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"hamster-breeding-app","appId":"1:797691641198:ios:6c5f4f019aa168646b557f","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"hamster-breeding-app","configurations":{"android":"1:797691641198:android:d62cacb562d47c4e6b557f","ios":"1:797691641198:ios:6c5f4f019aa168646b557f"}}}}}}
+{
+  "functions": { "source": "functions" },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "hamster-breeding-app",
+          "appId": "1:797691641198:android:d62cacb562d47c4e6b557f",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "hamster-breeding-app",
+          "appId": "1:797691641198:ios:6c5f4f019aa168646b557f",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "hamster-breeding-app",
+          "configurations": {
+            "android": "1:797691641198:android:d62cacb562d47c4e6b557f",
+            "ios": "1:797691641198:ios:6c5f4f019aa168646b557f"
+          }
+        }
+      }
+    }
+  }
+}
