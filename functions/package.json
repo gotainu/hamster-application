@@ -2,22 +2,28 @@
   "name": "functions",
   "private": true,
   "main": "lib/index.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
+  "type": "commonjs",
   "scripts": {
     "build": "tsc",
+    "clean": "node -e \"require('fs').rmSync('lib',{recursive:true,force:true})\"",
     "build:watch": "tsc --watch",
+    "deploy:one": "npm run build && firebase deploy --only functions:pollMySwitchbotNow",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions",
+    "deploy": "npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "dependencies": {
     "axios": "^1.7.7",
     "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.0"
+    "firebase-functions": "^7.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.11",
     "firebase-functions-test": "^3.4.1",
+    "rimraf": "^6.0.1",
     "typescript": "^5.7.3"
   }
 }

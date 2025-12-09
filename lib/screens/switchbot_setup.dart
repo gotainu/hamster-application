@@ -1,6 +1,7 @@
 // lib/screens/switchbot_setup.dart
-// SwitchBot: TOKEN/SECRETの保存 → デバイス一覧から温湿度計を選ぶ（Device ID自動保存）
+// SwitchBot: TOKEN/SECRET の保存 → デバイス一覧から温湿度計を選ぶ（Device ID 自動保存）
 
+import 'dart:convert'; // JSON 経由で Map<String, dynamic> に揃える
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,6 +23,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
   bool _saving = false;
   bool _canPickDevices = false; // 資格情報保存済みで有効化
   String? _status;
+  bool _disabling = false;
 
   // 選択済みデバイス表示用
   String? _selectedDeviceId;
@@ -48,7 +50,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     super.dispose();
   }
 
-  // ---- UIヘルパ ----
+  // ---- UI ヘルパ ----
   void _showSnack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -75,6 +77,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         (secDoc.data()?['v1']?['token'] != null) &&
         (secDoc.data()?['v1']?['secret'] != null);
 
+    if (!mounted) return;
     setState(() {
       _canPickDevices = hasSecrets;
       if (hasSecrets) {
@@ -85,22 +88,26 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     });
   }
 
-  // ---- TOKEN/SECRET の検証＋保存（Callable） ----
+  // ---- TOKEN/SECRET を Functions に保存 ----
   Future<void> _saveSecrets() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final token = _tokenCtrl.text.trim();
+    final secret = _secretCtrl.text.trim();
+
     setState(() {
       _saving = true;
-      _status = 'TOKEN/SECRET を検証中...';
+      _status = 'SwitchBot 資格情報を保存中...';
     });
 
     try {
       final callable = _fns.httpsCallable('registerSwitchbotSecrets');
       await callable.call(<String, dynamic>{
-        'token': _tokenCtrl.text.trim(),
-        'secret': _secretCtrl.text.trim(),
+        'token': token,
+        'secret': secret,
       });
 
+      if (!mounted) return;
       setState(() {
         _canPickDevices = true;
         _status = '資格情報を保存しました。次に「デバイス一覧から選ぶ」を押してください。';
@@ -111,28 +118,54 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       await _autoPickIfSingleMeter();
     } on FirebaseFunctionsException catch (e) {
       _showSnack('保存に失敗: ${e.message}');
-      setState(() => _status = 'エラー: ${e.message}');
+      if (mounted) {
+        setState(() => _status = 'エラー: ${e.message}');
+      }
     } catch (e) {
       _showSnack('保存に失敗: $e');
-      setState(() => _status = 'エラー: $e');
+      if (mounted) {
+        setState(() => _status = 'エラー: $e');
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
   // ---- デバイス一覧取得（Callable） ----
-  Future<List<dynamic>> _fetchDevicesOrThrow() async {
+  // listSwitchbotDevices (onCall) を使う。
+  // 戻り値の Map が dynamic キーになり得るので、JSON round-trip で正規化する。
+  Future<List<Map<String, dynamic>>> _fetchDevicesOrThrow() async {
     final callable = _fns.httpsCallable('listSwitchbotDevices');
     final res = await callable.call();
-    final List<dynamic> all = (res.data['devices'] as List<dynamic>? ?? []);
-    if (all.isEmpty) {
+
+    // JSON round-trip で Map<String, dynamic> に揃える
+    final normalized =
+        jsonDecode(jsonEncode(res.data)) as Map<String, dynamic>?;
+
+    final List devices = (normalized?['devices'] is List)
+        ? List.from(normalized!['devices'] as List)
+        : (normalized?['body'] is Map &&
+                (normalized!['body'] as Map)['deviceList'] is List)
+            ? List.from(
+                (normalized['body'] as Map)['deviceList'] as List,
+              )
+            : const [];
+
+    if (devices.isEmpty) {
       throw Exception('デバイスが見つかりませんでした');
     }
-    return all;
+
+    // すべて Map<String, dynamic> に
+    return devices
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.fromEntries(
+              e.entries.map((kv) => MapEntry(kv.key.toString(), kv.value)),
+            ))
+        .toList(growable: false);
   }
 
-  // 温湿度計らしいものだけ
-  List<Map<String, dynamic>> _filterMeters(List<dynamic> all) {
+  // 温湿度計らしいものだけフィルター
+  List<Map<String, dynamic>> _filterMeters(List<Map<String, dynamic>> all) {
     const meterKeywords = <String>{
       'meter',
       'meterplus',
@@ -143,13 +176,10 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     };
 
     final result = <Map<String, dynamic>>[];
-    for (final e in all) {
-      if (e is Map) {
-        final m = Map<String, dynamic>.from(e as Map);
-        final t = (m['deviceType']?.toString() ?? '').toLowerCase();
-        if (t.isNotEmpty && meterKeywords.any((k) => t.contains(k))) {
-          result.add(m);
-        }
+    for (final m in all) {
+      final t = (m['deviceType']?.toString() ?? '').toLowerCase();
+      if (t.isNotEmpty && meterKeywords.any((k) => t.contains(k))) {
+        result.add(m);
       }
     }
     return result;
@@ -162,14 +192,16 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       if (meters.length == 1) {
         final m = meters.first;
         await _saveChosenDevice(
-          id: m['deviceId'] as String,
-          name: (m['deviceName'] ?? '') as String,
-          type: (m['deviceType'] ?? '') as String,
+          id: (m['deviceId'] ?? '').toString(),
+          name: (m['deviceName'] ?? '').toString(),
+          type: (m['deviceType'] ?? '').toString(),
         );
-        _showSnack('温湿度計を自動選択しました: ${m['deviceName'] ?? m['deviceId']}');
+        _showSnack(
+          '温湿度計を自動選択しました: ${m['deviceName'] ?? m['deviceId']}',
+        );
       }
     } catch (_) {
-      // 無視（自動選択は任意）
+      // 自動選択はあくまでベストエフォートなので失敗しても無視
     }
   }
 
@@ -184,31 +216,29 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       final all = await _fetchDevicesOrThrow();
       final meters = _filterMeters(all);
       if (meters.isEmpty) {
-        _showSnack('温湿度計が見つかりませんでした（SwitchBotアプリで所有デバイスをご確認ください）');
+        _showSnack(
+          '温湿度計が見つかりませんでした（SwitchBotアプリで所有デバイスをご確認ください）',
+        );
         return;
       }
 
       if (!mounted) return;
+
       final picked = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
-        useRootNavigator: true, // ★ Navigatorロック回避に寄与
-        showDragHandle: true,
+        isScrollControlled: true,
         builder: (sheetCtx) {
-          return SafeArea(
-            child: ListView.separated(
+          return DraggableScrollableSheet(
+            expand: false,
+            builder: (_, controller) => ListView.builder(
+              controller: controller,
               itemCount: meters.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (_, i) {
-                final d = meters[i];
+              itemBuilder: (_, index) {
+                final d = meters[index];
                 return ListTile(
-                  leading: const Icon(Icons.thermostat),
-                  title: Text(
-                    (d['deviceName'] as String?)?.isNotEmpty == true
-                        ? d['deviceName'] as String
-                        : '(no name)',
-                  ),
+                  title: Text(d['deviceName']?.toString() ?? '（名前なし）'),
                   subtitle: Text('${d['deviceType']} • ${d['deviceId']}'),
-                  onTap: () => Navigator.of(sheetCtx).pop(d), // ★ 1回だけ確実にpop
+                  onTap: () => Navigator.of(sheetCtx).pop(d),
                 );
               },
             ),
@@ -216,9 +246,11 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         },
       );
 
-      // _pickDeviceFromCloud() 内の picked != null ブロックを置き換え
       if (picked != null) {
-        final m = Map<String, dynamic>.from(picked);
+        // 念のためキーを文字列に正規化
+        final m = Map<String, dynamic>.fromEntries(
+          picked.entries.map((kv) => MapEntry(kv.key.toString(), kv.value)),
+        );
         await _saveChosenDevice(
           id: (m['deviceId'] ?? '').toString(),
           name: (m['deviceName'] ?? '').toString(),
@@ -242,12 +274,15 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         .doc(_uid)
         .collection('integrations')
         .doc('switchbot')
-        .set({
-      'meterDeviceId': id,
-      'meterDeviceName': name,
-      'meterDeviceType': type,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+        .set(
+      {
+        'meterDeviceId': id,
+        'meterDeviceName': name,
+        'meterDeviceType': type,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
 
     if (!mounted) return;
     setState(() {
@@ -258,100 +293,150 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     });
   }
 
+  Future<void> _disableIntegration({bool deleteReadings = false}) async {
+    setState(() {
+      _disabling = true;
+      _status = 'SwitchBot 連携を解除しています...';
+    });
+
+    try {
+      final callable = _fns.httpsCallable('disableSwitchbotIntegration');
+      await callable.call(<String, dynamic>{
+        'deleteReadings': deleteReadings,
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _canPickDevices = false;
+        _selectedDeviceId = null;
+        _selectedDeviceName = null;
+        _selectedDeviceType = null;
+        _status = 'SwitchBot 連携を解除しました。再度使う場合は TOKEN/SECRET を保存し直してください。';
+      });
+
+      _showSnack('SwitchBot 連携を解除しました');
+    } on FirebaseFunctionsException catch (e) {
+      _showSnack('連携解除に失敗: ${e.message}');
+      if (mounted) {
+        setState(() => _status = 'エラー: ${e.message}');
+      }
+    } catch (e) {
+      _showSnack('連携解除に失敗: $e');
+      if (mounted) {
+        setState(() => _status = 'エラー: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _disabling = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final deviceSummary = (_selectedDeviceId == null ||
-            _selectedDeviceId!.isEmpty)
+    final deviceSummary = (_selectedDeviceId == null)
         ? '未選択'
-        : '${(_selectedDeviceName?.isNotEmpty ?? false) ? _selectedDeviceName : _selectedDeviceId}\n'
-            '(${_selectedDeviceType ?? 'Unknown'} / ID: $_selectedDeviceId)';
+        : '$_selectedDeviceName ($_selectedDeviceType)\n$_selectedDeviceId';
 
-    return WillPopScope(
-      onWillPop: () async => true, // 物理バック許可
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('SwitchBot 連携設定'),
-          leading: BackButton(onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
-          }),
-        ),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const Text(
-              '手順:\n'
-              '1) SwitchBot 公式アプリ → マイページ → 設定 → 開発者向け設定 → Token/Secret を取得\n'
-              '2) 下に貼り付けて [検証して保存]\n'
-              '3) [デバイス一覧から選ぶ] で温湿度計を選択（Device ID は自動保存）',
-            ),
-            const SizedBox(height: 16),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('SwitchBot 連携設定'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            '手順:\n'
+            '1) SwitchBot 公式アプリ → マイページ → 設定 → 開発者向け設定 → Token/Secret を取得\n'
+            '2) 下に貼り付けて [検証して保存]\n'
+            '3) [デバイス一覧から選ぶ] で温湿度計を選択（Device ID は自動保存）',
+          ),
+          const SizedBox(height: 16),
 
-            // 資格情報フォーム
-            Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _tokenCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'SwitchBot TOKEN',
-                      hintText: '例) 9c4b...',
-                    ),
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? '必須です' : null,
+          // 資格情報フォーム
+          Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                TextFormField(
+                  controller: _tokenCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'SwitchBot TOKEN',
+                    hintText: '例) 9c4b...',
                   ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _secretCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'SwitchBot SECRET',
-                      hintText: '例) 2f6a...',
-                    ),
-                    obscureText: true,
-                    validator: (v) =>
-                        (v == null || v.trim().isEmpty) ? '必須です' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? '必須です' : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _secretCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'SwitchBot SECRET',
+                    hintText: '例) 2f6a...',
                   ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: _saving ? null : _saveSecrets,
-                    icon: const Icon(Icons.verified_user),
-                    label: Text(_saving ? '保存中...' : '検証して保存'),
-                  ),
-                ],
-              ),
+                  obscureText: true,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? '必須です' : null,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _saving ? null : _saveSecrets,
+                  icon: const Icon(Icons.verified_user),
+                  label: Text(_saving ? '保存中...' : '検証して保存'),
+                ),
+              ],
             ),
+          ),
 
-            const SizedBox(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('選択中の温湿度計'),
-              subtitle: Text(deviceSummary),
-              trailing: ElevatedButton.icon(
-                onPressed: _canPickDevices ? _pickDeviceFromCloud : null,
-                icon: const Icon(Icons.list_alt),
-                label: const Text('デバイス一覧から選ぶ'),
-              ),
+          const SizedBox(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              'SwitchBot 連携を解除する',
+              style: TextStyle(fontWeight: FontWeight.w600),
             ),
-
-            const SizedBox(height: 16),
-            if (_status != null)
-              Text(
-                _status!,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.grey),
-              ),
-            const SizedBox(height: 8),
-            const Divider(),
-            const Text(
-              '※ TOKEN/SECRET は Functions 側で暗号化保管され、アプリからは参照できません。',
+            subtitle: const Text(
+              '連携を解除しても、これまで保存した温湿度データ（switchbot_readings）は残ります。\n'
+              '完全に消したい場合は、後から「データも削除する」ボタンを実装して対応できます。',
               style: TextStyle(fontSize: 12),
             ),
-          ],
-        ),
+            trailing: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+              ),
+              onPressed: _disabling ? null : () => _disableIntegration(),
+              icon: const Icon(Icons.link_off),
+              label: Text(_disabling ? '解除中...' : '連携を解除'),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('選択中の温湿度計'),
+            subtitle: Text(deviceSummary),
+            trailing: ElevatedButton.icon(
+              onPressed: _canPickDevices ? _pickDeviceFromCloud : null,
+              icon: const Icon(Icons.list_alt),
+              label: const Text('デバイス一覧から選ぶ'),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          if (_status != null)
+            Text(
+              _status!,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey),
+            ),
+          const SizedBox(height: 8),
+          const Divider(),
+          const Text(
+            '※ TOKEN/SECRET は Functions 側で暗号化保管され、アプリからは参照できません。',
+            style: TextStyle(fontSize: 12),
+          ),
+        ],
       ),
     );
   }

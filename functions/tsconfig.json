@@ -9,8 +9,9 @@
     "esModuleInterop": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
   "compileOnSave": false,
-  "include": ["src"]
+  "include": ["src/**/*.ts"]
 }
