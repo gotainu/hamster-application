@@ -1,13 +1,40 @@
-import 'package:hamster_project/services/switchbot_service.dart';
-import 'package:hamster_project/services/switchbot_repo.dart';
+// lib/services/fetch_and_store.dart
+import 'dart:convert';
+import 'package:cloud_functions/cloud_functions.dart';
 
-/// 選択済みの温湿度計から1回読み取り→Firestoreへ保存
-Future<void> fetchAndStoreOnce() async {
-  final repo = SwitchBotRepo();
-  final meterId = await repo.getSelectedMeterId();
-  if (meterId == null) {
-    throw StateError('温湿度計が未選択です（FuncBで長押し保存してください）');
+class FetchAndStore {
+  HttpsCallable _call(String name) =>
+      FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable(name);
+
+  Future<Map<String, dynamic>> pollMineNow() async {
+    final r = await _call('pollMySwitchbotNow').call();
+    return Map<String, dynamic>.from(r.data as Map);
   }
-  final reading = await SwitchBotService().readMeterOnce(meterId);
-  await repo.addReading(reading);
+
+  Future<Map<String, dynamic>> debugEcho() async {
+    final r = await _call('switchbotDebugEcho').call();
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
+  Future<Map<String, dynamic>> debugDevicesFromStore() async {
+    final r = await _call('switchbotDebugListFromStore').call();
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
+  Future<Map<String, dynamic>> debugStatusFromStore() async {
+    final r = await _call('switchbotDebugStatusFromStore').call();
+    return Map<String, dynamic>.from(r.data as Map);
+  }
+
+  static String pretty(Object? v) {
+    try {
+      return const JsonEncoder.withIndent('  ').convert(v);
+    } catch (_) {
+      return v.toString();
+    }
+  }
+
+  /// 互換用（古い呼び出し名）
+  Future<Map<String, dynamic>> debugListFromStore() => debugDevicesFromStore();
 }

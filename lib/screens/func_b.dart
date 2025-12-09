@@ -1,10 +1,8 @@
-// lib/screens/func_b.dart
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:hamster_project/services/switchbot_service.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:hamster_project/services/fetch_and_store.dart';
-import 'package:hamster_project/services/switchbot_repo.dart';
-import 'package:hamster_project/theme/app_theme.dart';
 
 class FuncBScreen extends StatefulWidget {
   const FuncBScreen({super.key});
@@ -14,259 +12,248 @@ class FuncBScreen extends StatefulWidget {
 }
 
 class _FuncBScreenState extends State<FuncBScreen> {
-  bool _loading = false;
-  bool _requestedOnce = false;
-  List<Map<String, dynamic>> _devices = const [];
-  String? _selectedId;
-  String _log = '未実行';
+  final _fetcher = FetchAndStore();
+  String? _lastInfo;
 
-  // dart-define から読み込み
-  final String _envToken =
-      const String.fromEnvironment('SWITCHBOT_TOKEN', defaultValue: '');
-  final String _envSecret =
-      const String.fromEnvironment('SWITCHBOT_SECRET', defaultValue: '');
+  Stream<List<_Point>> _watchPoints() {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return const Stream<List<_Point>>.empty();
 
-  @override
-  void initState() {
-    super.initState();
-    // トークンが揃っていれば、自動で1回だけ一覧取得
-    if (_envToken.isNotEmpty && _envSecret.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadDevices());
-    }
+    final col = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('switchbot_readings');
+
+    return col.orderBy('ts').limit(2000).snapshots().map((qs) {
+      return qs.docs
+          .map((d) {
+            final m = d.data();
+            final tsRaw = (m['ts'] ?? d.id) as String;
+            final dt = DateTime.tryParse(tsRaw)?.toLocal();
+
+            final temperature = m['temperature'];
+            final humidity = m['humidity'];
+            final t = (temperature is num) ? temperature.toDouble() : null;
+            final h = (humidity is num) ? humidity.toDouble() : null;
+
+            return _Point(dt, t, h);
+          })
+          .where((p) => p.x != null)
+          .toList();
+    });
   }
 
-  Widget _envBanner(BuildContext context) {
-    final ok = _envToken.isNotEmpty && _envSecret.isNotEmpty;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color:
-            ok ? Colors.green.withOpacity(.15) : Colors.orange.withOpacity(.15),
-        borderRadius: BorderRadius.circular(12),
-        border:
-            Border.all(color: ok ? Colors.greenAccent : Colors.orangeAccent),
-      ),
-      child: Text(
-        ok
-            ? 'SWITCHBOT_TOKEN/SECRET 検出済み（dart-define）→「デバイス一覧」を押してください'
-            : 'SWITCHBOT_TOKEN/SECRET が未設定です。--dart-define-from-file=env.json で実行してください。',
-        style: TextStyle(
-          color: ok ? Colors.greenAccent : Colors.orangeAccent,
-          fontWeight: FontWeight.w600,
+  void _showSheet(String title, Object data) {
+    final text = FetchAndStore.pretty(data);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(12),
+          child: ListView(
+            controller: controller,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              SelectableText(
+                text,
+                style: const TextStyle(fontFamily: 'monospace'),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Future<void> _loadDevices() async {
-    setState(() {
-      _loading = true;
-      _requestedOnce = true;
-      _log = '一覧取得中…';
-    });
-    try {
-      final list = await SwitchBotService().listDevices();
-      setState(() {
-        _devices = list;
-        _log = 'デバイス ${list.length} 件';
-        // 1件だけなら自動選択（好みで外してOK）
-        if (_devices.length == 1) {
-          _selectedId = _devices.first['deviceId']?.toString();
-        }
-      });
-    } catch (e) {
-      setState(() => _log = '失敗: $e');
-    } finally {
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadStatus() async {
-    if (_selectedId == null) {
-      setState(() => _log = '先にデバイスを選択してください');
-      return;
-    }
-    setState(() {
-      _loading = true;
-      _log = '$_selectedId のステータス取得中…';
-    });
-    try {
-      final body = await SwitchBotService().getDeviceStatus(_selectedId!);
-      final pretty = JsonEncoder.withIndent('  ');
-      setState(() => _log = pretty.convert(body));
-    } catch (e) {
-      setState(() => _log = '失敗: $e');
-    } finally {
-      setState(() => _loading = false);
-    }
-  }
-
-  Widget _placeholder(BuildContext themeCtx) {
-    final theme = Theme.of(themeCtx);
-    final text = !_requestedOnce ? '左上の「デバイス一覧」を押して取得します' : 'デバイスが見つかりませんでした';
-    return Center(
-      child: Text(
-        text,
-        style: theme.textTheme.bodyMedium,
-      ),
-    );
-  }
-
-  Future<void> _fetchAndStoreNow() async {
-    setState(() => _loading = true);
-    try {
-      await fetchAndStoreOnce();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('温湿度を1件保存しました')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存失敗: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('FuncB（SwitchBot 接続テスト）'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
+        title: const Text('走った記録（温湿度）'),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Debug',
+            icon: const Icon(Icons.bug_report),
+            onSelected: (k) async {
+              Map<String, dynamic> res;
+              if (k == 'echo') {
+                res = await _fetcher.debugEcho();
+                _showSheet('Echo', res);
+              } else if (k == 'list') {
+                res = await _fetcher.debugListFromStore();
+                _showSheet('Devices', res);
+              } else {
+                res = await _fetcher.debugStatusFromStore();
+                _showSheet('Status', res);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: 'echo',
+                child: Text('Echo (token/secret 長さ)'),
+              ),
+              PopupMenuItem(
+                value: 'list',
+                child: Text('/devices 取得'),
+              ),
+              PopupMenuItem(
+                value: 'status',
+                child: Text('/status 取得'),
+              ),
+            ],
+          ),
+          IconButton(
+            tooltip: '今すぐ取得',
+            icon: const Icon(Icons.sync),
+            onPressed: () async {
+              final res = await _fetcher.pollMineNow();
+              if (!mounted) return;
+              setState(() => _lastInfo = FetchAndStore.pretty(res));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('poll: ${FetchAndStore.pretty(res)}')),
+              );
+            },
+          ),
+        ],
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _envBanner(context),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: [
-                    FilledButton.tonal(
-                      onPressed: _loading ? null : _loadDevices,
-                      child: const Text('デバイス一覧'),
+      body: StreamBuilder<List<_Point>>(
+        stream: _watchPoints(),
+        builder: (context, snap) {
+          final data = snap.data ?? const <_Point>[];
+
+          return ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              _Card(
+                title: 'Temperature (°C)',
+                child: SizedBox(
+                  height: 260,
+                  child: SfCartesianChart(
+                    plotAreaBorderWidth: 0,
+                    primaryXAxis: DateTimeAxis(
+                      majorGridLines: const MajorGridLines(width: 0),
                     ),
-                    FilledButton(
-                      onPressed: (_loading || _selectedId == null)
-                          ? null
-                          : _loadStatus,
-                      child: const Text('選択デバイスのステータス'),
+                    primaryYAxis: const NumericAxis(
+                      majorGridLines: MajorGridLines(width: 0.5),
+                      opposedPosition: true,
                     ),
-                    OutlinedButton.icon(
-                      onPressed: _loading ? null : _fetchAndStoreNow,
-                      icon: const Icon(Icons.download),
-                      label: const Text('今すぐ取得して保存'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: Row(
-                    children: [
-                      // 左：デバイス一覧
-                      Expanded(
-                        flex: 2,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: _devices.isEmpty
-                              ? _placeholder(context)
-                              : ListView.separated(
-                                  itemCount: _devices.length,
-                                  separatorBuilder: (_, __) =>
-                                      const Divider(height: 1),
-                                  itemBuilder: (_, i) {
-                                    final d = _devices[i];
-                                    final id = d['deviceId']?.toString() ?? '';
-                                    final name = d['deviceName']?.toString() ??
-                                        '(no name)';
-                                    final devType =
-                                        d['deviceType']?.toString() ?? '';
-                                    final selected = id == _selectedId;
-                                    return ListTile(
-                                      dense: true,
-                                      title: Text(name),
-                                      subtitle: Text('$devType • $id'),
-                                      selected: selected,
-                                      trailing: selected
-                                          ? const Icon(Icons.check, size: 18)
-                                          : null,
-                                      onTap: () =>
-                                          setState(() => _selectedId = id),
-                                      onLongPress: () async {
-                                        if (devType == 'Meter' ||
-                                            devType == 'MeterPlus') {
-                                          await SwitchBotRepo()
-                                              .saveSelectedMeter(id,
-                                                  name: name);
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(context)
-                                                .showSnackBar(
-                                              SnackBar(
-                                                  content: Text(
-                                                      '「$name」を監視対象として保存しました')),
-                                            );
-                                          }
-                                        } else {
-                                          ScaffoldMessenger.of(context)
-                                              .showSnackBar(
-                                            const SnackBar(
-                                                content: Text(
-                                                    '温湿度計(Meter)のみ保存できます')),
-                                          );
-                                        }
-                                      },
-                                    );
-                                  },
-                                ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // 右：ログパネル
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface.withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: SingleChildScrollView(
-                            child: Text(
-                              _log,
-                              style: theme.textTheme.bodyMedium!
-                                  .copyWith(fontFamily: 'monospace'),
-                            ),
-                          ),
-                        ),
+                    series: <CartesianSeries<dynamic, dynamic>>[
+                      LineSeries<_Point, DateTime>(
+                        dataSource: data,
+                        xValueMapper: (p, _) => p.x!,
+                        yValueMapper: (p, _) => p.temp,
+                        width: 2,
+                        markerSettings: const MarkerSettings(isVisible: false),
+                        name: 'Temp',
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
+              const SizedBox(height: 12),
+              _Card(
+                title: 'Humidity (%)',
+                child: SizedBox(
+                  height: 260,
+                  child: SfCartesianChart(
+                    plotAreaBorderWidth: 0,
+                    primaryXAxis: DateTimeAxis(
+                      majorGridLines: const MajorGridLines(width: 0),
+                    ),
+                    primaryYAxis: const NumericAxis(
+                      majorGridLines: MajorGridLines(width: 0.5),
+                      opposedPosition: true,
+                    ),
+                    series: <CartesianSeries<dynamic, dynamic>>[
+                      LineSeries<_Point, DateTime>(
+                        dataSource: data,
+                        xValueMapper: (p, _) => p.x!,
+                        yValueMapper: (p, _) => p.hum,
+                        width: 2,
+                        markerSettings: const MarkerSettings(isVisible: false),
+                        name: 'Humidity',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_lastInfo != null)
+                Text(
+                  'last: $_lastInfo',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              if (snap.connectionState == ConnectionState.waiting)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              if (snap.hasError)
+                Text(
+                  '読み込みエラー: ${snap.error}',
+                  style: const TextStyle(color: Colors.redAccent),
+                ),
+              if (data.isEmpty &&
+                  !snap.hasError &&
+                  snap.connectionState == ConnectionState.active)
+                const Text('データがまだありません。ポーラーの実行をお待ちください。'),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _Point {
+  final DateTime? x;
+  final double? temp;
+  final double? hum;
+
+  _Point(this.x, this.temp, this.hum);
+}
+
+class _Card extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _Card({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 16,
+            offset: Offset(0, 8),
+            color: Color(0x1A000000),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            child: Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
-        ),
+          child,
+        ],
       ),
     );
   }

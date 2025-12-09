@@ -1,68 +1,103 @@
+// lib/services/switchbot_repo.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hamster_project/models/switchbot_reading.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import '../models/switchbot_reading.dart';
 
-class SwitchBotRepo {
-  final _auth = FirebaseAuth.instance;
-  final _db = FirebaseFirestore.instance;
+class SwitchbotRepo {
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
 
-  String get _uid => _auth.currentUser!.uid;
+  SwitchbotRepo({
+    FirebaseFirestore? db,
+    FirebaseAuth? auth,
+  })  : _db = db ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
-  /// 設定（既存の場所をそのまま使う）
-  DocumentReference<Map<String, dynamic>> get _cfgDoc => _db
-      .collection('users')
-      .doc(_uid)
-      .collection('integrations')
-      .doc('switchbot');
+  String? get _uid => _auth.currentUser?.uid;
 
-  Future<void> saveSelectedMeter(String deviceId, {String? name}) async {
-    await _cfgDoc.set({
-      'meterDeviceId': deviceId,
-      if (name != null) 'meterName': name,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
+        app: Firebase.app(),
+        region: 'asia-northeast1',
+      );
+
+  /// （追加）自分のアカウントだけ即時ポーリングして保存
+  Future<void> triggerPollNowForMe() async {
+    final callable = _fns.httpsCallable('pollMySwitchbotNow');
+    await callable.call(); // {saved:1} が返る
   }
 
-  Future<String?> getSelectedMeterId() async {
-    final snap = await _cfgDoc.get();
-    return snap.data()?['meterDeviceId'] as String?;
-  }
-
-  /// 記録コレクション
-  CollectionReference<Map<String, dynamic>> get _readingsCol =>
-      _db.collection('users').doc(_uid).collection('switchbot_readings');
-
-  /// 1件保存（★ ts を Timestamp で保存 / 数値を double に正規化）
-  Future<void> addReading(SwitchBotReading r) async {
-    final map = r.toJson();
-
-    // toJson() が ts を文字列で返していても上書きする
-    map['ts'] = Timestamp.fromDate(r.ts);
-
-    if (map['temperature'] is num) {
-      map['temperature'] = (map['temperature'] as num).toDouble();
+  /// UI表示用：選択中デバイス
+  Stream<Map<String, String>?> watchSelectedDeviceMeta() {
+    final uid = _uid;
+    if (uid == null) {
+      return const Stream<Map<String, String>?>.empty();
     }
-    if (map['humidity'] is num) {
-      map['humidity'] = (map['humidity'] as num).toDouble();
-    }
-    map['savedAt'] = FieldValue.serverTimestamp();
+    final doc = _db
+        .collection('users')
+        .doc(uid)
+        .collection('integrations')
+        .doc('switchbot');
 
-    // 既存の“日時文字列をドキュメントID”運用は維持
-    await _readingsCol
-        .doc(r.ts.toIso8601String())
-        .set(map, SetOptions(merge: true));
-    // もし衝突の心配を避けたいなら ↑ を ↓ に替えて自動IDでもOK
-    // await _readingsCol.add(map);
+    return doc.snapshots().map((snap) {
+      if (!snap.exists) return null;
+      final m = snap.data() ?? {};
+      return <String, String>{
+        'id': (m['meterDeviceId'] ?? '') as String,
+        'name': (m['meterDeviceName'] ?? '') as String,
+        'type': (m['meterDeviceType'] ?? '') as String,
+      };
+    });
   }
 
-  /// 期間読み込み（★ クエリも Timestamp ベースに修正）
-  Future<List<SwitchBotReading>> loadRange(DateTime from, DateTime to) async {
-    final q = await _readingsCol
-        .where('ts', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
-        .where('ts', isLessThanOrEqualTo: Timestamp.fromDate(to))
-        .orderBy('ts')
+  /// 温度/湿度/電池の時系列監視
+  Stream<List<SwitchbotReading>> watchReadings({
+    DateTime? since,
+    DateTime? until,
+    int limit = 720,
+  }) {
+    final uid = _uid;
+    if (uid == null) {
+      return const Stream<List<SwitchbotReading>>.empty();
+    }
+
+    Query<Map<String, dynamic>> q = _db
+        .collection('users')
+        .doc(uid)
+        .collection('switchbot_readings')
+        .orderBy('ts');
+
+    if (since != null) {
+      q = q.where('ts',
+          isGreaterThanOrEqualTo: since.toUtc().toIso8601String());
+    }
+    if (until != null) {
+      q = q.where('ts', isLessThanOrEqualTo: until.toUtc().toIso8601String());
+    }
+
+    q = q.limit(limit);
+
+    return q.snapshots().map((snap) {
+      final list = snap.docs.map(SwitchbotReading.fromDoc).toList();
+      return list;
+    });
+  }
+
+  /// 直近のみ一括取得
+  Future<List<SwitchbotReading>> fetchLatest({int limit = 200}) async {
+    final uid = _uid;
+    if (uid == null) return <SwitchbotReading>[];
+    final snap = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('switchbot_readings')
+        .orderBy('ts', descending: true)
+        .limit(limit)
         .get();
 
-    return q.docs.map((d) => SwitchBotReading.fromMap(d.data())).toList();
+    final list = snap.docs.map(SwitchbotReading.fromDoc).toList();
+    list.sort((a, b) => a.ts.compareTo(b.ts));
+    return list;
   }
 }
