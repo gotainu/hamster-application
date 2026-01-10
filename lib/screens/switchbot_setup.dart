@@ -88,7 +88,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     });
   }
 
-  // ---- TOKEN/SECRET を Functions に保存 ----
+  // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
   Future<void> _saveSecrets() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -97,34 +97,51 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
     setState(() {
       _saving = true;
-      _status = 'SwitchBot 資格情報を保存中...';
+      _status = 'SwitchBot 資格情報を検証中...';
     });
 
     try {
       final callable = _fns.httpsCallable('registerSwitchbotSecrets');
-      await callable.call(<String, dynamic>{
+      final res = await callable.call(<String, dynamic>{
         'token': token,
         'secret': secret,
       });
 
+      // ✅ 念のため戻り値も見る（Functionsが変な成功を返しても弾ける）
+      final data = (res.data is Map)
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
+      final ok = data['ok'] == true;
+      final verified = data['verified'] == true;
+
+      if (!ok || !verified) {
+        throw FirebaseFunctionsException(
+          code: 'unknown',
+          message: '検証に失敗しました（サーバ応答が不正です）。',
+          details: data,
+        );
+      }
+
       if (!mounted) return;
       setState(() {
         _canPickDevices = true;
-        _status = '資格情報を保存しました。次に「デバイス一覧から選ぶ」を押してください。';
+        _status = '✅ 認証OK：資格情報を保存しました。次に「デバイス一覧から選ぶ」を押してください。';
       });
-      _showSnack('SwitchBot 資格情報を保存しました');
+      _showSnack('✅ SwitchBot 認証OK：資格情報を保存しました');
 
       // 1件だけなら自動選択（ベストエフォート）
       await _autoPickIfSingleMeter();
     } on FirebaseFunctionsException catch (e) {
-      _showSnack('保存に失敗: ${e.message}');
+      // permission-denied / invalid-argument / unavailable などがここに来る
+      final msg = e.message ?? '不明なエラー';
+      _showSnack('❌ 検証に失敗: $msg');
       if (mounted) {
-        setState(() => _status = 'エラー: ${e.message}');
+        setState(() => _status = '❌ 検証に失敗: $msg');
       }
     } catch (e) {
-      _showSnack('保存に失敗: $e');
+      _showSnack('❌ 検証に失敗: $e');
       if (mounted) {
-        setState(() => _status = 'エラー: $e');
+        setState(() => _status = '❌ 検証に失敗: $e');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
