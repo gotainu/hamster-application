@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -82,6 +83,9 @@ class _FuncBScreenState extends State<FuncBScreen> {
               if (k == 'echo') {
                 res = await _fetcher.debugEcho();
                 _showSheet('Echo', res);
+              } else if (k == 'raw_devices') {
+                res = await _fetcher.debugCallDevices();
+                _showSheet('Raw /devices', res);
               } else if (k == 'list') {
                 res = await _fetcher.debugListFromStore();
                 _showSheet('Devices', res);
@@ -102,6 +106,10 @@ class _FuncBScreenState extends State<FuncBScreen> {
               PopupMenuItem(
                 value: 'status',
                 child: Text('/status 取得'),
+              ),
+              PopupMenuItem(
+                value: 'raw_devices',
+                child: Text('Debug: /devices 生レスポンス'),
               ),
             ],
           ),
