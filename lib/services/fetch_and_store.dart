@@ -35,6 +35,28 @@ class FetchAndStore {
     }
   }
 
+  FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
+        region: 'asia-northeast1',
+      );
+
+  Future<Map<String, dynamic>> debugCallDevices() async {
+    try {
+      final res = await _fns.httpsCallable('switchbotDebugCallDevices').call();
+      final data = res.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {'ok': false, 'error': 'unexpected response', 'data': data};
+    } on FirebaseFunctionsException catch (e) {
+      return {
+        'ok': false,
+        'code': e.code,
+        'message': e.message,
+        'details': e.details,
+      };
+    } catch (e) {
+      return {'ok': false, 'error': e.toString()};
+    }
+  }
+
   /// 互換用（古い呼び出し名）
   Future<Map<String, dynamic>> debugListFromStore() => debugDevicesFromStore();
 }
