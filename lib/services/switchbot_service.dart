@@ -10,7 +10,7 @@ class SwitchbotService {
   final _db = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
 
-  /// 直近 [limit] 件を新→旧の時系列で返すストリーム
+  /// 直近 [limit] 件を旧→新（昇順）の時系列で返すストリーム
   Stream<List<Json>> watchReadings({int limit = 1000}) {
     final uid = _auth.currentUser?.uid;
     if (uid == null) {

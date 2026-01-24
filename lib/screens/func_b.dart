@@ -1,9 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+// lib/screens/func_b.dart
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
-import 'package:hamster_project/services/fetch_and_store.dart';
+
+import '../services/fetch_and_store.dart';
+import '../services/switchbot_repo.dart';
+import '../models/switchbot_reading.dart';
 
 class FuncBScreen extends StatefulWidget {
   const FuncBScreen({super.key});
@@ -14,35 +15,9 @@ class FuncBScreen extends StatefulWidget {
 
 class _FuncBScreenState extends State<FuncBScreen> {
   final _fetcher = FetchAndStore();
+  final _sbRepo = SwitchbotRepo();
+
   String? _lastInfo;
-
-  Stream<List<_Point>> _watchPoints() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return const Stream<List<_Point>>.empty();
-
-    final col = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('switchbot_readings');
-
-    return col.orderBy('ts').limit(2000).snapshots().map((qs) {
-      return qs.docs
-          .map((d) {
-            final m = d.data();
-            final tsRaw = (m['ts'] ?? d.id) as String;
-            final dt = DateTime.tryParse(tsRaw)?.toLocal();
-
-            final temperature = m['temperature'];
-            final humidity = m['humidity'];
-            final t = (temperature is num) ? temperature.toDouble() : null;
-            final h = (humidity is num) ? humidity.toDouble() : null;
-
-            return _Point(dt, t, h);
-          })
-          .where((p) => p.x != null)
-          .toList();
-    });
-  }
 
   void _showSheet(String title, Object data) {
     final text = FetchAndStore.pretty(data);
@@ -82,15 +57,19 @@ class _FuncBScreenState extends State<FuncBScreen> {
               Map<String, dynamic> res;
               if (k == 'echo') {
                 res = await _fetcher.debugEcho();
+                if (!mounted) return;
                 _showSheet('Echo', res);
               } else if (k == 'raw_devices') {
                 res = await _fetcher.debugCallDevices();
+                if (!mounted) return;
                 _showSheet('Raw /devices', res);
               } else if (k == 'list') {
                 res = await _fetcher.debugListFromStore();
+                if (!mounted) return;
                 _showSheet('Devices', res);
               } else {
                 res = await _fetcher.debugStatusFromStore();
+                if (!mounted) return;
                 _showSheet('Status', res);
               }
             },
@@ -119,6 +98,7 @@ class _FuncBScreenState extends State<FuncBScreen> {
             onPressed: () async {
               final res = await _fetcher.pollMineNow();
               if (!mounted) return;
+
               setState(() => _lastInfo = FetchAndStore.pretty(res));
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('poll: ${FetchAndStore.pretty(res)}')),
@@ -127,10 +107,20 @@ class _FuncBScreenState extends State<FuncBScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<List<_Point>>(
-        stream: _watchPoints(),
+      body: StreamBuilder<List<SwitchbotReading>>(
+        stream: _sbRepo.watchReadings(limit: 2000), // ★Repo経由
         builder: (context, snap) {
-          final data = snap.data ?? const <_Point>[];
+          final readings = snap.data ?? const <SwitchbotReading>[];
+
+          // グラフ用に変換（nullは落とす）
+          final tempPts = <_Point>[];
+          final humPts = <_Point>[];
+
+          for (final r in readings) {
+            final t = r.ts;
+            if (r.temperature != null) tempPts.add(_Point(t, r.temperature!));
+            if (r.humidity != null) humPts.add(_Point(t, r.humidity!));
+          }
 
           return ListView(
             padding: const EdgeInsets.all(12),
@@ -148,11 +138,11 @@ class _FuncBScreenState extends State<FuncBScreen> {
                       majorGridLines: MajorGridLines(width: 0.5),
                       opposedPosition: true,
                     ),
-                    series: <CartesianSeries<dynamic, dynamic>>[
+                    series: <CartesianSeries<_Point, DateTime>>[
                       LineSeries<_Point, DateTime>(
-                        dataSource: data,
-                        xValueMapper: (p, _) => p.x!,
-                        yValueMapper: (p, _) => p.temp,
+                        dataSource: tempPts,
+                        xValueMapper: (p, _) => p.x,
+                        yValueMapper: (p, _) => p.y,
                         width: 2,
                         markerSettings: const MarkerSettings(isVisible: false),
                         name: 'Temp',
@@ -175,11 +165,11 @@ class _FuncBScreenState extends State<FuncBScreen> {
                       majorGridLines: MajorGridLines(width: 0.5),
                       opposedPosition: true,
                     ),
-                    series: <CartesianSeries<dynamic, dynamic>>[
+                    series: <CartesianSeries<_Point, DateTime>>[
                       LineSeries<_Point, DateTime>(
-                        dataSource: data,
-                        xValueMapper: (p, _) => p.x!,
-                        yValueMapper: (p, _) => p.hum,
+                        dataSource: humPts,
+                        xValueMapper: (p, _) => p.x,
+                        yValueMapper: (p, _) => p.y,
                         width: 2,
                         markerSettings: const MarkerSettings(isVisible: false),
                         name: 'Humidity',
@@ -190,10 +180,7 @@ class _FuncBScreenState extends State<FuncBScreen> {
               ),
               const SizedBox(height: 12),
               if (_lastInfo != null)
-                Text(
-                  'last: $_lastInfo',
-                  style: const TextStyle(fontSize: 12),
-                ),
+                Text('last: $_lastInfo', style: const TextStyle(fontSize: 12)),
               if (snap.connectionState == ConnectionState.waiting)
                 const Center(
                   child: Padding(
@@ -206,7 +193,7 @@ class _FuncBScreenState extends State<FuncBScreen> {
                   '読み込みエラー: ${snap.error}',
                   style: const TextStyle(color: Colors.redAccent),
                 ),
-              if (data.isEmpty &&
+              if (readings.isEmpty &&
                   !snap.hasError &&
                   snap.connectionState == ConnectionState.active)
                 const Text('データがまだありません。ポーラーの実行をお待ちください。'),
@@ -219,11 +206,9 @@ class _FuncBScreenState extends State<FuncBScreen> {
 }
 
 class _Point {
-  final DateTime? x;
-  final double? temp;
-  final double? hum;
-
-  _Point(this.x, this.temp, this.hum);
+  final DateTime x;
+  final double y;
+  _Point(this.x, this.y);
 }
 
 class _Card extends StatelessWidget {

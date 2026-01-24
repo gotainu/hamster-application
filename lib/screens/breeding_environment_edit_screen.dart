@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+
+import '../models/breeding_environment.dart';
+import '../services/breeding_environment_repo.dart';
 
 class BreedingEnvironmentEditScreen extends StatefulWidget {
   const BreedingEnvironmentEditScreen({super.key});
@@ -15,6 +16,7 @@ class BreedingEnvironmentEditScreen extends StatefulWidget {
 class _BreedingEnvironmentEditScreenState
     extends State<BreedingEnvironmentEditScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _repo = BreedingEnvironmentRepo();
 
   String? _cageWidth;
   String? _cageDepth;
@@ -31,85 +33,68 @@ class _BreedingEnvironmentEditScreenState
     _fetchExistingData();
   }
 
-  // Firestoreサブコレクション（ベストプラクティス構造）から取得
   Future<void> _fetchExistingData() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    // サブコレクション：users/{uid}/breeding_environments/main_env
-    final docSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('breeding_environments')
-        .doc('main_env')
-        .get();
-    if (!docSnapshot.exists) return;
-    final envData = docSnapshot.data();
-    if (envData != null) {
-      setState(() {
-        _cageWidth = envData['cageWidth']?.toString();
-        _cageDepth = envData['cageDepth']?.toString();
-        _beddingThickness = envData['beddingThickness']?.toString();
-        _wheelDiameter = envData['wheelDiameter']?.toString();
-        _temperatureControl = envData['temperatureControl'] ?? 'エアコン';
-        _accessories = envData['accessories']?.toString();
-      });
+    setState(() => _isLoading = true);
+
+    try {
+      final env = await _repo.fetchMainEnv();
+      if (!mounted) return;
+
+      if (env != null) {
+        setState(() {
+          _cageWidth = env.cageWidth;
+          _cageDepth = env.cageDepth;
+          _beddingThickness = env.beddingThickness;
+          _wheelDiameter = env.wheelDiameter;
+          _temperatureControl = env.temperatureControl;
+          _accessories = env.accessories;
+        });
+      }
+    } catch (_) {
+      // ここは握りつぶしてOK（必要ならSnackBar出しても良い）
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // サブコレクション：users/{uid}/breeding_environments/main_env に保存
   Future<void> _submitForm() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      _formKey.currentState?.save();
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) return;
-      setState(() {
-        _isLoading = true;
-      });
-      final envData = {
-        'cageWidth': _cageWidth,
-        'cageDepth': _cageDepth,
-        'beddingThickness': _beddingThickness,
-        'wheelDiameter': _wheelDiameter,
-        'temperatureControl': _temperatureControl,
-        'accessories': _accessories,
-        'updatedAt': FieldValue.serverTimestamp(),
-      };
-      try {
-        // ① 親ドキュメントが空にならないようにする
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .set({'has_subcollections': true}, SetOptions(merge: true));
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .collection('breeding_environments')
-            .doc('main_env')
-            .set(envData, SetOptions(merge: true));
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('飼育環境情報を変更しました！'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-        Future.delayed(const Duration(seconds: 2), () {
-          if (!mounted) return;
-          setState(() {
-            _isLoading = false;
-          });
-          Navigator.pop(context);
-        });
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('保存に失敗しました…')),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-      }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    _formKey.currentState?.save();
+
+    setState(() => _isLoading = true);
+
+    final env = BreedingEnvironment(
+      cageWidth: _cageWidth,
+      cageDepth: _cageDepth,
+      beddingThickness: _beddingThickness,
+      wheelDiameter: _wheelDiameter,
+      temperatureControl: _temperatureControl,
+      accessories: _accessories,
+    );
+
+    try {
+      await _repo.saveMainEnv(env);
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('飼育環境情報を変更しました！'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // 2秒後に戻る（mounted確認はここで）
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('保存に失敗しました…')),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -121,13 +106,12 @@ class _BreedingEnvironmentEditScreenState
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent, // ステータスバーを透明化
-        statusBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark, // アイコン色
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true, // ←AppBarの後ろまで背景を広げる
+        extendBodyBehindAppBar: true,
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: const Text('飼育環境を編集'),
@@ -136,11 +120,7 @@ class _BreedingEnvironmentEditScreenState
         ),
         body: Stack(
           children: [
-            Container(
-              decoration: BoxDecoration(
-                gradient: bgGradient,
-              ),
-            ),
+            Container(decoration: BoxDecoration(gradient: bgGradient)),
             Center(
               child: SingleChildScrollView(
                 child: Padding(
@@ -158,7 +138,6 @@ class _BreedingEnvironmentEditScreenState
                         BoxShadow(
                           color: AppTheme.accent.withOpacity(0.22),
                           blurRadius: 36,
-                          spreadRadius: 0,
                           offset: const Offset(0, 16),
                         ),
                       ],
@@ -167,7 +146,8 @@ class _BreedingEnvironmentEditScreenState
                       key: _formKey,
                       child: Column(
                         children: [
-                          const Icon(Icons.eco, color: AppTheme.accent, size: 38),
+                          const Icon(Icons.eco,
+                              color: AppTheme.accent, size: 38),
                           const SizedBox(height: 14),
                           Text(
                             '飼育環境フォーム',
@@ -183,12 +163,10 @@ class _BreedingEnvironmentEditScreenState
                               labelText: 'ケージの横幅 (cm)',
                             ),
                             keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return '横幅を入力してください';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? '横幅を入力してください'
+                                    : null,
                             onSaved: (value) => _cageWidth = value,
                           ),
                           const SizedBox(height: 16),
@@ -198,12 +176,10 @@ class _BreedingEnvironmentEditScreenState
                               labelText: 'ケージの奥行き (cm)',
                             ),
                             keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return '奥行きを入力してください';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? '奥行きを入力してください'
+                                    : null,
                             onSaved: (value) => _cageDepth = value,
                           ),
                           const SizedBox(height: 16),
@@ -213,12 +189,10 @@ class _BreedingEnvironmentEditScreenState
                               labelText: '床材の嵩 (cm)',
                             ),
                             keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return '床材の嵩を入力してください';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? '床材の嵩を入力してください'
+                                    : null,
                             onSaved: (value) => _beddingThickness = value,
                           ),
                           const SizedBox(height: 16),
@@ -228,12 +202,10 @@ class _BreedingEnvironmentEditScreenState
                               labelText: '車輪の直径 (cm)',
                             ),
                             keyboardType: TextInputType.number,
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return '車輪の直径を入力してください';
-                              }
-                              return null;
-                            },
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? '車輪の直径を入力してください'
+                                    : null,
                             onSaved: (value) => _wheelDiameter = value,
                           ),
                           const SizedBox(height: 16),
@@ -252,11 +224,8 @@ class _BreedingEnvironmentEditScreenState
                                 child: Text('その他のグッズ'),
                               ),
                             ],
-                            onChanged: (value) {
-                              setState(() {
-                                _temperatureControl = value!;
-                              });
-                            },
+                            onChanged: (value) =>
+                                setState(() => _temperatureControl = value!),
                             onSaved: (value) => _temperatureControl = value!,
                           ),
                           const SizedBox(height: 16),
@@ -272,7 +241,7 @@ class _BreedingEnvironmentEditScreenState
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(
-                              icon: const Icon(Icons.save, color: AppTheme.accent),
+                              icon: const Icon(Icons.save, color: Colors.white),
                               label: const Text('設定を保存'),
                               style: ElevatedButton.styleFrom(
                                 padding:
@@ -301,9 +270,7 @@ class _BreedingEnvironmentEditScreenState
             if (_isLoading)
               Container(
                 color: Colors.black.withOpacity(0.5),
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
+                child: const Center(child: CircularProgressIndicator()),
               ),
           ],
         ),
