@@ -2,11 +2,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/user_image_picker.dart';
+
+import '../models/pet_profile.dart';
+import '../services/pet_profile_repo.dart';
 
 class PetProfileEditScreen extends StatefulWidget {
   const PetProfileEditScreen({super.key});
@@ -20,8 +22,10 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   final _nameController = TextEditingController();
   final _birthdayController = TextEditingController();
 
+  final _repo = PetProfileRepo();
+
   File? _pickedImageFile;
-  String? _existingImageUrl; // ← 1回だけ定義（finalにしない）
+  String? _existingImageUrl; // 既存URL（プレビュー用）
   DateTime? _birthday;
 
   String _selectedSpecies = 'シリアン';
@@ -60,45 +64,35 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
   // ---------- data load ----------
   Future<void> _fetchExistingData() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    final p = await _repo.fetchMainPet(); // ★ Firestore直叩き禁止：Repo経由
+    if (!mounted) return;
 
-    final userDoc = FirebaseFirestore.instance.collection('users').doc(uid);
-    final petDoc = userDoc.collection('pet_profiles').doc('main_pet');
-
-    String? imageUrl;
-    String hamsterName = '';
-    DateTime? birthday;
-    String species = 'シリアン';
-    String? color;
-
-    // ① pet_profiles/main_pet 優先
-    final petSnap = await petDoc.get();
-    if (petSnap.exists) {
-      final d = petSnap.data()!;
-      hamsterName = d['name'] ?? '';
-      final b = d['birthday'];
-      if (b is Timestamp) birthday = b.toDate();
-      if (b is String) birthday = DateTime.tryParse(b);
-      species = d['species'] ?? 'シリアン';
-      color = d['color'];
-      imageUrl = d['imageUrl'] as String?;
+    if (p == null) {
+      // 未登録の場合は初期値のまま
+      setState(() {
+        _nameController.text = '';
+        _birthday = null;
+        _birthdayController.clear();
+        _selectedSpecies = 'シリアン';
+        _selectedColor = null;
+        _existingImageUrl = null;
+      });
+      return;
     }
 
-
-
     setState(() {
-      _nameController.text = hamsterName;
-      _birthday = birthday;
-      if (birthday != null) {
+      _nameController.text = p.name;
+      _birthday = p.birthday;
+      if (p.birthday != null) {
+        final d = p.birthday!;
         _birthdayController.text =
-            '${birthday.year}-${birthday.month.toString().padLeft(2, '0')}-${birthday.day.toString().padLeft(2, '0')}';
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
       } else {
         _birthdayController.clear();
       }
-      _selectedSpecies = species;
-      _selectedColor = color;
-      _existingImageUrl = imageUrl; // ← ピッカーに渡すURL
+      _selectedSpecies = p.species;
+      _selectedColor = p.color;
+      _existingImageUrl = p.imageUrl;
     });
   }
 
@@ -108,13 +102,16 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     final initialDate = _birthday ?? DateTime(now.year - 1);
     final firstDate = DateTime(now.year - 5);
     final lastDate = DateTime(now.year + 1);
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: lastDate,
     );
+    if (!mounted) return;
     if (picked == null) return;
+
     setState(() {
       _birthday = picked;
       _birthdayController.text =
@@ -135,10 +132,6 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    final petDoc = FirebaseFirestore.instance
-        .collection('users').doc(uid)
-        .collection('pet_profiles').doc('main_pet');
-
     final urlToDelete = _existingImageUrl;
 
     setState(() {
@@ -146,19 +139,25 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       _existingImageUrl = null;
     });
 
-    // main_pet のみ更新
-    await petDoc.set({
-      'imageUrl': FieldValue.delete(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      // ★ Firestore直叩き禁止：Repo経由で imageUrl を消す
+      await _repo.deleteImageUrl();
 
-    if (urlToDelete != null) {
-      try { await FirebaseStorage.instance.refFromURL(urlToDelete).delete(); } catch (_) {}
+      // Storage 側の実体も削除（任意：失敗しても握りつぶす）
+      if (urlToDelete != null) {
+        try {
+          await FirebaseStorage.instance.refFromURL(urlToDelete).delete();
+        } catch (_) {}
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('画像を削除しました')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('画像の削除に失敗しました…')));
     }
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('画像を削除しました')));
   }
 
   Future<void> _submitForm() async {
@@ -169,18 +168,16 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
     setState(() => _isLoading = true);
 
-    final petDoc = FirebaseFirestore.instance
-        .collection('users').doc(uid)
-        .collection('pet_profiles').doc('main_pet');
-
     String? imageUrl = _existingImageUrl;
 
+    // 画像アップロード（FirestoreではなくStorageなのでOK）
     if (_pickedImageFile != null) {
       try {
         final ref = FirebaseStorage.instance
             .ref()
             .child('hamster_images')
             .child('$uid-main_pet.jpg');
+
         await ref.putFile(_pickedImageFile!);
         imageUrl = await ref.getDownloadURL();
       } catch (_) {
@@ -188,33 +185,32 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('画像のアップロードに失敗しました')),
           );
+          setState(() => _isLoading = false);
         }
-        setState(() => _isLoading = false);
         return;
       }
     }
 
-    final petData = {
-      'name': _nameController.text.trim(),
-      'birthday': _birthday != null ? Timestamp.fromDate(_birthday!) : null,
-      'species': _selectedSpecies,
-      'color': _selectedColor,
-      'imageUrl': imageUrl,
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
-
     try {
-      await petDoc.set(petData, SetOptions(merge: true)); // ← main_pet だけ
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('ペット情報を変更しました！')));
-        Navigator.pop(context);
-      }
+      // ★ Firestore直叩き禁止：Repo経由で保存
+      await _repo.saveMainPet(
+        PetProfile(
+          name: _nameController.text.trim(),
+          birthday: _birthday,
+          species: _selectedSpecies,
+          color: _selectedColor,
+          imageUrl: imageUrl,
+        ),
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('ペット情報を変更しました！')));
+      Navigator.pop(context);
     } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('保存に失敗しました…')));
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('保存に失敗しました…')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -234,8 +230,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
@@ -257,12 +252,13 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 30, vertical: 38),
                   decoration: BoxDecoration(
-                    color:
-                        isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+                    color: isDark
+                        ? AppTheme.cardInnerDark
+                        : AppTheme.cardInnerLight,
                     borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: AppTheme.accent.withOpacity(0.19),
+                        color: AppTheme.accent.withValues(alpha: 0.19),
                         blurRadius: 36,
                         offset: const Offset(0, 16),
                       ),
@@ -273,23 +269,21 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // 画像ピッカー（既存URL + 削除対応）
                         UserImagePicker(
                           initialImageUrl: _existingImageUrl,
-                          onPickImage: _pickImage, // ← 小文字
+                          onPickImage: _pickImage,
                           onDelete: _onDeleteImage,
                         ),
                         const SizedBox(height: 18),
-
                         TextFormField(
                           controller: _nameController,
                           decoration:
                               const InputDecoration(labelText: 'ハムスターの名前'),
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? '名前を入力してください' : null,
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? '名前を入力してください'
+                              : null,
                         ),
                         const SizedBox(height: 18),
-
                         TextFormField(
                           controller: _birthdayController,
                           readOnly: true,
@@ -298,11 +292,10 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                             suffixIcon: Icon(Icons.calendar_today),
                           ),
                           onTap: _pickBirthday,
-                          validator: (value) =>
+                          validator: (_) =>
                               _birthday == null ? '生年月日を選択してください' : null,
                         ),
                         const SizedBox(height: 18),
-
                         DropdownButtonFormField<String>(
                           decoration:
                               const InputDecoration(labelText: 'ハムスターの種類'),
@@ -324,7 +317,6 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                           },
                         ),
                         const SizedBox(height: 18),
-
                         DropdownButtonFormField<String>(
                           decoration: const InputDecoration(labelText: '毛色'),
                           value: _selectedColor,
@@ -338,11 +330,9 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                                   ))
                               .toList(),
                           onChanged: (v) => setState(() => _selectedColor = v),
-                          validator: (v) =>
-                              v == null ? '毛色を選択してください' : null,
+                          validator: (v) => v == null ? '毛色を選択してください' : null,
                         ),
                         const SizedBox(height: 22),
-
                         ElevatedButton(
                           onPressed: _submitForm,
                           style: ElevatedButton.styleFrom(
@@ -372,7 +362,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
             ),
             if (_isLoading)
               Container(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 child: const Center(child: CircularProgressIndicator()),
               ),
           ],
