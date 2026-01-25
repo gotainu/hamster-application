@@ -39,6 +39,82 @@ class HealthRecordsRepo {
     return _db.collection('users').doc(uid).collection('health_records');
   }
 
+  /// ローカル日付の [start, end) をUTCに変換してクエリする
+  ({DateTime startUtc, DateTime endUtc}) _dayRangeUtc(DateTime dayLocal) {
+    final startLocal = DateTime(dayLocal.year, dayLocal.month, dayLocal.day);
+    final endLocal = startLocal.add(const Duration(days: 1));
+    return (startUtc: startLocal.toUtc(), endUtc: endLocal.toUtc());
+  }
+
+  /// 指定日の距離合計(m)
+  Future<double> fetchDailyTotalDistance(DateTime dayLocal) async {
+    final col = _col();
+    if (col == null) return 0;
+
+    final r = _dayRangeUtc(dayLocal);
+
+    final qs = await col
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(r.startUtc))
+        .where('date', isLessThan: Timestamp.fromDate(r.endUtc))
+        .get();
+
+    double sum = 0;
+    for (final d in qs.docs) {
+      final m = d.data();
+      final v = m['distance'];
+      if (v is num) sum += v.toDouble();
+    }
+    return sum;
+  }
+
+  /// 直近N日（今日含む）の1日平均(m)
+  Future<double> fetchRollingDailyAverage({
+    int days = 7,
+    DateTime? todayLocal,
+  }) async {
+    final col = _col();
+    if (col == null) return 0;
+
+    final today = todayLocal ?? DateTime.now();
+    final startLocal = DateTime(today.year, today.month, today.day)
+        .subtract(Duration(days: days - 1));
+    final endLocal = DateTime(today.year, today.month, today.day)
+        .add(const Duration(days: 1));
+
+    final startUtc = startLocal.toUtc();
+    final endUtc = endLocal.toUtc();
+
+    final qs = await col
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startUtc))
+        .where('date', isLessThan: Timestamp.fromDate(endUtc))
+        .get();
+
+    // 日別にバケツ集計（ローカル日付キー）
+    final map = <String, double>{};
+    for (final d in qs.docs) {
+      final m = d.data();
+      final ts = m['date'];
+      final dist = m['distance'];
+      if (ts is! Timestamp || dist is! num) continue;
+
+      final local = ts.toDate().toLocal();
+      final key =
+          '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+      map[key] = (map[key] ?? 0) + dist.toDouble();
+    }
+
+    // days分の「存在しない日は0」として平均を作る（実用上こっちが“感覚”に合う）
+    double total = 0;
+    for (int i = 0; i < days; i++) {
+      final d = DateTime(today.year, today.month, today.day)
+          .subtract(Duration(days: i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      total += map[key] ?? 0;
+    }
+    return total / days;
+  }
+
   // -------------------------
   // ★ 直径キャッシュ更新
   // -------------------------

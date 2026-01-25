@@ -28,16 +28,35 @@
 
 ```mermaid
 flowchart LR
-  subgraph Flutter[Flutter app]
-    App[Flutter UI]
-    Tabs[tabs.dart]
-    Graph[graph_function.dart]
-    SwitchSetup[switchbot_setup.dart]
-    RAG[search_function.dart]
-    Svc[services/*]
-    Model[models/*]
+  %% ===== Flutter =====
+  subgraph App[Flutter app]
+    subgraph Screens[lib/screens]
+      Tabs[tabs.dart]
+      PetScreen[pet_profile_screen.dart]
+      PetEdit[pet_profile_edit_screen.dart]
+      BreedEdit[breeding_environment_edit_screen.dart]
+      Graph[graph_function.dart]
+      SwitchSetup[switchbot_setup.dart]
+      Search[search_function.dart]
+    end
+
+    subgraph Services[lib/services]
+      PetRepo[PetProfileRepo]
+      BreedRepo[BreedingEnvironmentRepo]
+      HealthRepo[HealthRecordsRepo]
+      WheelRepo[WheelRepo]
+      SBRepo[SwitchbotRepo]
+    end
+
+    subgraph Models[lib/models]
+      PetModel[PetProfile]
+      BreedModel[BreedingEnvironment]
+      HealthModel[HealthRecord]
+      SBModel[SwitchbotReading]
+    end
   end
 
+  %% ===== Firebase / External =====
   subgraph Firebase[Firebase]
     Auth[Firebase Auth]
     FS[Firestore]
@@ -49,51 +68,85 @@ flowchart LR
     OAI[OpenAI API]
   end
 
+  %% ===== Screen -> Repo =====
+  Tabs --> PetScreen
   Tabs --> Graph
-  Graph --> SwitchSetup
-  Graph --> Svc
-  RAG --> Svc
-  App --> Auth
 
-  Svc --> FS
-  Svc --> CF
+  PetScreen --> PetRepo
+  PetScreen --> BreedEdit
+  PetEdit --> PetRepo
+  BreedEdit --> BreedRepo
+
+  Graph --> HealthRepo
+  HealthRepo --> WheelRepo
+  Graph --> SBRepo
+  Graph --> SwitchSetup
+
+  Search --> CF
+
+  %% ===== Repo -> Firebase =====
+  PetRepo --> FS
+  BreedRepo --> FS
+  HealthRepo --> FS
+  WheelRepo --> FS
+  SBRepo --> FS
+
+  PetRepo --> Auth
+  BreedRepo --> Auth
+  HealthRepo --> Auth
+  WheelRepo --> Auth
+  SBRepo --> Auth
+
+  SBRepo --> CF
   CF --> FS
   CF --> SB
-  Svc --> OAI
+  CF --> OAI
+
+  %% ===== Repo uses Model (dotted) =====
+  PetRepo -.-> PetModel
+  BreedRepo -.-> BreedModel
+  HealthRepo -.-> HealthModel
+  SBRepo -.-> SBModel
 ```
 
 ---
 
 ## SwitchBot data flow
 
-![System overview](./diagrams/switchBot_data_flow.png)
+![SwitchBot data flow](./diagrams/switchBot_data_flow.png)
 
 ```mermaid
 sequenceDiagram
   participant U as User
   participant App as Flutter
-  participant CF as Functions
+  participant CF as Functions(callable/http/scheduler)
   participant SB as SwitchBot API
   participant FS as Firestore
 
   U->>App: Token/Secret入力
-  App->>CF: registerSwitchbotSecrets()
-  CF->>SB: verify (devices or status)
-  SB-->>CF: ok / error
-  CF->>FS: users/{uid}/integrations/switchbot_secrets
-  CF->>FS: switchbot_users/{uid} hasSwitchbot=true
+  App->>CF: registerSwitchbotSecrets() (callable)
+  CF->>SB: verify
+  SB-->>CF: ok/error
+  CF->>FS: users/{uid}/integrations/switchbot_secrets (token/secret)
+  CF->>FS: switchbot_users/{uid} (hasSwitchbot=true)
   CF-->>App: ok
 
-  U->>App: device選択
-  App->>CF: listSwitchbotDevices()
+  U->>App: デバイス選択
+  App->>CF: listSwitchbotDevices() (callable)
   CF->>SB: GET /devices
   SB-->>CF: deviceList
   CF-->>App: deviceList
-  App->>FS: integrations/switchbot meterDeviceId...
+  App->>FS: users/{uid}/integrations/switchbot (meterDeviceId...)
 
-  CF->>FS: (scheduler) poll users
-  CF->>SB: GET /devices/{id}/status
-  SB-->>CF: temp/hum
-  CF->>FS: users/{uid}/switchbot_readings/{ts}
+  Note over CF,FS: 自動収集（アプリ不要）
+  CF->>FS: (scheduler) switchbot_users where hasSwitchbot==true
+  CF->>SB: GET /devices/{meterDeviceId}/status
+  SB-->>CF: temp/hum/battery
+  CF->>FS: users/{uid}/switchbot_readings/{tsIso}
+
+  Note over App,FS: 表示（graph_function.dart）
+  App->>FS: watchHasSecrets() / watchSwitchbotConfig()
+  App->>FS: watchLatestReadings()
+  FS-->>App: readings stream
 ```
 

@@ -110,6 +110,9 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
               body: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  _todayKPI(),
+                  const SizedBox(height: 16),
+
                   _wheelBlock(),
                   const SizedBox(height: 24),
                   _distanceChart(),
@@ -136,6 +139,112 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         );
       },
     );
+  }
+
+  // ===== 今日のKPI =====
+  Widget _todayKPI() {
+    return FutureBuilder<_TodayKpi>(
+      future: _buildTodayKpi(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const SizedBox(
+            height: 72,
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        final k = snap.data!;
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 16,
+                offset: Offset(0, 8),
+                color: Color(0x1A000000),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Text(k.emoji, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      k.headline,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '今日: ${k.todayMeters.toStringAsFixed(0)} m  /  7日平均: ${k.avg7Meters.toStringAsFixed(0)} m  (${k.deltaPct >= 0 ? '+' : ''}${k.deltaPct.toStringAsFixed(0)}%)',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<_TodayKpi> _buildTodayKpi() async {
+    final today = await _healthRepo.fetchDailyTotalDistance(DateTime.now());
+    final avg7 = await _healthRepo.fetchRollingDailyAverage(days: 7);
+
+    final base = (avg7 <= 0) ? 1.0 : avg7; // 0割防止
+    final deltaPct = (today - avg7) / base * 100.0;
+
+    if (avg7 <= 0 && today <= 0) {
+      return _TodayKpi(
+        emoji: '🌱',
+        headline: 'まずは記録をためよう',
+        todayMeters: today,
+        avg7Meters: avg7,
+        deltaPct: 0,
+      );
+    }
+
+    if (deltaPct >= 20) {
+      return _TodayKpi(
+        emoji: '🔥',
+        headline: '今日はよく走った！',
+        todayMeters: today,
+        avg7Meters: avg7,
+        deltaPct: deltaPct,
+      );
+    } else if (deltaPct >= 0) {
+      return _TodayKpi(
+        emoji: '✨',
+        headline: 'いい感じ！いつもより上',
+        todayMeters: today,
+        avg7Meters: avg7,
+        deltaPct: deltaPct,
+      );
+    } else if (deltaPct <= -20) {
+      return _TodayKpi(
+        emoji: '🫧',
+        headline: '今日は控えめ。様子見しよう',
+        todayMeters: today,
+        avg7Meters: avg7,
+        deltaPct: deltaPct,
+      );
+    } else {
+      return _TodayKpi(
+        emoji: '🙂',
+        headline: 'いつも通り！',
+        todayMeters: today,
+        avg7Meters: avg7,
+        deltaPct: deltaPct,
+      );
+    }
   }
 
   // ---------- Widgets ----------
@@ -316,4 +425,20 @@ class _Point {
   final DateTime x;
   final double y;
   _Point(this.x, this.y);
+}
+
+class _TodayKpi {
+  final String emoji;
+  final String headline;
+  final double todayMeters;
+  final double avg7Meters;
+  final double deltaPct;
+
+  _TodayKpi({
+    required this.emoji,
+    required this.headline,
+    required this.todayMeters,
+    required this.avg7Meters,
+    required this.deltaPct,
+  });
 }
