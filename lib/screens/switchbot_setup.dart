@@ -24,6 +24,9 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
   bool _canPickDevices = false; // 資格情報保存済みで有効化
   String? _status;
   bool _disabling = false;
+  bool _hasSecrets = false;
+  Map<String, dynamic>? _secretEcho; // {token:{head,len,tail}, secret:{...}}
+  bool _loading = false;
 
   // 選択済みデバイス表示用
   String? _selectedDeviceId;
@@ -58,6 +61,8 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
   // ---- 初期ロード：資格情報の有無と選択済みデバイスを読む ----
   Future<void> _loadCurrent() async {
+    setState(() => _loading = true);
+
     final userRef = FirebaseFirestore.instance.collection('users').doc(_uid);
 
     // 選択済みデバイス（任意）
@@ -65,30 +70,58 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         await userRef.collection('integrations').doc('switchbot').get();
     if (devDoc.exists) {
       final m = devDoc.data()!;
-      _selectedDeviceId = (m['meterDeviceId'] ?? '') as String?;
-      _selectedDeviceName = (m['meterDeviceName'] ?? '') as String?;
-      _selectedDeviceType = (m['meterDeviceType'] ?? '') as String?;
+      _selectedDeviceId = (m['meterDeviceId'] as String?);
+      _selectedDeviceName = (m['meterDeviceName'] as String?);
+      _selectedDeviceType = (m['meterDeviceType'] as String?);
     }
 
-    // 資格情報が保存済みか（暗号化済みの有無だけ確認）
+    // 資格情報（v1_plain 優先、なければ v1）
     final secDoc =
         await userRef.collection('integrations').doc('switchbot_secrets').get();
-    final hasSecrets = secDoc.exists &&
-        (secDoc.data()?['v1']?['token'] != null) &&
-        (secDoc.data()?['v1']?['secret'] != null);
+    final data = secDoc.data();
+
+    bool hasSecrets = false;
+    final v1p = data?['v1_plain'];
+    if (v1p is Map) {
+      hasSecrets =
+          (v1p['token'] is String && (v1p['token'] as String).isNotEmpty) &&
+              (v1p['secret'] is String && (v1p['secret'] as String).isNotEmpty);
+    }
+    if (!hasSecrets) {
+      final v1 = data?['v1'];
+      if (v1 is Map) {
+        hasSecrets =
+            (v1['token'] is String && (v1['token'] as String).isNotEmpty) &&
+                (v1['secret'] is String && (v1['secret'] as String).isNotEmpty);
+      }
+    }
+
+    // 保存済みなら head/tail を取得（表示用）
+    Map<String, dynamic>? echo;
+    if (hasSecrets) {
+      try {
+        final callable = _fns.httpsCallable('switchbotDebugEcho');
+        final res = await callable.call();
+        echo = (res.data is Map)
+            ? Map<String, dynamic>.from(res.data as Map)
+            : null;
+      } catch (_) {
+        // 表示の補助なので失敗してもOK
+      }
+    }
 
     if (!mounted) return;
     setState(() {
+      _hasSecrets = hasSecrets;
       _canPickDevices = hasSecrets;
-      if (hasSecrets) {
-        _status = '資格情報は保存済みです。必要なら「デバイス一覧から選ぶ」を押してください。';
-      } else {
-        _status = 'まだ資格情報がありません。TOKEN/SECRETを保存してから「デバイス一覧から選ぶ」を押してください。';
-      }
+      _secretEcho = echo;
+      _status = hasSecrets
+          ? '✅ 資格情報は保存済みです。温湿度計を選択してください。'
+          : 'まだ資格情報がありません。TOKEN/SECRET を保存してください。';
+      _loading = false;
     });
-  }
+  } // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
 
-  // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
   Future<void> _saveSecrets() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -131,6 +164,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
       // 1件だけなら自動選択（ベストエフォート）
       await _autoPickIfSingleMeter();
+      await _loadCurrent();
     } on FirebaseFunctionsException catch (e) {
       // permission-denied / invalid-argument / unavailable などがここに来る
       final msg = e.message ?? '不明なエラー';
@@ -348,6 +382,91 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     }
   }
 
+  Widget _secretsForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        children: [
+          TextFormField(
+            controller: _tokenCtrl,
+            decoration: const InputDecoration(
+              labelText: 'SwitchBot TOKEN',
+              hintText: '例) 9c4b...',
+            ),
+            validator: (v) => (v == null || v.trim().isEmpty) ? '必須です' : null,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _secretCtrl,
+            decoration: const InputDecoration(
+              labelText: 'SwitchBot SECRET',
+              hintText: '例) 2f6a...',
+            ),
+            obscureText: true,
+            validator: (v) => (v == null || v.trim().isEmpty) ? '必須です' : null,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _saving ? null : _saveSecrets,
+            icon: const Icon(Icons.verified_user),
+            label: Text(_saving ? '保存中...' : '検証して保存'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _savedSecretsCard() {
+    String fmt(dynamic v) {
+      if (v is Map) {
+        final head = v['head']?.toString() ?? '';
+        final tail = v['tail']?.toString() ?? '';
+        final len = v['len']?.toString() ?? '?';
+        if (head.isEmpty || tail.isEmpty) return '保存済み（詳細取得不可）';
+        return '$head…$tail（len:$len）';
+      }
+      return '保存済み';
+    }
+
+    final token = _secretEcho?['token'];
+    final secret = _secretEcho?['secret'];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 16,
+            offset: Offset(0, 8),
+            color: Color(0x1A000000),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'SwitchBot 資格情報（保存済み）',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text('TOKEN: ${fmt(token)}'),
+          const SizedBox(height: 4),
+          Text('SECRET: ${fmt(secret)}'),
+          const SizedBox(height: 10),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: _disabling ? null : () => _disableIntegration(),
+            icon: const Icon(Icons.link_off),
+            label: Text(_disabling ? '解除中...' : '連携を解除'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final deviceSummary = (_selectedDeviceId == null)
@@ -369,74 +488,30 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
           ),
           const SizedBox(height: 16),
 
-          // 資格情報フォーム
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _tokenCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'SwitchBot TOKEN',
-                    hintText: '例) 9c4b...',
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? '必須です' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _secretCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'SwitchBot SECRET',
-                    hintText: '例) 2f6a...',
-                  ),
-                  obscureText: true,
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty) ? '必須です' : null,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _saving ? null : _saveSecrets,
-                  icon: const Icon(Icons.verified_user),
-                  label: Text(_saving ? '保存中...' : '検証して保存'),
-                ),
-              ],
-            ),
-          ),
+          // 資格情報（未保存: フォーム / 保存済み: 表示カード）
+          if (_loading) ...[
+            const SizedBox(height: 24),
+            const Center(child: CircularProgressIndicator()),
+            const SizedBox(height: 24),
+          ] else if (!_hasSecrets) ...[
+            _secretsForm(),
+          ] else ...[
+            _savedSecretsCard(),
+          ],
 
-          const SizedBox(height: 24),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text(
-              'SwitchBot 連携を解除する',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text(
-              '連携を解除しても、これまで保存した温湿度データ（switchbot_readings）は残ります。\n'
-              '完全に消したい場合は、後から「データも削除する」ボタンを実装して対応できます。',
-              style: TextStyle(fontSize: 12),
-            ),
-            trailing: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+          if (_hasSecrets) ...[
+            const SizedBox(height: 24),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('選択中の温湿度計'),
+              subtitle: Text(deviceSummary),
+              trailing: ElevatedButton.icon(
+                onPressed: _canPickDevices ? _pickDeviceFromCloud : null,
+                icon: const Icon(Icons.list_alt),
+                label: const Text('デバイス一覧から選ぶ'),
               ),
-              onPressed: _disabling ? null : () => _disableIntegration(),
-              icon: const Icon(Icons.link_off),
-              label: Text(_disabling ? '解除中...' : '連携を解除'),
             ),
-          ),
-
-          const SizedBox(height: 24),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('選択中の温湿度計'),
-            subtitle: Text(deviceSummary),
-            trailing: ElevatedButton.icon(
-              onPressed: _canPickDevices ? _pickDeviceFromCloud : null,
-              icon: const Icon(Icons.list_alt),
-              label: const Text('デバイス一覧から選ぶ'),
-            ),
-          ),
+          ],
 
           const SizedBox(height: 16),
           if (_status != null)
