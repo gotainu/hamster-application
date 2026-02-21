@@ -37,7 +37,6 @@ class HomeScreen extends StatelessWidget {
                   borderWidth: 2.5,
                   active: true, // ←常にシャイン
                   child: Container(
-                    width: 600,
                     constraints: const BoxConstraints(maxWidth: 600),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 24, vertical: 32),
@@ -86,7 +85,7 @@ class HomeScreen extends StatelessWidget {
                         // ② 走った記録（既存のタブ遷移はそのまま維持）
                         _HomeMenuButton(
                           icon: Icons.show_chart_outlined,
-                          label: "走った記録（タブで開く）",
+                          label: "走った記録",
                           onTap: () => onTabSelected(2),
                         ),
                         const SizedBox(height: 12),
@@ -106,7 +105,13 @@ class HomeScreen extends StatelessWidget {
                               );
                             },
                             icon: const Icon(Icons.open_in_new),
-                            label: const Text("走った記録を直接開く（別画面）"),
+                            label: const Flexible(
+                              child: Text(
+                                "走った記録を直接開く（別画面）",
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -166,38 +171,38 @@ class _HomeMenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
       child: Container(
+        width: double.infinity, // ★親幅いっぱい
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 24),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           gradient: LinearGradient(
             colors: isDark
-                ? [
-                    AppTheme.accent.withOpacity(0.15),
-                    Colors.transparent,
-                  ]
-                : [
-                    AppTheme.accent.withOpacity(0.10),
-                    Colors.transparent,
-                  ],
+                ? [AppTheme.accent.withOpacity(0.15), Colors.transparent]
+                : [AppTheme.accent.withOpacity(0.10), Colors.transparent],
             begin: Alignment.centerLeft,
             end: Alignment.centerRight,
           ),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, color: AppTheme.accent),
             const SizedBox(width: 12),
-            Text(
-              label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            Expanded(
+              // ★ここが本命
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),

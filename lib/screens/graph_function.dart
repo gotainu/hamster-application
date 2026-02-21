@@ -28,17 +28,21 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   String? _saveMsg;
   int _calcSeq = 0;
 
+  late Future<_TodayKpi> _todayKpiFuture;
+
   // ===== SwitchBot =====
   final SwitchbotRepo _sbRepo = SwitchbotRepo();
 
   @override
   void initState() {
     super.initState();
-    // 直径を先にキャッシュ（キー入力が軽くなる）
+
+    _todayKpiFuture = _buildTodayKpi(); // ★これを追加
+
     _healthRepo.refreshWheelDiameter().then((_) {
       if (!mounted) return;
       _recalcDistance(_wheelCtrl.text);
-      setState(() {}); // wheelReady表示更新用
+      setState(() {});
     });
 
     _wheelCtrl.addListener(() => _recalcDistance(_wheelCtrl.text));
@@ -75,6 +79,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
       await _healthRepo.addWheelRotationRecord(rotations: rotations);
       if (!mounted) return;
       setState(() => _saveMsg = '保存しました！');
+      _invalidateTodayKpiCache();
     } on MissingWheelDiameterException {
       if (!mounted) return;
       setState(() => _saveMsg = 'まずは飼育環境を設定してください（車輪の直径が未設定です）。');
@@ -86,6 +91,12 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         setState(() => _saving = false);
       }
     }
+  }
+
+  void _invalidateTodayKpiCache() {
+    setState(() {
+      _todayKpiFuture = _buildTodayKpi();
+    });
   }
 
   // ---------- UI ----------
@@ -118,20 +129,35 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                   _distanceChart(),
                   const SizedBox(height: 32),
 
-                  _switchbotBlock(hasSwitchBot: linked),
-
-                  // ★グラフは secrets + device 選択済みのとき表示
-                  if (linked && hasDevice) ...[
+                  // ===== SwitchBot UI（課題③対応）=====
+                  if (!linked) ...[
+                    // 未連携：ボタンを出す
+                    _switchbotBlock(hasSwitchBot: false),
+                  ] else if (linked && !hasDevice) ...[
+                    // 連携済みだがデバイス未選択：編集導線を出す
+                    _switchbotNeedDeviceBlock(),
+                  ] else ...[
+                    // 連携済み＋デバイス選択済み：ボタンは消してグラフを出す
                     const SizedBox(height: 24),
                     _switchbotCharts(),
-                  ],
 
-                  // （任意）連携済みだがデバイス未選択ならメッセージ
-                  if (linked && !hasDevice)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text('温湿度計が未選択です。「編集する」からデバイスを選択してください。'),
+                    // 任意：設定を触れる導線だけ残したいなら
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.settings),
+                        label: const Text('SwitchBot設定を編集'),
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const SwitchbotSetupScreen()),
+                          );
+                        },
+                      ),
                     ),
+                  ],
                 ],
               ),
             );
@@ -144,14 +170,12 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   // ===== 今日のKPI =====
   Widget _todayKPI() {
     return FutureBuilder<_TodayKpi>(
-      future: _buildTodayKpi(),
+      future: _todayKpiFuture, // ★ここがポイント（キャッシュしたFuture）
       builder: (context, snap) {
         if (!snap.hasData) {
-          return const SizedBox(
-            height: 72,
-            child: Center(child: CircularProgressIndicator()),
-          );
+          return _kpiLoadingCard(); // ★ロード用UIに差し替え
         }
+
         final k = snap.data!;
         return Container(
           padding: const EdgeInsets.all(14),
@@ -196,8 +220,12 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   Future<_TodayKpi> _buildTodayKpi() async {
-    final today = await _healthRepo.fetchDailyTotalDistance(DateTime.now());
-    final avg7 = await _healthRepo.fetchRollingDailyAverage(days: 7);
+    final results = await Future.wait<double>([
+      _healthRepo.fetchDailyTotalDistance(DateTime.now()),
+      _healthRepo.fetchRollingDailyAverage(days: 7),
+    ]);
+    final today = results[0];
+    final avg7 = results[1];
 
     final base = (avg7 <= 0) ? 1.0 : avg7; // 0割防止
     final deltaPct = (today - avg7) / base * 100.0;
@@ -245,6 +273,47 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         deltaPct: deltaPct,
       );
     }
+  }
+
+  Widget _kpiLoadingCard() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Theme.of(context).colorScheme.surface,
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 16,
+            offset: Offset(0, 8),
+            color: Color(0x1A000000),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Text('⏳', style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'データから結果を生成中…',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                const LinearProgressIndicator(),
+                const SizedBox(height: 6),
+                Text(
+                  '少し時間がかかることがあります（通信状況・データ量によります）',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ---------- Widgets ----------
@@ -362,6 +431,32 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         const Text(
           'SwitchBotと連携すると、温度・湿度の自動記録が有効になります。',
           style: TextStyle(fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _switchbotNeedDeviceBlock() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('SwitchBot'),
+        const SizedBox(height: 8),
+        const Text(
+          '✅ 認証は完了しています。\n'
+          '次は温湿度計（Meter）を選択してください。',
+          style: TextStyle(fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.settings),
+          label: const Text('SwitchBot設定を開く'),
+          onPressed: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SwitchbotSetupScreen()),
+            );
+          },
         ),
       ],
     );
