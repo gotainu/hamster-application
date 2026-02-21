@@ -22,18 +22,20 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
   bool _saving = false;
   bool _canPickDevices = false; // 資格情報保存済みで有効化
-  String? _status;
   bool _disabling = false;
   bool _hasSecrets = false;
-  Map<String, dynamic>? _secretEcho; // {token:{head,len,tail}, secret:{...}}
   bool _loading = false;
+  bool _polling = false;
 
   // 選択済みデバイス表示用
   String? _selectedDeviceId;
   String? _selectedDeviceName;
   String? _selectedDeviceType;
 
+  String? _status;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
+
+  Map<String, dynamic>? _secretEcho; // {token:{head,len,tail}, secret:{...}}
 
   FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
         app: Firebase.app(),
@@ -342,6 +344,8 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       _selectedDeviceType = type;
       _status = 'デバイスを保存しました。';
     });
+    // ✅ 初回の設定が保存できた瞬間に1回取得して、readingsを早速1件作る
+    await _pollNowOnce();
   }
 
   Future<void> _disableIntegration({bool deleteReadings = false}) async {
@@ -358,27 +362,69 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
       if (!mounted) return;
 
+      // ✅ まずローカル状態を “解除済み” に倒す（古いカードが残らない）
       setState(() {
+        _hasSecrets = false;
+        _secretEcho = null;
+
         _canPickDevices = false;
         _selectedDeviceId = null;
         _selectedDeviceName = null;
         _selectedDeviceType = null;
-        _status = 'SwitchBot 連携を解除しました。再度使う場合は TOKEN/SECRET を保存し直してください。';
+
+        _tokenCtrl.clear();
+        _secretCtrl.clear();
+
+        _status = 'SwitchBot 連携を解除しました。TOKEN/SECRET を保存し直してください。';
       });
 
       _showSnack('SwitchBot 連携を解除しました');
+
+      // ✅ Firestoreの最新状態と同期（ここが本命）
+      await _loadCurrent();
     } on FirebaseFunctionsException catch (e) {
       _showSnack('連携解除に失敗: ${e.message}');
-      if (mounted) {
-        setState(() => _status = 'エラー: ${e.message}');
-      }
+      if (mounted) setState(() => _status = 'エラー: ${e.message}');
     } catch (e) {
       _showSnack('連携解除に失敗: $e');
-      if (mounted) {
-        setState(() => _status = 'エラー: $e');
-      }
+      if (mounted) setState(() => _status = 'エラー: $e');
     } finally {
       if (mounted) setState(() => _disabling = false);
+    }
+  }
+
+  Future<void> _pollNowOnce() async {
+    setState(() {
+      _polling = true;
+      _status = 'SwitchBotから最新データを取得しています...';
+    });
+
+    try {
+      final callable = _fns.httpsCallable('pollMySwitchbotNow');
+      final res = await callable.call();
+
+      final data = (res.data is Map)
+          ? Map<String, dynamic>.from(res.data as Map)
+          : <String, dynamic>{};
+
+      if (data['ok'] == true) {
+        _showSnack('✅ 最新データを取得しました');
+        if (mounted) {
+          setState(() => _status = '✅ 最新データを取得しました（グラフに反映されます）');
+        }
+      } else {
+        final msg = data['error']?.toString() ?? '不明なエラー';
+        _showSnack('⚠️ 取得できませんでした: $msg');
+        if (mounted) setState(() => _status = '⚠️ 取得できませんでした: $msg');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      _showSnack('❌ 取得に失敗: ${e.message}');
+      if (mounted) setState(() => _status = '❌ 取得に失敗: ${e.message}');
+    } catch (e) {
+      _showSnack('❌ 取得に失敗: $e');
+      if (mounted) setState(() => _status = '❌ 取得に失敗: $e');
+    } finally {
+      if (mounted) setState(() => _polling = false);
     }
   }
 
@@ -506,7 +552,9 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
               title: const Text('選択中の温湿度計'),
               subtitle: Text(deviceSummary),
               trailing: ElevatedButton.icon(
-                onPressed: _canPickDevices ? _pickDeviceFromCloud : null,
+                onPressed: (_canPickDevices && !_polling)
+                    ? _pickDeviceFromCloud
+                    : null,
                 icon: const Icon(Icons.list_alt),
                 label: const Text('デバイス一覧から選ぶ'),
               ),
@@ -515,17 +563,33 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
           const SizedBox(height: 16),
           if (_status != null)
-            Text(
-              _status!,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: Colors.grey),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_polling) ...[
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    _status!,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey),
+                  ),
+                ),
+              ],
             ),
           const SizedBox(height: 8),
           const Divider(),
           const Text(
-            '※ TOKEN/SECRET は Functions 側で暗号化保管され、アプリからは参照できません。',
+            '※ TOKEN/SECRET はサーバ（Cloud Functions）経由で保存されます。'
+            '安全のため、アプリでは全文を表示しません（先頭/末尾のみ表示）。',
             style: TextStyle(fontSize: 12),
           ),
         ],

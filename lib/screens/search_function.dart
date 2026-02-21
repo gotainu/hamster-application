@@ -8,10 +8,57 @@ import 'dart:async';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/shine_border.dart';
 
+class RetrievedChunk {
+  final String id;
+  final double score;
+  final String text;
+  final String filename;
+  final int? lineStart;
+  final int? lineEnd;
+  final String semanticTitle;
+  final String sectionName;
+  final String sectionSummary;
+  final String metaVersion;
+
+  RetrievedChunk({
+    required this.id,
+    required this.score,
+    required this.text,
+    required this.filename,
+    this.lineStart,
+    this.lineEnd,
+    required this.semanticTitle,
+    required this.sectionName,
+    required this.sectionSummary,
+    required this.metaVersion,
+  });
+
+  factory RetrievedChunk.fromJson(Map<String, dynamic> j) {
+    return RetrievedChunk(
+      id: (j['id'] ?? '') as String,
+      score: (j['score'] as num?)?.toDouble() ?? 0.0,
+      text: (j['text'] ?? '') as String,
+      filename: (j['filename'] ?? '') as String,
+      lineStart: (j['line_start'] as num?)?.toInt(),
+      lineEnd: (j['line_end'] as num?)?.toInt(),
+      semanticTitle: (j['semantic_title'] ?? '') as String,
+      sectionName: (j['section_name'] ?? '') as String,
+      sectionSummary: (j['section_summary'] ?? '') as String,
+      metaVersion: (j['meta_version'] ?? '') as String,
+    );
+  }
+}
+
+class ChatApiResult {
+  final String answer;
+  final List<RetrievedChunk> chunks;
+  ChatApiResult({required this.answer, required this.chunks});
+}
+
 class ChatMessage {
   final String content;
   final bool isUser;
-  final List<String>? chunks;
+  final List<RetrievedChunk>? chunks;
   final String? originalQuery;
   final bool isLoading;
 
@@ -96,13 +143,21 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     });
   }
 
-  Future<List<String>> _fetchAIResponseWithHistory(String userMessage) async {
+  Future<ChatApiResult> _fetchAIResponseWithHistory(String userMessage) async {
     final url = Uri.parse('http://10.0.2.2:8000/chat');
-    final List<String> history =
-        _messages.where((msg) => msg.isUser).map((msg) => msg.content).toList();
+
+    // 直近の履歴を送る（多すぎ防止）
+    const int maxHistory = 12;
+    final historyToSend = List<Map<String, String>>.from(
+      _conversationHistory.length > maxHistory
+          ? _conversationHistory
+              .sublist(_conversationHistory.length - maxHistory)
+          : _conversationHistory,
+    );
+
     final requestBody = json.encode({
       "query": userMessage,
-      "history": history,
+      "history": historyToSend, // ★ role/content の配列
     });
 
     final res = await http.post(
@@ -112,10 +167,16 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     );
 
     if (res.statusCode == 200) {
-      final decoded = json.decode(utf8.decode(res.bodyBytes));
-      final answer = decoded["answer"] as String;
-      final chunks = (decoded["chunks"] as List<dynamic>).cast<String>();
-      return [answer, ...chunks];
+      final decoded =
+          json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+      final answer = (decoded["answer"] ?? "") as String;
+
+      final rawChunks = (decoded["chunks"] as List<dynamic>? ?? []);
+      final chunks = rawChunks
+          .map((e) => RetrievedChunk.fromJson(e as Map<String, dynamic>))
+          .toList();
+
+      return ChatApiResult(answer: answer, chunks: chunks);
     } else {
       throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
     }
@@ -155,18 +216,17 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
 
     try {
       final result = await _fetchAIResponseWithHistory(text);
-      final aiAnswer = result[0];
-      final aiChunks = result.sublist(1);
 
       setState(() {
         _messages.removeWhere((msg) => msg.isLoading);
         _messages.add(ChatMessage(
-          content: aiAnswer,
+          content: result.answer,
           isUser: false,
-          chunks: aiChunks,
+          chunks: result.chunks,
           originalQuery: text,
         ));
-        _conversationHistory.add({"role": "assistant", "content": aiAnswer});
+        _conversationHistory
+            .add({"role": "assistant", "content": result.answer});
       });
       _scrollToBottom();
     } catch (e) {
@@ -195,72 +255,66 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
     });
   }
 
-  Future<void> _showDebugChunksDialog(String query) async {
-    final uri = Uri.parse(
-        'http://10.0.2.2:8000/debug_search?query=${Uri.encodeQueryComponent(query)}&top_k=10');
-    final resp = await http.get(uri);
-
-    if (resp.statusCode == 200) {
-      final decoded = json.decode(utf8.decode(resp.bodyBytes));
-      final List<Map<String, dynamic>> chunks =
-          (decoded['matches'] as List).map((item) {
-        return {
-          'score': item['score'] ?? 0.0,
-          'id': item['id'] ?? '',
-          'text': item['text'] ?? '',
-        };
-      }).toList();
-      showDialog(
-        context: context,
-        builder: (context) {
-          return DefaultTabController(
-            length: chunks.length,
-            child: AlertDialog(
-              title: const Text('検索チャンク一覧'),
-              content: SizedBox(
-                width: double.maxFinite,
-                height: 420,
-                child: Column(
-                  children: [
-                    TabBar(
-                      isScrollable: true,
-                      tabs: List.generate(
-                          chunks.length, (i) => Tab(text: 'チャンク${i + 1}')),
+  Future<void> _showChunksDialog(List<RetrievedChunk> chunks) async {
+    if (chunks.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (_) {
+        return DefaultTabController(
+          length: chunks.length,
+          child: AlertDialog(
+            title: const Text('引用チャンク'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 420,
+              child: Column(
+                children: [
+                  TabBar(
+                    isScrollable: true,
+                    tabs: List.generate(
+                        chunks.length, (i) => Tab(text: 'チャンク${i + 1}')),
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      children: chunks.map((c) {
+                        return SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('score: ${c.score}'),
+                              Text('id: ${c.id}'),
+                              if (c.filename.isNotEmpty)
+                                Text('file: ${c.filename}'),
+                              if (c.lineStart != null && c.lineEnd != null)
+                                Text('lines: ${c.lineStart}-${c.lineEnd}'),
+                              if (c.semanticTitle.isNotEmpty)
+                                Text('title: ${c.semanticTitle}'),
+                              if (c.sectionName.isNotEmpty)
+                                Text('section: ${c.sectionName}'),
+                              const SizedBox(height: 8),
+                              Text(c.text),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    Expanded(
-                      child: TabBarView(
-                        children: chunks.map((chunk) {
-                          return SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('score: ${chunk['score']}'),
-                                Text('id: ${chunk['id']}'),
-                                const SizedBox(height: 8),
-                                Text(chunk['text']),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('閉じる'),
-                ),
-              ],
             ),
-          );
-        },
-      );
-    }
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('閉じる')),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildMessageBubble(ChatMessage msg) {
+    final hasChunks = (msg.chunks?.isNotEmpty ?? false);
     if (msg.isLoading) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,9 +388,9 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
             ],
           ],
         ),
-        if (!msg.isUser && msg.originalQuery != null)
+        if (!msg.isUser && hasChunks)
           TextButton(
-            onPressed: () => _showDebugChunksDialog(msg.originalQuery!),
+            onPressed: () => _showChunksDialog(msg.chunks!),
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
