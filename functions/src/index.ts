@@ -9,6 +9,15 @@ import crypto from 'crypto';
 admin.initializeApp();
 const db = admin.firestore();
 
+function getProjectId(): string | null {
+  return (
+    process.env.GCLOUD_PROJECT ||
+    process.env.PROJECT_ID ||
+    admin.app().options.projectId ||
+    null
+  );
+}
+
 /** ---- Envelope 復号（今回は未使用だけど残してOK） ---- */
 function getEnvelopeKey(): Buffer {
   const raw = process.env.ENVELOPE_KEY || '';
@@ -95,7 +104,6 @@ export const registerSwitchbotSecrets = onCall(
     const token = String(req.data?.token ?? '').trim();
     const secret = String(req.data?.secret ?? '').trim();
 
-    // ✅ TS: string.isEmpty は無い。length で判定。
     if (token.length === 0 || secret.length === 0) {
       throw new HttpsError('invalid-argument', 'TOKEN/SECRET は必須です。');
     }
@@ -103,7 +111,6 @@ export const registerSwitchbotSecrets = onCall(
       throw new HttpsError('invalid-argument', 'TOKEN/SECRET の形式が不正です（短すぎます）。');
     }
 
-    // ✅ ここが本命：保存前に検証（401/403ならここで落ちる）
     await verifySwitchbotTokenSecret(token, secret);
 
     const docRef = db
@@ -133,7 +140,18 @@ export const registerSwitchbotSecrets = onCall(
       { merge: true },
     );
 
-    return { ok: true, verified: true };
+    const verifySnap = await docRef.get();
+
+    return {
+      ok: true,
+      verified: true,
+      uid,
+      projectId: process.env.GCLOUD_PROJECT ?? null,
+      debugMarker: 'registerSwitchbotSecrets_v2_20260301',
+      savedDocExists: verifySnap.exists,
+      savedDocData: verifySnap.data() ?? null,
+      savedPath: docRef.path,
+    };
   },
 );
 
@@ -324,13 +342,21 @@ export const pollMySwitchbotNow = onCall({ region: 'asia-northeast1' }, async (r
   if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
   try {
     const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-    if (!token || !secret || !meterDeviceId) return { ok: false, error: 'missing config (token/secret/deviceId)' };
+    if (!token || !secret || !meterDeviceId) {
+      return { ok: false, uid: req.auth.uid, error: 'missing config (token/secret/deviceId)' };
+    }
     const status = await getMeterStatus(meterDeviceId, token, secret);
     await saveReading(req.auth.uid, status);
-    return { ok: true, saved: 1, status };
+
+    logger.info('pollMySwitchbotNow success', {
+      uid: req.auth.uid,
+      meterDeviceId,
+    });
+
+    return { ok: true, uid: req.auth.uid, saved: 1, status };
   } catch (e: any) {
-    logger.error('pollMine error', e);
-    return { ok: false, error: String(e?.message ?? e) };
+    logger.error('pollMine error', { uid: req.auth?.uid, error: String(e?.message ?? e) });
+    return { ok: false, uid: req.auth?.uid ?? null, error: String(e?.message ?? e) };
   }
 });
 
