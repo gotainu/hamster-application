@@ -62,24 +62,33 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
   }
 
   // ---- 初期ロード：資格情報の有無と選択済みデバイスを読む ----
-  Future<void> _loadCurrent() async {
+  Future<void> _loadCurrent({bool forceServer = false}) async {
     setState(() => _loading = true);
 
     final userRef = FirebaseFirestore.instance.collection('users').doc(_uid);
+    final options = forceServer
+        ? const GetOptions(source: Source.server)
+        : const GetOptions(source: Source.serverAndCache);
 
-    // 選択済みデバイス（任意）
+    // 先にリセットしておく
+    String? selectedDeviceId;
+    String? selectedDeviceName;
+    String? selectedDeviceType;
+
     final devDoc =
-        await userRef.collection('integrations').doc('switchbot').get();
+        await userRef.collection('integrations').doc('switchbot').get(options);
     if (devDoc.exists) {
       final m = devDoc.data()!;
-      _selectedDeviceId = (m['meterDeviceId'] as String?);
-      _selectedDeviceName = (m['meterDeviceName'] as String?);
-      _selectedDeviceType = (m['meterDeviceType'] as String?);
+      selectedDeviceId = m['meterDeviceId'] as String?;
+      selectedDeviceName = m['meterDeviceName'] as String?;
+      selectedDeviceType = m['meterDeviceType'] as String?;
     }
 
-    // 資格情報（v1_plain 優先、なければ v1）
-    final secDoc =
-        await userRef.collection('integrations').doc('switchbot_secrets').get();
+    final secDoc = await userRef
+        .collection('integrations')
+        .doc('switchbot_secrets')
+        .get(options);
+
     final data = secDoc.data();
 
     bool hasSecrets = false;
@@ -98,7 +107,6 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       }
     }
 
-    // 保存済みなら head/tail を取得（表示用）
     Map<String, dynamic>? echo;
     if (hasSecrets) {
       try {
@@ -107,13 +115,15 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         echo = (res.data is Map)
             ? Map<String, dynamic>.from(res.data as Map)
             : null;
-      } catch (_) {
-        // 表示の補助なので失敗してもOK
-      }
+      } catch (_) {}
     }
 
     if (!mounted) return;
     setState(() {
+      _selectedDeviceId = selectedDeviceId;
+      _selectedDeviceName = selectedDeviceName;
+      _selectedDeviceType = selectedDeviceType;
+
       _hasSecrets = hasSecrets;
       _canPickDevices = hasSecrets;
       _secretEcho = echo;
@@ -122,7 +132,8 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
           : 'まだ資格情報がありません。TOKEN/SECRET を保存してください。';
       _loading = false;
     });
-  } // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
+  }
+  // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
 
   Future<void> _saveSecrets() async {
     if (!_formKey.currentState!.validate()) return;
@@ -142,10 +153,10 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         'secret': secret,
       });
 
-      // ✅ 念のため戻り値も見る（Functionsが変な成功を返しても弾ける）
       final data = (res.data is Map)
           ? Map<String, dynamic>.from(res.data as Map)
           : <String, dynamic>{};
+
       final ok = data['ok'] == true;
       final verified = data['verified'] == true;
 
@@ -157,18 +168,43 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         );
       }
 
+      final returnedProjectId = data['projectId']?.toString() ?? 'unknown';
+      final returnedUid = data['uid']?.toString() ?? 'unknown';
+      final debugMarker = data['debugMarker']?.toString() ?? 'unknown';
+
+      final secRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(_uid)
+          .collection('integrations')
+          .doc('switchbot_secrets');
+
+      final secSnap = await secRef.get(const GetOptions(source: Source.server));
+      final existsNow = secSnap.exists;
+
       if (!mounted) return;
       setState(() {
+        _hasSecrets = true; // ← 最重要
         _canPickDevices = true;
-        _status = '✅ 認証OK：資格情報を保存しました。次に「デバイス一覧から選ぶ」を押してください。';
+        _status = '✅ 認証OK：資格情報を保存しました。\n'
+            'Functions uid=$returnedUid\n'
+            'Functions projectId=$returnedProjectId\n'
+            'Functions debugMarker=$debugMarker\n'
+            'Firestore exists(after save)=$existsNow\n'
+            '次に「デバイス一覧から選ぶ」を押してください。';
       });
-      _showSnack('✅ SwitchBot 認証OK：資格情報を保存しました');
 
-      // 1件だけなら自動選択（ベストエフォート）
+      _showSnack(
+        existsNow
+            ? '✅ SwitchBot 認証OK：保存確認できた'
+            : '⚠️ Functionsは成功したが Firestore に switchbot_secrets が見つからない',
+      );
+
+      // 自動選択
       await _autoPickIfSingleMeter();
-      await _loadCurrent();
+
+      // 最後に server から正で再同期
+      await _loadCurrent(forceServer: true);
     } on FirebaseFunctionsException catch (e) {
-      // permission-denied / invalid-argument / unavailable などがここに来る
       final msg = e.message ?? '不明なエラー';
       _showSnack('❌ 検証に失敗: $msg');
       if (mounted) {
@@ -332,6 +368,8 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         'meterDeviceId': id,
         'meterDeviceName': name,
         'meterDeviceType': type,
+        'enabled': true,
+        'disabledAt': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
@@ -515,6 +553,9 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final app = Firebase.app();
+    final projectId = app.options.projectId ?? 'unknown';
+    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? 'null';
     final deviceSummary = (_selectedDeviceId == null)
         ? '未選択'
         : '$_selectedDeviceName ($_selectedDeviceType)\n$_selectedDeviceId';
@@ -532,6 +573,23 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
             '2) 下に貼り付けて [検証して保存]\n'
             '3) [デバイス一覧から選ぶ] で温湿度計を選択（Device ID は自動保存）',
           ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Theme.of(context).colorScheme.surface,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Firebase projectId: $projectId'),
+                const SizedBox(height: 4),
+                Text('Current UID: $currentUid'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           const SizedBox(height: 16),
 
           // 資格情報（未保存: フォーム / 保存済み: 表示カード）
