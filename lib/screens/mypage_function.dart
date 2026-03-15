@@ -7,6 +7,8 @@ class FuncMyPageScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    final uid = user?.uid ?? 'null';
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bgGradient =
         isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
@@ -65,6 +67,15 @@ class FuncMyPageScreen extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 24,
                         ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'UID: $uid',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
                   Text(

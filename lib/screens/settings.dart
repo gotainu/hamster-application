@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:hamster_project/main.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+final uid = FirebaseAuth.instance.currentUser?.uid;
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -76,6 +80,7 @@ class _SettingScreenState extends State<SettingScreen> {
                           newValue ? ThemeMode.dark : ThemeMode.light;
                       MyApp.of(context).setThemeMode(newMode);
                       setState(() {});
+                      debugPrint('🔥 current uid = $uid');
                     },
                   ),
                 ],
