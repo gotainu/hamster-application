@@ -1,6 +1,81 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
+  // ===== Environment Assessment Visual =====
+  static const Color envGood = Color(0xFF4CD6A7);
+  static const Color envCaution = Color(0xFFFFC857);
+  static const Color envDanger = Color(0xFFFF6B6B);
+
+  static Gradient environmentHeroGradient(String? level, {bool isDark = true}) {
+    switch (level) {
+      case '良好':
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xFF163B3A),
+                  Color(0xFF1E4E59),
+                  Color(0xFF2A2E4A),
+                ]
+              : const [
+                  Color(0xFFDDFBF2),
+                  Color(0xFFCDEEF7),
+                  Color(0xFFEFF4FF),
+                ],
+        );
+      case '危険':
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xFF4A1F26),
+                  Color(0xFF452B39),
+                  Color(0xFF2A2438),
+                ]
+              : const [
+                  Color(0xFFFFE2E2),
+                  Color(0xFFFFECE5),
+                  Color(0xFFF8F1F4),
+                ],
+        );
+      case '注意':
+      default:
+        return LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [
+                  Color(0xFF4B3A1E),
+                  Color(0xFF2F3C59),
+                  Color(0xFF252A40),
+                ]
+              : const [
+                  Color(0xFFFFF2CC),
+                  Color(0xFFDCEBFF),
+                  Color(0xFFF1F4FA),
+                ],
+        );
+    }
+  }
+
+  static Color environmentAccent(String? level) {
+    switch (level) {
+      case '良好':
+        return envGood;
+      case '危険':
+        return envDanger;
+      case '注意':
+      default:
+        return envCaution;
+    }
+  }
+
+  static Color environmentSoftFill(String? level, {double opacity = 0.16}) {
+    return environmentAccent(level).withOpacity(opacity);
+  }
+
   // ---- グラデーションカラー（OuraRing風） ----
   static const Color gradientStart = Color(0xFF263C70); // 深めの青
   static const Color gradientEnd = Color(0xFF181A20); // 黒に近い
