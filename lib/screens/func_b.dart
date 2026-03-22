@@ -1,6 +1,7 @@
 // lib/screens/func_b.dart
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../services/fetch_and_store.dart';
 import '../services/switchbot_repo.dart';
@@ -18,6 +19,8 @@ class _FuncBScreenState extends State<FuncBScreen> {
   final _sbRepo = SwitchbotRepo();
 
   String? _lastInfo;
+  bool _polling = false;
+  bool _backfilling = false;
 
   void _showSheet(String title, Object data) {
     final text = FetchAndStore.pretty(data);
@@ -44,8 +47,87 @@ class _FuncBScreenState extends State<FuncBScreen> {
     );
   }
 
+  Future<void> _runPollNow() async {
+    if (_polling || _backfilling) return;
+
+    setState(() => _polling = true);
+
+    try {
+      final res = await _fetcher.pollMineNow();
+      if (!mounted) return;
+
+      final pretty = FetchAndStore.pretty(res);
+      setState(() => _lastInfo = 'poll:\n$pretty');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('最新取得を実行しました')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _lastInfo = 'poll error:\n$e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('最新取得に失敗: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _polling = false);
+      }
+    }
+  }
+
+  Future<void> _runBackfill() async {
+    if (_polling || _backfilling) return;
+
+    setState(() => _backfilling = true);
+
+    try {
+      final callable = FirebaseFunctions.instanceFor(
+        region: 'asia-northeast1',
+      ).httpsCallable('backfillMyEnvironmentAssessmentsHistory');
+
+      final res = await callable.call();
+
+      if (!mounted) return;
+
+      final data = res.data;
+      final pretty = FetchAndStore.pretty(data);
+      setState(() => _lastInfo = 'backfill:\n$pretty');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('履歴バックフィルを実行しました')),
+      );
+
+      _showSheet('Backfill Result', data);
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+
+      final msg = e.message ?? e.code;
+      setState(() => _lastInfo = 'backfill error:\n$msg');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('バックフィル失敗: $msg')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _lastInfo = 'backfill error:\n$e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('バックフィル失敗: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _backfilling = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final busy = _polling || _backfilling;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('走った記録（温湿度）'),
@@ -94,25 +176,22 @@ class _FuncBScreenState extends State<FuncBScreen> {
           ),
           IconButton(
             tooltip: '今すぐ取得',
-            icon: const Icon(Icons.sync),
-            onPressed: () async {
-              final res = await _fetcher.pollMineNow();
-              if (!mounted) return;
-
-              setState(() => _lastInfo = FetchAndStore.pretty(res));
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('poll: ${FetchAndStore.pretty(res)}')),
-              );
-            },
+            icon: _polling
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+            onPressed: busy ? null : _runPollNow,
           ),
         ],
       ),
       body: StreamBuilder<List<SwitchbotReading>>(
-        stream: _sbRepo.watchReadings(limit: 2000), // ★Repo経由
+        stream: _sbRepo.watchReadings(limit: 2000),
         builder: (context, snap) {
           final readings = snap.data ?? const <SwitchbotReading>[];
 
-          // グラフ用に変換（nullは落とす）
           final tempPts = <_Point>[];
           final humPts = <_Point>[];
 
@@ -125,6 +204,53 @@ class _FuncBScreenState extends State<FuncBScreen> {
           return ListView(
             padding: const EdgeInsets.all(12),
             children: [
+              _Card(
+                title: 'Debug Actions',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: busy ? null : _runPollNow,
+                          icon: _polling
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.sync),
+                          label: Text(_polling ? '取得中...' : '最新取得'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : _runBackfill,
+                          icon: _backfilling
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.history),
+                          label: Text(_backfilling ? 'バックフィル中...' : '履歴バックフィル'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '履歴バックフィルは、既存の switchbot_readings から '
+                      'environment_assessments_history/{yyyyMMdd} を過去日付分まとめて作成します。',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
               _Card(
                 title: 'Temperature (°C)',
                 child: SizedBox(
@@ -180,7 +306,10 @@ class _FuncBScreenState extends State<FuncBScreen> {
               ),
               const SizedBox(height: 12),
               if (_lastInfo != null)
-                Text('last: $_lastInfo', style: const TextStyle(fontSize: 12)),
+                SelectableText(
+                  _lastInfo!,
+                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                ),
               if (snap.connectionState == ConnectionState.waiting)
                 const Center(
                   child: Padding(
