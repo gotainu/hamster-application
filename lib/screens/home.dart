@@ -7,6 +7,7 @@ import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/func_b.dart';
+import 'package:hamster_project/services/environment_trend_service.dart';
 import 'dart:math' as math;
 
 class HomeScreen extends StatefulWidget {
@@ -186,6 +187,9 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     this.history = const [],
   });
 
+  static const EnvironmentTrendService _trendService =
+      EnvironmentTrendService();
+
   factory _EnvironmentAssessmentHero.loading() {
     return const _EnvironmentAssessmentHero(isLoading: true);
   }
@@ -197,25 +201,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
       isEmptyState: true,
       onOpenSetup: onOpenSetup,
     );
-  }
-
-  String _emojiForLevel(String? level) {
-    switch (level) {
-      case '良好':
-        return '✅';
-      case '注意':
-        return '⚠️';
-      case '危険':
-        return '🚨';
-      default:
-        return '🏠';
-    }
-  }
-
-  IconData _iconForMetricLabel(String text) {
-    if (text.contains('温度')) return Icons.thermostat_rounded;
-    if (text.contains('湿度')) return Icons.water_drop_outlined;
-    return Icons.analytics_outlined;
   }
 
   String _formatTime(DateTime? dt) {
@@ -234,32 +219,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
       default:
         return '総合評価: 未評価';
     }
-  }
-
-  String _buildHeroLead(EnvironmentAssessment a) {
-    final hum = a.avgHum;
-    final temp = a.avgTemp;
-
-    if (a.level == '危険') {
-      return '今すぐ環境を確認したい状態です';
-    }
-
-    if (hum != null && hum > 60) {
-      return 'いま一番気にしたいのは湿度です';
-    }
-    if (hum != null && hum < 40) {
-      return '乾燥気味なので湿度を見たいです';
-    }
-    if (temp != null && temp > 26) {
-      return '暑さに注意したい状態です';
-    }
-    if (temp != null && temp < 20) {
-      return '寒さに注意したい状態です';
-    }
-    if (a.level == '良好') {
-      return 'かなり安定した飼育環境です';
-    }
-    return 'いまの状態をすぐ確認できます';
   }
 
   String _mainMetricLabel(EnvironmentAssessment a) {
@@ -301,113 +260,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     if (temp > 26) return '理想 20–26℃ より高め';
     if (temp < 20) return '理想 20–26℃ より低め';
     return '理想 20–26℃ の範囲';
-  }
-
-  List<_MetricPillData> _buildMetricPills(EnvironmentAssessment a) {
-    final pills = <_MetricPillData>[];
-
-    if (a.avgTemp != null) {
-      pills.add(
-        _MetricPillData(
-          icon: Icons.thermostat_rounded,
-          label: '平均温度',
-          value: '${a.avgTemp!.toStringAsFixed(1)}℃',
-        ),
-      );
-    }
-
-    if (a.avgHum != null) {
-      pills.add(
-        _MetricPillData(
-          icon: Icons.water_drop_outlined,
-          label: '平均湿度',
-          value: '${a.avgHum!.round()}%',
-        ),
-      );
-    }
-
-    if (a.tempRatio != null) {
-      pills.add(
-        _MetricPillData(
-          icon: Icons.monitor_heart_outlined,
-          label: '温度適正率',
-          value: '${(a.tempRatio! * 100).round()}%',
-        ),
-      );
-    }
-
-    if (a.humRatio != null) {
-      pills.add(
-        _MetricPillData(
-          icon: Icons.air_rounded,
-          label: '湿度適正率',
-          value: '${(a.humRatio! * 100).round()}%',
-        ),
-      );
-    }
-
-    return pills;
-  }
-
-  double? _avgOfHistory(
-    List<EnvironmentAssessmentHistory> items,
-    double? Function(EnvironmentAssessmentHistory e) pick,
-  ) {
-    if (items.isEmpty) return null;
-
-    final values = items.map(pick).whereType<double>().toList();
-
-    if (values.isEmpty) return null;
-    return values.reduce((a, b) => a + b) / values.length;
-  }
-
-  int? _avgIntOfHistory(
-    List<EnvironmentAssessmentHistory> items,
-    int? Function(EnvironmentAssessmentHistory e) pick,
-  ) {
-    if (items.isEmpty) return null;
-
-    final values = items.map(pick).whereType<int>().toList();
-
-    if (values.isEmpty) return null;
-    return (values.reduce((a, b) => a + b) / values.length).round();
-  }
-
-  String _buildTrendText(EnvironmentAssessment a) {
-    final validHistory = history.where((e) => e.hasCoreData).toList();
-    if (validHistory.length < 2) return 'まだ週間比較データが少ないです';
-
-    final label = _mainMetricLabel(a);
-
-    if (label == '平均湿度' && a.avgHum != null) {
-      final baseline = _avgOfHistory(validHistory, (e) => e.avgHum);
-      if (baseline == null) return 'まだ週間比較データが少ないです';
-
-      final diff = a.avgHum! - baseline;
-      final sign = diff > 0 ? '+' : '';
-      final absDiff = diff.abs().round();
-
-      if (absDiff == 0) {
-        return '直近7日平均とほぼ同じ湿度です';
-      }
-      return '直近7日平均より湿度 ${sign}${diff.round()}%';
-    }
-
-    if (label == '平均温度' && a.avgTemp != null) {
-      final baseline = _avgOfHistory(validHistory, (e) => e.avgTemp);
-      if (baseline == null) return 'まだ週間比較データが少ないです';
-
-      final diff = a.avgTemp! - baseline;
-      final sign = diff > 0 ? '+' : '';
-      final absDiff = diff.abs();
-
-      if (absDiff < 0.1) {
-        return '直近7日平均とほぼ同じ温度です';
-      }
-      return '直近7日平均より温度 ${sign}${diff.toStringAsFixed(1)}℃';
-    }
-
-    return '直近7日の推移を確認できます';
   }
 
   List<double> _buildSparkValues(EnvironmentAssessment a) {
@@ -484,14 +336,18 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     }
 
     final a = assessment!;
-    final trendText = _buildTrendText(a);
-    final sparkValues = _buildSparkValues(a);
-    final accent = AppTheme.environmentAccent(a.level);
-
-    // ===== 主役決定 =====
     final label = _mainMetricLabel(a);
     final value = _mainMetricValue(a);
     final sub = _mainMetricSub(a);
+
+    final trend = _trendService.buildWeeklyTrendSummary(
+      assessment: a,
+      history: history,
+      mainMetricLabel: label,
+    );
+
+    final sparkValues = _buildSparkValues(a);
+    final accent = AppTheme.environmentAccent(a.level);
 
     return Material(
       color: Colors.transparent,
@@ -562,19 +418,52 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  Text(
-                    _levelShortText(a.level),
-                    style: TextStyle(
-                      color: accent,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        _levelShortText(a.level),
+                        style: TextStyle(
+                          color: accent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: accent.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                            color: accent.withOpacity(0.18),
+                          ),
+                        ),
+                        child: Text(
+                          trend.directionText,
+                          style: TextStyle(
+                            color: accent,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
 
                   Text(
-                    trendText,
+                    trend.deltaText,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    trend.summaryText,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.white70,
                           fontWeight: FontWeight.w600,
@@ -590,20 +479,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                   ],
 
                   const SizedBox(height: 18),
-
-                  // ===== 小さい補助指標 =====
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _buildMetricPills(a)
-                        .map((m) => _HeroMetricPill(
-                              data: m,
-                              accent: accent,
-                            ))
-                        .toList(),
-                  ),
-
-                  const SizedBox(height: 16),
 
                   Row(
                     children: [
@@ -630,62 +505,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  static const String _levelBadgeTextPrefix = '●';
-}
-
-class _MetricPillData {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _MetricPillData({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-}
-
-class _HeroMetricPill extends StatelessWidget {
-  final _MetricPillData data;
-  final Color accent;
-
-  const _HeroMetricPill({
-    required this.data,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: accent.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: accent.withOpacity(0.16),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            data.icon,
-            size: 16,
-            color: accent,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            '${data.label} ${data.value}',
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -1103,41 +922,6 @@ class _WideActionTile extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _MetricChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _MetricChip({
-    required this.icon,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppTheme.accent.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppTheme.accent),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
