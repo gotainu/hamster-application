@@ -1,0 +1,51 @@
+import 'activity_distribution.dart';
+
+class ActivitySummary {
+  final double todayDistanceMeters;
+  final double avg7DistanceMeters;
+  final double deltaPct;
+  final DateTime? latestRecordedAt;
+  final String headline;
+  final String deltaText;
+  final String summaryText;
+  final String directionText;
+  final bool hasAnyRecord;
+  final bool todayHasRecord;
+  final double referenceDistanceMeters;
+  final DateTime? referenceDate;
+  final ActivityDistribution? distribution;
+
+  const ActivitySummary({
+    required this.todayDistanceMeters,
+    required this.avg7DistanceMeters,
+    required this.deltaPct,
+    required this.latestRecordedAt,
+    required this.headline,
+    required this.deltaText,
+    required this.summaryText,
+    required this.directionText,
+    required this.hasAnyRecord,
+    required this.todayHasRecord,
+    required this.referenceDistanceMeters,
+    required this.referenceDate,
+    required this.distribution,
+  });
+
+  factory ActivitySummary.empty() {
+    return const ActivitySummary(
+      todayDistanceMeters: 0,
+      avg7DistanceMeters: 0,
+      deltaPct: 0,
+      latestRecordedAt: null,
+      headline: 'まずは記録をためよう',
+      deltaText: '比較データがまだ少ないです',
+      summaryText: '走行距離の記録が増えると推移を表示できます',
+      directionText: '比較中',
+      hasAnyRecord: false,
+      todayHasRecord: false,
+      referenceDistanceMeters: 0,
+      referenceDate: null,
+      distribution: null,
+    );
+  }
+}
