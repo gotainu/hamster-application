@@ -8,10 +8,11 @@ import '../models/environment_assessment_history.dart';
 import '../models/health_record.dart';
 import '../services/activity_trend_service.dart';
 import '../services/environment_assessment_repo.dart';
-import '../services/environment_trend_service.dart';
 import '../services/health_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../theme/app_theme.dart';
+import '../models/semantic_chart_band.dart';
+import '../widgets/semantic_sparkline.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
   const DailyStatusDetailScreen({super.key});
@@ -116,23 +117,7 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                         .whereType<double>()
                         .toList(),
                     accent: AppTheme.environmentAccent(a.level),
-                    chartBands: [
-                      _SparkBand(
-                        start: double.negativeInfinity,
-                        end: 20,
-                        color: AppTheme.sparkBandLow(context),
-                      ),
-                      _SparkBand(
-                        start: 20,
-                        end: 26,
-                        color: AppTheme.sparkBandNormal(context),
-                      ),
-                      _SparkBand(
-                        start: 26,
-                        end: double.infinity,
-                        color: AppTheme.sparkBandHigh(context),
-                      ),
-                    ],
+                    chartBands: tempStatus.chartBands,
                   ),
                   const SizedBox(height: 14),
                   _MetricDetailCard(
@@ -151,23 +136,7 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                         .whereType<double>()
                         .toList(),
                     accent: AppTheme.environmentAccent(a.level),
-                    chartBands: [
-                      _SparkBand(
-                        start: double.negativeInfinity,
-                        end: 40,
-                        color: AppTheme.sparkBandLow(context),
-                      ),
-                      _SparkBand(
-                        start: 40,
-                        end: 60,
-                        color: AppTheme.sparkBandNormal(context),
-                      ),
-                      _SparkBand(
-                        start: 60,
-                        end: double.infinity,
-                        color: AppTheme.sparkBandHigh(context),
-                      ),
-                    ],
+                    chartBands: humStatus.chartBands,
                   ),
                   const SizedBox(height: 20),
                   _SectionLabel(title: '活動量'),
@@ -199,25 +168,7 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                     hasChart: bundle.activitySummary.hasAnyRecord,
                     emptyChartText: 'まだ走行距離の記録がありません',
                     emptyChartSubtext: '記録すると7日推移を表示できます',
-                    chartBands: bundle.activitySummary.distribution == null
-                        ? null
-                        : [
-                            _SparkBand(
-                              start: double.negativeInfinity,
-                              end: bundle.activitySummary.distribution!.p25,
-                              color: AppTheme.sparkBandLow(context),
-                            ),
-                            _SparkBand(
-                              start: bundle.activitySummary.distribution!.p25,
-                              end: bundle.activitySummary.distribution!.p75,
-                              color: AppTheme.sparkBandNormal(context),
-                            ),
-                            _SparkBand(
-                              start: bundle.activitySummary.distribution!.p75,
-                              end: double.infinity,
-                              color: AppTheme.sparkBandHigh(context),
-                            ),
-                          ],
+                    chartBands: bundle.activitySummary.chartBands,
                   ),
                   const SizedBox(height: 14),
                   if (bundle.activitySummary.distribution != null)
@@ -364,7 +315,7 @@ class _MetricDetailCard extends StatelessWidget {
   final bool hasChart;
   final String? emptyChartText;
   final String? emptyChartSubtext;
-  final List<_SparkBand>? chartBands;
+  final List<SemanticChartBand>? chartBands;
 
   const _MetricDetailCard({
     required this.title,
@@ -476,14 +427,11 @@ class _MetricDetailCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           if (hasChart && sparkValues.length >= 2)
-            SizedBox(
+            SemanticSparkline(
+              values: sparkValues,
+              color: accent,
+              bands: chartBands,
               height: 56,
-              child: _MiniSparkline(
-                values: sparkValues,
-                color: accent,
-                bands: chartBands,
-                parentContext: context,
-              ),
             )
           else
             Container(
@@ -518,162 +466,6 @@ class _MetricDetailCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MiniSparkline extends StatelessWidget {
-  final List<double> values;
-  final Color color;
-  final List<_SparkBand>? bands;
-  final BuildContext parentContext;
-
-  const _MiniSparkline({
-    required this.values,
-    required this.color,
-    this.bands,
-    required this.parentContext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (values.length < 2) return const SizedBox.shrink();
-
-    return CustomPaint(
-      painter: _MiniSparklinePainter(
-        values: values,
-        color: color,
-        bands: bands,
-        context: parentContext,
-      ),
-      size: const Size(double.infinity, 56),
-    );
-  }
-}
-
-class _MiniSparklinePainter extends CustomPainter {
-  final List<double> values;
-  final Color color;
-  final List<_SparkBand>? bands;
-  final BuildContext context;
-
-  _MiniSparklinePainter({
-    required this.values,
-    required this.color,
-    this.bands,
-    required this.context,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (values.length < 2) return;
-
-    double minV = values.first;
-    double maxV = values.first;
-    for (final v in values) {
-      if (v < minV) minV = v;
-      if (v > maxV) maxV = v;
-    }
-
-// 背景帯の境界もレンジ計算に含める
-    if (bands != null && bands!.isNotEmpty) {
-      for (final band in bands!) {
-        if (!band.start.isInfinite && band.start < minV) {
-          minV = band.start;
-        }
-        if (!band.end.isInfinite && band.end > maxV) {
-          maxV = band.end;
-        }
-      }
-    }
-
-    // 余白を少し足して、帯と線が端に張り付きすぎないようにする
-    final rawRange = (maxV - minV).abs();
-    final pad = rawRange < 0.0001 ? 1.0 : rawRange * 0.08;
-    minV -= pad;
-    maxV += pad;
-
-    final range = (maxV - minV).abs() < 0.0001 ? 1.0 : (maxV - minV);
-
-    if (bands != null && bands!.isNotEmpty) {
-      for (final band in bands!) {
-        final bandStart = (band.start.isInfinite && band.start.isNegative)
-            ? minV
-            : band.start;
-        final bandEnd = band.end.isInfinite ? maxV : band.end;
-
-        final clippedStart = bandStart.clamp(minV, maxV).toDouble();
-        final clippedEnd = bandEnd.clamp(minV, maxV).toDouble();
-
-        if (clippedEnd <= clippedStart) continue;
-
-        final topY = size.height - ((clippedEnd - minV) / range) * size.height;
-        final bottomY =
-            size.height - ((clippedStart - minV) / range) * size.height;
-
-        final rect = Rect.fromLTRB(0, topY, size.width, bottomY);
-
-        canvas.drawRect(
-          rect,
-          Paint()..color = band.color,
-        );
-      }
-    }
-
-    final path = Path();
-    for (int i = 0; i < values.length; i++) {
-      final x = size.width * i / (values.length - 1);
-      final y = size.height - ((values[i] - minV) / range) * size.height;
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    final glow = Paint()
-      ..color = AppTheme.chartGlow(color, context)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawPath(path, glow);
-    canvas.drawPath(path, paint);
-
-    final lastX = size.width;
-    final lastY = size.height - ((values.last - minV) / range) * size.height;
-
-    canvas.drawCircle(
-      Offset(lastX, lastY),
-      3.5,
-      Paint()..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _MiniSparklinePainter oldDelegate) {
-    return oldDelegate.values != values ||
-        oldDelegate.color != color ||
-        oldDelegate.bands != bands;
-  }
-}
-
-class _SparkBand {
-  final double start;
-  final double end;
-  final Color color;
-
-  const _SparkBand({
-    required this.start,
-    required this.end,
-    required this.color,
-  });
 }
 
 class _ActivityDistributionCard extends StatelessWidget {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/semantic_chart_band.dart';
 
 class AppTheme {
   // ===== Environment Assessment Visual =====
@@ -177,6 +178,20 @@ class AppTheme {
 
   static Color emptyStateFill(BuildContext context, Color accentColor) =>
       accentColor.withOpacity(isDark(context) ? 0.08 : 0.06);
+
+  static Color semanticBandColor(
+    BuildContext context,
+    SemanticBandKey bandKey,
+  ) {
+    switch (bandKey) {
+      case SemanticBandKey.low:
+        return sparkBandLow(context);
+      case SemanticBandKey.high:
+        return sparkBandHigh(context);
+      case SemanticBandKey.normal:
+        return sparkBandNormal(context);
+    }
+  }
 
   // ===== Spark / Distribution colors =====
   static Color sparkBandLow(BuildContext context) =>
