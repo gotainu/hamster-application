@@ -9,6 +9,8 @@ import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/func_b.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/theme/app_theme.dart';
+import 'package:hamster_project/services/environment_status_service.dart';
+import 'package:hamster_project/widgets/semantic_sparkline.dart';
 import 'dart:math' as math;
 
 class HomeScreen extends StatefulWidget {
@@ -205,6 +207,9 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
   static const EnvironmentTrendService _trendService =
       EnvironmentTrendService();
 
+  static const EnvironmentStatusService _environmentStatusService =
+      EnvironmentStatusService();
+
   factory _EnvironmentAssessmentHero.loading() {
     return const _EnvironmentAssessmentHero(isLoading: true);
   }
@@ -236,54 +241,13 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     }
   }
 
-  String _mainMetricLabel(EnvironmentAssessment a) {
-    final hum = a.avgHum;
-    final temp = a.avgTemp;
-
-    if (hum != null && hum > 60) return '平均湿度';
-    if (hum != null && hum < 40) return '平均湿度';
-    if (temp != null && temp > 26) return '平均温度';
-    if (temp != null && temp < 20) return '平均温度';
-    if ((a.humRatio ?? 1) < (a.tempRatio ?? 1)) return '平均湿度';
-    return '平均温度';
-  }
-
-  String _mainMetricValue(EnvironmentAssessment a) {
-    final label = _mainMetricLabel(a);
-    if (label == '平均湿度' && a.avgHum != null) {
-      return '${a.avgHum!.round()}%';
-    }
-    if (label == '平均温度' && a.avgTemp != null) {
-      return '${a.avgTemp!.toStringAsFixed(1)}℃';
-    }
-    return '—';
-  }
-
-  String _mainMetricSub(EnvironmentAssessment a) {
-    final label = _mainMetricLabel(a);
-
-    if (label == '平均湿度') {
-      final hum = a.avgHum;
-      if (hum == null) return '理想 40–60%';
-      if (hum > 60) return '理想 40–60% より高め';
-      if (hum < 40) return '理想 40–60% より低め';
-      return '理想 40–60% の範囲';
-    }
-
-    final temp = a.avgTemp;
-    if (temp == null) return '理想 20–26℃';
-    if (temp > 26) return '理想 20–26℃ より高め';
-    if (temp < 20) return '理想 20–26℃ より低め';
-    return '理想 20–26℃ の範囲';
-  }
-
   List<double> _buildSparkValues(EnvironmentAssessment a) {
     final validHistory = history.where((e) => e.hasCoreData).toList();
     if (validHistory.isEmpty) return const [];
 
-    final label = _mainMetricLabel(a);
+    final heroData = _environmentStatusService.buildHeroViewData(a);
 
-    if (label == '平均湿度') {
+    if (heroData.metricKind == EnvironmentMetricKind.humidity) {
       return validHistory.map((e) => e.avgHum).whereType<double>().toList();
     }
 
@@ -363,9 +327,10 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     }
 
     final a = assessment!;
-    final label = _mainMetricLabel(a);
-    final value = _mainMetricValue(a);
-    final sub = _mainMetricSub(a);
+    final heroData = _environmentStatusService.buildHeroViewData(a);
+    final label = heroData.metricLabel;
+    final value = heroData.metricValueText;
+    final sub = heroData.metricSubText;
 
     final trend = _trendService.buildWeeklyTrendSummary(
       assessment: a,
@@ -374,6 +339,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     );
 
     final sparkValues = _buildSparkValues(a);
+    final sparkBands = heroData.chartBands;
     final accent = AppTheme.environmentAccent(a.level);
 
     return Material(
@@ -499,10 +465,11 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
 
                   if (sparkValues.length >= 2) ...[
                     const SizedBox(height: 12),
-                    _MiniSparkline(
+                    SemanticSparkline(
                       values: sparkValues,
                       color: accent,
-                      parentContext: context,
+                      bands: sparkBands,
+                      height: 36,
                     ),
                   ],
 
@@ -976,99 +943,5 @@ class _WideActionTile extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _MiniSparkline extends StatelessWidget {
-  final List<double> values;
-  final Color color;
-  final BuildContext parentContext;
-
-  const _MiniSparkline({
-    required this.values,
-    required this.color,
-    required this.parentContext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (values.length < 2) return const SizedBox.shrink();
-
-    return SizedBox(
-      width: double.infinity,
-      height: 36,
-      child: CustomPaint(
-        painter: _MiniSparklinePainter(
-          values: values,
-          color: color,
-          context: parentContext,
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniSparklinePainter extends CustomPainter {
-  final List<double> values;
-  final Color color;
-  final BuildContext context;
-
-  _MiniSparklinePainter({
-    required this.values,
-    required this.color,
-    required this.context,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (values.length < 2) return;
-
-    final minV = values.reduce(math.min);
-    final maxV = values.reduce(math.max);
-    final range = (maxV - minV).abs() < 0.0001 ? 1.0 : (maxV - minV);
-
-    final path = Path();
-
-    for (int i = 0; i < values.length; i++) {
-      final x = size.width * i / (values.length - 1);
-      final y = size.height - ((values[i] - minV) / range) * size.height;
-
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final glow = Paint()
-      ..color = AppTheme.chartGlow(color, context)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawPath(path, glow);
-    canvas.drawPath(path, paint);
-
-    final lastX = size.width;
-    final lastY = size.height - ((values.last - minV) / range) * size.height;
-
-    canvas.drawCircle(
-      Offset(lastX, lastY),
-      3.5,
-      Paint()..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _MiniSparklinePainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.color != color;
   }
 }

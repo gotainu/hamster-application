@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:hamster_project/models/activity_distribution.dart';
 import 'package:hamster_project/models/activity_summary.dart';
 import 'package:hamster_project/models/health_record.dart';
+import 'package:hamster_project/models/semantic_chart_band.dart';
 
 class ActivityTrendService {
   const ActivityTrendService();
@@ -36,6 +37,8 @@ class ActivityTrendService {
       markerCaption: todayHasRecord ? '今日の位置' : '最新記録日の位置',
     );
 
+    final chartBands = _buildChartBands(distribution);
+
     final deltaPct = avg7DistanceMeters <= 0
         ? 0.0
         : (referenceDistanceMeters - avg7DistanceMeters) /
@@ -57,6 +60,7 @@ class ActivityTrendService {
         referenceDistanceMeters: referenceDistanceMeters,
         referenceDate: referenceDate,
         distribution: distribution,
+        chartBands: chartBands,
       );
     }
 
@@ -76,7 +80,28 @@ class ActivityTrendService {
       referenceDistanceMeters: referenceDistanceMeters,
       referenceDate: referenceDate,
       distribution: distribution,
+      chartBands: chartBands,
     );
+  }
+
+  List<SemanticChartBand> _buildChartBands(ActivityDistribution distribution) {
+    return [
+      SemanticChartBand(
+        start: double.negativeInfinity,
+        end: distribution.p25,
+        bandKey: SemanticBandKey.low,
+      ),
+      SemanticChartBand(
+        start: distribution.p25,
+        end: distribution.p75,
+        bandKey: SemanticBandKey.normal,
+      ),
+      SemanticChartBand(
+        start: distribution.p75,
+        end: double.infinity,
+        bandKey: SemanticBandKey.high,
+      ),
+    ];
   }
 
   bool _hasTodayRecord(List<HealthRecord> records) {

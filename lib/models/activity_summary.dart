@@ -1,4 +1,17 @@
 import 'activity_distribution.dart';
+import 'semantic_chart_band.dart';
+
+class ActivityChartBand {
+  final double start;
+  final double end;
+  final String bandKey; // low / normal / high
+
+  const ActivityChartBand({
+    required this.start,
+    required this.end,
+    required this.bandKey,
+  });
+}
 
 class ActivitySummary {
   final double todayDistanceMeters;
@@ -14,6 +27,7 @@ class ActivitySummary {
   final double referenceDistanceMeters;
   final DateTime? referenceDate;
   final ActivityDistribution? distribution;
+  final List<SemanticChartBand>? chartBands;
 
   const ActivitySummary({
     required this.todayDistanceMeters,
@@ -29,6 +43,7 @@ class ActivitySummary {
     required this.referenceDistanceMeters,
     required this.referenceDate,
     required this.distribution,
+    required this.chartBands,
   });
 
   factory ActivitySummary.empty() {
@@ -46,6 +61,7 @@ class ActivitySummary {
       referenceDistanceMeters: 0,
       referenceDate: null,
       distribution: null,
+      chartBands: null,
     );
   }
 }
