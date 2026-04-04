@@ -77,11 +77,11 @@ class AppTheme {
   }
 
   // ---- グラデーションカラー（OuraRing風） ----
-  static const Color gradientStart = Color(0xFF263C70); // 深めの青
-  static const Color gradientEnd = Color(0xFF181A20); // 黒に近い
-  static const Color cardGradientStart = Color(0xFF232E47); // カード上部
-  static const Color cardGradientEnd = Color(0xFF202638); // カード下部
-  static const Color accent = Color.fromARGB(255, 73, 125, 246); // ボタン青
+  static const Color gradientStart = Color(0xFF263C70);
+  static const Color gradientEnd = Color(0xFF181A20);
+  static const Color cardGradientStart = Color(0xFF232E47);
+  static const Color cardGradientEnd = Color(0xFF202638);
+  static const Color accent = Color.fromARGB(255, 73, 125, 246);
 
   // ダークテーマの色
   static const Color darkBg = gradientEnd;
@@ -110,6 +110,90 @@ class AppTheme {
       Color.fromARGB(255, 183, 193, 211),
     ],
   );
+
+  // ===== Shared semantic helpers =====
+  static bool isDark(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark;
+
+  static Color primaryText(BuildContext context) =>
+      isDark(context) ? Colors.white : lightText;
+
+  static Color secondaryText(BuildContext context) =>
+      isDark(context) ? Colors.white70 : const Color(0xFF5F6B7A);
+
+  static Color tertiaryText(BuildContext context) =>
+      isDark(context) ? Colors.white54 : const Color(0xFF7E8896);
+
+  static Color weakText(BuildContext context) =>
+      isDark(context) ? Colors.white38 : const Color(0xFF9AA3AF);
+
+  static Color softBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withOpacity(0.14)
+      : Colors.black.withOpacity(0.08);
+
+  static Color softShadow(BuildContext context) =>
+      isDark(context) ? const Color(0x1A000000) : const Color(0x12000000);
+
+  static Color chipFill(Color accentColor, BuildContext context,
+      {double? opacity}) {
+    final value = opacity ?? (isDark(context) ? 0.12 : 0.10);
+    return accentColor.withOpacity(value);
+  }
+
+  static Color chartAxis(BuildContext context) => isDark(context)
+      ? Colors.white.withOpacity(0.25)
+      : Colors.black.withOpacity(0.22);
+
+  static Color chartGrid(BuildContext context) => isDark(context)
+      ? Colors.white.withOpacity(0.08)
+      : Colors.black.withOpacity(0.08);
+
+  static Color cardSurface(BuildContext context) =>
+      Theme.of(context).colorScheme.surface;
+
+  static Color heroDecorationFill(
+    BuildContext context,
+    Color accentColor, {
+    double darkOpacity = 0.10,
+    double lightOpacity = 0.08,
+  }) {
+    return accentColor.withOpacity(
+      isDark(context) ? darkOpacity : lightOpacity,
+    );
+  }
+
+  static Color heroPetIcon(BuildContext context) => isDark(context)
+      ? Colors.white.withOpacity(0.05)
+      : Colors.black.withOpacity(0.04);
+
+  static Color quickActionFill(BuildContext context) =>
+      accent.withOpacity(isDark(context) ? 0.09 : 0.08);
+
+  static Color quickActionBorder(BuildContext context) =>
+      accent.withOpacity(isDark(context) ? 0.18 : 0.14);
+
+  static Color chartGlow(Color base, BuildContext context) =>
+      base.withOpacity(isDark(context) ? 0.18 : 0.14);
+
+  static Color emptyStateFill(BuildContext context, Color accentColor) =>
+      accentColor.withOpacity(isDark(context) ? 0.08 : 0.06);
+
+  // ===== Spark / Distribution colors =====
+  static Color sparkBandLow(BuildContext context) =>
+      isDark(context) ? const Color(0x142D7FF9) : const Color(0x1F7FB3FF);
+
+  static Color sparkBandNormal(BuildContext context) =>
+      isDark(context) ? const Color(0x142CD67A) : const Color(0x1F4CD6A7);
+
+  static Color sparkBandHigh(BuildContext context) =>
+      isDark(context) ? const Color(0x14FFB84D) : const Color(0x24FFC857);
+
+  static Color histogramBar(BuildContext context) => isDark(context)
+      ? const Color.fromARGB(255, 136, 125, 1)
+      : const Color(0xFFC6B84A);
+
+  static Color histogramBarHighlight(BuildContext context) =>
+      isDark(context) ? const Color(0xFFFFF176) : const Color(0xFFFFD54F);
 
   // ------ グラデ付きテーマ拡張 ------
   static BoxDecoration backgroundGradient([bool isDark = true]) =>
@@ -151,7 +235,7 @@ class AppTheme {
       secondary: Colors.white,
       surface: darkCard,
     ),
-    cardColor: Colors.transparent, // ← カードもグラデで描くのでtransparent
+    cardColor: Colors.transparent,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -173,7 +257,7 @@ class AppTheme {
       contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
     ),
     cardTheme: const CardThemeData(
-      color: Colors.transparent, // グラデ用
+      color: Colors.transparent,
       shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(24))),
       margin: EdgeInsets.all(16),
@@ -197,7 +281,7 @@ class AppTheme {
       secondary: Colors.black87,
       surface: lightCard,
     ),
-    cardColor: Colors.transparent, // グラデで描く
+    cardColor: Colors.transparent,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,

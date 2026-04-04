@@ -22,16 +22,13 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   // ===== 回し車 =====
   final _wheelCtrl = TextEditingController();
   final _healthRepo = HealthRecordsRepo();
+  final SwitchbotRepo _sbRepo = SwitchbotRepo();
+  late Future<_TodayKpi> _todayKpiFuture;
   double? _distance;
   bool _saving = false;
-
   String? _saveMsg;
+  DateTime _selectedRecordDate = DateTime.now();
   int _calcSeq = 0;
-
-  late Future<_TodayKpi> _todayKpiFuture;
-
-  // ===== SwitchBot =====
-  final SwitchbotRepo _sbRepo = SwitchbotRepo();
 
   @override
   void initState() {
@@ -76,9 +73,15 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     });
 
     try {
-      await _healthRepo.addWheelRotationRecord(rotations: rotations);
+      await _healthRepo.addWheelRotationRecord(
+        rotations: rotations,
+        date: _selectedRecordDate,
+      );
       if (!mounted) return;
-      setState(() => _saveMsg = '保存しました！');
+      setState(() {
+        _saveMsg =
+            '${DateFormat('yyyy/MM/dd').format(_selectedRecordDate)} の記録を保存しました！';
+      });
       _invalidateTodayKpiCache();
     } on MissingWheelDiameterException {
       if (!mounted) return;
@@ -96,6 +99,25 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   void _invalidateTodayKpiCache() {
     setState(() {
       _todayKpiFuture = _buildTodayKpi();
+    });
+  }
+
+  Future<void> _pickRecordDate() async {
+    final now = DateTime.now();
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedRecordDate,
+      firstDate: DateTime(now.year - 3),
+      lastDate: DateTime(now.year + 1),
+      helpText: '記録する日付を選択',
+      locale: const Locale('ja'),
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedRecordDate = picked;
     });
   }
 
@@ -324,6 +346,41 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          '記録する日付',
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: _pickRecordDate,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: Colors.white12,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_today_outlined, size: 18),
+                const SizedBox(width: 10),
+                Text(
+                  DateFormat('yyyy/MM/dd').format(_selectedRecordDate),
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const Spacer(),
+                const Icon(Icons.expand_more),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
         TextField(
           controller: _wheelCtrl,
           keyboardType: TextInputType.number,
@@ -369,7 +426,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: Text(_saving ? '保存中...' : '距離を保存'),
+              label: Text(_saving ? '保存中...' : 'この日付で保存'),
             ),
             const SizedBox(width: 12),
             if (_saveMsg != null)

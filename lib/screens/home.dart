@@ -4,10 +4,11 @@ import 'package:intl/intl.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
 import 'package:hamster_project/services/environment_assessment_repo.dart';
-import 'package:hamster_project/theme/app_theme.dart';
+import 'package:hamster_project/services/environment_trend_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/func_b.dart';
-import 'package:hamster_project/services/environment_trend_service.dart';
+import 'package:hamster_project/screens/daily_status_detail.dart';
+import 'package:hamster_project/theme/app_theme.dart';
 import 'dart:math' as math;
 
 class HomeScreen extends StatefulWidget {
@@ -81,7 +82,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           _EnvironmentAssessmentHero(
                             assessment: assessment,
                             history: history,
-                            onTap: () => widget.onTabSelected(2),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const DailyStatusDetailScreen(),
+                                ),
+                              );
+                            },
                           ),
                         const SizedBox(height: 14),
                         if (!isLoading &&
@@ -92,7 +100,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                 .isNotEmpty) ...[
                           _TodayActionCard(
                             assessment: assessment,
-                            onTap: () => widget.onTabSelected(2),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const DailyStatusDetailScreen(),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: 14),
                         ],
@@ -161,7 +176,7 @@ class _HomeHeader extends StatelessWidget {
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
+                  color: AppTheme.secondaryText(context),
                 ),
           ),
         ],
@@ -287,17 +302,25 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
           gradient: AppTheme.environmentHeroGradient('注意', isDark: isDark),
           borderRadius: BorderRadius.circular(32),
         ),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               '今日の飼育環境',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: AppTheme.primaryText(context),
+              ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Text(
               '読み込み中…',
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.primaryText(context),
+              ),
             ),
           ],
         ),
@@ -315,9 +338,13 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '今日の飼育環境',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: AppTheme.primaryText(context),
+              ),
             ),
             const SizedBox(height: 20),
             Text(
@@ -364,7 +391,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
               BoxShadow(
                 blurRadius: 36,
                 offset: const Offset(0, 18),
-                color: accent.withOpacity(0.25),
+                color: accent.withValues(alpha: 0.25),
               ),
             ],
           ),
@@ -379,7 +406,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                     '今日の飼育環境',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: Colors.white70,
+                          color: AppTheme.secondaryText(context),
                         ),
                   ),
 
@@ -390,7 +417,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                     label,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
-                          color: Colors.white70,
+                          color: AppTheme.secondaryText(context),
                         ),
                   ),
 
@@ -412,7 +439,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                   Text(
                     sub,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
+                          color: AppTheme.secondaryText(context),
                         ),
                   ),
 
@@ -433,10 +460,10 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: accent.withOpacity(0.12),
+                          color: accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: accent.withOpacity(0.18),
+                            color: accent.withValues(alpha: 0.18),
                           ),
                         ),
                         child: Text(
@@ -465,7 +492,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                   Text(
                     trend.summaryText,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white70,
+                          color: AppTheme.secondaryText(context),
                           fontWeight: FontWeight.w600,
                         ),
                   ),
@@ -475,6 +502,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                     _MiniSparkline(
                       values: sparkValues,
                       color: accent,
+                      parentContext: context,
                     ),
                   ],
 
@@ -487,7 +515,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                           '最終評価: ${_formatTime(a.evaluatedAt)}',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white70,
+                                    color: AppTheme.secondaryText(context),
                                   ),
                         ),
                       ),
@@ -532,7 +560,12 @@ class _HeroBackgroundDecoration extends StatelessWidget {
                 height: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: c.withOpacity(0.10),
+                  color: AppTheme.heroDecorationFill(
+                    context,
+                    c,
+                    darkOpacity: 0.10,
+                    lightOpacity: 0.08,
+                  ),
                 ),
               ),
             ),
@@ -544,7 +577,12 @@ class _HeroBackgroundDecoration extends StatelessWidget {
                 height: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: c.withOpacity(0.06),
+                  color: AppTheme.heroDecorationFill(
+                    context,
+                    c,
+                    darkOpacity: 0.06,
+                    lightOpacity: 0.05,
+                  ),
                 ),
               ),
             ),
@@ -556,14 +594,19 @@ class _HeroBackgroundDecoration extends StatelessWidget {
                 child: Icon(
                   Icons.pets_rounded,
                   size: 92,
-                  color: Colors.white.withOpacity(0.05),
+                  color: AppTheme.heroPetIcon(context),
                 ),
               ),
             ),
             Positioned.fill(
               child: CustomPaint(
                 painter: _WavePainter(
-                  color: c.withOpacity(0.12),
+                  color: AppTheme.heroDecorationFill(
+                    context,
+                    c,
+                    darkOpacity: 0.12,
+                    lightOpacity: 0.10,
+                  ),
                 ),
               ),
             ),
@@ -619,7 +662,7 @@ class _TodayActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
+    final surface = AppTheme.cardSurface(context);
 
     return Material(
       color: Colors.transparent,
@@ -647,7 +690,11 @@ class _TodayActionCard extends StatelessWidget {
                 width: 42,
                 height: 42,
                 decoration: BoxDecoration(
-                  color: AppTheme.accent.withOpacity(0.14),
+                  color: AppTheme.chipFill(
+                    AppTheme.accent,
+                    context,
+                    opacity: AppTheme.isDark(context) ? 0.14 : 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Icon(
@@ -676,7 +723,7 @@ class _TodayActionCard extends StatelessWidget {
                       Text(
                         assessment.why!,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
+                              color: AppTheme.secondaryText(context),
                             ),
                       ),
                     ],
@@ -718,7 +765,12 @@ class _QuickActionsCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppTheme.accent.withOpacity(0.16),
+            color: AppTheme.heroDecorationFill(
+              context,
+              AppTheme.accent,
+              darkOpacity: 0.16,
+              lightOpacity: 0.12,
+            ),
             blurRadius: 28,
             offset: const Offset(0, 14),
           ),
@@ -737,7 +789,7 @@ class _QuickActionsCard extends StatelessWidget {
           Text(
             'よく使う機能にすぐアクセスできます',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
+                  color: AppTheme.secondaryText(context),
                 ),
           ),
           const SizedBox(height: 18),
@@ -803,7 +855,7 @@ class _QuickActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tileColor = AppTheme.accent.withOpacity(0.09);
+    final tileColor = AppTheme.quickActionFill(context);
 
     return Material(
       color: Colors.transparent,
@@ -815,7 +867,7 @@ class _QuickActionTile extends StatelessWidget {
             color: tileColor,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: AppTheme.accent.withOpacity(0.18),
+              color: AppTheme.quickActionBorder(context),
             ),
           ),
           child: Padding(
@@ -839,7 +891,7 @@ class _QuickActionTile extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white70,
+                        color: AppTheme.secondaryText(context),
                         height: 1.25,
                       ),
                 ),
@@ -867,7 +919,7 @@ class _WideActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tileColor = AppTheme.accent.withOpacity(0.09);
+    final tileColor = AppTheme.quickActionFill(context);
 
     return Material(
       color: Colors.transparent,
@@ -879,7 +931,7 @@ class _WideActionTile extends StatelessWidget {
             color: tileColor,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
-              color: AppTheme.accent.withOpacity(0.18),
+              color: AppTheme.quickActionBorder(context),
             ),
           ),
           child: Padding(
@@ -907,16 +959,16 @@ class _WideActionTile extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.white70,
+                              color: AppTheme.secondaryText(context),
                             ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
-                  color: Colors.white54,
+                  color: AppTheme.tertiaryText(context),
                 ),
               ],
             ),
@@ -930,10 +982,12 @@ class _WideActionTile extends StatelessWidget {
 class _MiniSparkline extends StatelessWidget {
   final List<double> values;
   final Color color;
+  final BuildContext parentContext;
 
   const _MiniSparkline({
     required this.values,
     required this.color,
+    required this.parentContext,
   });
 
   @override
@@ -947,6 +1001,7 @@ class _MiniSparkline extends StatelessWidget {
         painter: _MiniSparklinePainter(
           values: values,
           color: color,
+          context: parentContext,
         ),
       ),
     );
@@ -956,10 +1011,12 @@ class _MiniSparkline extends StatelessWidget {
 class _MiniSparklinePainter extends CustomPainter {
   final List<double> values;
   final Color color;
+  final BuildContext context;
 
   _MiniSparklinePainter({
     required this.values,
     required this.color,
+    required this.context,
   });
 
   @override
@@ -991,7 +1048,7 @@ class _MiniSparklinePainter extends CustomPainter {
       ..strokeJoin = StrokeJoin.round;
 
     final glow = Paint()
-      ..color = color.withOpacity(0.18)
+      ..color = AppTheme.chartGlow(color, context)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6
       ..strokeCap = StrokeCap.round

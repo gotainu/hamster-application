@@ -67,6 +67,43 @@ class HealthRecordsRepo {
     return sum;
   }
 
+  Future<List<HealthRecord>> fetchAllDailyDistanceSeries() async {
+    final col = _col();
+    if (col == null) return const [];
+
+    final qs = await col.orderBy('date').get();
+
+    final map = <String, double>{};
+    final dateMap = <String, DateTime>{};
+
+    for (final d in qs.docs) {
+      final m = d.data();
+      final ts = m['date'];
+      final dist = m['distance'];
+
+      if (ts is! Timestamp || dist is! num) continue;
+
+      final local = ts.toDate().toLocal();
+      final day = DateTime(local.year, local.month, local.day);
+      final key =
+          '${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+
+      map[key] = (map[key] ?? 0) + dist.toDouble();
+      dateMap[key] = day;
+    }
+
+    final keys = map.keys.toList()..sort();
+
+    return keys
+        .map(
+          (k) => HealthRecord(
+            date: dateMap[k]!,
+            distance: map[k] ?? 0,
+          ),
+        )
+        .toList();
+  }
+
   /// 直近N日（今日含む）の1日平均(m)
   Future<double> fetchRollingDailyAverage({
     int days = 7,
@@ -209,5 +246,57 @@ class HealthRecordsRepo {
         .orderBy('date')
         .snapshots()
         .map((qs) => qs.docs.map(HealthRecord.fromDoc).toList());
+  }
+
+  Future<List<HealthRecord>> fetchDailyDistanceSeries({
+    int days = 7,
+    DateTime? todayLocal,
+  }) async {
+    final col = _col();
+    if (col == null) return const [];
+
+    final today = todayLocal ?? DateTime.now();
+    final startLocal = DateTime(today.year, today.month, today.day)
+        .subtract(Duration(days: days - 1));
+    final endLocal = DateTime(today.year, today.month, today.day)
+        .add(const Duration(days: 1));
+
+    final startUtc = startLocal.toUtc();
+    final endUtc = endLocal.toUtc();
+
+    final qs = await col
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startUtc))
+        .where('date', isLessThan: Timestamp.fromDate(endUtc))
+        .get();
+
+    final map = <String, double>{};
+
+    for (final d in qs.docs) {
+      final m = d.data();
+      final ts = m['date'];
+      final dist = m['distance'];
+      if (ts is! Timestamp || dist is! num) continue;
+
+      final local = ts.toDate().toLocal();
+      final key =
+          '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+      map[key] = (map[key] ?? 0) + dist.toDouble();
+    }
+
+    final result = <HealthRecord>[];
+    for (int i = 0; i < days; i++) {
+      final d = DateTime(today.year, today.month, today.day)
+          .subtract(Duration(days: days - 1 - i));
+      final key =
+          '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+      result.add(
+        HealthRecord(
+          date: d,
+          distance: map[key] ?? 0,
+        ),
+      );
+    }
+
+    return result;
   }
 }
