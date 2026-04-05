@@ -1,17 +1,6 @@
 import 'activity_distribution.dart';
 import 'semantic_chart_band.dart';
-
-class ActivityChartBand {
-  final double start;
-  final double end;
-  final String bandKey; // low / normal / high
-
-  const ActivityChartBand({
-    required this.start,
-    required this.end,
-    required this.bandKey,
-  });
-}
+import 'metric_card_view_data.dart';
 
 class ActivitySummary {
   final double todayDistanceMeters;
@@ -28,6 +17,7 @@ class ActivitySummary {
   final DateTime? referenceDate;
   final ActivityDistribution? distribution;
   final List<SemanticChartBand>? chartBands;
+  final MetricCardViewData card;
 
   const ActivitySummary({
     required this.todayDistanceMeters,
@@ -44,6 +34,7 @@ class ActivitySummary {
     required this.referenceDate,
     required this.distribution,
     required this.chartBands,
+    required this.card,
   });
 
   factory ActivitySummary.empty() {
@@ -62,6 +53,16 @@ class ActivitySummary {
       referenceDate: null,
       distribution: null,
       chartBands: null,
+      card: MetricCardViewData(
+        currentValueText: '未入力',
+        stateText: '比較中',
+        deltaText: '比較データがまだ少ないです',
+        summaryText: '走行距離の記録が増えると推移を表示できます',
+        chartBands: null,
+        hasChart: false,
+        emptyChartText: 'まだ走行距離の記録がありません',
+        emptyChartSubtext: '記録すると7日推移を表示できます',
+      ),
     );
   }
 }
