@@ -1,8 +1,10 @@
+// /Users/gota/local_dev/flutter_projects/hamster_project/lib/services/activity_trend_service.dart
 import 'dart:math' as math;
 
 import 'package:hamster_project/models/activity_distribution.dart';
 import 'package:hamster_project/models/activity_summary.dart';
 import 'package:hamster_project/models/health_record.dart';
+import 'package:hamster_project/models/metric_card_view_data.dart';
 import 'package:hamster_project/models/semantic_chart_band.dart';
 
 class ActivityTrendService {
@@ -46,25 +48,41 @@ class ActivityTrendService {
             100.0;
 
     if (!todayHasRecord) {
+      const stateText = '未入力';
+      final deltaText = '今日はまだ走行距離が記録されていません';
+      final summaryText =
+          '最新記録日は ${distribution.bandLabel} です。記録すると今日の位置も確認できます';
+
       return ActivitySummary(
         todayDistanceMeters: 0,
         avg7DistanceMeters: avg7DistanceMeters,
         deltaPct: 0,
         latestRecordedAt: latestRecordedAt,
         headline: '今日はまだ未入力です',
-        deltaText: '今日はまだ走行距離が記録されていません',
-        summaryText: '最新記録日は ${distribution.bandLabel} です。記録すると今日の位置も確認できます',
-        directionText: '未入力',
+        deltaText: deltaText,
+        summaryText: summaryText,
+        directionText: stateText,
         hasAnyRecord: true,
         todayHasRecord: false,
         referenceDistanceMeters: referenceDistanceMeters,
         referenceDate: referenceDate,
         distribution: distribution,
         chartBands: chartBands,
+        card: MetricCardViewData(
+          currentValueText: '未入力',
+          stateText: stateText,
+          deltaText: deltaText,
+          summaryText: summaryText,
+          chartBands: chartBands,
+          hasChart: true,
+        ),
       );
     }
 
     final bandLabel = distribution.bandLabel;
+    final deltaText =
+        _deltaText(todayDistanceMeters, avg7DistanceMeters, deltaPct);
+    final summaryText = _summaryText(bandLabel);
 
     return ActivitySummary(
       todayDistanceMeters: todayDistanceMeters,
@@ -72,8 +90,8 @@ class ActivityTrendService {
       deltaPct: deltaPct,
       latestRecordedAt: latestRecordedAt,
       headline: _headline(bandLabel),
-      deltaText: _deltaText(todayDistanceMeters, avg7DistanceMeters, deltaPct),
-      summaryText: _summaryText(bandLabel),
+      deltaText: deltaText,
+      summaryText: summaryText,
       directionText: bandLabel,
       hasAnyRecord: true,
       todayHasRecord: true,
@@ -81,6 +99,14 @@ class ActivityTrendService {
       referenceDate: referenceDate,
       distribution: distribution,
       chartBands: chartBands,
+      card: MetricCardViewData(
+        currentValueText: '${todayDistanceMeters.toStringAsFixed(0)} m',
+        stateText: bandLabel,
+        deltaText: deltaText,
+        summaryText: summaryText,
+        chartBands: chartBands,
+        hasChart: true,
+      ),
     );
   }
 

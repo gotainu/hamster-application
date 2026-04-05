@@ -11,7 +11,7 @@ import '../services/environment_assessment_repo.dart';
 import '../services/health_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../theme/app_theme.dart';
-import '../models/semantic_chart_band.dart';
+import '../models/metric_card_view_data.dart';
 import '../widgets/semantic_sparkline.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
@@ -102,51 +102,37 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                   const SizedBox(height: 10),
                   _MetricDetailCard(
                     title: '過去7日間の平均温度',
-                    currentValue: a.avgTemp != null
-                        ? '${a.avgTemp!.toStringAsFixed(1)}℃'
-                        : '—',
-                    stateText: tempStatus.stateText,
+                    card: tempStatus.card,
                     secondaryStats: [
                       const _StatItem('対象期間', '過去7日'),
                       _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
                     ],
-                    summaryText: tempStatus.summaryText,
-                    deltaText: tempStatus.deltaText,
                     sparkValues: bundle.history
                         .map((e) => e.avgTemp)
                         .whereType<double>()
                         .toList(),
                     accent: AppTheme.environmentAccent(a.level),
-                    chartBands: tempStatus.chartBands,
                   ),
                   const SizedBox(height: 14),
                   _MetricDetailCard(
                     title: '過去7日間の平均湿度',
-                    currentValue:
-                        a.avgHum != null ? '${a.avgHum!.round()}%' : '—',
-                    stateText: humStatus.stateText,
+                    card: humStatus.card,
                     secondaryStats: [
                       const _StatItem('対象期間', '過去7日'),
                       _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
                     ],
-                    summaryText: humStatus.summaryText,
-                    deltaText: humStatus.deltaText,
                     sparkValues: bundle.history
                         .map((e) => e.avgHum)
                         .whereType<double>()
                         .toList(),
                     accent: AppTheme.environmentAccent(a.level),
-                    chartBands: humStatus.chartBands,
                   ),
                   const SizedBox(height: 20),
                   _SectionLabel(title: '活動量'),
                   const SizedBox(height: 10),
                   _MetricDetailCard(
                     title: '直近の走った距離',
-                    currentValue: bundle.activitySummary.todayHasRecord
-                        ? '${bundle.activitySummary.todayDistanceMeters.toStringAsFixed(0)} m'
-                        : '未入力',
-                    stateText: bundle.activitySummary.directionText,
+                    card: bundle.activitySummary.card,
                     secondaryStats: [
                       _StatItem(
                         '7日平均',
@@ -160,15 +146,9 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                             : '—',
                       ),
                     ],
-                    summaryText: bundle.activitySummary.summaryText,
-                    deltaText: bundle.activitySummary.deltaText,
                     sparkValues:
                         bundle.distanceSeries.map((e) => e.distance).toList(),
                     accent: AppTheme.accent,
-                    hasChart: bundle.activitySummary.hasAnyRecord,
-                    emptyChartText: 'まだ走行距離の記録がありません',
-                    emptyChartSubtext: '記録すると7日推移を表示できます',
-                    chartBands: bundle.activitySummary.chartBands,
                   ),
                   const SizedBox(height: 14),
                   if (bundle.activitySummary.distribution != null)
@@ -305,31 +285,17 @@ class _StatItem {
 
 class _MetricDetailCard extends StatelessWidget {
   final String title;
-  final String currentValue;
-  final String stateText;
+  final MetricCardViewData card;
   final List<_StatItem> secondaryStats;
-  final String summaryText;
-  final String deltaText;
   final List<double> sparkValues;
   final Color accent;
-  final bool hasChart;
-  final String? emptyChartText;
-  final String? emptyChartSubtext;
-  final List<SemanticChartBand>? chartBands;
 
   const _MetricDetailCard({
     required this.title,
-    required this.currentValue,
-    required this.stateText,
+    required this.card,
     required this.secondaryStats,
-    required this.summaryText,
-    required this.deltaText,
     required this.sparkValues,
     required this.accent,
-    this.hasChart = true,
-    this.emptyChartText,
-    this.emptyChartSubtext,
-    this.chartBands,
   });
 
   @override
@@ -367,7 +333,7 @@ class _MetricDetailCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  stateText,
+                  card.stateText,
                   style: TextStyle(
                     color: accent,
                     fontWeight: FontWeight.w800,
@@ -379,7 +345,7 @@ class _MetricDetailCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            currentValue,
+            card.currentValueText,
             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
@@ -413,24 +379,24 @@ class _MetricDetailCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            deltaText,
+            card.deltaText,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
           ),
           const SizedBox(height: 4),
           Text(
-            summaryText,
+            card.summaryText,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.secondaryText(context),
                 ),
           ),
           const SizedBox(height: 14),
-          if (hasChart && sparkValues.length >= 2)
+          if (card.hasChart && sparkValues.length >= 2)
             SemanticSparkline(
               values: sparkValues,
               color: accent,
-              bands: chartBands,
+              bands: card.chartBands,
               height: 56,
             )
           else
@@ -445,15 +411,15 @@ class _MetricDetailCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    emptyChartText ?? 'まだデータがありません',
+                    card.emptyChartText ?? 'まだデータがありません',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                   ),
-                  if ((emptyChartSubtext ?? '').trim().isNotEmpty) ...[
+                  if ((card.emptyChartSubtext ?? '').trim().isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      emptyChartSubtext!,
+                      card.emptyChartSubtext!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppTheme.secondaryText(context),
                           ),
