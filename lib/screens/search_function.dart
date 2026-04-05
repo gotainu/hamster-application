@@ -4,11 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert';
 import 'dart:async';
-
 import '../theme/app_theme.dart';
 import '../widgets/shine_border.dart';
 import '../services/breeding_environment_repo.dart';
-import '../models/breeding_environment.dart';
 
 class RetrievedChunk {
   final String id;

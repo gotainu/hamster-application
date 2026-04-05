@@ -8,7 +8,7 @@ import '../models/environment_assessment_history.dart';
 import '../models/health_record.dart';
 import '../services/activity_trend_service.dart';
 import '../services/environment_assessment_repo.dart';
-import '../services/health_records_repo.dart';
+import '../services/distance_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../theme/app_theme.dart';
 import '../models/metric_card_view_data.dart';
@@ -24,7 +24,7 @@ class DailyStatusDetailScreen extends StatefulWidget {
 
 class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
   final _assessmentRepo = EnvironmentAssessmentRepo();
-  final _healthRepo = HealthRecordsRepo();
+  final _distanceRepo = DistanceRecordsRepo();
   final _activityTrendService = const ActivityTrendService();
   final _environmentStatusService = const EnvironmentStatusService();
 
@@ -33,12 +33,12 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
     final history = await _assessmentRepo.fetchRecentHistory(limit: 7);
 
     final todayDistance =
-        await _healthRepo.fetchDailyTotalDistance(DateTime.now());
-    final avg7Distance = await _healthRepo.fetchRollingDailyAverage(days: 7);
+        await _distanceRepo.fetchDailyTotalDistance(DateTime.now());
+    final avg7Distance = await _distanceRepo.fetchRollingDailyAverage(days: 7);
     final dailyDistanceSeries =
-        await _healthRepo.fetchDailyDistanceSeries(days: 7);
+        await _distanceRepo.fetchDailyDistanceSeries(days: 7);
     final allDailyDistanceSeries =
-        await _healthRepo.fetchAllDailyDistanceSeries();
+        await _distanceRepo.fetchAllDailyDistanceSeries();
 
     final activitySummary = _activityTrendService.buildSummary(
       todayDistanceMeters: todayDistance,

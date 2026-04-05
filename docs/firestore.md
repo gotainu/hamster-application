@@ -5,6 +5,7 @@
 > 設計意図
 > - ユーザー単位のデータは `users/{uid}` を起点にサブコレクションで管理する。
 > - SwitchBot の全ユーザーを定期ポーリングするため、横断参照用に `switchbot_users` をトップレベルに持つ。
+> - 回し車の走行距離は、日次で1ドキュメントに正規化して保持する。
 
 ---
 
@@ -36,24 +37,24 @@
 
 ### Read/Write
 - 読み: `BreedingEnvironmentRepo.fetchMainEnv()` / `watchMainEnv()`
-- 書き: `BreedingEnvironmentRepo.saveMainEnv(env)`  
+- 書き: `BreedingEnvironmentRepo.saveMainEnv(env)`
   - 保存前に必ず `users/{uid}` に `has_subcollections: true` を `merge: true` でセットして親docを確実に作る
 
 ### Fields
 `BreedingEnvironment.toMapForSave()` の内容 + `updatedAt`
 
-- `cageWidth` (string|null) 例: "60" (cm)
-- `cageDepth` (string|null) 例: "45" (cm)
-- `beddingThickness` (string|null) 例: "10" (cm)
-- `wheelDiameter` (string|null) 例: "28" (cm)
-- `temperatureControl` (string) default: "エアコン"
+- `cageWidth` (string|null) 例: `"60"` (cm)
+- `cageDepth` (string|null) 例: `"45"` (cm)
+- `beddingThickness` (string|null) 例: `"10"` (cm)
+- `wheelDiameter` (string|null) 例: `"28"` (cm)
+- `temperatureControl` (string) default: `"エアコン"`
 - `accessories` (string|null)
 - `updatedAt` (timestamp, serverTimestamp)
-  - `PetProfile.toMapForSave()` 内で常にセットされる想定
 
 > メモ: フォーム入力の都合で数値も string として保存している。
 
 ---
+
 ## Pet Profile
 
 ### Path
@@ -67,88 +68,167 @@
 ### Fields (PetProfile)
 `PetProfile.toMapForSave()` に準拠（モデル定義側で確定）
 
-- `name` (string) 例: "マロ"
-- `birthday` (timestamp|null)  
+- `name` (string) 例: `"マロ"`
+- `birthday` (timestamp|null)
   - 保存は Timestamp
   - 読み取りは `Timestamp -> DateTime` / `String -> DateTime.tryParse` の両対応（互換）
-- `species` (string) default: "シリアン"
+- `species` (string) default: `"シリアン"`
 - `color` (string|null)
 - `imageUrl` (string|null)
-- `updatedAt` (timestamp, serverTimestamp) ※ toMapForSave()側で入れている想定
+- `updatedAt` (timestamp, serverTimestamp)
 
 > 重要: `saveMainPet` は「named params版」ではなく **PetProfileを受け取る版**に統一されている。
 
 ---
 
-## Health Records (wheel running)
+## Distance Records (wheel running)
 
 ### Path
-- `users/{uid}/health_records/{autoId}`
+- `users/{uid}/distance_records/{dayKey}`
 
 ### Purpose
-- 回し車の記録（回転数・距離）を蓄積し、グラフ表示や日次集計に使う。
+- 回し車の走行記録を **日次単位で1ドキュメント** 保存する。
+- 同じ日に再入力した場合は **上書き** し、入力ミスを後から修正できるようにする。
+- グラフ表示、日次集計、直近平均の計算をシンプルにする。
+
+### Document ID
+- `{dayKey}` = `yyyy-MM-dd`
+- 例:
+  - `2026-04-04`
+  - `2026-03-24`
+
+### Source of truth
+- 走行距離データの正規保存先は **`distance_records`**。
+- 今後の読み書きはこのコレクションを基準とする。
+
+---
 
 ### Write patterns
 
-#### 推奨: 回転数→距離→保存
-- `HealthRecordsRepo.addWheelRotationRecord({rotations, date?, source})`
-  - `wheelDiameterCm` を breeding_environment から取得できない場合は例外:
-    - `MissingWheelDiameterException`
-  - `date` は **UTCで保存** (`Timestamp.fromDate((date ?? DateTime.now()).toUtc())`)
+#### 推奨: 回転数 → 距離 → 日次レコードへ保存
+- `DistanceRecordsRepo.addWheelRotationRecord({rotations, date?, source})`
 
-**Fields**
-- `date` (timestamp) ※ UTC
-- `distance` (number) meter
-- `rotations` (number) 回転数
-- `wheelDiameterCm` (number) 計算に使った直径(cm)
-- `source` (string) default: `"wheel_manual"`
+動作:
+- 指定日からローカル日付ベースで `dayKey` を生成
+- `users/{uid}/distance_records/{dayKey}` に保存
+- 既存ドキュメントがあれば **同日レコードを上書き**
+- 存在しなければ新規作成
+
+#### 互換: 距離を直接、日次レコードへ保存
+- `DistanceRecordsRepo.addDistanceRecord({date, distance, source})`
+
+動作:
+- 指定日の `dayKey` ドキュメントへ直接保存
+- 同日レコードが既に存在すれば上書き
+
+---
+
+### Stored fields
+
+#### `addWheelRotationRecord()` で保存されるフィールド
+- `dayKey` (string)
+  - 例: `"2026-04-04"`
+- `date` (timestamp)
+  - その日のローカル 00:00 を UTC化して保存
+- `distance` (number)
+  - meter
+- `rotations` (number)
+  - 回転数
+- `wheelDiameterCm` (number)
+  - 距離計算に使った車輪直径(cm)
+- `source` (string)
+  - 例: `"wheel_manual"`
 - `createdAt` (timestamp, serverTimestamp)
+- `updatedAt` (timestamp, serverTimestamp)
 
-#### 互換: 距離を直接保存（残置）
-- `HealthRecordsRepo.addDistanceRecord({date, distance, source})`
-
-**Fields**
-- `date` (timestamp) ※ UTC
+#### `addDistanceRecord()` で保存されるフィールド
+- `dayKey` (string)
+- `date` (timestamp)
 - `distance` (number)
 - `source` (string)
 - `createdAt` (timestamp, serverTimestamp)
+- `updatedAt` (timestamp, serverTimestamp)
 
-### Read patterns / aggregation rules
+> 実装上は `set(..., SetOptions(merge: true))` を使っているため、`createdAt` も更新時に再セットされうる。
+> そのため現状の `createdAt` は「厳密な初回作成日時」ではなく、「保存時に入る時刻フィールド」として扱うのが安全。
+> 厳密な初回作成日時を保持したい場合は、将来 `create時のみcreatedAtを付与する実装` に改める余地がある。
+
+---
+
+### Read patterns
 
 #### グラフ表示（時系列）
 - `watchDistanceSeries()`
   - `orderBy('date')`
-  - `HealthRecord.fromDoc` で model 化
+  - `users/{uid}/distance_records` をそのまま時系列として読む
 
-#### 指定日の距離合計（ローカル日付基準）
+#### 指定日の距離
 - `fetchDailyTotalDistance(dayLocal)`
-  - ローカル日付の `[startLocal, endLocal)` を作り、UTCに変換してクエリ:
-    - `where('date' >= startUtc)`
-    - `where('date' < endUtc)`
-  - 対象期間の `distance` を合計して返す
+  - 対象 `dayKey` のドキュメントを直接読む
+  - その日の記録が無ければ `0`
 
-#### 直近N日平均（ローカル日付基準）
+#### 全期間の日次系列
+- `fetchAllDailyDistanceSeries()`
+  - `orderBy('date')`
+  - 各ドキュメントを `HealthRecord` に変換して返す
+
+#### 直近N日平均
 - `fetchRollingDailyAverage(days=7, todayLocal?)`
-  - 期間クエリ自体は UTC 範囲で取得
-  - 取得後、`date` を `toLocal()` して **ローカル日付キー**で日別バケツ集計
-  - 「存在しない日は0」として days 分で割る（ユーザー体感に合わせた仕様）
+  - `distance_records` を日次データとして扱う
+  - 存在しない日は `0` として平均に含める
+
+#### 直近N日系列
+- `fetchDailyDistanceSeries(days=7, todayLocal?)`
+  - 直近N日を日付で埋める
+  - 記録のない日は `distance = 0`
 
 ---
 
-## Design notes / pitfalls
+### Internal rules / normalization
 
-- `health_records.date` は **UTC保存**、集計は **ローカル日付**で切り出す（`_dayRangeUtc` の考え方）。
-- `fetchRollingDailyAverage` は「記録ゼロの日も平均に含める」仕様（データがない日を除外しない）。
-- `wheelDiameterCm` が未設定のとき、保存処理は例外で止める（UI側で「飼育環境を設定してね」の導線が必要）。
+- 日付の主キーは `dayKey`
+- `dayKey` はローカル日付ベースで生成する
+- `date` はそのローカル日付の 00:00 を UTC化した Timestamp を保存する
+- 読み出し時は `dayKey` を優先し、必要に応じて `date` を補助的に使う
+- 1日1ドキュメントを前提とするため、同日複数レコードの後段集約は不要
 
 ---
 
-## SwitchBot integration
+### Design notes / benefits
 
-SwitchBot は以下の2系統でデータを持つ:
-1) `users/{uid}/integrations/*` : 連携設定（token/secret、デバイスIDなど）
-2) `users/{uid}/switchbot_readings/*` : 収集された温湿度ログ
-+ 3) `switchbot_users/{uid}` : ポーリング対象ユーザーを列挙するトップレベル
+- 1日1ドキュメントなので、**入力ミスを後から修正しやすい**
+- Firestore上でも日付単位で意味が明確
+- autoId方式と違って、同日の複数レコードを後で集約する必要がない
+- グラフや平均値の計算が単純になる
+- ドキュメントIDを見るだけで保存日が分かる
+
+---
+
+### Operational considerations
+
+- `distance_records` は **日次の確定値ストア**
+- UI上で同じ日付に再保存した場合は **更新** とみなす
+- `wheelDiameterCm` 未設定時は保存せず、`MissingWheelDiameterException` を投げる
+- 直近平均は「記録ゼロの日も平均に含める」仕様
+- 欠損日を0埋めすることで、ユーザー体感に合う推移表示を優先している
+
+---
+
+### Legacy
+
+#### Old path
+- `users/{uid}/health_records/{autoId}`
+
+#### Old structure problems
+- 1日に複数レコードが入りうる
+- 同じ日の修正がしづらい
+- 後段で日次集約が必要
+- Firestoreコンソール上でも意味が読み取りにくい
+
+#### Current policy
+- 今後の正規運用は `distance_records` を基準とする
+- `health_records` は legacy データとして扱う
+- 旧データ移行を行う場合は、日付単位に集約した上で `distance_records/{dayKey}` に変換する
 
 ---
 
@@ -169,6 +249,19 @@ SwitchBot は以下の2系統でデータを持つ:
 
 ---
 
+## SwitchBot integration
+
+SwitchBot は以下の3系統でデータを持つ:
+
+1. `users/{uid}/integrations/*`
+   - 連携設定（token/secret、デバイスIDなど）
+2. `users/{uid}/switchbot_readings/*`
+   - 収集された温湿度ログ
+3. `switchbot_users/{uid}`
+   - ポーリング対象ユーザーを列挙するトップレベル索引
+
+---
+
 ### 1) Secrets
 
 #### Path
@@ -183,7 +276,8 @@ SwitchBot は以下の2系統でデータを持つ:
   - `token` (string)
   - `secret` (string)
   - `updatedAt` (timestamp, serverTimestamp)
-- `v1` (map|null) ※ legacy fallback（暗号化ラップを想定した復号関数あり）
+- `v1` (map|null)
+  - legacy fallback（暗号化ラップを想定した復号関数あり）
   - `token` (string)
   - `secret` (string)
 - `disabledAt` (timestamp|null)
@@ -206,16 +300,18 @@ SwitchBot は以下の2系統でデータを持つ:
 - `meterDeviceId` (string|null)
 - `meterDeviceName` (string|null)
 - `meterDeviceType` (string|null)
-- `enabled` (bool|null)  ※ 解除時に `false` をセット
+- `enabled` (bool|null)
+  - 解除時に `false` をセット
+- `disabledAt` (timestamp|null)
+  - 解除時にセット
 
-- `disabledAt` (timestamp|null) ※ 解除時にセット
-
-> 注意: 現状の functions 側は meterDeviceId のみ参照している。UI側が name/type/enabled を持っていても、必須ではない。
+> 注意: 現状の functions 側は `meterDeviceId` のみ参照している。  
+> UI側が `name/type/enabled` を持っていても、必須ではない。  
 > 実質的な必須フィールドは `meterDeviceId` のみ。
 
 ---
 
-### 3) SwitchBot readings (temperature/humidity logs)
+### 3) SwitchBot readings (temperature / humidity logs)
 
 #### Path
 - `users/{uid}/switchbot_readings/{tsIso}`
@@ -232,7 +328,7 @@ SwitchBot は以下の2系統でデータを持つ:
 - `temperature` (number|null)
 - `humidity` (number|null)
 - `battery` (number|null)
-- `source` (string) 例: "status"
+- `source` (string) 例: `"status"`
 - `createdAt` (timestamp, serverTimestamp)
 
 ---
@@ -258,7 +354,7 @@ SwitchBot は以下の2系統でデータを持つ:
 
 ## Notes / operational considerations
 
-- SwitchBot secrets は Cloud Functions 側で SwitchBot /devices を叩いて **保存前に検証**している。
+- SwitchBot secrets は Cloud Functions 側で SwitchBot `/devices` を叩いて **保存前に検証**している。
 - SwitchBot 読み取りは scheduler が top-level `switchbot_users` を走査し、ユーザーごとに
   - `users/{uid}/integrations/switchbot_secrets`
   - `users/{uid}/integrations/switchbot`
