@@ -3,7 +3,7 @@ import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
 
 import '../services/switchbot_repo.dart';
-import '../services/health_records_repo.dart';
+import '../services/distance_records_repo.dart';
 import '../models/health_record.dart';
 import '../models/switchbot_reading.dart';
 import 'switchbot_setup.dart';
@@ -21,7 +21,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   // ===== 回し車 =====
   final _wheelCtrl = TextEditingController();
-  final _healthRepo = HealthRecordsRepo();
+  final _distanceRepo = DistanceRecordsRepo();
   final SwitchbotRepo _sbRepo = SwitchbotRepo();
   late Future<_TodayKpi> _todayKpiFuture;
   double? _distance;
@@ -36,7 +36,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
     _todayKpiFuture = _buildTodayKpi(); // ★これを追加
 
-    _healthRepo.refreshWheelDiameter().then((_) {
+    _distanceRepo.refreshWheelDiameter().then((_) {
       if (!mounted) return;
       _recalcDistance(_wheelCtrl.text);
       setState(() {});
@@ -55,7 +55,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
       return;
     }
 
-    final dist = await _healthRepo.previewDistanceFromRotations(r);
+    final dist = await _distanceRepo.previewDistanceFromRotations(r);
 
     if (!mounted) return;
     if (seq != _calcSeq) return; // 古い結果を捨てる
@@ -73,7 +73,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     });
 
     try {
-      await _healthRepo.addWheelRotationRecord(
+      await _distanceRepo.addWheelRotationRecord(
         rotations: rotations,
         date: _selectedRecordDate,
       );
@@ -243,8 +243,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   Future<_TodayKpi> _buildTodayKpi() async {
     final results = await Future.wait<double>([
-      _healthRepo.fetchDailyTotalDistance(DateTime.now()),
-      _healthRepo.fetchRollingDailyAverage(days: 7),
+      _distanceRepo.fetchDailyTotalDistance(DateTime.now()),
+      _distanceRepo.fetchRollingDailyAverage(days: 7),
     ]);
     final today = results[0];
     final avg7 = results[1];
@@ -340,7 +340,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   // ---------- Widgets ----------
   Widget _wheelBlock() {
-    final wheelReady = (_healthRepo.cachedWheelDiameterCm != null);
+    final wheelReady = (_distanceRepo.cachedWheelDiameterCm != null);
     final canSave = wheelReady && (_distance != null) && !_saving;
 
     return Column(
@@ -407,7 +407,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                 MaterialPageRoute(
                     builder: (_) => const BreedingEnvironmentEditScreen()),
               );
-              await _healthRepo.refreshWheelDiameter();
+              await _distanceRepo.refreshWheelDiameter();
               if (!mounted) return;
               _recalcDistance(_wheelCtrl.text);
               setState(() {});
@@ -441,7 +441,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     return SizedBox(
       height: 280,
       child: StreamBuilder<List<HealthRecord>>(
-        stream: _healthRepo.watchDistanceSeries(),
+        stream: _distanceRepo.watchDistanceSeries(),
         builder: (context, snap) {
           if (!snap.hasData) {
             return const Center(child: CircularProgressIndicator());

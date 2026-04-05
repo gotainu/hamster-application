@@ -1,6 +1,4 @@
-// /Users/gota/local_dev/flutter_projects/hamster_project/lib/widgets/semantic_sparkline.dart
-import 'dart:math' as math;
-
+// lib/widgets/semantic_sparkline.dart
 import 'package:flutter/material.dart';
 import 'package:hamster_project/models/semantic_chart_band.dart';
 import 'package:hamster_project/theme/app_theme.dart';
