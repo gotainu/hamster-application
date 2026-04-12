@@ -5,6 +5,7 @@ class AppTheme {
   // ===== Environment Assessment Visual =====
   static const Color envGood = Color(0xFF4CD6A7);
   static const Color envCaution = Color(0xFFFFC857);
+  static const Color envCautionLight = Color(0xFFB77900);
   static const Color envDanger = Color(0xFFFF6B6B);
 
   static Gradient environmentHeroGradient(String? level, {bool isDark = true}) {
@@ -70,6 +71,23 @@ class AppTheme {
       case '注意':
       default:
         return envCaution;
+    }
+  }
+
+  static Color environmentAccentForContext(
+    BuildContext context,
+    String? level,
+  ) {
+    final dark = isDark(context);
+
+    switch (level) {
+      case '良好':
+        return envGood;
+      case '危険':
+        return envDanger;
+      case '注意':
+      default:
+        return dark ? envCaution : envCautionLight;
     }
   }
 
