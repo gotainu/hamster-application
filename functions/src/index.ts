@@ -5,6 +5,7 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
+import { executeAnomalyNotificationPipeline } from './anomalyNotification';
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -668,6 +669,33 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     dailyLevel: dailyAssessment.level,
     sourceDocCount: readings.length,
   });
+
+  // ===== 異常検知通知パイプライン =====
+  try {
+    const notificationResult = await executeAnomalyNotificationPipeline({
+      db,
+      messaging: admin.messaging(),
+      uid,
+      windowDays: 14,
+      now: evaluatedAt,
+    });
+
+    logger.info('executeAnomalyNotificationPipeline done', {
+      uid,
+      shouldNotify: notificationResult.decision.shouldNotify,
+      reason: notificationResult.decision.reason,
+      notificationKey: notificationResult.notificationKey,
+      tokenCount: notificationResult.tokenCount,
+      sentCount: notificationResult.sentCount,
+      failedCount: notificationResult.failedCount,
+      noTokens: notificationResult.noTokens,
+    });
+  } catch (e: any) {
+    logger.error('executeAnomalyNotificationPipeline error', {
+      uid,
+      error: String(e?.message ?? e),
+    });
+  }
 }
 
 async function saveEnvironmentAssessmentHistoryDaily(

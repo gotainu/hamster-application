@@ -19,11 +19,32 @@ class TabsScreenState extends State<TabsScreen> {
   int selectedIndex = 0;
   late final List<Widget> _pages;
 
+  final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+
+  Future<void> openHomeAnomalyCard() async {
+    if (!mounted) return;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+
+    if (!mounted) return;
+
+    setState(() {
+      selectedIndex = 0;
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+
+    await _homeKey.currentState?.focusAnomalyCard();
+  }
+
   @override
   void initState() {
     super.initState();
     _pages = [
       HomeScreen(
+        key: _homeKey,
         onTabSelected: (index) {
           setState(() {
             selectedIndex = index;
