@@ -24,10 +24,13 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.onTabSelected});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _anomalyCardKey = GlobalKey();
+
   final _activityTrendService = const ActivityTrendService();
   final _assessmentRepo = EnvironmentAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
@@ -118,6 +121,48 @@ class _HomeScreenState extends State<HomeScreen> {
     return _anomalyDetectionService.detect(history: history);
   }
 
+  Future<void> focusAnomalyCard() async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    if (!mounted) return;
+
+    await WidgetsBinding.instance.endOfFrame;
+
+    if (!mounted) return;
+
+    final anomalyContext = _anomalyCardKey.currentContext;
+
+    if (anomalyContext == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('現在、最近の気になる変化は表示されていません。'),
+        ),
+      );
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      anomalyContext,
+      duration: const Duration(milliseconds: 550),
+      curve: Curves.easeOutCubic,
+      alignment: 0.18,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('最近の気になる変化を表示しました。'),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -164,6 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
 
                       return SingleChildScrollView(
+                        controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(18, 20, 18, 24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,16 +252,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             if (!isLoading && anomalyDetection.hasAnomaly) ...[
                               const SizedBox(height: 14),
-                              _HomeAnomalyCard(
-                                result: anomalyDetection,
-                                onTap: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const DailyStatusDetailScreen(),
-                                    ),
-                                  );
-                                },
+                              Container(
+                                key: _anomalyCardKey,
+                                child: _HomeAnomalyCard(
+                                  result: anomalyDetection,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const DailyStatusDetailScreen(),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ],
                             const SizedBox(height: 14),
