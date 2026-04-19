@@ -1020,7 +1020,7 @@ export const switchbotPollNow = onRequest({ region: 'asia-northeast1' }, async (
 /* ===== Scheduler ===== */
 
 export const switchbotPoller = onSchedule(
-  { region: 'asia-northeast1', schedule: 'every 15 minutes' },
+  { region: 'asia-northeast1', schedule: 'every 60 minutes' },
   async () => {
     await pollAllUsersOnce();
   },
