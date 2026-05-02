@@ -244,6 +244,20 @@ type BreedingEnvironment = {
   temperatureControl?: string | null;
 };
 
+type HistoryRow = {
+  dateKey?: string;
+  level?: string | null;
+  avgTemp?: number | null;
+  avgHum?: number | null;
+  tempRatio?: number | null;
+  humRatio?: number | null;
+  dangerMinutes?: number | null;
+  spikesTemp?: number | null;
+  spikesHum?: number | null;
+  lastEvaluatedAt?: Date | null;
+  updatedAt?: Date | null;
+};
+
 const WINDOW_DAYS = 7;
 const TEMP_MIN = 20.0;
 const TEMP_MAX = 26.0;
@@ -564,13 +578,10 @@ function buildEnvironmentAssessment(params: {
   } else if (spikesTemp > 0 && temperatureControl === 'エアコン') {
     todayAction = 'エアコンの風がケージに直接当たっていないか確認してください。';
     why = '温度の急変が空調由来で起きている可能性があるからです。';
-  } else if (humRatio < 0.7 && beddingThickness !== null && beddingThickness >= 5) {
-    todayAction = '床材が厚めなら、通気性を少し改善して湿気のこもりを減らしてみてください。';
-    why = '平均湿度が高めで、厚い床材は湿気がこもりやすいからです。';
   } else if (humRatio < 0.7 && humState === '高め') {
-    todayAction = 'ケージ周辺の通気を少し見直して、湿度がこもりすぎないか確認してください。';
-    why = '湿度がやや高めで推移しているからです。';
-  }
+  todayAction = 'まずは部屋全体の湿度・ケージ周辺の風通し・濡れた床材がないかを確認してください。床材の厚み自体は、掘る行動を支える大切な要素なので、安易に減らす必要はありません。';
+  why = '平均湿度が高めで推移していますが、床材の厚さそのものよりも、部屋の湿度・通気・局所的な濡れや汚れが影響している可能性を先に確認したいからです。';
+}
 
   const notes: string[] = [];
   if (temperatureControl) notes.push(`現在の温度管理方法：${temperatureControl}`);
@@ -621,6 +632,430 @@ function buildEnvironmentAssessment(params: {
   };
 }
 
+type EnvironmentAssessmentForAi = ReturnType<typeof buildEnvironmentAssessment>;
+
+type TrendDirection = 'improving' | 'worsening' | 'stable' | 'unknown';
+type TrendMainMetric = 'temperature' | 'humidity' | 'overall';
+
+type LatestTrendSummary = {
+  direction: TrendDirection;
+  mainMetric: TrendMainMetric;
+  summary: string;
+  deltaText: string;
+  currentHumRatio: number | null;
+  previousHumRatio: number | null;
+  currentTempRatio: number | null;
+  previousTempRatio: number | null;
+};
+
+type LatestAnomalySummary = {
+  hasAnomaly: boolean;
+  topTitle: string | null;
+  severity: 'info' | 'low' | 'medium' | 'high' | null;
+  description: string | null;
+  flags: string[];
+};
+
+type SensorEvaluationSummary = {
+  overallState: 'good' | 'caution' | 'alert' | 'unknown';
+  flags: string[];
+};
+
+type AiAdvisorContext = {
+  status: 'available' | 'insufficient_data';
+  summary: string;
+  priority: string | null;
+  promptText: string;
+  generatedAt: FirebaseFirestore.Timestamp;
+  version: number;
+};
+
+async function fetchRecentEnvironmentHistory(
+  uid: string,
+  limit: number,
+): Promise<HistoryRow[]> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('environment_assessments_history')
+    .orderBy('dateKey', 'desc')
+    .limit(limit)
+    .get();
+
+  const rows = snap.docs.map((d) => {
+    const m = d.data() ?? {};
+    return {
+      dateKey: asString(m.dateKey) ?? d.id,
+      level: asString(m.level),
+      avgTemp: asNumber(m.avgTemp),
+      avgHum: asNumber(m.avgHum),
+      tempRatio: asNumber(m.tempRatio),
+      humRatio: asNumber(m.humRatio),
+      dangerMinutes: asNumber(m.dangerMinutes),
+      spikesTemp: asNumber(m.spikesTemp),
+      spikesHum: asNumber(m.spikesHum),
+      lastEvaluatedAt: null,
+      updatedAt: null,
+    } as HistoryRow;
+  });
+
+  rows.sort((a, b) => String(a.dateKey ?? '').localeCompare(String(b.dateKey ?? '')));
+  return rows;
+}
+
+function averageNullable(values: Array<number | null | undefined>): number | null {
+  const nums = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function buildTrendSummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  history: HistoryRow[];
+}): LatestTrendSummary {
+  const { latest, history } = params;
+
+  const currentTempRatio =
+    typeof latest.tempRatio === 'number' ? latest.tempRatio : null;
+  const currentHumRatio =
+    typeof latest.humRatio === 'number' ? latest.humRatio : null;
+
+  if (history.length < 4 || currentTempRatio == null || currentHumRatio == null) {
+    return {
+      direction: 'unknown',
+      mainMetric: 'overall',
+      summary: '推移を判断するには、もう少し履歴データが必要です。',
+      deltaText: '比較データ不足',
+      currentHumRatio,
+      previousHumRatio: null,
+      currentTempRatio,
+      previousTempRatio: null,
+    };
+  }
+
+  const recent = history.slice(-3);
+  const previous = history.slice(0, Math.max(0, history.length - 3));
+
+  const previousTempRatio = averageNullable(previous.map((e) => e.tempRatio));
+  const previousHumRatio = averageNullable(previous.map((e) => e.humRatio));
+
+  if (previousTempRatio == null || previousHumRatio == null) {
+    return {
+      direction: 'unknown',
+      mainMetric: 'overall',
+      summary: '過去平均との差分を判断するには、もう少し履歴データが必要です。',
+      deltaText: '比較データ不足',
+      currentHumRatio,
+      previousHumRatio,
+      currentTempRatio,
+      previousTempRatio,
+    };
+  }
+
+  const recentTempRatio = averageNullable(recent.map((e) => e.tempRatio)) ?? currentTempRatio;
+  const recentHumRatio = averageNullable(recent.map((e) => e.humRatio)) ?? currentHumRatio;
+
+  const tempDelta = recentTempRatio - previousTempRatio;
+  const humDelta = recentHumRatio - previousHumRatio;
+
+  const absTempDelta = Math.abs(tempDelta);
+  const absHumDelta = Math.abs(humDelta);
+
+  const mainMetric: TrendMainMetric =
+    absHumDelta >= absTempDelta ? 'humidity' : 'temperature';
+
+  const mainDelta = mainMetric === 'humidity' ? humDelta : tempDelta;
+  const mainLabel = mainMetric === 'humidity' ? '湿度' : '温度';
+  const deltaPt = Math.round(mainDelta * 100);
+
+  let direction: TrendDirection = 'stable';
+  if (mainDelta >= 0.10) {
+    direction = 'improving';
+  } else if (mainDelta <= -0.10) {
+    direction = 'worsening';
+  }
+
+  const deltaText =
+    direction === 'stable'
+      ? `${mainLabel}の適正率は大きく変わっていません。`
+      : `${mainLabel}の適正率が過去平均との差で${deltaPt >= 0 ? '+' : ''}${deltaPt}pt変化しています。`;
+
+  let summary = '温湿度の推移はおおむね安定しています。';
+
+  if (direction === 'improving') {
+    summary = `${mainLabel}は以前より改善傾向です。`;
+  } else if (direction === 'worsening') {
+    summary = `${mainLabel}は以前より悪化傾向です。`;
+  } else if (currentHumRatio !== null && currentHumRatio < 0.6) {
+    summary = '湿度はまだ不安定ですが、急激な悪化は見られません。';
+  }
+
+  return {
+    direction,
+    mainMetric,
+    summary,
+    deltaText,
+    currentHumRatio,
+    previousHumRatio,
+    currentTempRatio,
+    previousTempRatio,
+  };
+}
+
+function buildLightweightAnomalySummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  history: HistoryRow[];
+}): LatestAnomalySummary {
+  const { latest, history } = params;
+  const flags: string[] = [];
+
+  const sorted = [...history].sort((a, b) =>
+    String(a.dateKey ?? '').localeCompare(String(b.dateKey ?? '')),
+  );
+
+  const tailCount = (predicate: (row: HistoryRow) => boolean): number => {
+    let count = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (predicate(sorted[i])) count++;
+      else break;
+    }
+    return count;
+  };
+
+  const highHumStreak = tailCount(
+    (e) => (e.avgHum ?? Number.NEGATIVE_INFINITY) > HUM_MAX,
+  );
+  const lowTempStreak = tailCount(
+    (e) => (e.avgTemp ?? Number.POSITIVE_INFINITY) < TEMP_MIN,
+  );
+  const highTempStreak = tailCount(
+    (e) => (e.avgTemp ?? Number.NEGATIVE_INFINITY) > TEMP_MAX,
+  );
+  const cautionStreak = tailCount((e) => e.level === '注意');
+
+  const recent3 = sorted.length <= 3 ? sorted : sorted.slice(sorted.length - 3);
+  const dangerHit = recent3.some((e) => e.level === '危険');
+  const dangerMinutesMax = recent3.reduce(
+    (max, e) => Math.max(max, e.dangerMinutes ?? 0),
+    0,
+  );
+  const tempSpikeTotal = recent3.reduce((sum, e) => sum + (e.spikesTemp ?? 0), 0);
+  const humSpikeTotal = recent3.reduce((sum, e) => sum + (e.spikesHum ?? 0), 0);
+
+  if (highHumStreak >= 3) flags.push('humidityHighStreak');
+  if (lowTempStreak >= 3) flags.push('temperatureLowStreak');
+  if (highTempStreak >= 3) flags.push('temperatureHighStreak');
+  if (cautionStreak >= 3) flags.push('cautionLevelStreak');
+  if (dangerHit || dangerMinutesMax > 0) flags.push('dangerDetected');
+  if (tempSpikeTotal >= 3) flags.push('temperatureSpike');
+  if (humSpikeTotal >= 3) flags.push('humiditySpike');
+
+  if (dangerHit || dangerMinutesMax >= 30) {
+    return {
+      hasAnomaly: true,
+      topTitle: '危険評価が検出されています',
+      severity: 'high',
+      description: '直近の環境評価で危険サインが出ています。温度・湿度・行動の変化を優先して確認してください。',
+      flags,
+    };
+  }
+
+  if (highHumStreak >= 5) {
+    const hum =
+      typeof latest.avgHum === 'number' ? Math.round(latest.avgHum) : null;
+    return {
+      hasAnomaly: true,
+      topTitle: '高湿が続いています',
+      severity: 'high',
+      description:
+        hum != null
+          ? `湿度が高めの状態が${highHumStreak}日連続です。最新の平均湿度は${hum}%です。`
+          : `湿度が高めの状態が${highHumStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (highTempStreak >= 5 || lowTempStreak >= 5) {
+    const isHigh = highTempStreak >= 5;
+    const streak = isHigh ? highTempStreak : lowTempStreak;
+    return {
+      hasAnomaly: true,
+      topTitle: isHigh ? '高温が続いています' : '低温が続いています',
+      severity: 'high',
+      description: `温度が${isHigh ? '高め' : '低め'}の状態が${streak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (highHumStreak >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '湿度が高めです',
+      severity: 'medium',
+      description: `湿度が高めの状態が${highHumStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (tempSpikeTotal >= 3 || humSpikeTotal >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '温湿度の急変が見られます',
+      severity: tempSpikeTotal >= 6 || humSpikeTotal >= 6 ? 'high' : 'medium',
+      description: `直近3日で温度急変${tempSpikeTotal}回、湿度急変${humSpikeTotal}回が記録されています。`,
+      flags,
+    };
+  }
+
+  if (cautionStreak >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '注意評価が続いています',
+      severity: cautionStreak >= 5 ? 'high' : 'medium',
+      description: `環境評価の「注意」が${cautionStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  return {
+    hasAnomaly: false,
+    topTitle: null,
+    severity: null,
+    description: null,
+    flags,
+  };
+}
+
+function buildSensorEvaluationSummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  anomaly: LatestAnomalySummary;
+}): SensorEvaluationSummary {
+  const { latest, anomaly } = params;
+  const flags = new Set<string>(anomaly.flags);
+
+  if (latest.humState === '高め') flags.add('humidityHigh');
+  if (latest.humState === '低め') flags.add('humidityLow');
+  if (latest.tempState === '高め') flags.add('temperatureHigh');
+  if (latest.tempState === '低め') flags.add('temperatureLow');
+  if ((latest.dangerMinutes ?? 0) > 0) flags.add('dangerMinutesDetected');
+  if ((latest.spikesTemp ?? 0) > 0) flags.add('temperatureSpike');
+  if ((latest.spikesHum ?? 0) > 0) flags.add('humiditySpike');
+
+  let overallState: SensorEvaluationSummary['overallState'] = 'unknown';
+
+  if (latest.status !== 'ok') {
+    overallState = 'unknown';
+  } else if (latest.level === '危険' || anomaly.severity === 'high') {
+    overallState = 'alert';
+  } else if (latest.level === '注意' || anomaly.hasAnomaly) {
+    overallState = 'caution';
+  } else if (latest.level === '良好') {
+    overallState = 'good';
+  }
+
+  return {
+    overallState,
+    flags: Array.from(flags),
+  };
+}
+
+function buildAiAdvisorContext(params: {
+  latest: EnvironmentAssessmentForAi;
+  trend: LatestTrendSummary;
+  anomaly: LatestAnomalySummary;
+  sensorEvaluation: SensorEvaluationSummary;
+  evaluatedAt: Date;
+}): AiAdvisorContext {
+  const { latest, trend, anomaly, sensorEvaluation, evaluatedAt } = params;
+
+  if (latest.status !== 'ok') {
+    return {
+      status: 'insufficient_data',
+      summary: '温湿度データが不足しているため、AI相談で参照できる環境評価は限定的です。',
+      priority: 'SwitchBotの記録が継続して入っているか確認してください。',
+      promptText:
+        '【現在のセンサー評価】\n' +
+        '温湿度データが不足しています。環境評価は参考程度に扱ってください。\n' +
+        `状態: ${latest.headline}\n` +
+        `今日やること: ${latest.todayAction}\n`,
+      generatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
+      version: 1,
+    };
+  }
+
+  const avgTempText =
+    typeof latest.avgTemp === 'number' ? `${latest.avgTemp.toFixed(1)}℃` : '不明';
+  const avgHumText =
+    typeof latest.avgHum === 'number' ? `${Math.round(latest.avgHum)}%` : '不明';
+
+  const tempRatioText =
+    typeof latest.tempRatio === 'number' ? fmtPct01(latest.tempRatio) : '不明';
+  const humRatioText =
+    typeof latest.humRatio === 'number' ? fmtPct01(latest.humRatio) : '不明';
+
+  const anomalyText = anomaly.hasAnomaly
+    ? [
+        anomaly.topTitle ?? '気になる変化があります',
+        anomaly.description ?? '',
+        anomaly.severity ? `重要度: ${anomaly.severity}` : '',
+      ].filter(Boolean).join('\n')
+    : '目立った異常検知はありません。';
+
+  const priority =
+    anomaly.severity === 'high'
+      ? anomaly.description
+      : latest.todayAction ?? null;
+
+  const promptText = [
+    '【現在のセンサー評価】',
+    `総合評価: ${latest.level}`,
+    `見出し: ${latest.headline}`,
+    `平均温度: ${avgTempText}`,
+    `平均湿度: ${avgHumText}`,
+    `温度適正率: ${tempRatioText}`,
+    `湿度適正率: ${humRatioText}`,
+    `温度の解釈: ${latest.tempInterpretation ?? ''}`,
+    `湿度の解釈: ${latest.humInterpretation ?? ''}`,
+    `今日やること: ${latest.todayAction}`,
+    `理由: ${latest.why}`,
+    '',
+    '【最近の推移】',
+    trend.summary,
+    trend.deltaText,
+    '',
+    '【最近の気になる変化】',
+    anomalyText,
+    '',
+    '【注意フラグ】',
+    sensorEvaluation.flags.length > 0
+      ? sensorEvaluation.flags.join(', ')
+      : '特になし',
+    '',
+    '【回答方針】',
+'ユーザーの質問に関係する場合だけ、上記のセンサー評価を自然に参照してください。',
+'関係ない質問では、無理に温湿度や異常検知へ言及しないでください。',
+'体調不良の可能性がある相談では、センサー情報だけで病気や原因を断定しないでください。',
+'必要に応じて「環境要因としては」という表現で、観察・環境調整・受診検討を分けて提案してください。',
+'床材が十分に深い場合は、その厚みをまず肯定してください。',
+'高湿対策として、床材を安易に減らす・掘り返す・全交換する提案は避けてください。',
+'湿度が高い場合は、まず部屋全体の湿度、ケージ周辺の風通し、エアコンや除湿、濡れた床材・汚れた部分の局所確認を優先してください。',
+'床材の交換や除去を提案する場合は、濡れている・カビ臭い・汚れているなどの明確な根拠がある場合に限定してください。',
+  ].join('\n');
+
+  const summary = anomaly.hasAnomaly
+    ? `${latest.level}。${anomaly.topTitle ?? '気になる変化があります'}`
+    : `${latest.level}。${trend.summary}`;
+
+  return {
+    status: 'available',
+    summary,
+    priority,
+    promptText,
+    generatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
+    version: 1,
+  };
+}
+
 async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
   const [env, readings] = await Promise.all([
     fetchBreedingEnvironment(uid),
@@ -637,6 +1072,32 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
 
   const evaluatedAt = new Date();
 
+  // AI相談用に、直近履歴から trend / anomaly / prompt context を生成
+  const recentHistory = await fetchRecentEnvironmentHistory(uid, 14);
+
+  const trend = buildTrendSummary({
+    latest: latestAssessment,
+    history: recentHistory,
+  });
+
+  const anomaly = buildLightweightAnomalySummary({
+    latest: latestAssessment,
+    history: recentHistory,
+  });
+
+  const sensorEvaluation = buildSensorEvaluationSummary({
+    latest: latestAssessment,
+    anomaly,
+  });
+
+  const aiAdvisorContext = buildAiAdvisorContext({
+    latest: latestAssessment,
+    trend,
+    anomaly,
+    sensorEvaluation,
+    evaluatedAt,
+  });
+
   await db
     .collection('users')
     .doc(uid)
@@ -645,6 +1106,10 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     .set(
       {
         ...latestAssessment,
+        trend,
+        anomaly,
+        sensorEvaluation,
+        aiAdvisorContext,
         evaluatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
       },
       { merge: true },
@@ -668,6 +1133,11 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     latestLevel: latestAssessment.level,
     dailyLevel: dailyAssessment.level,
     sourceDocCount: readings.length,
+    trendDirection: trend.direction,
+    trendSummary: trend.summary,
+    hasAnomaly: anomaly.hasAnomaly,
+    anomalySeverity: anomaly.severity,
+    aiAdvisorContextStatus: aiAdvisorContext.status,
   });
 
   // ===== 異常検知通知パイプライン =====

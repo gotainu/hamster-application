@@ -6,8 +6,8 @@ import '../services/switchbot_repo.dart';
 import '../services/distance_records_repo.dart';
 import '../models/health_record.dart';
 import '../models/switchbot_reading.dart';
+import '../widgets/wheel_rotation_input_card.dart';
 import 'switchbot_setup.dart';
-import 'breeding_environment_edit_screen.dart';
 
 class GraphFunctionScreen extends StatefulWidget {
   const GraphFunctionScreen({super.key});
@@ -20,104 +20,20 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   //final uid = FirebaseAuth.instance.currentUser!.uid;
 
   // ===== 回し車 =====
-  final _wheelCtrl = TextEditingController();
   final _distanceRepo = DistanceRecordsRepo();
   final SwitchbotRepo _sbRepo = SwitchbotRepo();
   late Future<_TodayKpi> _todayKpiFuture;
-  double? _distance;
-  bool _saving = false;
-  String? _saveMsg;
-  DateTime _selectedRecordDate = DateTime.now();
-  int _calcSeq = 0;
 
   @override
   void initState() {
     super.initState();
 
-    _todayKpiFuture = _buildTodayKpi(); // ★これを追加
-
-    _distanceRepo.refreshWheelDiameter().then((_) {
-      if (!mounted) return;
-      _recalcDistance(_wheelCtrl.text);
-      setState(() {});
-    });
-
-    _wheelCtrl.addListener(() => _recalcDistance(_wheelCtrl.text));
-  }
-
-  void _recalcDistance(String v) async {
-    final seq = ++_calcSeq;
-
-    final r = int.tryParse(v);
-    if (r == null) {
-      if (!mounted) return;
-      setState(() => _distance = null);
-      return;
-    }
-
-    final dist = await _distanceRepo.previewDistanceFromRotations(r);
-
-    if (!mounted) return;
-    if (seq != _calcSeq) return; // 古い結果を捨てる
-
-    setState(() => _distance = dist);
-  }
-
-  Future<void> _saveDistance() async {
-    final rotations = int.tryParse(_wheelCtrl.text);
-    if (rotations == null) return;
-
-    setState(() {
-      _saving = true;
-      _saveMsg = null;
-    });
-
-    try {
-      await _distanceRepo.addWheelRotationRecord(
-        rotations: rotations,
-        date: _selectedRecordDate,
-      );
-      if (!mounted) return;
-      setState(() {
-        _saveMsg =
-            '${DateFormat('yyyy/MM/dd').format(_selectedRecordDate)} の記録を保存しました！';
-      });
-      _invalidateTodayKpiCache();
-    } on MissingWheelDiameterException {
-      if (!mounted) return;
-      setState(() => _saveMsg = 'まずは飼育環境を設定してください（車輪の直径が未設定です）。');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _saveMsg = '保存に失敗: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
-    }
+    _todayKpiFuture = _buildTodayKpi();
   }
 
   void _invalidateTodayKpiCache() {
     setState(() {
       _todayKpiFuture = _buildTodayKpi();
-    });
-  }
-
-  Future<void> _pickRecordDate() async {
-    final now = DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedRecordDate,
-      firstDate: DateTime(now.year - 3),
-      lastDate: DateTime(now.year + 1),
-      helpText: '記録する日付を選択',
-      locale: const Locale('ja'),
-    );
-
-    if (picked == null) return;
-
-    setState(() {
-      _selectedRecordDate = picked;
     });
   }
 
@@ -340,100 +256,17 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   // ---------- Widgets ----------
   Widget _wheelBlock() {
-    final wheelReady = (_distanceRepo.cachedWheelDiameterCm != null);
-    final canSave = wheelReady && (_distance != null) && !_saving;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '記録する日付',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        const SizedBox(height: 8),
-        InkWell(
-          onTap: _pickRecordDate,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.white12,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 18),
-                const SizedBox(width: 10),
-                Text(
-                  DateFormat('yyyy/MM/dd').format(_selectedRecordDate),
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const Spacer(),
-                const Icon(Icons.expand_more),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        TextField(
-          controller: _wheelCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: '回し車の回転数'),
-          enabled: wheelReady,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '走った距離（m）：${_distance?.toStringAsFixed(2) ?? '-'}',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        if (!wheelReady) ...[
-          const SizedBox(height: 6),
-          const Text(
-            'まずは飼育環境を設定してください（車輪の直径が未設定です）。',
-            style: TextStyle(fontSize: 12),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            icon: const Icon(Icons.settings),
-            label: const Text('飼育環境を設定する'),
-            onPressed: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const BreedingEnvironmentEditScreen()),
-              );
-              await _distanceRepo.refreshWheelDiameter();
-              if (!mounted) return;
-              _recalcDistance(_wheelCtrl.text);
-              setState(() {});
-            },
-          ),
-        ],
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            ElevatedButton.icon(
-              onPressed: canSave ? _saveDistance : null,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save),
-              label: Text(_saving ? '保存中...' : 'この日付で保存'),
-            ),
-            const SizedBox(width: 12),
-            if (_saveMsg != null)
-              Expanded(child: Text(_saveMsg!, overflow: TextOverflow.ellipsis)),
-          ],
-        ),
-      ],
+    return WheelRotationInputCard(
+      distanceRepo: _distanceRepo,
+      title: '回し車の記録',
+      subtitle: '回転数を入れると、走行距離に換算して保存できます。',
+      onSaved: ({
+        required DateTime date,
+        required int rotations,
+        double? distanceMeters,
+      }) {
+        _invalidateTodayKpiCache();
+      },
     );
   }
 
