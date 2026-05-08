@@ -18,6 +18,7 @@ import 'package:hamster_project/screens/func_b.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_sparkline.dart';
+import 'package:hamster_project/widgets/wheel_rotation_input_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
@@ -284,6 +285,15 @@ class HomeScreenState extends State<HomeScreen> {
                                     ),
                                   );
                                 },
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                            if (!isLoading) ...[
+                              WheelRotationInputCard(
+                                distanceRepo: _distanceRepo,
+                                title: '今日の走った記録',
+                                subtitle: '回転数を入れると、今日の活動量評価に反映されます。',
+                                compact: true,
                               ),
                               const SizedBox(height: 14),
                             ],
