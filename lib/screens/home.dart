@@ -19,6 +19,7 @@ import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_sparkline.dart';
 import 'package:hamster_project/widgets/wheel_rotation_input_card.dart';
+import 'package:hamster_project/widgets/daily_condition_input_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
@@ -294,6 +295,16 @@ class HomeScreenState extends State<HomeScreen> {
                                 title: '今日の走った記録',
                                 subtitle: '回転数を入れると、今日の活動量評価に反映されます。',
                                 compact: true,
+                              ),
+                              const SizedBox(height: 14),
+                              DailyConditionInputCard(
+                                onSaved: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('今日の様子を保存しました。'),
+                                    ),
+                                  );
+                                },
                               ),
                               const SizedBox(height: 14),
                             ],
