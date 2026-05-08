@@ -27,8 +27,10 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   final _memoCtrl = TextEditingController();
 
   DailyCondition? _condition;
+  DailyCheckin? _savedCheckin;
   final Set<String> _selectedTags = <String>{};
 
+  bool _isEditing = true;
   bool _isLoading = true;
   bool _isSaving = false;
   String? _message;
@@ -72,7 +74,9 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
 
       if (checkin != null) {
         setState(() {
+          _savedCheckin = checkin;
           _condition = checkin.condition;
+          _isEditing = false;
           _selectedTags
             ..clear()
             ..addAll(checkin.concernTags);
@@ -189,6 +193,14 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
       if (!mounted) return;
 
       setState(() {
+        _savedCheckin = DailyCheckin(
+          dayKey: _repo.dateKeyLocal(_date),
+          date: _repo.normalizeLocalDay(_date),
+          condition: condition,
+          concernTags: _showConcernFields ? _selectedTags.toList() : const [],
+          memo: _showConcernFields ? _memoCtrl.text.trim() : '',
+        );
+        _isEditing = false;
         _message = '今日の様子を保存しました';
         _isErrorMessage = false;
       });
@@ -206,6 +218,110 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  String _concernTagLabel(String id) {
+    for (final tag in _concernTags) {
+      if (tag.id == id) return tag.label;
+    }
+    return id;
+  }
+
+  Widget _buildSavedSummary(BuildContext context) {
+    final checkin = _savedCheckin!;
+    final color = _conditionColor(context, checkin.condition);
+    final secondary = AppTheme.secondaryText(context);
+
+    final tagText = checkin.concernTags.isEmpty
+        ? ''
+        : checkin.concernTags.map(_concernTagLabel).join('・');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.chipFill(
+              color,
+              context,
+              opacity: AppTheme.isDark(context) ? 0.12 : 0.08,
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: color.withValues(alpha: 0.26),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _conditionIcon(checkin.condition),
+                color: color,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '今日の様子：${_conditionLabel(checkin.condition)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            color: color,
+                          ),
+                    ),
+                    if (tagText.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '気になる内容：$tagText',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: secondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ],
+                    if (checkin.memo.trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        checkin.memo.trim(),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: secondary,
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _isEditing = true;
+                    _message = null;
+                    _isErrorMessage = false;
+                  });
+                },
+                child: const Text('編集'),
+              ),
+            ],
+          ),
+        ),
+        if (_message != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _message!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: _isErrorMessage
+                      ? Theme.of(context).colorScheme.error
+                      : AppTheme.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -275,7 +391,9 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
           const SizedBox(height: 16),
           if (_isLoading)
             const LinearProgressIndicator()
-          else
+          else if (_savedCheckin != null && !_isEditing)
+            _buildSavedSummary(context)
+          else ...[
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -305,73 +423,74 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                 );
               }).toList(),
             ),
-          if (_showConcernFields) ...[
-            const SizedBox(height: 18),
-            Text(
-              '気になる内容',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _concernTags.map((tag) {
-                final selected = _selectedTags.contains(tag.id);
+            if (_showConcernFields) ...[
+              const SizedBox(height: 18),
+              Text(
+                '気になる内容',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _concernTags.map((tag) {
+                  final selected = _selectedTags.contains(tag.id);
 
-                return FilterChip(
-                  selected: selected,
-                  onSelected: (_) => _toggleTag(tag.id),
-                  label: Text(tag.label),
-                  selectedColor: AppTheme.accent.withValues(alpha: 0.16),
-                  side: BorderSide(
-                    color: selected
-                        ? AppTheme.accent.withValues(alpha: 0.50)
-                        : AppTheme.quickActionBorder(context),
-                  ),
-                );
-              }).toList(),
-            ),
+                  return FilterChip(
+                    selected: selected,
+                    onSelected: (_) => _toggleTag(tag.id),
+                    label: Text(tag.label),
+                    selectedColor: AppTheme.accent.withValues(alpha: 0.16),
+                    side: BorderSide(
+                      color: selected
+                          ? AppTheme.accent.withValues(alpha: 0.50)
+                          : AppTheme.quickActionBorder(context),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _memoCtrl,
+                minLines: 1,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'メモ（任意）',
+                  hintText: '例：夜あまり出てこなかった',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+            if (_message != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _message!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: _isErrorMessage
+                          ? Theme.of(context).colorScheme.error
+                          : AppTheme.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
             const SizedBox(height: 14),
-            TextField(
-              controller: _memoCtrl,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'メモ（任意）',
-                hintText: '例：夜あまり出てこなかった',
-                border: OutlineInputBorder(),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _canSave ? _save : null,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_rounded),
+                label: Text(_isSaving ? '保存中…' : '今日の様子を保存'),
               ),
             ),
           ],
-          if (_message != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _message!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _isErrorMessage
-                        ? Theme.of(context).colorScheme.error
-                        : AppTheme.accent,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _canSave ? _save : null,
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save_rounded),
-              label: Text(_isSaving ? '保存中…' : '今日の様子を保存'),
-            ),
-          ),
         ],
       ),
     );
