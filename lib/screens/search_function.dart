@@ -75,10 +75,10 @@ class FuncSearchScreen extends StatefulWidget {
   const FuncSearchScreen({super.key});
 
   @override
-  State<FuncSearchScreen> createState() => _FuncSearchScreenState();
+  FuncSearchScreenState createState() => FuncSearchScreenState();
 }
 
-class _FuncSearchScreenState extends State<FuncSearchScreen> {
+class FuncSearchScreenState extends State<FuncSearchScreen> {
   final BreedingEnvironmentRepo _envRepo = BreedingEnvironmentRepo();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -112,6 +112,32 @@ class _FuncSearchScreenState extends State<FuncSearchScreen> {
         });
       }
     });
+  }
+
+  void setDraftText(String text, {bool focus = true}) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+
+    setState(() {
+      _textController.text = trimmed;
+      _textController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _textController.text.length),
+      );
+
+      if (_showDescriptionCard) {
+        _cardOpacity = 0.0;
+        _cardOffset = const Offset(0, -0.15);
+      }
+    });
+
+    if (focus) {
+      Future<void>.delayed(const Duration(milliseconds: 120), () {
+        if (!mounted) return;
+        _focusNode.requestFocus();
+      });
+    }
+
+    _scrollToBottom();
   }
 
   Widget _aiAvatar() => const CircleAvatar(

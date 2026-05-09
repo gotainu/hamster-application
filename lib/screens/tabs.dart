@@ -20,6 +20,8 @@ class TabsScreenState extends State<TabsScreen> {
   late final List<Widget> _pages;
 
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
+  final GlobalKey<FuncSearchScreenState> _searchKey =
+      GlobalKey<FuncSearchScreenState>();
 
   Future<void> openHomeAnomalyCard() async {
     if (!mounted) return;
@@ -39,6 +41,22 @@ class TabsScreenState extends State<TabsScreen> {
     await _homeKey.currentState?.focusAnomalyCard();
   }
 
+  Future<void> openAiWithDraft(String draftText) async {
+    if (!mounted) return;
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    setState(() {
+      selectedIndex = 1;
+    });
+
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+
+    if (!mounted) return;
+
+    _searchKey.currentState?.setDraftText(draftText);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -50,8 +68,9 @@ class TabsScreenState extends State<TabsScreen> {
             selectedIndex = index;
           });
         },
+        onOpenAiWithDraft: openAiWithDraft,
       ),
-      const FuncSearchScreen(),
+      FuncSearchScreen(key: _searchKey),
       const GraphFunctionScreen(),
       const FuncMyPageScreen(),
     ];

@@ -23,7 +23,13 @@ import 'package:hamster_project/widgets/daily_condition_input_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
-  const HomeScreen({super.key, required this.onTabSelected});
+  final Future<void> Function(String draftText)? onOpenAiWithDraft;
+
+  const HomeScreen({
+    super.key,
+    required this.onTabSelected,
+    this.onOpenAiWithDraft,
+  });
 
   @override
   State<HomeScreen> createState() => HomeScreenState();
@@ -159,6 +165,17 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openAiWithDraft(String draftText) async {
+    final handler = widget.onOpenAiWithDraft;
+
+    if (handler != null) {
+      await handler(draftText);
+      return;
+    }
+
+    widget.onTabSelected(1);
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -251,6 +268,11 @@ class HomeScreenState extends State<HomeScreen> {
                                     ),
                                   );
                                 },
+                                onAskAi: () {
+                                  _openAiWithDraft(
+                                    '今日の飼育環境の評価を踏まえて、今確認すべきことと優先順位を教えてください。',
+                                  );
+                                },
                               ),
                             if (!isLoading && anomalyDetection.hasAnomaly) ...[
                               const SizedBox(height: 14),
@@ -264,6 +286,14 @@ class HomeScreenState extends State<HomeScreen> {
                                         builder: (_) =>
                                             const DailyStatusDetailScreen(),
                                       ),
+                                    );
+                                  },
+                                  onAskAi: () {
+                                    final top = anomalyDetection.topAnomaly;
+                                    _openAiWithDraft(
+                                      top == null
+                                          ? '最近の気になる変化について、原因候補と今日確認すべきことを教えてください。'
+                                          : '最近の気になる変化「${top.title}」について、原因候補と今日確認すべきことを教えてください。',
                                     );
                                   },
                                 ),
@@ -284,6 +314,16 @@ class HomeScreenState extends State<HomeScreen> {
                                       builder: (_) =>
                                           const DailyStatusDetailScreen(),
                                     ),
+                                  );
+                                },
+                                onAskAi: () {
+                                  final action =
+                                      (assessment.todayAction ?? '').trim();
+
+                                  _openAiWithDraft(
+                                    action.isEmpty
+                                        ? '今日やることについて、うちの飼育環境に合わせて具体的に教えてください。'
+                                        : '今日やること「$action」について、うちの飼育環境に合わせて具体的な確認手順を教えてください。',
                                   );
                                 },
                               ),
@@ -389,6 +429,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
   final EnvironmentAssessment? assessment;
   final VoidCallback? onTap;
   final VoidCallback? onOpenSetup;
+  final VoidCallback? onAskAi;
   final bool isLoading;
   final bool isEmptyState;
   final List<EnvironmentAssessmentHistory> history;
@@ -398,6 +439,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     this.assessment,
     this.onTap,
     this.onOpenSetup,
+    this.onAskAi,
     this.isLoading = false,
     this.isEmptyState = false,
     this.history = const [],
@@ -794,6 +836,17 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                       ),
                     ],
                   ),
+                  if (onAskAi != null) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: onAskAi,
+                        icon: const Icon(Icons.smart_toy_outlined),
+                        label: const Text('今日の状態についてAIに相談'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -874,10 +927,12 @@ class _HeroBackgroundDecoration extends StatelessWidget {
 class _TodayActionCard extends StatelessWidget {
   final EnvironmentAssessment assessment;
   final VoidCallback? onTap;
+  final VoidCallback? onAskAi;
 
   const _TodayActionCard({
     required this.assessment,
     this.onTap,
+    this.onAskAi,
   });
 
   @override
@@ -945,6 +1000,17 @@ class _TodayActionCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppTheme.secondaryText(context),
                             ),
+                      ),
+                    ],
+                    if (onAskAi != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: onAskAi,
+                          icon: const Icon(Icons.smart_toy_outlined, size: 18),
+                          label: const Text('この対策をAIに相談'),
+                        ),
                       ),
                     ],
                   ],
@@ -1202,10 +1268,12 @@ class _WideActionTile extends StatelessWidget {
 class _HomeAnomalyCard extends StatelessWidget {
   final AnomalyDetectionResult result;
   final VoidCallback? onTap;
+  final VoidCallback? onAskAi;
 
   const _HomeAnomalyCard({
     required this.result,
     this.onTap,
+    this.onAskAi,
   });
 
   String _severityText(AnomalySeverity severity) {
@@ -1313,6 +1381,17 @@ class _HomeAnomalyCard extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                     ),
+                    if (onAskAi != null) ...[
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: onAskAi,
+                          icon: const Icon(Icons.smart_toy_outlined, size: 18),
+                          label: const Text('この変化をAIに相談'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
