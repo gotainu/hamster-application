@@ -38,6 +38,12 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   late final DistanceRecordsRepo _repo;
   late DateTime _selectedRecordDate;
 
+  DateTime _defaultRecordDate() {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    return DateTime(yesterday.year, yesterday.month, yesterday.day);
+  }
+
   final _wheelCtrl = TextEditingController();
 
   double? _distance;
@@ -56,7 +62,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
     super.initState();
 
     _repo = widget.distanceRepo ?? DistanceRecordsRepo();
-    _selectedRecordDate = widget.initialDate ?? DateTime.now();
+    _selectedRecordDate = widget.initialDate ?? _defaultRecordDate();
 
     _wheelCtrl.addListener(() => _recalcDistance(_wheelCtrl.text));
     _refreshWheelDiameter();
@@ -266,6 +272,17 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
     return '${meters.toStringAsFixed(0)} m';
   }
 
+  bool _isDefaultYesterday(DateTime date) {
+    final now = DateTime.now();
+    final yesterday = now.subtract(const Duration(days: 1));
+    final y = DateTime(yesterday.year, yesterday.month, yesterday.day);
+
+    final d = date.toLocal();
+    final target = DateTime(d.year, d.month, d.day);
+
+    return target == y;
+  }
+
   Widget _buildSavedSummary(BuildContext context) {
     final record = _savedRecord!;
     final secondary = AppTheme.secondaryText(context);
@@ -299,7 +316,9 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '今日の記録済み',
+                      _isDefaultYesterday(record.date)
+                          ? '昨日の記録済み'
+                          : '${DateFormat('M/d').format(record.date)}の記録済み',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                           ),

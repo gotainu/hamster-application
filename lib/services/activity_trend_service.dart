@@ -15,10 +15,13 @@ class ActivityTrendService {
     required double avg7DistanceMeters,
     required List<HealthRecord> recentRecords,
     required List<HealthRecord> allDailyRecords,
+    DateTime? referenceDate,
   }) {
     final nonZeroAll = allDailyRecords.where((e) => e.distance > 0).toList();
     final hasAnyRecord = nonZeroAll.isNotEmpty;
-    final todayHasRecord = _hasTodayRecord(allDailyRecords);
+
+    final referenceDay = _normalizeLocalDay(referenceDate ?? DateTime.now());
+    final referenceHasRecord = _hasRecordOnDate(allDailyRecords, referenceDay);
     final latestRecordedAt =
         hasAnyRecord ? _latestRecordedAt(allDailyRecords) : null;
 
@@ -26,17 +29,19 @@ class ActivityTrendService {
       return ActivitySummary.empty();
     }
 
-    final referenceRecord = todayHasRecord
-        ? _todayRecord(allDailyRecords)!
+    final referenceRecord = referenceHasRecord
+        ? _recordOnDate(allDailyRecords, referenceDay)!
         : _latestNonZeroRecord(allDailyRecords)!;
 
     final referenceDistanceMeters = referenceRecord.distance;
-    final referenceDate = referenceRecord.date;
+    final effectiveReferenceDate = referenceRecord.date;
+
+    final referenceLabel = _referenceLabel(referenceDay);
 
     final distribution = _buildDistribution(
       allDailyRecords: nonZeroAll,
       markerValue: referenceDistanceMeters,
-      markerCaption: todayHasRecord ? '今日の位置' : '最新記録日の位置',
+      markerCaption: referenceHasRecord ? '$referenceLabelの位置' : '最新記録日の位置',
     );
 
     final chartBands = _buildChartBands(distribution);
@@ -47,25 +52,25 @@ class ActivityTrendService {
             avg7DistanceMeters *
             100.0;
 
-    if (!todayHasRecord) {
+    if (!referenceHasRecord) {
       const stateText = '未入力';
-      final deltaText = '今日はまだ走行距離が記録されていません';
+      final deltaText = '$referenceLabelはまだ走行距離が記録されていません';
       final summaryText =
-          '最新記録日は ${distribution.bandLabel} です。記録すると今日の位置も確認できます';
+          '最新記録日は ${distribution.bandLabel} です。記録すると$referenceLabelの位置も確認できます';
 
       return ActivitySummary(
         todayDistanceMeters: 0,
         avg7DistanceMeters: avg7DistanceMeters,
         deltaPct: 0,
         latestRecordedAt: latestRecordedAt,
-        headline: '今日はまだ未入力です',
+        headline: '$referenceLabelはまだ未入力です',
         deltaText: deltaText,
         summaryText: summaryText,
         directionText: stateText,
         hasAnyRecord: true,
         todayHasRecord: false,
         referenceDistanceMeters: referenceDistanceMeters,
-        referenceDate: referenceDate,
+        referenceDate: effectiveReferenceDate,
         distribution: distribution,
         chartBands: chartBands,
         card: MetricCardViewData(
@@ -89,14 +94,14 @@ class ActivityTrendService {
       avg7DistanceMeters: avg7DistanceMeters,
       deltaPct: deltaPct,
       latestRecordedAt: latestRecordedAt,
-      headline: _headline(bandLabel),
+      headline: _headline(bandLabel, referenceLabel: referenceLabel),
       deltaText: deltaText,
       summaryText: summaryText,
       directionText: bandLabel,
       hasAnyRecord: true,
       todayHasRecord: true,
       referenceDistanceMeters: referenceDistanceMeters,
-      referenceDate: referenceDate,
+      referenceDate: effectiveReferenceDate,
       distribution: distribution,
       chartBands: chartBands,
       card: MetricCardViewData(
@@ -130,26 +135,43 @@ class ActivityTrendService {
     ];
   }
 
-  bool _hasTodayRecord(List<HealthRecord> records) {
-    final now = DateTime.now();
+  DateTime _normalizeLocalDay(DateTime dt) {
+    final local = dt.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
+
+  bool _isSameLocalDay(DateTime a, DateTime b) {
+    final aa = _normalizeLocalDay(a);
+    final bb = _normalizeLocalDay(b);
+    return aa.year == bb.year && aa.month == bb.month && aa.day == bb.day;
+  }
+
+  bool _hasRecordOnDate(List<HealthRecord> records, DateTime targetDay) {
     return records.any((e) {
       if (e.distance <= 0) return false;
-      final d = e.date.toLocal();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
+      return _isSameLocalDay(e.date, targetDay);
     });
   }
 
-  HealthRecord? _todayRecord(List<HealthRecord> records) {
-    final now = DateTime.now();
+  HealthRecord? _recordOnDate(List<HealthRecord> records, DateTime targetDay) {
     final matches = records.where((e) {
       if (e.distance <= 0) return false;
-      final d = e.date.toLocal();
-      return d.year == now.year && d.month == now.month && d.day == now.day;
+      return _isSameLocalDay(e.date, targetDay);
     }).toList();
 
     if (matches.isEmpty) return null;
     matches.sort((a, b) => a.date.compareTo(b.date));
     return matches.last;
+  }
+
+  String _referenceLabel(DateTime referenceDay) {
+    final today = _normalizeLocalDay(DateTime.now());
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    if (_isSameLocalDay(referenceDay, today)) return '今日';
+    if (_isSameLocalDay(referenceDay, yesterday)) return '昨日';
+
+    return '${referenceDay.month}/${referenceDay.day}';
   }
 
   HealthRecord? _latestNonZeroRecord(List<HealthRecord> records) {
@@ -279,18 +301,18 @@ class ActivityTrendService {
     return '普段の範囲内';
   }
 
-  String _headline(String bandLabel) {
+  String _headline(String bandLabel, {required String referenceLabel}) {
     switch (bandLabel) {
       case 'かなり少なめ':
-        return '今日はかなり少なめです';
+        return '$referenceLabelはかなり少なめです';
       case 'やや少なめ':
-        return '今日はやや少なめです';
+        return '$referenceLabelはやや少なめです';
       case 'やや多め':
-        return '今日はやや多めです';
+        return '$referenceLabelはやや多めです';
       case 'かなり多め':
-        return '今日はかなり多めです';
+        return '$referenceLabelはかなり多めです';
       default:
-        return '今日は普段の範囲内です';
+        return '$referenceLabelは普段の範囲内です';
     }
   }
 

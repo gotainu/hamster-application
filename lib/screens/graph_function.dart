@@ -142,7 +142,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '今日: ${k.todayMeters.toStringAsFixed(0)} m  /  7日平均: ${k.avg7Meters.toStringAsFixed(0)} m  (${k.deltaPct >= 0 ? '+' : ''}${k.deltaPct.toStringAsFixed(0)}%)',
+                      '昨日: ${k.todayMeters.toStringAsFixed(0)} m  /  7日平均: ${k.avg7Meters.toStringAsFixed(0)} m  (${k.deltaPct >= 0 ? '+' : ''}${k.deltaPct.toStringAsFixed(0)}%)',
                       style: Theme.of(context).textTheme.bodySmall,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -158,21 +158,33 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   Future<_TodayKpi> _buildTodayKpi() async {
+    final now = DateTime.now();
+    final yesterdayRaw = now.subtract(const Duration(days: 1));
+    final referenceDay = DateTime(
+      yesterdayRaw.year,
+      yesterdayRaw.month,
+      yesterdayRaw.day,
+    );
+
     final results = await Future.wait<double>([
-      _distanceRepo.fetchDailyTotalDistance(DateTime.now()),
-      _distanceRepo.fetchRollingDailyAverage(days: 7),
+      _distanceRepo.fetchDailyTotalDistance(referenceDay),
+      _distanceRepo.fetchRollingDailyAverage(
+        days: 7,
+        todayLocal: referenceDay,
+      ),
     ]);
-    final today = results[0];
+
+    final referenceMeters = results[0];
     final avg7 = results[1];
 
-    final base = (avg7 <= 0) ? 1.0 : avg7; // 0割防止
-    final deltaPct = (today - avg7) / base * 100.0;
+    final base = (avg7 <= 0) ? 1.0 : avg7;
+    final deltaPct = (referenceMeters - avg7) / base * 100.0;
 
-    if (avg7 <= 0 && today <= 0) {
+    if (avg7 <= 0 && referenceMeters <= 0) {
       return _TodayKpi(
         emoji: '🌱',
         headline: 'まずは記録をためよう',
-        todayMeters: today,
+        todayMeters: referenceMeters,
         avg7Meters: avg7,
         deltaPct: 0,
       );
@@ -181,32 +193,32 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     if (deltaPct >= 20) {
       return _TodayKpi(
         emoji: '🔥',
-        headline: '今日はよく走った！',
-        todayMeters: today,
+        headline: '昨日はよく走った！',
+        todayMeters: referenceMeters,
         avg7Meters: avg7,
         deltaPct: deltaPct,
       );
     } else if (deltaPct >= 0) {
       return _TodayKpi(
         emoji: '✨',
-        headline: 'いい感じ！いつもより上',
-        todayMeters: today,
+        headline: '昨日はいい感じ！いつもより上',
+        todayMeters: referenceMeters,
         avg7Meters: avg7,
         deltaPct: deltaPct,
       );
     } else if (deltaPct <= -20) {
       return _TodayKpi(
         emoji: '🫧',
-        headline: '今日は控えめ。様子見しよう',
-        todayMeters: today,
+        headline: '昨日は控えめ。様子見しよう',
+        todayMeters: referenceMeters,
         avg7Meters: avg7,
         deltaPct: deltaPct,
       );
     } else {
       return _TodayKpi(
         emoji: '🙂',
-        headline: 'いつも通り！',
-        todayMeters: today,
+        headline: '昨日はいつも通り！',
+        todayMeters: referenceMeters,
         avg7Meters: avg7,
         deltaPct: deltaPct,
       );
@@ -258,8 +270,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   Widget _wheelBlock() {
     return WheelRotationInputCard(
       distanceRepo: _distanceRepo,
-      title: '回し車の記録',
-      subtitle: '回転数を入れると、走行距離に換算して保存できます。',
+      title: '昨日の走った記録',
+      subtitle: '昨晩〜今朝の回転数を入れると、走行距離に換算して保存できます。',
       onSaved: ({
         required DateTime date,
         required int rotations,

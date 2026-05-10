@@ -86,14 +86,19 @@ class HomeScreenState extends State<HomeScreen> {
     if (assessment == null || !assessment.hasData) return null;
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final yesterdayRaw = now.subtract(const Duration(days: 1));
+    final referenceDay = DateTime(
+      yesterdayRaw.year,
+      yesterdayRaw.month,
+      yesterdayRaw.day,
+    );
 
-    double todayDistance = 0;
+    double referenceDistance = 0;
     for (final r in allDistanceRecords) {
       final d = r.date.toLocal();
       final day = DateTime(d.year, d.month, d.day);
-      if (day == today) {
-        todayDistance = r.distance;
+      if (day == referenceDay) {
+        referenceDistance = r.distance;
         break;
       }
     }
@@ -101,7 +106,7 @@ class HomeScreenState extends State<HomeScreen> {
     final recentRecords = _buildRecentDistanceSeries(
       allDistanceRecords,
       days: 7,
-      today: today,
+      today: referenceDay,
     );
 
     final avg7Distance = recentRecords.fold<double>(
@@ -111,10 +116,11 @@ class HomeScreenState extends State<HomeScreen> {
         7;
 
     final activitySummary = _activityTrendService.buildSummary(
-      todayDistanceMeters: todayDistance,
+      todayDistanceMeters: referenceDistance,
       avg7DistanceMeters: avg7Distance,
       recentRecords: recentRecords,
       allDailyRecords: allDistanceRecords,
+      referenceDate: referenceDay,
     );
 
     return _dailyStatusSummaryService.buildSensorEvaluation(
@@ -332,8 +338,8 @@ class HomeScreenState extends State<HomeScreen> {
                             if (!isLoading) ...[
                               WheelRotationInputCard(
                                 distanceRepo: _distanceRepo,
-                                title: '今日の走った記録',
-                                subtitle: '回転数を入れると、今日の活動量評価に反映されます。',
+                                title: '昨日の走った記録',
+                                subtitle: '昨晩〜今朝の回転数を入れると、活動量評価に反映されます。',
                                 compact: true,
                               ),
                               const SizedBox(height: 14),

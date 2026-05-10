@@ -39,19 +39,33 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
     final history = await _assessmentRepo.fetchRecentHistory(limit: 7);
     final anomalyHistory = await _assessmentRepo.fetchRecentHistory(limit: 14);
 
-    final todayDistance =
-        await _distanceRepo.fetchDailyTotalDistance(DateTime.now());
-    final avg7Distance = await _distanceRepo.fetchRollingDailyAverage(days: 7);
-    final dailyDistanceSeries =
-        await _distanceRepo.fetchDailyDistanceSeries(days: 7);
+    final now = DateTime.now();
+    final yesterdayRaw = now.subtract(const Duration(days: 1));
+    final referenceDay = DateTime(
+      yesterdayRaw.year,
+      yesterdayRaw.month,
+      yesterdayRaw.day,
+    );
+
+    final referenceDistance =
+        await _distanceRepo.fetchDailyTotalDistance(referenceDay);
+    final avg7Distance = await _distanceRepo.fetchRollingDailyAverage(
+      days: 7,
+      todayLocal: referenceDay,
+    );
+    final dailyDistanceSeries = await _distanceRepo.fetchDailyDistanceSeries(
+      days: 7,
+      todayLocal: referenceDay,
+    );
     final allDailyDistanceSeries =
         await _distanceRepo.fetchAllDailyDistanceSeries();
 
     final activitySummary = _activityTrendService.buildSummary(
-      todayDistanceMeters: todayDistance,
+      todayDistanceMeters: referenceDistance,
       avg7DistanceMeters: avg7Distance,
       recentRecords: dailyDistanceSeries,
       allDailyRecords: allDailyDistanceSeries,
+      referenceDate: referenceDay,
     );
 
     final SensorEvaluation? sensorEvaluation =
@@ -73,6 +87,7 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
       distanceSeries: dailyDistanceSeries,
       sensorEvaluation: sensorEvaluation,
       anomalyDetection: anomalyDetection,
+      activityReferenceDate: referenceDay,
     );
   }
 
@@ -182,19 +197,22 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                   _SectionLabel(title: '活動量'),
                   const SizedBox(height: 10),
                   _MetricDetailCard(
-                    title: '直近の走った距離',
+                    title: '昨日の走った距離',
                     card: bundle.activitySummary.card,
                     secondaryStats: [
+                      _StatItem(
+                        '昨日',
+                        '${bundle.activitySummary.todayDistanceMeters.toStringAsFixed(0)} m',
+                      ),
                       _StatItem(
                         '7日平均',
                         '${bundle.activitySummary.avg7DistanceMeters.toStringAsFixed(0)} m',
                       ),
                       _StatItem(
-                        '最新記録',
-                        bundle.activitySummary.latestRecordedAt != null
-                            ? _formatTime(
-                                bundle.activitySummary.latestRecordedAt)
-                            : '—',
+                        '基準日',
+                        DateFormat('M/d').format(
+                          bundle.activityReferenceDate.toLocal(),
+                        ),
                       ),
                     ],
                     sparkValues:
@@ -206,7 +224,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                     _ActivityDistributionCard(
                       distribution: bundle.activitySummary.distribution!,
                       referenceDate: bundle.activitySummary.referenceDate,
-                      todayHasRecord: bundle.activitySummary.todayHasRecord,
+                      referenceDayHasRecord:
+                          bundle.activitySummary.todayHasRecord,
                     ),
                 ],
               );
@@ -230,6 +249,7 @@ class _DetailBundle {
   final List<HealthRecord> distanceSeries;
   final SensorEvaluation? sensorEvaluation;
   final AnomalyDetectionResult anomalyDetection;
+  final DateTime activityReferenceDate;
 
   _DetailBundle({
     required this.assessment,
@@ -238,6 +258,7 @@ class _DetailBundle {
     required this.distanceSeries,
     required this.sensorEvaluation,
     required this.anomalyDetection,
+    required this.activityReferenceDate,
   });
 }
 
@@ -842,12 +863,12 @@ class _MetricDetailCard extends StatelessWidget {
 class _ActivityDistributionCard extends StatelessWidget {
   final ActivityDistribution distribution;
   final DateTime? referenceDate;
-  final bool todayHasRecord;
+  final bool referenceDayHasRecord;
 
   const _ActivityDistributionCard({
     required this.distribution,
     required this.referenceDate,
-    required this.todayHasRecord,
+    required this.referenceDayHasRecord,
   });
 
   @override
@@ -887,10 +908,9 @@ class _ActivityDistributionCard extends StatelessWidget {
 
     final referenceValueText = '${distribution.markerValue.round()} m';
 
-    final markerText = todayHasRecord
-        ? '今日は $referenceValueText で、「${distribution.bandLabel}」です'
-        : '今日は未入力です。直近の記録は $referenceValueText で、「${distribution.bandLabel}」でした';
-
+    final markerText = referenceDayHasRecord
+        ? '昨日は $referenceValueText で、「${distribution.bandLabel}」です'
+        : '昨日は未入力です。直近の記録は $referenceValueText で、「${distribution.bandLabel}」でした';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
