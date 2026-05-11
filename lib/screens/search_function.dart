@@ -7,6 +7,7 @@ import 'dart:async';
 import '../theme/app_theme.dart';
 import '../widgets/shine_border.dart';
 import '../services/breeding_environment_repo.dart';
+import '../services/ai_chat_history_repo.dart';
 
 class RetrievedChunk {
   final String id;
@@ -47,6 +48,21 @@ class RetrievedChunk {
       metaVersion: (j['meta_version'] ?? '') as String,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'score': score,
+      'text': text,
+      'filename': filename,
+      'line_start': lineStart,
+      'line_end': lineEnd,
+      'semantic_title': semanticTitle,
+      'section_name': sectionName,
+      'section_summary': sectionSummary,
+      'meta_version': metaVersion,
+    };
+  }
 }
 
 class ChatApiResult {
@@ -80,6 +96,7 @@ class FuncSearchScreen extends StatefulWidget {
 
 class FuncSearchScreenState extends State<FuncSearchScreen> {
   final BreedingEnvironmentRepo _envRepo = BreedingEnvironmentRepo();
+  final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
@@ -95,7 +112,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   Timer? _dotTimer;
 
   final List<Map<String, String>> _conversationHistory = [];
-
+  bool _isRestoringHistory = true;
   bool _showDescriptionCard = true;
   double _cardOpacity = 1.0;
   Offset _cardOffset = Offset.zero;
@@ -103,6 +120,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   @override
   void initState() {
     super.initState();
+    _restoreChatHistory();
     _listenUserAvatar(); // ← ここで購読開始
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
@@ -138,6 +156,75 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
 
     _scrollToBottom();
+  }
+
+  Future<void> _restoreChatHistory() async {
+    setState(() {
+      _isRestoringHistory = true;
+    });
+
+    try {
+      final savedMessages =
+          await _chatHistoryRepo.fetchRecentMessages(limit: 50);
+
+      if (!mounted) return;
+
+      final restoredMessages = <ChatMessage>[];
+      final restoredHistory = <Map<String, String>>[];
+
+      for (final m in savedMessages) {
+        final chunks = m.chunks.map((e) => RetrievedChunk.fromJson(e)).toList();
+
+        restoredMessages.add(
+          ChatMessage(
+            content: m.content,
+            isUser: m.isUser,
+            chunks: chunks,
+            originalQuery: m.originalQuery,
+          ),
+        );
+
+        restoredHistory.add({
+          'role': m.role,
+          'content': m.content,
+        });
+      }
+
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(restoredMessages);
+
+        _conversationHistory
+          ..clear()
+          ..addAll(restoredHistory);
+
+        if (_messages.isNotEmpty) {
+          _showDescriptionCard = false;
+          _cardOpacity = 0.0;
+          _cardOffset = const Offset(0, -0.15);
+        }
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            content: '履歴の読み込みに失敗しました: $e',
+            isUser: false,
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoringHistory = false;
+        });
+      }
+    }
   }
 
   Widget _aiAvatar() => const CircleAvatar(
@@ -254,6 +341,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         isLoading: true,
       ));
     });
+
+    unawaited(_chatHistoryRepo.addUserMessage(content: text));
     _startDotTimer();
     _textController.clear();
     _scrollToBottom();
@@ -272,6 +361,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         _conversationHistory
             .add({"role": "assistant", "content": result.answer});
       });
+
+      unawaited(
+        _chatHistoryRepo.addAssistantMessage(
+          content: result.answer,
+          originalQuery: text,
+          chunks: result.chunks.map((e) => e.toJson()).toList(),
+        ),
+      );
       _scrollToBottom();
     } catch (e) {
       setState(() {
@@ -548,17 +645,21 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                     : const SizedBox.shrink(),
               ),
               Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _messages.length,
-                  itemBuilder: (context, index) {
-                    return KeyedSubtree(
-                      key: ValueKey(_messages[index].hashCode),
-                      child: _buildMessageBubble(_messages[index]),
-                    );
-                  },
-                ),
+                child: _isRestoringHistory
+                    ? const Center(
+                        child: CircularProgressIndicator(),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _messages.length,
+                        itemBuilder: (context, index) {
+                          return KeyedSubtree(
+                            key: ValueKey(_messages[index].hashCode),
+                            child: _buildMessageBubble(_messages[index]),
+                          );
+                        },
+                      ),
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(
