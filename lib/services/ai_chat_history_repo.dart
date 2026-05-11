@@ -150,6 +150,73 @@ class AiChatHistoryRepo {
     }, SetOptions(merge: true));
   }
 
+  Future<void> archiveAndClearMainThread() async {
+    final col = _messagesCol();
+    final threadDoc = _threadDoc();
+
+    if (col == null || threadDoc == null) return;
+
+    final uid = _uid;
+    if (uid == null) return;
+
+    final qs = await col.orderBy('createdAt').limit(200).get();
+
+    if (qs.docs.isEmpty) {
+      await threadDoc.set({
+        'lastMessage': '',
+        'lastRole': '',
+        'updatedAt': FieldValue.serverTimestamp(),
+        'archivedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    final archiveDoc = _db
+        .collection('users')
+        .doc(uid)
+        .collection('ai_chat_thread_archives')
+        .doc();
+
+    final batch = _db.batch();
+    final now = FieldValue.serverTimestamp();
+
+    batch.set(archiveDoc, {
+      'sourceThreadId': 'main',
+      'messageCount': qs.docs.length,
+      'createdAt': now,
+      'updatedAt': now,
+      'archivedAt': now,
+      'lastMessage': qs.docs.last.data()['content'] as String? ?? '',
+      'lastRole': qs.docs.last.data()['role'] as String? ?? '',
+    });
+
+    for (final doc in qs.docs) {
+      final data = doc.data();
+
+      final archivedMessageDoc = archiveDoc.collection('messages').doc(doc.id);
+
+      batch.set(archivedMessageDoc, {
+        ...data,
+        'sourceMessageId': doc.id,
+        'archivedAt': now,
+      });
+
+      batch.delete(doc.reference);
+    }
+
+    batch.set(
+        threadDoc,
+        {
+          'lastMessage': '',
+          'lastRole': '',
+          'updatedAt': now,
+          'archivedAt': now,
+        },
+        SetOptions(merge: true));
+
+    await batch.commit();
+  }
+
   Future<void> clearMainThread() async {
     final col = _messagesCol();
     if (col == null) return;

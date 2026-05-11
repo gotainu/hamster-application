@@ -113,6 +113,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
   final List<Map<String, String>> _conversationHistory = [];
   bool _isRestoringHistory = true;
+  bool _hasRestoredHistory = false;
   bool _showDescriptionCard = true;
   double _cardOpacity = 1.0;
   Offset _cardOffset = Offset.zero;
@@ -199,6 +200,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           ..clear()
           ..addAll(restoredHistory);
 
+        _hasRestoredHistory = restoredMessages.isNotEmpty;
+
         if (_messages.isNotEmpty) {
           _showDescriptionCard = false;
           _cardOpacity = 0.0;
@@ -218,6 +221,74 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           ),
         );
       });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoringHistory = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _confirmStartNewChat() async {
+    if (_isLoading || _isRestoringHistory) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('新しく相談を始めますか？'),
+          content: const Text(
+            '今の相談履歴は画面から消えますが、記録としては保存されます。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('新しく始める'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isRestoringHistory = true;
+    });
+
+    try {
+      await _chatHistoryRepo.archiveAndClearMainThread();
+
+      if (!mounted) return;
+
+      setState(() {
+        _messages.clear();
+        _conversationHistory.clear();
+        _hasRestoredHistory = false;
+        _showDescriptionCard = true;
+        _cardOpacity = 1.0;
+        _cardOffset = Offset.zero;
+        _textController.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('新しい相談を始めました。'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('新しい相談の開始に失敗しました: $e'),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -332,6 +403,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     if (text.isEmpty || _isLoading) return;
 
     setState(() {
+      _hasRestoredHistory = false;
       _messages.add(ChatMessage(content: text, isUser: true));
       _conversationHistory.add({"role": "user", "content": text});
       _isLoading = true;
@@ -451,6 +523,57 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHistoryRestoredCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.quickActionBorder(context),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.history_rounded,
+            color: AppTheme.accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '前回の相談を読み込みました',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'このまま続けて相談できます。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                      ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: _confirmStartNewChat,
+            child: const Text('新しく始める'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -644,6 +767,10 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                       )
                     : const SizedBox.shrink(),
               ),
+              if (!_isRestoringHistory &&
+                  _hasRestoredHistory &&
+                  _messages.isNotEmpty)
+                _buildHistoryRestoredCard(context),
               Expanded(
                 child: _isRestoringHistory
                     ? const Center(
