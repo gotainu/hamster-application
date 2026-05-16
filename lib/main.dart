@@ -12,9 +12,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'firebase_options.dart';
 import 'package:hamster_project/screens/auth.dart';
+import 'package:hamster_project/screens/onboarding_screen.dart';
+import 'package:hamster_project/screens/setup_checklist_screen.dart';
 import 'package:hamster_project/screens/splash.dart';
 import 'package:hamster_project/screens/tabs.dart';
 import 'package:hamster_project/services/notification_token_repo.dart';
+import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -329,18 +332,68 @@ class MyAppState extends State<MyApp> {
         Locale('en'),
       ],
       locale: const Locale('ja'),
-      home: StreamBuilder(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (ctx, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const SplashScreen();
-          }
-          if (snapshot.hasData) {
-            return TabsScreen(key: tabsScreenKey);
-          }
+      home: const _AuthGate(),
+    );
+  }
+}
+
+class _AuthGate extends StatelessWidget {
+  const _AuthGate();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (ctx, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SplashScreen();
+        }
+
+        if (!snapshot.hasData) {
           return const AuthScreen();
-        },
-      ),
+        }
+
+        return const _OnboardingGate();
+      },
+    );
+  }
+}
+
+class _OnboardingGate extends StatelessWidget {
+  const _OnboardingGate();
+
+  @override
+  Widget build(BuildContext context) {
+    final repo = OnboardingStateRepo();
+
+    return StreamBuilder<OnboardingState>(
+      stream: repo.watchState(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SplashScreen();
+        }
+
+        final state = snapshot.data ?? OnboardingState.initial();
+
+        if (!state.introCompleted) {
+          return OnboardingScreen(
+            onFinished: () async {
+              await repo.markIntroCompleted();
+            },
+          );
+        }
+
+        if (!state.setupChecklistViewed) {
+          return SetupChecklistScreen(
+            onFinished: () {
+              // SetupChecklistScreen 側で markSetupChecklistViewed() 済み。
+              // Stream更新後、このGateが自動でTabsScreenへ切り替える。
+            },
+          );
+        }
+
+        return TabsScreen(key: tabsScreenKey);
+      },
     );
   }
 }
