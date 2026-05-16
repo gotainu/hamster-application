@@ -6,6 +6,7 @@ import 'package:hamster_project/screens/graph_function.dart';
 import 'package:hamster_project/screens/mypage_function.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
+import 'package:hamster_project/screens/onboarding_screen.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
 class TabsScreen extends StatefulWidget {
