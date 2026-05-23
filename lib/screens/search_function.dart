@@ -345,7 +345,17 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   Future<ChatApiResult> _fetchAIResponseWithHistory(String userMessage) async {
     final url = Uri.parse('http://10.0.2.2:8000/chat');
 
-    // 直近の履歴を送る（多すぎ防止）
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      throw Exception('ログイン情報を確認できませんでした。もう一度ログインしてください。');
+    }
+
+    final idToken = await user.getIdToken();
+
+    if (idToken == null || idToken.isEmpty) {
+      throw Exception('認証トークンを取得できませんでした。もう一度ログインしてください。');
+    }
+
     const int maxHistory = 12;
     final historyToSend = List<Map<String, String>>.from(
       _conversationHistory.length > maxHistory
@@ -354,17 +364,17 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           : _conversationHistory,
     );
 
-    final profile = await _buildUserProfile();
-
     final requestBody = json.encode({
       "query": userMessage,
       "history": historyToSend,
-      "user_profile": profile,
     });
 
     final res = await http.post(
       url,
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
       body: requestBody,
     );
 
@@ -379,6 +389,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           .toList();
 
       return ChatApiResult(answer: answer, chunks: chunks);
+    } else if (res.statusCode == 401) {
+      throw Exception('認証に失敗しました。ログインし直してください。');
     } else {
       throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
     }
