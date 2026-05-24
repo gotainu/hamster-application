@@ -6,9 +6,11 @@ import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
 import { executeAnomalyNotificationPipeline } from './anomalyNotification';
+import { defineSecret } from 'firebase-functions/params';
 
 admin.initializeApp();
 const db = admin.firestore();
+const ENVELOPE_KEY_SECRET = defineSecret('ENVELOPE_KEY');
 
 function getProjectId(): string | null {
   return (
@@ -48,6 +50,43 @@ function unwrapIfWrapped(b64OrPlain?: string): string | undefined {
     // ignore
   }
   return b64OrPlain;
+}
+
+function wrapSecret(plain: string): string {
+  const key = getEnvelopeKey();
+  const iv = crypto.randomBytes(12);
+
+  const enc = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([
+    enc.update(plain, 'utf8'),
+    enc.final(),
+  ]);
+
+  const tag = enc.getAuthTag();
+
+  // format: base64(iv + ciphertext + tag)
+  return Buffer.concat([iv, ct, tag]).toString('base64');
+}
+
+function unwrapSecret(b64: string): string {
+  const key = getEnvelopeKey();
+  const buf = Buffer.from(b64, 'base64');
+
+  if (buf.length < 12 + 16 + 1) {
+    throw new Error('encrypted secret is too short');
+  }
+
+  const iv = buf.subarray(0, 12);
+  const tag = buf.subarray(buf.length - 16);
+  const ct = buf.subarray(12, buf.length - 16);
+
+  const dec = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  dec.setAuthTag(tag);
+
+  return Buffer.concat([
+    dec.update(ct),
+    dec.final(),
+  ]).toString('utf8');
 }
 
 /** SwitchBot auth header (v1.1)
@@ -95,9 +134,12 @@ async function verifySwitchbotTokenSecret(token: string, secret: string): Promis
   throw new HttpsError('unavailable', `SwitchBot API エラー(${res.status}): ${text.slice(0, 300)}`);
 }
 
-/** ★ TOKEN / SECRET を “検証してから” 平文保存（v1_plain） */
+/** ★ TOKEN / SECRET を “検証してから” 暗号化保存（v2_encrypted） */
 export const registerSwitchbotSecrets = onCall(
-  { region: 'asia-northeast1' },
+  { 
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+   },
   async (req) => {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
@@ -114,44 +156,70 @@ export const registerSwitchbotSecrets = onCall(
 
     await verifySwitchbotTokenSecret(token, secret);
 
-    const docRef = db
-      .collection('users')
-      .doc(uid)
-      .collection('integrations')
-      .doc('switchbot_secrets');
+    const userRef = db.collection('users').doc(uid);
+    const integCol = userRef.collection('integrations');
+    const secretsRef = integCol.doc('switchbot_secrets');
+    const switchbotRef = integCol.doc('switchbot');
+    const switchbotUserRef = db.collection('switchbot_users').doc(uid);
 
-    await docRef.set(
+    const encryptedToken = wrapSecret(token);
+    const encryptedSecret = wrapSecret(secret);
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const batch = db.batch();
+
+    batch.set(
+      secretsRef,
       {
-        v1_plain: {
-          token,
-          secret,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        v2_encrypted: {
+          token: encryptedToken,
+          secret: encryptedSecret,
+          algorithm: 'aes-256-gcm',
+          keyRef: 'functions-secret:ENVELOPE_KEY',
+          updatedAt: now,
         },
+        v1_plain: admin.firestore.FieldValue.delete(),
+        v1: admin.firestore.FieldValue.delete(),
         disabledAt: admin.firestore.FieldValue.delete(),
       },
       { merge: true },
     );
 
-    await db.collection('switchbot_users').doc(uid).set(
+    batch.set(
+      switchbotRef,
+      {
+        enabled: true,
+        hasSecrets: true,
+        authVersion: 'v2_encrypted',
+        secretsUpdatedAt: now,
+        disabledAt: admin.firestore.FieldValue.delete(),
+      },
+      { merge: true },
+    );
+
+    batch.set(
+      switchbotUserRef,
       {
         hasSwitchbot: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: now,
         disabledAt: admin.firestore.FieldValue.delete(),
       },
       { merge: true },
     );
 
-    const verifySnap = await docRef.get();
+    await batch.commit();
+
+    const verifySnap = await secretsRef.get();
 
     return {
       ok: true,
       verified: true,
       uid,
       projectId: process.env.GCLOUD_PROJECT ?? null,
-      debugMarker: 'registerSwitchbotSecrets_v2_20260301',
+      debugMarker: 'registerSwitchbotSecrets_v2_encrypted_20260523',
       savedDocExists: verifySnap.exists,
-      savedDocData: verifySnap.data() ?? null,
-      savedPath: docRef.path,
+      savedPath: secretsRef.path,
     };
   },
 );
@@ -165,11 +233,30 @@ async function loadUserConfig(uid: string) {
   let token: string | undefined;
   let secret: string | undefined;
 
-  // prefer v1_plain
-  const v1p = (secSnap.exists ? (secSnap.get('v1_plain') as any) : null) ?? null;
-  if (v1p && typeof v1p === 'object') {
-    token = typeof v1p.token === 'string' ? v1p.token : undefined;
-    secret = typeof v1p.secret === 'string' ? v1p.secret : undefined;
+  // prefer v2_encrypted
+  const v2 = (secSnap.exists ? (secSnap.get('v2_encrypted') as any) : null) ?? null;
+  if (v2 && typeof v2 === 'object') {
+    try {
+      const t = typeof v2.token === 'string' ? unwrapSecret(v2.token) : undefined;
+      const s = typeof v2.secret === 'string' ? unwrapSecret(v2.secret) : undefined;
+
+      if (typeof t === 'string') token = t;
+      if (typeof s === 'string') secret = s;
+    } catch (e: any) {
+      logger.error('failed to decrypt v2_encrypted switchbot secrets', {
+        uid,
+        error: String(e?.message ?? e),
+      });
+    }
+  }
+
+  // fallback to v1_plain during migration
+  if (!token || !secret) {
+    const v1p = (secSnap.exists ? (secSnap.get('v1_plain') as any) : null) ?? null;
+    if (v1p && typeof v1p === 'object') {
+      token = typeof v1p.token === 'string' ? v1p.token : token;
+      secret = typeof v1p.secret === 'string' ? v1p.secret : secret;
+    }
   }
 
   // fallback to legacy v1
@@ -1235,10 +1322,6 @@ async function pollAllUsersOnce(): Promise<PollAllResult> {
   return result;
 }
 
-/* =================================================================== */
-/*  連携解除: disableSwitchbotIntegration                              */
-/* =================================================================== */
-
 export const disableSwitchbotIntegration = onCall(
   { region: 'asia-northeast1' },
   async (req) => {
@@ -1260,6 +1343,7 @@ export const disableSwitchbotIntegration = onCall(
         meterDeviceName: admin.firestore.FieldValue.delete(),
         meterDeviceType: admin.firestore.FieldValue.delete(),
         enabled: false,
+        hasSecrets: false,
         disabledAt: now,
       },
       { merge: true },
@@ -1268,6 +1352,7 @@ export const disableSwitchbotIntegration = onCall(
     batch.set(
       integCol.doc('switchbot_secrets'),
       {
+        v2_encrypted: admin.firestore.FieldValue.delete(),
         v1_plain: admin.firestore.FieldValue.delete(),
         v1: admin.firestore.FieldValue.delete(),
         disabledAt: now,
@@ -1301,30 +1386,39 @@ export const disableSwitchbotIntegration = onCall(
 );
 
 /** Debug: token/secret がちゃんと読めているか head/tail を返す */
-export const switchbotDebugEcho = onCall({ region: 'asia-northeast1' }, async (req) => {
-  if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-  const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-
-  const headTail = (s?: string) => (!s ? null : { head: s.slice(0, 5), len: s.length, tail: s.slice(-5) });
-
-  return { ok: true, uid: req.auth.uid, meterDeviceId, token: headTail(token), secret: headTail(secret) };
-});
-
-export const pollMySwitchbotNow = onCall({ region: 'asia-northeast1' }, async (req) => {
-  if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-  try {
+export const switchbotDebugEcho = onCall(
+  { 
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  }, 
+  async (req) => {
+    if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
     const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-    if (!token || !secret || !meterDeviceId) {
-      return { ok: false, uid: req.auth.uid, error: 'missing config (token/secret/deviceId)' };
+    const headTail = (s?: string) => (!s ? null : { head: s.slice(0, 5), len: s.length, tail: s.slice(-5) });
+    return { ok: true, uid: req.auth.uid, meterDeviceId, token: headTail(token), secret: headTail(secret) };
     }
-    const status = await getMeterStatus(meterDeviceId, token, secret);
-    await saveReading(req.auth.uid, status);
-    await saveEnvironmentAssessmentLatest(req.auth.uid);
+  );
 
-    logger.info('pollMySwitchbotNow success', {
-      uid: req.auth.uid,
-      meterDeviceId,
-    });
+export const pollMySwitchbotNow = onCall(
+  { 
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (req) => {
+    if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
+    try {
+      const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
+      if (!token || !secret || !meterDeviceId) {
+        return { ok: false, uid: req.auth.uid, error: 'missing config (token/secret/deviceId)' };
+      }
+      const status = await getMeterStatus(meterDeviceId, token, secret);
+      await saveReading(req.auth.uid, status);
+      await saveEnvironmentAssessmentLatest(req.auth.uid);
+      logger.info('pollMySwitchbotNow success', {
+        uid: req.auth.uid,
+        meterDeviceId,
+        }
+      );
 
     return { ok: true, uid: req.auth.uid, saved: 1, status };
   } catch (e: any) {
@@ -1337,7 +1431,12 @@ export const pollMySwitchbotNow = onCall({ region: 'asia-northeast1' }, async (r
 /*  Flutter から呼ぶ本命: listSwitchbotDevices                         */
 /* =================================================================== */
 
-export const listSwitchbotDevices = onCall({ region: 'asia-northeast1' }, async (req) => {
+export const listSwitchbotDevices = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', '認証ユーザーのみが呼び出せます。');
 
@@ -1482,7 +1581,12 @@ export const backfillMyEnvironmentAssessmentsHistory = onCall(
 
 /* ===== HTTP: 手動で叩きたいとき用 ===== */
 
-export const switchbotPollNow = onRequest({ region: 'asia-northeast1' }, async (_req, res) => {
+export const switchbotPollNow = onRequest(
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (_req, res) => {
   const result = await pollAllUsersOnce();
   res.json({ ok: true, ...result });
 });
@@ -1490,7 +1594,11 @@ export const switchbotPollNow = onRequest({ region: 'asia-northeast1' }, async (
 /* ===== Scheduler ===== */
 
 export const switchbotPoller = onSchedule(
-  { region: 'asia-northeast1', schedule: 'every 60 minutes' },
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+    schedule: 'every 60 minutes',
+  },
   async () => {
     await pollAllUsersOnce();
   },

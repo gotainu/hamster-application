@@ -40,66 +40,51 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<bool>(
-      stream: _sbRepo.watchHasSecrets(),
-      builder: (context, secretsSnap) {
-        final hasSecrets = secretsSnap.data ?? false;
+    return StreamBuilder<SwitchbotConfig?>(
+      stream: _sbRepo.watchSwitchbotConfig(),
+      builder: (context, cfgSnap) {
+        final cfg = cfgSnap.data;
 
-        return StreamBuilder<SwitchbotConfig?>(
-          stream: _sbRepo.watchSwitchbotConfig(),
-          builder: (context, cfgSnap) {
-            final cfg = cfgSnap.data;
-            final hasDevice = (cfg?.hasDevice ?? false);
+        final linked = cfg?.isLinked ?? false;
+        final hasDevice = cfg?.hasDevice ?? false;
 
-            // ★連携中判定は secrets 基準
-            final linked = hasSecrets;
-
-            return Scaffold(
-              appBar: AppBar(title: const Text('走った記録')),
-              body: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  _todayKPI(),
-                  const SizedBox(height: 16),
-
-                  _wheelBlock(),
-                  const SizedBox(height: 24),
-                  _distanceChart(),
-                  const SizedBox(height: 32),
-
-                  // ===== SwitchBot UI（課題③対応）=====
-                  if (!linked) ...[
-                    // 未連携：ボタンを出す
-                    _switchbotBlock(hasSwitchBot: false),
-                  ] else if (linked && !hasDevice) ...[
-                    // 連携済みだがデバイス未選択：編集導線を出す
-                    _switchbotNeedDeviceBlock(),
-                  ] else ...[
-                    // 連携済み＋デバイス選択済み：ボタンは消してグラフを出す
-                    const SizedBox(height: 24),
-                    _switchbotCharts(),
-
-                    // 任意：設定を触れる導線だけ残したいなら
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.settings),
-                        label: const Text('SwitchBot設定を編集'),
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                                builder: (_) => const SwitchbotSetupScreen()),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            );
-          },
+        return Scaffold(
+          appBar: AppBar(title: const Text('走った記録')),
+          body: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _todayKPI(),
+              const SizedBox(height: 16),
+              _wheelBlock(),
+              const SizedBox(height: 24),
+              _distanceChart(),
+              const SizedBox(height: 32),
+              if (!linked) ...[
+                _switchbotBlock(hasSwitchBot: false),
+              ] else if (linked && !hasDevice) ...[
+                _switchbotNeedDeviceBlock(),
+              ] else ...[
+                const SizedBox(height: 24),
+                _switchbotCharts(),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.settings),
+                    label: const Text('SwitchBot設定を編集'),
+                    onPressed: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SwitchbotSetupScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
