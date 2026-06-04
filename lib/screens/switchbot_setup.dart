@@ -1,12 +1,31 @@
 // lib/screens/switchbot_setup.dart
 // SwitchBot: TOKEN/SECRET の保存 → デバイス一覧から温湿度計を選ぶ（Device ID 自動保存）
 
-import 'dart:convert'; // JSON 経由で Map<String, dynamic> に揃える
-import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:hamster_project/theme/app_theme.dart';
+
+class _SwitchbotGuideStep {
+  const _SwitchbotGuideStep({
+    required this.stepLabel,
+    required this.title,
+    required this.description,
+    required this.imageAssetPath,
+    required this.fallbackIcon,
+  });
+
+  final String stepLabel;
+  final String title;
+  final String description;
+  final String imageAssetPath;
+  final IconData fallbackIcon;
+}
 
 class SwitchbotSetupScreen extends StatefulWidget {
   const SwitchbotSetupScreen({super.key});
@@ -16,18 +35,63 @@ class SwitchbotSetupScreen extends StatefulWidget {
 }
 
 class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
+  static const List<_SwitchbotGuideStep> _guideSteps = [
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 1',
+      title: 'SwitchBotアプリとハブを準備',
+      description:
+          'SwitchBot公式アプリをインストールし、温湿度計とハブをアプリに追加します。温湿度データをクラウド経由で取得できる状態にしておきます。',
+      imageAssetPath: 'assets/images/switchbot_guide_01_prepare_hub_app.png',
+      fallbackIcon: Icons.hub_rounded,
+    ),
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 2',
+      title: 'SwitchBotアプリを開く',
+      description: 'SwitchBot公式アプリを起動し、画面右下のプロフィールへ進みます。',
+      imageAssetPath: 'assets/images/switchbot_guide_02_open_app.png',
+      fallbackIcon: Icons.phone_android_rounded,
+    ),
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 3',
+      title: 'プロフィールから設定へ進む',
+      description: 'プロフィール画面から設定を開き、アプリ情報を確認できる画面へ進みます。',
+      imageAssetPath: 'assets/images/switchbot_guide_03_profile_settings.png',
+      fallbackIcon: Icons.account_circle_rounded,
+    ),
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 4',
+      title: 'アプリバージョンを連続タップ',
+      description: 'アプリバージョンを5〜15回ほど連続タップすると、開発者向けオプションが表示されます。',
+      imageAssetPath: 'assets/images/switchbot_guide_04_tap_version.png',
+      fallbackIcon: Icons.touch_app_rounded,
+    ),
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 5',
+      title: 'TOKEN / SECRET をコピー',
+      description: '開発者向けオプションを開き、TOKENとSECRETをコピーします。',
+      imageAssetPath: 'assets/images/switchbot_guide_05_token_secret.png',
+      fallbackIcon: Icons.vpn_key_rounded,
+    ),
+    _SwitchbotGuideStep(
+      stepLabel: 'STEP 6',
+      title: 'このアプリで認証する',
+      description: 'TOKENとSECRETを貼り付けて保存し、記録に使う温湿度計を選択します。',
+      imageAssetPath: 'assets/images/switchbot_guide_06_select_meter.png',
+      fallbackIcon: Icons.sensors_rounded,
+    ),
+  ];
+
   final _formKey = GlobalKey<FormState>();
   final _tokenCtrl = TextEditingController();
   final _secretCtrl = TextEditingController();
 
   bool _saving = false;
-  bool _canPickDevices = false; // 資格情報保存済みで有効化
+  bool _canPickDevices = false;
   bool _disabling = false;
   bool _hasSecrets = false;
   bool _loading = false;
   bool _polling = false;
 
-  // 選択済みデバイス表示用
   String? _selectedDeviceId;
   String? _selectedDeviceName;
   String? _selectedDeviceType;
@@ -35,7 +99,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
   String? _status;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  Map<String, dynamic>? _secretEcho; // {token:{head,len,tail}, secret:{...}}
+  Map<String, dynamic>? _secretEcho;
 
   FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
         app: Firebase.app(),
@@ -55,13 +119,68 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     super.dispose();
   }
 
-  // ---- UI ヘルパ ----
   void _showSnack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  // ---- 初期ロード：資格情報の有無と選択済みデバイスを読む ----
+  bool get _hasSelectedMeter =>
+      _selectedDeviceId != null && _selectedDeviceId!.trim().isNotEmpty;
+
+  int get _completedSetupSteps {
+    if (!_hasSecrets) return 0;
+    if (!_hasSelectedMeter) return 1;
+    return 2;
+  }
+
+  String get _connectionStateTitle {
+    if (!_hasSecrets) {
+      return '未連携です';
+    }
+
+    if (!_hasSelectedMeter) {
+      return '認証情報は保存済みです';
+    }
+
+    return '連携は完了しています';
+  }
+
+  String get _connectionStateDescription {
+    if (!_hasSecrets) {
+      return 'TOKEN/SECRETを保存すると、温湿度計を選択できるようになります。';
+    }
+
+    if (!_hasSelectedMeter) {
+      return '次に、記録に使うSwitchBot温湿度計を選択してください。';
+    }
+
+    return '温湿度計のデータを取得できる状態です。環境評価やAI相談に活用できます。';
+  }
+
+  IconData get _connectionStateIcon {
+    if (!_hasSecrets) {
+      return Icons.link_off_rounded;
+    }
+
+    if (!_hasSelectedMeter) {
+      return Icons.verified_user_rounded;
+    }
+
+    return Icons.check_circle_rounded;
+  }
+
+  Color _connectionStateColor(BuildContext context) {
+    if (!_hasSecrets) {
+      return AppTheme.secondaryText(context);
+    }
+
+    if (!_hasSelectedMeter) {
+      return AppTheme.accent;
+    }
+
+    return const Color(0xFF00D6A3);
+  }
+
   Future<void> _loadCurrent({bool forceServer = false}) async {
     setState(() => _loading = true);
 
@@ -70,13 +189,13 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         ? const GetOptions(source: Source.server)
         : const GetOptions(source: Source.serverAndCache);
 
-    // 先にリセットしておく
     String? selectedDeviceId;
     String? selectedDeviceName;
     String? selectedDeviceType;
 
     final devDoc =
         await userRef.collection('integrations').doc('switchbot').get(options);
+
     if (devDoc.exists) {
       final m = devDoc.data()!;
       selectedDeviceId = m['meterDeviceId'] as String?;
@@ -92,12 +211,23 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     final data = secDoc.data();
 
     bool hasSecrets = false;
-    final v1p = data?['v1_plain'];
-    if (v1p is Map) {
+
+    final v2 = data?['v2_encrypted'];
+    if (v2 is Map) {
       hasSecrets =
-          (v1p['token'] is String && (v1p['token'] as String).isNotEmpty) &&
-              (v1p['secret'] is String && (v1p['secret'] as String).isNotEmpty);
+          (v2['token'] is String && (v2['token'] as String).isNotEmpty) &&
+              (v2['secret'] is String && (v2['secret'] as String).isNotEmpty);
     }
+
+    if (!hasSecrets) {
+      final v1p = data?['v1_plain'];
+      if (v1p is Map) {
+        hasSecrets = (v1p['token'] is String &&
+                (v1p['token'] as String).isNotEmpty) &&
+            (v1p['secret'] is String && (v1p['secret'] as String).isNotEmpty);
+      }
+    }
+
     if (!hasSecrets) {
       final v1 = data?['v1'];
       if (v1 is Map) {
@@ -119,6 +249,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     }
 
     if (!mounted) return;
+
     setState(() {
       _selectedDeviceId = selectedDeviceId;
       _selectedDeviceName = selectedDeviceName;
@@ -128,12 +259,11 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       _canPickDevices = hasSecrets;
       _secretEcho = echo;
       _status = hasSecrets
-          ? '✅ 資格情報は保存済みです。温湿度計を選択してください。'
+          ? '資格情報は保存済みです。温湿度計を選択してください。'
           : 'まだ資格情報がありません。TOKEN/SECRET を保存してください。';
       _loading = false;
     });
   }
-  // ---- TOKEN/SECRET を Functions に保存（=保存前にFunctions側で検証される） ----
 
   Future<void> _saveSecrets() async {
     if (!_formKey.currentState!.validate()) return;
@@ -168,10 +298,6 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         );
       }
 
-      final returnedProjectId = data['projectId']?.toString() ?? 'unknown';
-      final returnedUid = data['uid']?.toString() ?? 'unknown';
-      final debugMarker = data['debugMarker']?.toString() ?? 'unknown';
-
       final secRef = FirebaseFirestore.instance
           .collection('users')
           .doc(_uid)
@@ -182,52 +308,41 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       final existsNow = secSnap.exists;
 
       if (!mounted) return;
+
       setState(() {
-        _hasSecrets = true; // ← 最重要
+        _hasSecrets = true;
         _canPickDevices = true;
-        _status = '✅ 認証OK：資格情報を保存しました。\n'
-            'Functions uid=$returnedUid\n'
-            'Functions projectId=$returnedProjectId\n'
-            'Functions debugMarker=$debugMarker\n'
-            'Firestore exists(after save)=$existsNow\n'
-            '次に「デバイス一覧から選ぶ」を押してください。';
+        _status = '認証OK：資格情報を保存しました。次に温湿度計を選択してください。';
       });
 
       _showSnack(
         existsNow
-            ? '✅ SwitchBot 認証OK：保存確認できた'
-            : '⚠️ Functionsは成功したが Firestore に switchbot_secrets が見つからない',
+            ? 'SwitchBot 認証OK：保存確認できました'
+            : 'Functionsは成功しましたが、Firestoreの保存確認ができませんでした',
       );
 
-      // 自動選択
       await _autoPickIfSingleMeter();
-
-      // 最後に server から正で再同期
       await _loadCurrent(forceServer: true);
     } on FirebaseFunctionsException catch (e) {
       final msg = e.message ?? '不明なエラー';
-      _showSnack('❌ 検証に失敗: $msg');
+      _showSnack('検証に失敗: $msg');
       if (mounted) {
-        setState(() => _status = '❌ 検証に失敗: $msg');
+        setState(() => _status = '検証に失敗: $msg');
       }
     } catch (e) {
-      _showSnack('❌ 検証に失敗: $e');
+      _showSnack('検証に失敗: $e');
       if (mounted) {
-        setState(() => _status = '❌ 検証に失敗: $e');
+        setState(() => _status = '検証に失敗: $e');
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  // ---- デバイス一覧取得（Callable） ----
-  // listSwitchbotDevices (onCall) を使う。
-  // 戻り値の Map が dynamic キーになり得るので、JSON round-trip で正規化する。
   Future<List<Map<String, dynamic>>> _fetchDevicesOrThrow() async {
     final callable = _fns.httpsCallable('listSwitchbotDevices');
     final res = await callable.call();
 
-    // JSON round-trip で Map<String, dynamic> に揃える
     final normalized =
         jsonDecode(jsonEncode(res.data)) as Map<String, dynamic>?;
 
@@ -244,16 +359,16 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       throw Exception('デバイスが見つかりませんでした');
     }
 
-    // すべて Map<String, dynamic> に
     return devices
         .whereType<Map>()
-        .map((e) => Map<String, dynamic>.fromEntries(
-              e.entries.map((kv) => MapEntry(kv.key.toString(), kv.value)),
-            ))
+        .map(
+          (e) => Map<String, dynamic>.fromEntries(
+            e.entries.map((kv) => MapEntry(kv.key.toString(), kv.value)),
+          ),
+        )
         .toList(growable: false);
   }
 
-  // 温湿度計らしいものだけフィルター
   List<Map<String, dynamic>> _filterMeters(List<Map<String, dynamic>> all) {
     const meterKeywords = <String>{
       'meter',
@@ -265,12 +380,14 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     };
 
     final result = <Map<String, dynamic>>[];
+
     for (final m in all) {
       final t = (m['deviceType']?.toString() ?? '').toLowerCase();
       if (t.isNotEmpty && meterKeywords.any((k) => t.contains(k))) {
         result.add(m);
       }
     }
+
     return result;
   }
 
@@ -278,6 +395,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     try {
       final devices = await _fetchDevicesOrThrow();
       final meters = _filterMeters(devices);
+
       if (meters.length == 1) {
         final m = meters.first;
         await _saveChosenDevice(
@@ -289,12 +407,9 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
           '温湿度計を自動選択しました: ${m['deviceName'] ?? m['deviceId']}',
         );
       }
-    } catch (_) {
-      // 自動選択はあくまでベストエフォートなので失敗しても無視
-    }
+    } catch (_) {}
   }
 
-  // ---- 一覧から選ぶ → ボトムシート ----
   Future<void> _pickDeviceFromCloud() async {
     try {
       if (!_canPickDevices) {
@@ -304,10 +419,9 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
       final all = await _fetchDevicesOrThrow();
       final meters = _filterMeters(all);
+
       if (meters.isEmpty) {
-        _showSnack(
-          '温湿度計が見つかりませんでした（SwitchBotアプリで所有デバイスをご確認ください）',
-        );
+        _showSnack('温湿度計が見つかりませんでした。SwitchBotアプリで所有デバイスをご確認ください。');
         return;
       }
 
@@ -316,6 +430,10 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       final picked = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
         isScrollControlled: true,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
         builder: (sheetCtx) {
           return DraggableScrollableSheet(
             expand: false,
@@ -325,6 +443,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
               itemBuilder: (_, index) {
                 final d = meters[index];
                 return ListTile(
+                  leading: const Icon(Icons.thermostat_rounded),
                   title: Text(d['deviceName']?.toString() ?? '（名前なし）'),
                   subtitle: Text('${d['deviceType']} • ${d['deviceId']}'),
                   onTap: () => Navigator.of(sheetCtx).pop(d),
@@ -336,15 +455,16 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
       );
 
       if (picked != null) {
-        // 念のためキーを文字列に正規化
         final m = Map<String, dynamic>.fromEntries(
           picked.entries.map((kv) => MapEntry(kv.key.toString(), kv.value)),
         );
+
         await _saveChosenDevice(
           id: (m['deviceId'] ?? '').toString(),
           name: (m['deviceName'] ?? '').toString(),
           type: (m['deviceType'] ?? '').toString(),
         );
+
         _showSnack('Device ID を保存しました');
       }
     } catch (e) {
@@ -352,7 +472,6 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     }
   }
 
-  // ---- 選択したデバイスを保存（Firestore） ----
   Future<void> _saveChosenDevice({
     required String id,
     required String name,
@@ -369,6 +488,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         'meterDeviceName': name,
         'meterDeviceType': type,
         'enabled': true,
+        'hasSecrets': true,
         'disabledAt': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       },
@@ -376,14 +496,51 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
     );
 
     if (!mounted) return;
+
     setState(() {
       _selectedDeviceId = id;
       _selectedDeviceName = name;
       _selectedDeviceType = type;
       _status = 'デバイスを保存しました。';
     });
-    // ✅ 初回の設定が保存できた瞬間に1回取得して、readingsを早速1件作る
+
     await _pollNowOnce();
+  }
+
+  Future<void> _confirmAndDisableIntegration() async {
+    if (_disabling) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('SwitchBot連携を解除しますか？'),
+          content: const Text(
+            'TOKEN/SECRETと選択中の温湿度計を解除します。過去の温湿度記録は通常残します。\n\n'
+            '解除後にもう一度使う場合は、TOKEN/SECRETの保存と温湿度計の選択をやり直してください。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('解除する'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+    if (!mounted) return;
+
+    await _disableIntegration();
   }
 
   Future<void> _disableIntegration({bool deleteReadings = false}) async {
@@ -400,7 +557,6 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
       if (!mounted) return;
 
-      // ✅ まずローカル状態を “解除済み” に倒す（古いカードが残らない）
       setState(() {
         _hasSecrets = false;
         _secretEcho = null;
@@ -418,8 +574,7 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
       _showSnack('SwitchBot 連携を解除しました');
 
-      // ✅ Firestoreの最新状態と同期（ここが本命）
-      await _loadCurrent();
+      await _loadCurrent(forceServer: true);
     } on FirebaseFunctionsException catch (e) {
       _showSnack('連携解除に失敗: ${e.message}');
       if (mounted) setState(() => _status = 'エラー: ${e.message}');
@@ -446,56 +601,538 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
           : <String, dynamic>{};
 
       if (data['ok'] == true) {
-        _showSnack('✅ 最新データを取得しました');
+        _showSnack('最新データを取得しました');
         if (mounted) {
-          setState(() => _status = '✅ 最新データを取得しました（グラフに反映されます）');
+          setState(() => _status = '最新データを取得しました。グラフに反映されます。');
         }
       } else {
         final msg = data['error']?.toString() ?? '不明なエラー';
-        _showSnack('⚠️ 取得できませんでした: $msg');
-        if (mounted) setState(() => _status = '⚠️ 取得できませんでした: $msg');
+        _showSnack('取得できませんでした: $msg');
+        if (mounted) setState(() => _status = '取得できませんでした: $msg');
       }
     } on FirebaseFunctionsException catch (e) {
-      _showSnack('❌ 取得に失敗: ${e.message}');
-      if (mounted) setState(() => _status = '❌ 取得に失敗: ${e.message}');
+      _showSnack('取得に失敗: ${e.message}');
+      if (mounted) setState(() => _status = '取得に失敗: ${e.message}');
     } catch (e) {
-      _showSnack('❌ 取得に失敗: $e');
-      if (mounted) setState(() => _status = '❌ 取得に失敗: $e');
+      _showSnack('取得に失敗: $e');
+      if (mounted) setState(() => _status = '取得に失敗: $e');
     } finally {
       if (mounted) setState(() => _polling = false);
     }
   }
 
-  Widget _secretsForm() {
-    return Form(
-      key: _formKey,
+  Widget _sectionTitle(String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 24, 4, 8),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextFormField(
-            controller: _tokenCtrl,
-            decoration: const InputDecoration(
-              labelText: 'SwitchBot TOKEN',
-              hintText: '例) 9c4b...',
-            ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? '必須です' : null,
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
           ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _secretCtrl,
-            decoration: const InputDecoration(
-              labelText: 'SwitchBot SECRET',
-              hintText: '例) 2f6a...',
-            ),
-            obscureText: true,
-            validator: (v) => (v == null || v.trim().isEmpty) ? '必須です' : null,
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _saving ? null : _saveSecrets,
-            icon: const Icon(Icons.verified_user),
-            label: Text(_saving ? '保存中...' : '検証して保存'),
+          const SizedBox(height: 2),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _surfaceCard({
+    required Widget child,
+    EdgeInsetsGeometry padding = const EdgeInsets.all(18),
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      padding: padding,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.quickActionBorder(context)),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.softShadow(context),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _headerCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: AppTheme.cardGradient(
+          Theme.of(context).brightness == Brightness.dark),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.thermostat_rounded,
+            color: AppTheme.accent,
+            size: 42,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'SwitchBot連携',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '温湿度計のデータを自動で記録し、環境評価やAI相談に活用します。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _connectionStateCard() {
+    final completed = _completedSetupSteps;
+    final accentColor = _connectionStateColor(context);
+
+    return _surfaceCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppTheme.chipFill(accentColor, context, opacity: 0.16),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _connectionStateIcon,
+              color: accentColor,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _connectionStateTitle,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _connectionStateDescription,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(99),
+                  child: LinearProgressIndicator(
+                    value: completed / 2,
+                    minHeight: 7,
+                    backgroundColor: AppTheme.chipFill(AppTheme.accent, context,
+                        opacity: 0.10),
+                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$completed / 2 完了',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.tertiaryText(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _guideEntryCard() {
+    return _surfaceCard(
+      padding: const EdgeInsets.all(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _showConnectionGuide,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color:
+                    AppTheme.chipFill(AppTheme.accent, context, opacity: 0.16),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                color: AppTheme.accent,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '連携の流れを見る',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'SwitchBotアプリの準備からTOKEN/SECRET取得、温湿度計の選択まで確認できます。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.secondaryText(context),
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showConnectionGuide() async {
+    final pageController = PageController();
+    var currentPage = 0;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final isDark = Theme.of(sheetContext).brightness == Brightness.dark;
+
+        return StatefulBuilder(
+          builder: (modalContext, setModalState) {
+            final isLastPage = currentPage == _guideSteps.length - 1;
+
+            return FractionallySizedBox(
+              heightFactor: 0.92,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(28),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: AppTheme.weakText(sheetContext),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 12, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'SwitchBot連携の流れ',
+                                style: Theme.of(sheetContext)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: PageView.builder(
+                          controller: pageController,
+                          itemCount: _guideSteps.length,
+                          onPageChanged: (index) {
+                            setModalState(() {
+                              currentPage = index;
+                            });
+                          },
+                          itemBuilder: (_, index) {
+                            return _guidePage(
+                              context: sheetContext,
+                              step: _guideSteps[index],
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                _guideSteps.length,
+                                (index) {
+                                  final selected = index == currentPage;
+
+                                  return AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: selected ? 22 : 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 4),
+                                    decoration: BoxDecoration(
+                                      color: selected
+                                          ? AppTheme.accent
+                                          : AppTheme.weakText(sheetContext),
+                                      borderRadius: BorderRadius.circular(99),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextButton(
+                                    onPressed: currentPage == 0
+                                        ? null
+                                        : () {
+                                            pageController.previousPage(
+                                              duration: const Duration(
+                                                  milliseconds: 240),
+                                              curve: Curves.easeOut,
+                                            );
+                                          },
+                                    child: const Text('戻る'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  flex: 2,
+                                  child: FilledButton(
+                                    onPressed: () {
+                                      if (isLastPage) {
+                                        Navigator.of(sheetContext).pop();
+                                        return;
+                                      }
+
+                                      pageController.nextPage(
+                                        duration:
+                                            const Duration(milliseconds: 240),
+                                        curve: Curves.easeOut,
+                                      );
+                                    },
+                                    child: Text(isLastPage ? '閉じる' : '次へ'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    pageController.dispose();
+  }
+
+  Widget _guidePage({
+    required BuildContext context,
+    required _SwitchbotGuideStep step,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppTheme.quickActionBorder(context),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                step.stepLabel,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.accent,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                step.title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                step.description,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.secondaryText(context),
+                      height: 1.5,
+                    ),
+              ),
+              const SizedBox(height: 18),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  width: double.infinity,
+                  height: 300,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.all(10),
+                  color: isDark
+                      ? const Color(0xFF20243A)
+                      : const Color(0xFFEFF3FA),
+                  child: Image.asset(
+                    step.imageAssetPath,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, __, ___) {
+                      return SizedBox(
+                        height: 260,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              step.fallbackIcon,
+                              size: 64,
+                              color: AppTheme.accent,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '画像を準備中です',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: AppTheme.secondaryText(context),
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 18),
+                              child: Text(
+                                step.imageAssetPath,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: AppTheme.weakText(context),
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _secretsForm() {
+    return _surfaceCard(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          children: [
+            TextFormField(
+              controller: _tokenCtrl,
+              decoration: const InputDecoration(
+                labelText: 'SwitchBot TOKEN',
+                hintText: '例) 9c4b...',
+              ),
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'TOKENを入力してください' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _secretCtrl,
+              decoration: const InputDecoration(
+                labelText: 'SwitchBot SECRET',
+                hintText: '例) 2f6a...',
+              ),
+              obscureText: true,
+              validator: (v) =>
+                  (v == null || v.trim().isEmpty) ? 'SECRETを入力してください' : null,
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _saving ? null : _saveSecrets,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.verified_user_rounded),
+                label: Text(_saving ? '検証中...' : '検証して保存'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -506,45 +1143,236 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
         final head = v['head']?.toString() ?? '';
         final tail = v['tail']?.toString() ?? '';
         final len = v['len']?.toString() ?? '?';
-        if (head.isEmpty || tail.isEmpty) return '保存済み（詳細取得不可）';
+
+        if (head.isEmpty || tail.isEmpty) {
+          return '保存済み';
+        }
+
         return '$head…$tail（len:$len）';
       }
+
       return '保存済み';
     }
 
     final token = _secretEcho?['token'];
     final secret = _secretEcho?['secret'];
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Theme.of(context).colorScheme.surface,
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 16,
-            offset: Offset(0, 8),
-            color: Color(0x1A000000),
-          ),
-        ],
-      ),
+    return _surfaceCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'SwitchBot 資格情報（保存済み）',
-            style: TextStyle(fontWeight: FontWeight.w700),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF00D6A3),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOKEN / SECRET は保存済みです',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _hasSelectedMeter ? '認証情報は保存されています。' : '次に温湿度計を選択してください。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.secondaryText(context),
+                            height: 1.45,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text('TOKEN: ${fmt(token)}'),
-          const SizedBox(height: 4),
-          Text('SECRET: ${fmt(secret)}'),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppTheme.chipFill(
+                AppTheme.accent,
+                context,
+                opacity: 0.08,
+              ),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TOKEN: ${fmt(token)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'SECRET: ${fmt(secret)}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _deviceCard() {
+    final deviceSummary = _hasSelectedMeter
+        ? '$_selectedDeviceName ($_selectedDeviceType)\n$_selectedDeviceId'
+        : 'まだ温湿度計が選択されていません';
+
+    return _surfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                _hasSelectedMeter
+                    ? Icons.check_circle_rounded
+                    : Icons.sensors_rounded,
+                color: _hasSelectedMeter
+                    ? const Color(0xFF00D6A3)
+                    : AppTheme.accent,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _hasSelectedMeter ? '温湿度計は選択済みです' : '温湿度計を選択してください',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 10),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: _disabling ? null : () => _disableIntegration(),
-            icon: const Icon(Icons.link_off),
-            label: Text(_disabling ? '解除中...' : '連携を解除'),
+          Text(
+            deviceSummary,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed:
+                  (_canPickDevices && !_polling) ? _pickDeviceFromCloud : null,
+              icon: _polling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      _hasSelectedMeter
+                          ? Icons.swap_horiz_rounded
+                          : Icons.list_alt_rounded,
+                    ),
+              label: Text(
+                _polling
+                    ? '取得中...'
+                    : _hasSelectedMeter
+                        ? '別の温湿度計を選ぶ'
+                        : 'デバイス一覧から選ぶ',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusCard() {
+    if (_status == null) return const SizedBox.shrink();
+
+    return _surfaceCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_polling) ...[
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ] else ...[
+            Icon(
+              Icons.info_outline_rounded,
+              color: AppTheme.secondaryText(context),
+              size: 20,
+            ),
+          ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              _status!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dangerZone() {
+    if (!_hasSecrets) return const SizedBox.shrink();
+
+    return _surfaceCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '連携を解除',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'TOKEN/SECRETと選択中の温湿度計を解除します。過去の温湿度記録は通常残します。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _disabling ? null : _confirmAndDisableIntegration,
+              icon: _disabling
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.link_off_rounded),
+              label: Text(_disabling ? '解除中...' : 'SwitchBot連携を解除'),
+            ),
           ),
         ],
       ),
@@ -553,104 +1381,85 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final app = Firebase.app();
-    final projectId = app.options.projectId ?? 'unknown';
-    final currentUid = FirebaseAuth.instance.currentUser?.uid ?? 'null';
-    final deviceSummary = (_selectedDeviceId == null)
-        ? '未選択'
-        : '$_selectedDeviceName ($_selectedDeviceType)\n$_selectedDeviceId';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('SwitchBot 連携設定'),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text(
-            '手順:\n'
-            '1) SwitchBot 公式アプリ → マイページ → 設定 → 開発者向け設定 → Token/Secret を取得\n'
-            '2) 下に貼り付けて [検証して保存]\n'
-            '3) [デバイス一覧から選ぶ] で温湿度計を選択（Device ID は自動保存）',
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(
+            'SwitchBot連携設定',
+            style: Theme.of(context).textTheme.titleLarge,
           ),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Theme.of(context).colorScheme.surface,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Firebase projectId: $projectId'),
-                const SizedBox(height: 4),
-                Text('Current UID: $currentUid'),
-              ],
-            ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient:
+                isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
           ),
-          const SizedBox(height: 16),
-          const SizedBox(height: 16),
-
-          // 資格情報（未保存: フォーム / 保存済み: 表示カード）
-          if (_loading) ...[
-            const SizedBox(height: 24),
-            const Center(child: CircularProgressIndicator()),
-            const SizedBox(height: 24),
-          ] else if (!_hasSecrets) ...[
-            _secretsForm(),
-          ] else ...[
-            _savedSecretsCard(),
-          ],
-
-          if (_hasSecrets) ...[
-            const SizedBox(height: 24),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('選択中の温湿度計'),
-              subtitle: Text(deviceSummary),
-              trailing: ElevatedButton.icon(
-                onPressed: (_canPickDevices && !_polling)
-                    ? _pickDeviceFromCloud
-                    : null,
-                icon: const Icon(Icons.list_alt),
-                label: const Text('デバイス一覧から選ぶ'),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 16),
-          if (_status != null)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
               children: [
-                if (_polling) ...[
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                _headerCard(),
+                _sectionTitle(
+                  '現在の状態',
+                  'SwitchBot連携の進み具合を確認できます',
+                ),
+                _connectionStateCard(),
+                _sectionTitle(
+                  '連携ガイド',
+                  'SwitchBotアプリの準備から温湿度計の選択まで確認できます',
+                ),
+                _guideEntryCard(),
+                _sectionTitle(
+                  '認証情報',
+                  'TOKEN/SECRETはサーバ経由で安全に保存します',
+                ),
+                if (_loading) ...[
+                  _surfaceCard(
+                    child: const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 10),
+                ] else if (!_hasSecrets) ...[
+                  _secretsForm(),
+                ] else ...[
+                  _savedSecretsCard(),
                 ],
-                Expanded(
-                  child: Text(
-                    _status!,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: Colors.grey),
+                if (_hasSecrets) ...[
+                  _sectionTitle(
+                    '温湿度計の選択',
+                    '記録に使うSwitchBot温湿度計を選択します',
                   ),
+                  _deviceCard(),
+                ],
+                _statusCard(),
+                _dangerZone(),
+                const SizedBox(height: 8),
+                Text(
+                  '※ TOKEN/SECRET はCloud Functions経由で保存されます。安全のため、アプリでは全文を表示しません。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.tertiaryText(context),
+                      ),
                 ),
               ],
             ),
-          const SizedBox(height: 8),
-          const Divider(),
-          const Text(
-            '※ TOKEN/SECRET はサーバ（Cloud Functions）経由で保存されます。'
-            '安全のため、アプリでは全文を表示しません（先頭/末尾のみ表示）。',
-            style: TextStyle(fontSize: 12),
           ),
-        ],
+        ),
       ),
     );
   }

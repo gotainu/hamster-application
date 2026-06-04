@@ -78,6 +78,12 @@ flutter:
     - assets/images/roiroi.png
     - assets/images/roi.png
     - assets/images/chat.png
+    - assets/images/switchbot_guide_01_prepare_hub_app.png
+    - assets/images/switchbot_guide_02_open_app.png
+    - assets/images/switchbot_guide_03_profile_settings.png
+    - assets/images/switchbot_guide_04_tap_version.png
+    - assets/images/switchbot_guide_05_token_secret.png
+    - assets/images/switchbot_guide_06_select_meter.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

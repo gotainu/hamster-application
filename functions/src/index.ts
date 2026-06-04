@@ -419,6 +419,78 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+type DeepDeleteStats = {
+  deletedDocuments: number;
+  deletedBatches: number;
+  touchedCollections: Set<string>;
+  deletedRootDocuments: string[];
+};
+
+function createDeepDeleteStats(): DeepDeleteStats {
+  return {
+    deletedDocuments: 0,
+    deletedBatches: 0,
+    touchedCollections: new Set<string>(),
+    deletedRootDocuments: [],
+  };
+}
+
+async function deleteCollectionDeep(
+  colRef: FirebaseFirestore.CollectionReference,
+  stats: DeepDeleteStats,
+  batchSize = 200,
+): Promise<void> {
+  while (true) {
+    const snap = await colRef.limit(batchSize).get();
+
+    if (snap.empty) {
+      return;
+    }
+
+    stats.touchedCollections.add(colRef.path);
+
+    // 先に各ドキュメントのサブコレクションを削除する
+    for (const doc of snap.docs) {
+      const subcollections = await doc.ref.listCollections();
+
+      for (const subcol of subcollections) {
+        await deleteCollectionDeep(subcol, stats, batchSize);
+      }
+    }
+
+    const batch = db.batch();
+
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+    }
+
+    await batch.commit();
+
+    stats.deletedDocuments += snap.size;
+    stats.deletedBatches += 1;
+
+    if (snap.size < batchSize) {
+      return;
+    }
+  }
+}
+
+async function deleteDocumentDeep(
+  docRef: FirebaseFirestore.DocumentReference,
+  stats: DeepDeleteStats,
+): Promise<void> {
+  const subcollections = await docRef.listCollections();
+
+  for (const subcol of subcollections) {
+    await deleteCollectionDeep(subcol, stats);
+  }
+
+  await docRef.delete();
+
+  stats.deletedDocuments += 1;
+  stats.deletedRootDocuments.push(docRef.path);
+}
+
 function mean(values: number[]): number | null {
   if (values.length === 0) return null;
   return values.reduce((a, b) => a + b, 0) / values.length;
@@ -1382,6 +1454,86 @@ export const disableSwitchbotIntegration = onCall(
     }
 
     return { ok: true, deletedReadings };
+  },
+);
+
+export const deleteMyAccountAndData = onCall(
+  {
+    region: 'asia-northeast1',
+    timeoutSeconds: 540,
+    memory: '1GiB',
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    const confirmText = String(req.data?.confirmText ?? '').trim();
+
+    if (confirmText !== 'DELETE_MY_ACCOUNT') {
+      throw new HttpsError(
+        'invalid-argument',
+        '削除確認文字列が一致しません。',
+      );
+    }
+
+    const deleteAuthUser = req.data?.deleteAuthUser !== false;
+
+    const stats = createDeepDeleteStats();
+
+    logger.warn('deleteMyAccountAndData started', {
+      uid,
+      deleteAuthUser,
+    });
+
+    try {
+      // 1. users/{uid} 配下をサブコレクションごと削除
+      await deleteDocumentDeep(db.collection('users').doc(uid), stats);
+
+      // 2. switchbot_users/{uid} を削除
+      await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
+
+      // 3. Firebase Auth ユーザー本体を削除
+      if (deleteAuthUser) {
+        try {
+          await admin.auth().deleteUser(uid);
+        } catch (e: any) {
+          if (e?.code === 'auth/user-not-found') {
+            logger.warn('deleteMyAccountAndData auth user already missing', {
+              uid,
+            });
+          } else {
+            throw e;
+          }
+        }
+      }
+
+      const result = {
+        ok: true,
+        uid,
+        deleteAuthUser,
+        deletedDocuments: stats.deletedDocuments,
+        deletedBatches: stats.deletedBatches,
+        touchedCollections: Array.from(stats.touchedCollections).sort(),
+        deletedRootDocuments: stats.deletedRootDocuments,
+      };
+
+      logger.warn('deleteMyAccountAndData completed', result);
+
+      return result;
+    } catch (e: any) {
+      logger.error('deleteMyAccountAndData failed', {
+        uid,
+        error: String(e?.message ?? e),
+      });
+
+      throw new HttpsError(
+        'internal',
+        `アカウントデータ削除に失敗しました: ${String(e?.message ?? e)}`,
+      );
+    }
   },
 );
 

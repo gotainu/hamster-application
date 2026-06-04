@@ -6,7 +6,6 @@ import 'dart:convert';
 import 'dart:async';
 import '../theme/app_theme.dart';
 import '../widgets/shine_border.dart';
-import '../services/breeding_environment_repo.dart';
 import '../services/ai_chat_history_repo.dart';
 
 class RetrievedChunk {
@@ -95,7 +94,6 @@ class FuncSearchScreen extends StatefulWidget {
 }
 
 class FuncSearchScreenState extends State<FuncSearchScreen> {
-  final BreedingEnvironmentRepo _envRepo = BreedingEnvironmentRepo();
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -326,20 +324,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       // 失敗時はデフォルトアイコンに戻す
       if (mounted) setState(() => _userImageUrl = null);
     });
-  }
-
-  Future<Map<String, dynamic>?> _buildUserProfile() async {
-    final env = await _envRepo.fetchMainEnv();
-    if (env == null) return null;
-
-    return {
-      "cage_width_cm": double.tryParse(env.cageWidth ?? ''),
-      "cage_depth_cm": double.tryParse(env.cageDepth ?? ''),
-      "bedding_thickness_cm": double.tryParse(env.beddingThickness ?? ''),
-      "wheel_diameter_cm": double.tryParse(env.wheelDiameter ?? ''),
-      "temperature_control": env.temperatureControl,
-      "accessories": env.accessories,
-    };
   }
 
   Future<ChatApiResult> _fetchAIResponseWithHistory(String userMessage) async {
