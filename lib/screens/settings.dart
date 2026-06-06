@@ -3,7 +3,10 @@ import 'package:hamster_project/main.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
+import '../services/ai_chat_history_repo.dart';
 import '../services/notification_settings_service.dart';
 import 'switchbot_setup.dart';
 import 'pet_profile_edit_screen.dart';
@@ -20,7 +23,12 @@ class _SettingScreenState extends State<SettingScreen> {
   final AccountDeleteService _accountDeleteService = AccountDeleteService();
   final NotificationSettingsService _notificationSettingsService =
       NotificationSettingsService();
+  final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
 
+  PackageInfo? _packageInfo;
+
+  bool _isOpeningContact = false;
+  bool _isDeletingAiChatHistory = false;
   bool _isDeletingAccount = false;
   bool _isSigningOut = false;
   bool _isUpdatingNotificationSetting = false;
@@ -165,6 +173,71 @@ class _SettingScreenState extends State<SettingScreen> {
     }
   }
 
+  Future<void> _deleteAiChatHistory() async {
+    if (_isDeletingAiChatHistory) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('AI相談履歴を削除しますか？'),
+          content: const Text(
+            '過去のAI相談履歴を削除します。この操作は元に戻せません。\n\n'
+            'ペットプロフィール、飼育記録、温湿度データ、SwitchBot連携情報は削除されません。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('削除する'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    if (!mounted) return;
+
+    setState(() {
+      _isDeletingAiChatHistory = true;
+    });
+
+    try {
+      final deletedCount = await _aiChatHistoryRepo.deleteAllHistory();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            deletedCount > 0 ? 'AI相談履歴を削除しました。' : '削除対象のAI相談履歴はありませんでした。',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('AI相談履歴の削除に失敗しました: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isDeletingAiChatHistory = false;
+        });
+      }
+    }
+  }
+
   Future<void> _setAnomalyNotificationsEnabled(bool enabled) async {
     if (_isUpdatingNotificationSetting) return;
 
@@ -195,6 +268,62 @@ class _SettingScreenState extends State<SettingScreen> {
       if (mounted) {
         setState(() {
           _isUpdatingNotificationSetting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openContactEmail() async {
+    if (_isOpeningContact) return;
+
+    setState(() {
+      _isOpeningContact = true;
+    });
+
+    final user = FirebaseAuth.instance.currentUser;
+    final packageInfo = _packageInfo;
+
+    final appVersionText = packageInfo == null
+        ? '不明'
+        : '${packageInfo.version}+${packageInfo.buildNumber}';
+
+    final subject = Uri.encodeComponent('ハムスター飼育アプリへのお問い合わせ');
+    final body = Uri.encodeComponent(
+      'お問い合わせ内容を入力してください。\n\n'
+      '---\n'
+      'アプリ情報\n'
+      'バージョン: $appVersionText\n'
+      'ユーザー: ${user?.email ?? user?.uid ?? '未ログイン'}\n'
+      '端末: \n'
+      '発生した画面: \n'
+      '---\n',
+    );
+
+    final uri = Uri.parse(
+      'mailto:gotainu@gmail.com?subject=$subject&body=$body',
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        throw Exception('メールアプリを開けませんでした');
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('メールアプリを開けませんでした: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningContact = false;
         });
       }
     }
@@ -282,6 +411,67 @@ class _SettingScreenState extends State<SettingScreen> {
         onTap: onTap,
       ),
     );
+  }
+
+  Widget _appVersionCard() {
+    final info = _packageInfo;
+    final versionText = info == null
+        ? '読み込み中...'
+        : 'Version ${info.version} (${info.buildNumber})';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 18),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppTheme.cardInnerDark
+            : AppTheme.cardInnerLight,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.quickActionBorder(context),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            color: AppTheme.secondaryText(context),
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              versionText,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPackageInfo();
+  }
+
+  Future<void> _loadPackageInfo() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+
+      if (!mounted) return;
+
+      setState(() {
+        _packageInfo = info;
+      });
+    } catch (e) {
+      debugPrint('PackageInfo load failed: $e');
+    }
   }
 
   @override
@@ -501,6 +691,21 @@ class _SettingScreenState extends State<SettingScreen> {
                   '利用条件、データの扱い、AI相談の注意点を確認できます',
                 ),
                 _settingsTile(
+                  icon: Icons.delete_sweep_rounded,
+                  title: 'AI相談履歴を削除',
+                  subtitle: '過去のAI相談履歴だけを削除します',
+                  iconColor: Colors.redAccent,
+                  titleColor: Colors.redAccent,
+                  onTap: _isDeletingAiChatHistory ? null : _deleteAiChatHistory,
+                  trailing: _isDeletingAiChatHistory
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                ),
+                _settingsTile(
                   icon: Icons.privacy_tip_rounded,
                   title: 'プライバシーポリシー',
                   subtitle: '保存するデータ、利用目的、削除について',
@@ -536,6 +741,25 @@ class _SettingScreenState extends State<SettingScreen> {
                     );
                   },
                 ),
+                _sectionTitle(
+                  context,
+                  'サポート',
+                  'お問い合わせやアプリ情報を確認できます',
+                ),
+                _settingsTile(
+                  icon: Icons.mail_outline_rounded,
+                  title: 'お問い合わせ',
+                  subtitle: '不具合報告・ご相談・フィードバックを送信',
+                  onTap: _isOpeningContact ? null : _openContactEmail,
+                  trailing: _isOpeningContact
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                ),
+                _appVersionCard(),
                 _sectionTitle(
                   context,
                   'アカウント操作',

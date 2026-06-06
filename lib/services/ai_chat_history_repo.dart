@@ -230,4 +230,90 @@ class AiChatHistoryRepo {
 
     await batch.commit();
   }
+
+  Future<int> deleteAllHistory({
+    int pageSize = 200,
+  }) async {
+    final uid = _uid;
+    final threadDoc = _threadDoc();
+
+    if (uid == null || threadDoc == null) return 0;
+
+    var deletedCount = 0;
+
+    final mainMessagesCol = _messagesCol();
+    if (mainMessagesCol != null) {
+      deletedCount += await _deleteCollectionByQuery(
+        mainMessagesCol.limit(pageSize),
+        pageSize: pageSize,
+      );
+    }
+
+    final archivesCol =
+        _db.collection('users').doc(uid).collection('ai_chat_thread_archives');
+
+    while (true) {
+      final archiveSnap = await archivesCol.limit(pageSize).get();
+
+      if (archiveSnap.docs.isEmpty) {
+        break;
+      }
+
+      for (final archiveDoc in archiveSnap.docs) {
+        final archiveMessagesCol = archiveDoc.reference.collection('messages');
+
+        deletedCount += await _deleteCollectionByQuery(
+          archiveMessagesCol.limit(pageSize),
+          pageSize: pageSize,
+        );
+
+        await archiveDoc.reference.delete();
+        deletedCount += 1;
+      }
+
+      if (archiveSnap.docs.length < pageSize) {
+        break;
+      }
+    }
+
+    await threadDoc.set({
+      'lastMessage': '',
+      'lastRole': '',
+      'updatedAt': FieldValue.serverTimestamp(),
+      'clearedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    return deletedCount;
+  }
+
+  Future<int> _deleteCollectionByQuery(
+    Query<Json> query, {
+    required int pageSize,
+  }) async {
+    var deletedCount = 0;
+
+    while (true) {
+      final snap = await query.get();
+
+      if (snap.docs.isEmpty) {
+        break;
+      }
+
+      final batch = _db.batch();
+
+      for (final doc in snap.docs) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+
+      deletedCount += snap.docs.length;
+
+      if (snap.docs.length < pageSize) {
+        break;
+      }
+    }
+
+    return deletedCount;
+  }
 }
