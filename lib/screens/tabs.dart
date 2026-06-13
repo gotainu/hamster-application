@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hamster_project/widgets/paid_feature_gate.dart';
 import 'package:hamster_project/screens/pet_profile_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
 import 'package:hamster_project/screens/search_function.dart';
@@ -70,7 +71,12 @@ class TabsScreenState extends State<TabsScreen> {
         },
         onOpenAiWithDraft: openAiWithDraft,
       ),
-      FuncSearchScreen(key: _searchKey),
+      PaidFeatureGate(
+        featureName: 'AI相談',
+        lockedTitle: 'AI相談は有料プランの機能です',
+        lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
+        child: FuncSearchScreen(key: _searchKey),
+      ),
       const GraphFunctionScreen(),
       const FuncMyPageScreen(),
     ];

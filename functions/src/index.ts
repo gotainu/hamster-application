@@ -5,12 +5,121 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
+import Stripe from 'stripe';
 import { executeAnomalyNotificationPipeline } from './anomalyNotification';
 import { defineSecret } from 'firebase-functions/params';
+
 
 admin.initializeApp();
 const db = admin.firestore();
 const ENVELOPE_KEY_SECRET = defineSecret('ENVELOPE_KEY');
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_PRICE_ID_MONTHLY = defineSecret('STRIPE_PRICE_ID_MONTHLY');
+const STRIPE_SUCCESS_URL = defineSecret('STRIPE_SUCCESS_URL');
+const STRIPE_CANCEL_URL = defineSecret('STRIPE_CANCEL_URL');
+
+export const createStripeCheckoutSession = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_PRICE_ID_MONTHLY,
+      STRIPE_SUCCESS_URL,
+      STRIPE_CANCEL_URL,
+    ],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    const email = req.auth?.token?.email;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const priceId = process.env.STRIPE_PRICE_ID_MONTHLY;
+    const successUrl = process.env.STRIPE_SUCCESS_URL;
+    const cancelUrl = process.env.STRIPE_CANCEL_URL;
+
+    if (!stripeSecretKey) {
+      throw new HttpsError('failed-precondition', 'STRIPE_SECRET_KEY が設定されていません。');
+    }
+
+    if (!priceId) {
+      throw new HttpsError('failed-precondition', 'STRIPE_PRICE_ID_MONTHLY が設定されていません。');
+    }
+
+    if (!successUrl || !cancelUrl) {
+      throw new HttpsError('failed-precondition', 'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL が設定されていません。');
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+    });
+
+    const userRef = db.collection('users').doc(uid);
+    const billingRef = userRef.collection('billing').doc('subscription');
+    const billingSnap = await billingRef.get();
+
+    const existingStripeCustomerId = billingSnap.exists
+      ? billingSnap.get('stripeCustomerId') as string | undefined
+      : undefined;
+
+    logger.info('createStripeCheckoutSession started', {
+      uid,
+      hasExistingStripeCustomerId: !!existingStripeCustomerId,
+    });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      client_reference_id: uid,
+      customer: existingStripeCustomerId,
+      customer_email: existingStripeCustomerId ? undefined : email,
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: {
+        firebaseUid: uid,
+      },
+      subscription_data: {
+        metadata: {
+          firebaseUid: uid,
+        },
+      },
+      allow_promotion_codes: true,
+    });
+
+    if (!session.url) {
+      throw new HttpsError('internal', 'Stripe Checkout URL を作成できませんでした。');
+    }
+
+    await billingRef.set(
+      {
+        provider: 'stripe',
+        checkoutSessionId: session.id,
+        checkoutCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    logger.info('createStripeCheckoutSession completed', {
+      uid,
+      sessionId: session.id,
+    });
+
+    return {
+      ok: true,
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    };
+  },
+);
 
 function getProjectId(): string | null {
   return (

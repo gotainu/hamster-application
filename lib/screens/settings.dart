@@ -8,7 +8,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/notification_settings_service.dart';
+import '../services/subscription_status_service.dart';
 import 'switchbot_setup.dart';
+import 'subscription_plan_screen.dart';
 import 'pet_profile_edit_screen.dart';
 import 'breeding_environment_edit_screen.dart';
 
@@ -24,6 +26,8 @@ class _SettingScreenState extends State<SettingScreen> {
   final NotificationSettingsService _notificationSettingsService =
       NotificationSettingsService();
   final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
+  final SubscriptionStatusService _subscriptionStatusService =
+      SubscriptionStatusService();
 
   PackageInfo? _packageInfo;
 
@@ -329,6 +333,54 @@ class _SettingScreenState extends State<SettingScreen> {
     }
   }
 
+  Future<void> _openPaidFeatureOrPlan({
+    required String featureName,
+    required Widget screen,
+  }) async {
+    final status = await _subscriptionStatusService.fetchStatus();
+
+    if (!mounted) return;
+
+    if (status.isEntitled) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => screen,
+        ),
+      );
+      return;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text('$featureNameは有料プランの機能です'),
+          content: const Text(
+            'この機能を利用するには、有料プランが必要です。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('閉じる'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('利用プランを見る'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true && mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const SubscriptionPlanScreen(),
+        ),
+      );
+    }
+  }
+
   void _openInfoPage({
     required String title,
     required IconData icon,
@@ -341,6 +393,14 @@ class _SettingScreenState extends State<SettingScreen> {
           icon: icon,
           sections: sections,
         ),
+      ),
+    );
+  }
+
+  void _openPaidPlanPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionPlanScreen(),
       ),
     );
   }
@@ -641,6 +701,17 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
                 _sectionTitle(
                   context,
+                  'プラン・課金',
+                  'このアプリの利用プランを確認できます',
+                ),
+                _settingsTile(
+                  icon: Icons.workspace_premium_rounded,
+                  title: '利用プラン',
+                  subtitle: 'ハムスターの環境管理を継続支援する課金プラン',
+                  onTap: _openPaidPlanPage,
+                ),
+                _sectionTitle(
+                  context,
                   '飼育情報',
                   'AI相談と環境評価に使う基本情報を編集します',
                 ),
@@ -678,10 +749,9 @@ class _SettingScreenState extends State<SettingScreen> {
                   title: 'SwitchBot連携設定',
                   subtitle: 'TOKEN/SECRET、温湿度計の選択、連携解除',
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const SwitchbotSetupScreen(),
-                      ),
+                    _openPaidFeatureOrPlan(
+                      featureName: 'SwitchBot連携',
+                      screen: const SwitchbotSetupScreen(),
                     );
                   },
                 ),

@@ -16,8 +16,9 @@ class HealthRecord {
     // date は Timestamp or String(ISO) 両対応
     DateTime parseDate(dynamic v) {
       if (v is Timestamp) return v.toDate();
-      if (v is String)
+      if (v is String) {
         return DateTime.tryParse(v) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      }
       return DateTime.fromMillisecondsSinceEpoch(0);
     }
 
