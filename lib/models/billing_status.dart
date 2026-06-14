@@ -124,6 +124,7 @@ class BillingStatus {
       case 'unpaid':
         return BillingStatusValue.unpaid;
       case 'incomplete':
+      case 'incomplete_expired':
         return BillingStatusValue.incomplete;
       case 'none':
       case null:

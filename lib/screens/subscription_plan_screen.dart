@@ -182,6 +182,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isPaid = billing.isPaid;
+    final visual = _visualForBillingStatus();
 
     final periodEndText = billing.currentPeriodEnd == null
         ? null
@@ -195,13 +196,13 @@ class _BillingStatusHeroCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            isPaid ? Icons.verified_rounded : Icons.workspace_premium_rounded,
-            color: isPaid ? const Color(0xFF00D6A3) : AppTheme.accent,
+            visual.icon,
+            color: visual.accentColor,
             size: 46,
           ),
           const SizedBox(height: 16),
           Text(
-            isPaid ? '有料プランを利用中です' : '有料プランは未契約です',
+            visual.title,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w900,
                   height: 1.35,
@@ -209,9 +210,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            isPaid
-                ? '温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。'
-                : 'このアプリは有料プランでの提供を予定しています。Stripe Web課金と連携後、ここに契約状態が反映されます。',
+            visual.description,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.secondaryText(context),
                   height: 1.55,
@@ -223,7 +222,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: AppTheme.chipFill(
-                isPaid ? const Color(0xFF00D6A3) : AppTheme.accent,
+                visual.accentColor,
                 context,
                 opacity: 0.14,
               ),
@@ -232,7 +231,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
             child: Text(
               _statusText(periodEndText),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: isPaid ? const Color(0xFF00D6A3) : AppTheme.accent,
+                    color: visual.accentColor,
                     fontWeight: FontWeight.w800,
                     height: 1.45,
                   ),
@@ -258,7 +257,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+              visual.checkoutNote,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.secondaryText(context),
                     height: 1.45,
@@ -277,8 +276,112 @@ class _BillingStatusHeroCard extends StatelessWidget {
       return base;
     }
 
-    return '$base\n有効期限: $periodEndText';
+    final status = billing.status;
+
+    if (status == BillingStatusValue.active ||
+        status == BillingStatusValue.trialing) {
+      return '$base\n有効期限: $periodEndText';
+    }
+
+    if (status == BillingStatusValue.pastDue) {
+      return '$base\n確認対象の期限: $periodEndText';
+    }
+
+    if (status == BillingStatusValue.unpaid) {
+      return '$base\n最終確認期限: $periodEndText';
+    }
+
+    if (status == BillingStatusValue.canceled) {
+      return '$base\n終了日: $periodEndText';
+    }
+
+    return base;
   }
+
+  _BillingStatusVisual _visualForBillingStatus() {
+    switch (billing.status) {
+      case BillingStatusValue.active:
+      case BillingStatusValue.trialing:
+        return const _BillingStatusVisual(
+          icon: Icons.verified_rounded,
+          accentColor: Color(0xFF00D6A3),
+          title: '有料プランを利用中です',
+          description: '温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
+          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+        );
+
+      case BillingStatusValue.pastDue:
+        return const _BillingStatusVisual(
+          icon: Icons.error_rounded,
+          accentColor: Color(0xFFFFB020),
+          title: 'お支払いの確認が必要です',
+          description:
+              '前回のお支払いを確認できませんでした。有料機能は一時停止されています。再度登録するか、支払い方法を確認してください。',
+          checkoutNote: '支払い状態を復旧するには、Stripeの決済ページで再度手続きしてください。',
+        );
+
+      case BillingStatusValue.unpaid:
+        return const _BillingStatusVisual(
+          icon: Icons.block_rounded,
+          accentColor: Color(0xFFFF6B6B),
+          title: '有料プランは停止中です',
+          description: 'お支払いを確認できなかったため、有料機能は停止されています。再度登録すると、有料機能を利用できます。',
+          checkoutNote: 'Stripeの安全な決済ページで再登録できます。',
+        );
+
+      case BillingStatusValue.canceled:
+        return const _BillingStatusVisual(
+          icon: Icons.workspace_premium_rounded,
+          accentColor: AppTheme.accent,
+          title: '有料プランは未契約です',
+          description: '有料プランはキャンセルされています。再度登録すると、有料機能を利用できます。',
+          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+        );
+
+      case BillingStatusValue.incomplete:
+        return const _BillingStatusVisual(
+          icon: Icons.pending_actions_rounded,
+          accentColor: AppTheme.accent,
+          title: '登録は完了していません',
+          description: '有料プランの登録が完了していません。支払いページで手続きを完了してください。',
+          checkoutNote: 'Stripeの安全な決済ページで手続きを再開できます。',
+        );
+
+      case BillingStatusValue.none:
+        return const _BillingStatusVisual(
+          icon: Icons.workspace_premium_rounded,
+          accentColor: AppTheme.accent,
+          title: '有料プランは未契約です',
+          description: '有料プランに登録すると、温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
+          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+        );
+
+      case BillingStatusValue.unknown:
+        return const _BillingStatusVisual(
+          icon: Icons.help_rounded,
+          accentColor: AppTheme.accent,
+          title: '契約状態を確認できません',
+          description: '現在の契約状態を確認できませんでした。時間をおいて再度確認してください。',
+          checkoutNote: '必要に応じて、Stripeの決済ページから再度手続きできます。',
+        );
+    }
+  }
+}
+
+class _BillingStatusVisual {
+  const _BillingStatusVisual({
+    required this.icon,
+    required this.accentColor,
+    required this.title,
+    required this.description,
+    required this.checkoutNote,
+  });
+
+  final IconData icon;
+  final Color accentColor;
+  final String title;
+  final String description;
+  final String checkoutNote;
 }
 
 class _PaidPlanFeatureCard extends StatelessWidget {
