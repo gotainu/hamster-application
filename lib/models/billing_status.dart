@@ -39,6 +39,19 @@ class BillingStatus {
             status == BillingStatusValue.trialing);
   }
 
+  bool get canUsePaidFeatures {
+    return isPaid && !isExpired;
+  }
+
+  bool get needsPaymentAttention {
+    return status == BillingStatusValue.pastDue ||
+        status == BillingStatusValue.unpaid;
+  }
+
+  bool get isInactive {
+    return !canUsePaidFeatures;
+  }
+
   bool get isExpired {
     final end = currentPeriodEnd;
     if (end == null) return false;

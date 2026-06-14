@@ -7,6 +7,8 @@ import 'dart:async';
 import '../theme/app_theme.dart';
 import '../widgets/shine_border.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/billing_status_repo.dart';
+import '../screens/subscription_plan_screen.dart';
 
 class RetrievedChunk {
   final String id;
@@ -95,11 +97,16 @@ class FuncSearchScreen extends StatefulWidget {
 
 class FuncSearchScreenState extends State<FuncSearchScreen> {
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
+  final BillingStatusRepo _billingStatusRepo = BillingStatusRepo();
+
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
+
   bool _isLoading = false;
+  bool _canUseAiChat = false;
+  bool _isCheckingBilling = true;
 
   // ユーザーのメインペット画像URL（users/{uid}/pet_profiles/main_pet.imageUrl）
   String? _userImageUrl;
@@ -121,6 +128,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     super.initState();
     _restoreChatHistory();
     _listenUserAvatar(); // ← ここで購読開始
+    _checkBillingStatus();
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
         setState(() {
@@ -155,6 +163,45 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
 
     _scrollToBottom();
+  }
+
+  Future<void> _checkBillingStatus() async {
+    setState(() {
+      _isCheckingBilling = true;
+    });
+
+    try {
+      final billing = await _billingStatusRepo.fetchBillingStatus();
+
+      if (!mounted) return;
+
+      setState(() {
+        _canUseAiChat = billing.canUsePaidFeatures;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _canUseAiChat = false;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCheckingBilling = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openSubscriptionPlan() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionPlanScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+    await _checkBillingStatus();
   }
 
   Future<void> _restoreChatHistory() async {
@@ -397,6 +444,11 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   void _handleSend() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
+
+    if (!_canUseAiChat) {
+      await _openSubscriptionPlan();
+      return;
+    }
 
     setState(() {
       _hasRestoredHistory = false;
@@ -801,9 +853,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                         child: TextField(
                           focusNode: _focusNode,
                           controller: _textController,
+                          enabled: _canUseAiChat && !_isCheckingBilling,
                           style: const TextStyle(fontSize: 17),
                           decoration: InputDecoration(
-                            hintText: '質問してみましょう',
+                            hintText: _isCheckingBilling
+                                ? '利用状態を確認中...'
+                                : _canUseAiChat
+                                    ? '質問してみましょう'
+                                    : 'AI相談は有料プランで利用できます',
                             border: InputBorder.none,
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 13),
@@ -815,9 +872,11 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                       ),
                       const SizedBox(width: 6),
                       IconButton(
-                        icon: Icon(Icons.send,
-                            color: Theme.of(context).colorScheme.primary),
-                        onPressed: _handleSend,
+                        icon: Icon(
+                          _canUseAiChat ? Icons.send : Icons.lock_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        onPressed: _isCheckingBilling ? null : _handleSend,
                       ),
                     ],
                   ),
