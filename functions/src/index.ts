@@ -17,6 +17,7 @@ const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_PRICE_ID_MONTHLY = defineSecret('STRIPE_PRICE_ID_MONTHLY');
 const STRIPE_SUCCESS_URL = defineSecret('STRIPE_SUCCESS_URL');
 const STRIPE_CANCEL_URL = defineSecret('STRIPE_CANCEL_URL');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 
 export const createStripeCheckoutSession = onCall(
   {
@@ -118,6 +119,342 @@ export const createStripeCheckoutSession = onCall(
       checkoutUrl: session.url,
       sessionId: session.id,
     };
+  },
+);
+
+function createStripeClient(): Stripe {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+  if (!stripeSecretKey) {
+    throw new Error('STRIPE_SECRET_KEY is not set');
+  }
+
+  return new Stripe(stripeSecretKey, {
+    apiVersion: '2025-02-24.acacia',
+  });
+}
+
+function toFirestoreTimestampFromUnixSeconds(
+  seconds: number | null | undefined,
+): FirebaseFirestore.Timestamp | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return null;
+  }
+
+  return admin.firestore.Timestamp.fromMillis(seconds * 1000);
+}
+
+function mapStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status | string | null | undefined,
+): string {
+  switch (status) {
+    case 'active':
+      return 'active';
+    case 'trialing':
+      return 'trialing';
+    case 'past_due':
+      return 'past_due';
+    case 'canceled':
+      return 'canceled';
+    case 'unpaid':
+      return 'unpaid';
+    case 'incomplete':
+      return 'incomplete';
+    case 'incomplete_expired':
+      return 'incomplete';
+    case 'paused':
+      return 'unpaid';
+    default:
+      return 'unknown';
+  }
+}
+
+async function findUidByStripeSubscription(
+  subscription: Stripe.Subscription,
+): Promise<string | null> {
+  const metadataUid = subscription.metadata?.firebaseUid;
+  if (metadataUid) return metadataUid;
+
+  const subId = subscription.id;
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+
+  const bySubSnap = await db
+    .collectionGroup('billing')
+    .where('stripeSubscriptionId', '==', subId)
+    .limit(1)
+    .get();
+
+  if (!bySubSnap.empty) {
+    const doc = bySubSnap.docs[0];
+    return doc.ref.parent.parent?.id ?? null;
+  }
+
+  if (customerId) {
+    const byCustomerSnap = await db
+      .collectionGroup('billing')
+      .where('stripeCustomerId', '==', customerId)
+      .limit(1)
+      .get();
+
+    if (!byCustomerSnap.empty) {
+      const doc = byCustomerSnap.docs[0];
+      return doc.ref.parent.parent?.id ?? null;
+    }
+  }
+
+  return null;
+}
+
+async function saveStripeSubscriptionToFirestore(params: {
+  uid: string;
+  subscription: Stripe.Subscription;
+  checkoutSessionId?: string | null;
+}): Promise<void> {
+  const { uid, subscription, checkoutSessionId } = params;
+
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+
+  const status = mapStripeSubscriptionStatus(subscription.status);
+  const isPaid = status === 'active' || status === 'trialing';
+
+  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
+    subscription.current_period_end,
+  );
+
+  const priceId = subscription.items.data[0]?.price?.id ?? null;
+  const productId =
+    typeof subscription.items.data[0]?.price?.product === 'string'
+      ? subscription.items.data[0]?.price?.product
+      : subscription.items.data[0]?.price?.product?.id ?? null;
+
+  const billingRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription');
+
+  await billingRef.set(
+    {
+      provider: 'stripe',
+      plan: isPaid ? 'paid' : 'none',
+      status,
+      stripeCustomerId: customerId,
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: priceId,
+      stripeProductId: productId,
+      currentPeriodEnd,
+      checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
+      latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  logger.info('Stripe subscription saved to Firestore', {
+    uid,
+    status,
+    plan: isPaid ? 'paid' : 'none',
+    subscriptionId: subscription.id,
+    customerId,
+    priceId,
+    currentPeriodEnd: currentPeriodEnd?.toDate().toISOString() ?? null,
+  });
+}
+
+async function markStripeSubscriptionCanceled(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const uid = await findUidByStripeSubscription(subscription);
+
+  if (!uid) {
+    logger.warn('Could not find uid for canceled Stripe subscription', {
+      subscriptionId: subscription.id,
+      customer:
+        typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer?.id ?? null,
+    });
+    return;
+  }
+
+  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
+    subscription.current_period_end,
+  );
+
+  await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .set(
+      {
+        provider: 'stripe',
+        plan: 'none',
+        status: 'canceled',
+        stripeSubscriptionId: subscription.id,
+        currentPeriodEnd,
+        canceledAt: admin.firestore.FieldValue.serverTimestamp(),
+        latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+  logger.info('Stripe subscription marked canceled', {
+    uid,
+    subscriptionId: subscription.id,
+  });
+}
+
+export const stripeWebhook = onRequest(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET,
+    ],
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripeSecretKey || !webhookSecret) {
+      logger.error('Stripe webhook secrets are not set', {
+        hasStripeSecretKey: !!stripeSecretKey,
+        hasWebhookSecret: !!webhookSecret,
+      });
+      res.status(500).send('Webhook secrets are not configured');
+      return;
+    }
+
+    const stripe = createStripeClient();
+    const signature = req.headers['stripe-signature'];
+
+    if (typeof signature !== 'string') {
+      logger.warn('Stripe webhook missing signature');
+      res.status(400).send('Missing stripe-signature header');
+      return;
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        webhookSecret,
+      );
+    } catch (e: any) {
+      logger.warn('Stripe webhook signature verification failed', {
+        error: String(e?.message ?? e),
+      });
+      res.status(400).send(`Webhook Error: ${String(e?.message ?? e)}`);
+      return;
+    }
+
+    logger.info('Stripe webhook received', {
+      eventId: event.id,
+      type: event.type,
+    });
+
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+
+          const uid =
+            session.client_reference_id ||
+            session.metadata?.firebaseUid ||
+            null;
+
+          if (!uid) {
+            logger.warn('checkout.session.completed missing firebase uid', {
+              sessionId: session.id,
+            });
+            break;
+          }
+
+          const subscriptionId =
+            typeof session.subscription === 'string'
+              ? session.subscription
+              : session.subscription?.id;
+
+          if (!subscriptionId) {
+            logger.warn('checkout.session.completed missing subscription id', {
+              uid,
+              sessionId: session.id,
+            });
+            break;
+          }
+
+          const subscription = await stripe.subscriptions.retrieve(
+            subscriptionId,
+          );
+
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+            checkoutSessionId: session.id,
+          });
+
+          break;
+        }
+
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          const uid = await findUidByStripeSubscription(subscription);
+
+          if (!uid) {
+            logger.warn('Could not find uid for Stripe subscription update', {
+              subscriptionId: subscription.id,
+              status: subscription.status,
+            });
+            break;
+          }
+
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+          });
+
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          await markStripeSubscriptionCanceled(subscription);
+          break;
+        }
+
+        default:
+          logger.info('Stripe webhook ignored event type', {
+            eventId: event.id,
+            type: event.type,
+          });
+      }
+
+      res.status(200).json({ received: true });
+    } catch (e: any) {
+      logger.error('Stripe webhook handler failed', {
+        eventId: event.id,
+        type: event.type,
+        error: String(e?.message ?? e),
+      });
+
+      res.status(500).send('Webhook handler failed');
+    }
   },
 );
 

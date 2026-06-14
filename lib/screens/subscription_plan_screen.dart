@@ -3,16 +3,87 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/billing_status.dart';
 import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
 
-class SubscriptionPlanScreen extends StatelessWidget {
+class SubscriptionPlanScreen extends StatefulWidget {
   const SubscriptionPlanScreen({super.key});
 
   @override
+  State<SubscriptionPlanScreen> createState() => _SubscriptionPlanScreenState();
+}
+
+class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
+  final BillingStatusRepo _repo = BillingStatusRepo();
+
+  bool _isOpeningCheckout = false;
+
+  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(
+        app: Firebase.app(),
+        region: 'asia-northeast1',
+      );
+
+  Future<void> _startCheckout() async {
+    if (_isOpeningCheckout) return;
+
+    setState(() {
+      _isOpeningCheckout = true;
+    });
+
+    try {
+      final callable = _functions.httpsCallable('createStripeCheckoutSession');
+      final result = await callable.call();
+
+      final data = result.data;
+      final checkoutUrl = data is Map ? data['checkoutUrl']?.toString() : null;
+
+      if (checkoutUrl == null || checkoutUrl.isEmpty) {
+        throw Exception('Checkout URL を取得できませんでした。');
+      }
+
+      final uri = Uri.parse(checkoutUrl);
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        throw Exception('Stripe Checkout を開けませんでした。');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('購入ページの作成に失敗しました: ${e.message ?? e.code}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('購入ページを開けませんでした: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningCheckout = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final repo = BillingStatusRepo();
+    final repo = _repo;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -48,7 +119,11 @@ class SubscriptionPlanScreen extends StatelessWidget {
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                   children: [
-                    _BillingStatusHeroCard(billing: billing),
+                    _BillingStatusHeroCard(
+                      billing: billing,
+                      isOpeningCheckout: _isOpeningCheckout,
+                      onStartCheckout: _startCheckout,
+                    ),
                     const SizedBox(height: 16),
                     const _PaidPlanFeatureCard(
                       icon: Icons.thermostat_rounded,
@@ -95,9 +170,13 @@ class SubscriptionPlanScreen extends StatelessWidget {
 class _BillingStatusHeroCard extends StatelessWidget {
   const _BillingStatusHeroCard({
     required this.billing,
+    required this.isOpeningCheckout,
+    required this.onStartCheckout,
   });
 
   final BillingStatus billing;
+  final bool isOpeningCheckout;
+  final VoidCallback onStartCheckout;
 
   @override
   Widget build(BuildContext context) {
@@ -159,6 +238,33 @@ class _BillingStatusHeroCard extends StatelessWidget {
                   ),
             ),
           ),
+          if (!isPaid) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: isOpeningCheckout ? null : onStartCheckout,
+                icon: isOpeningCheckout
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.open_in_new_rounded),
+                label: Text(
+                  isOpeningCheckout ? '購入ページを準備中...' : '月額プランに登録する',
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                    height: 1.45,
+                  ),
+            ),
+          ],
         ],
       ),
     );
