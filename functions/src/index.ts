@@ -224,7 +224,8 @@ async function saveStripeSubscriptionToFirestore(params: {
   const isPaid = status === 'active' || status === 'trialing';
 
   const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
-    subscription.current_period_end,
+    (subscription as any).current_period_end ??
+      (subscription.items?.data?.[0] as any)?.current_period_end,
   );
 
   const priceId = subscription.items.data[0]?.price?.id ?? null;
@@ -239,22 +240,26 @@ async function saveStripeSubscriptionToFirestore(params: {
     .collection('billing')
     .doc('subscription');
 
-  await billingRef.set(
-    {
-      provider: 'stripe',
-      plan: isPaid ? 'paid' : 'none',
-      status,
-      stripeCustomerId: customerId,
-      stripeSubscriptionId: subscription.id,
-      stripePriceId: priceId,
-      stripeProductId: productId,
-      currentPeriodEnd,
-      checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
-      latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  );
+  const updateData: FirebaseFirestore.DocumentData = {
+    provider: 'stripe',
+    plan: isPaid ? 'paid' : 'none',
+    status,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscription.id,
+    stripePriceId: priceId,
+    stripeProductId: productId,
+    currentPeriodEnd,
+    checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
+    latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (isPaid) {
+    updateData.canceledAt = admin.firestore.FieldValue.delete();
+  }
+
+  await billingRef.set(updateData, { merge: true });
+
 
   logger.info('Stripe subscription saved to Firestore', {
     uid,
@@ -284,7 +289,8 @@ async function markStripeSubscriptionCanceled(
   }
 
   const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
-    subscription.current_period_end,
+    (subscription as any).current_period_end ??
+      (subscription.items?.data?.[0] as any)?.current_period_end,
   );
 
   await db
@@ -309,6 +315,56 @@ async function markStripeSubscriptionCanceled(
   logger.info('Stripe subscription marked canceled', {
     uid,
     subscriptionId: subscription.id,
+  });
+}
+
+async function updateStripeSubscriptionFromInvoice(
+  invoice: Stripe.Invoice,
+): Promise<void> {
+  const stripe = createStripeClient();
+
+  const subscriptionId =
+    typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id ??
+        (invoice as any).parent?.subscription_details?.subscription ??
+        null;
+
+  if (!subscriptionId) {
+    logger.warn('invoice event missing subscription id', {
+      invoiceId: invoice.id,
+      customer:
+        typeof invoice.customer === 'string'
+          ? invoice.customer
+          : invoice.customer?.id ?? null,
+      status: invoice.status,
+    });
+    return;
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const uid = await findUidByStripeSubscription(subscription);
+
+  if (!uid) {
+    logger.warn('Could not find uid for invoice subscription event', {
+      invoiceId: invoice.id,
+      subscriptionId,
+      subscriptionStatus: subscription.status,
+    });
+    return;
+  }
+
+  await saveStripeSubscriptionToFirestore({
+    uid,
+    subscription,
+  });
+
+  logger.info('Stripe invoice subscription status synced', {
+    uid,
+    invoiceId: invoice.id,
+    subscriptionId,
+    subscriptionStatus: subscription.status,
+    invoiceStatus: invoice.status,
   });
 }
 
@@ -435,6 +491,18 @@ export const stripeWebhook = onRequest(
         case 'customer.subscription.deleted': {
           const subscription = event.data.object as Stripe.Subscription;
           await markStripeSubscriptionCanceled(subscription);
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await updateStripeSubscriptionFromInvoice(invoice);
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await updateStripeSubscriptionFromInvoice(invoice);
           break;
         }
 
