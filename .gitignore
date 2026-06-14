@@ -36,6 +36,8 @@ migrate_working_dir/
 .pub/
 /build/
 
+.firebase/
+
 # Symbolication related
 app.*.symbols
 
@@ -48,3 +50,4 @@ app.*.map.json
 /android/app/release
 android_bak/
 android_broken_*/
+.firebase/
