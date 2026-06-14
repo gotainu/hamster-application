@@ -208,6 +208,36 @@ async function findUidByStripeSubscription(
   return null;
 }
 
+async function assertPaidFeatureAccess(uid: string): Promise<void> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .get();
+
+  const data = snap.data() ?? {};
+  const plan = data.plan;
+  const status = data.status;
+
+  const isEntitled =
+    plan === 'paid' &&
+    (status === 'active' || status === 'trialing');
+
+  if (!isEntitled) {
+    logger.warn('Paid feature access denied', {
+      uid,
+      plan,
+      status,
+    });
+
+    throw new HttpsError(
+      'permission-denied',
+      'この機能は有料プランで利用できます。',
+    );
+  }
+}
+
 async function saveStripeSubscriptionToFirestore(params: {
   uid: string;
   subscription: Stripe.Subscription;
@@ -657,6 +687,7 @@ export const registerSwitchbotSecrets = onCall(
   async (req) => {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    await assertPaidFeatureAccess(uid);
 
     const token = String(req.data?.token ?? '').trim();
     const secret = String(req.data?.secret ?? '').trim();
@@ -1883,6 +1914,17 @@ async function pollAllUsersOnce(): Promise<PollAllResult> {
   for (const doc of usersSnap.docs) {
     const uid = doc.id;
     try {
+            try {
+        await assertPaidFeatureAccess(uid);
+      } catch {
+        skipped++;
+        logger.info('pollAllUsersOnce skip', {
+          uid,
+          reason: 'not_paid',
+        });
+        continue;
+      }
+      
       const { token, secret, meterDeviceId } = await loadUserConfig(uid);
       if (!token || !secret || !meterDeviceId) {
         skipped++;
@@ -1913,6 +1955,7 @@ export const disableSwitchbotIntegration = onCall(
   async (req) => {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    await assertPaidFeatureAccess(uid);
 
     const deleteReadings = !!req.data?.deleteReadings;
 
@@ -2071,27 +2114,33 @@ export const pollMySwitchbotNow = onCall(
     secrets: [ENVELOPE_KEY_SECRET],
   },
   async (req) => {
-    if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-    try {
-      const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-      if (!token || !secret || !meterDeviceId) {
-        return { ok: false, uid: req.auth.uid, error: 'missing config (token/secret/deviceId)' };
-      }
-      const status = await getMeterStatus(meterDeviceId, token, secret);
-      await saveReading(req.auth.uid, status);
-      await saveEnvironmentAssessmentLatest(req.auth.uid);
-      logger.info('pollMySwitchbotNow success', {
-        uid: req.auth.uid,
-        meterDeviceId,
-        }
-      );
+    const uid = req.auth?.uid;
+    if (!uid) return { ok: false, error: 'unauthenticated' };
 
-    return { ok: true, uid: req.auth.uid, saved: 1, status };
-  } catch (e: any) {
-    logger.error('pollMine error', { uid: req.auth?.uid, error: String(e?.message ?? e) });
-    return { ok: false, uid: req.auth?.uid ?? null, error: String(e?.message ?? e) };
+    try {
+      await assertPaidFeatureAccess(uid);
+
+      const { token, secret, meterDeviceId } = await loadUserConfig(uid);
+      if (!token || !secret || !meterDeviceId) {
+        return { ok: false, uid, error: 'missing config (token/secret/deviceId)' };
+      }
+
+      const status = await getMeterStatus(meterDeviceId, token, secret);
+      await saveReading(uid, status);
+      await saveEnvironmentAssessmentLatest(uid);
+
+      logger.info('pollMySwitchbotNow success', {
+        uid,
+        meterDeviceId,
+      });
+
+      return { ok: true, uid, saved: 1, status };
+    } catch (e: any) {
+      logger.error('pollMine error', { uid, error: String(e?.message ?? e) });
+      return { ok: false, uid, error: String(e?.message ?? e) };
+    }
   }
-});
+);
 
 /* =================================================================== */
 /*  Flutter から呼ぶ本命: listSwitchbotDevices                         */
@@ -2105,6 +2154,7 @@ export const listSwitchbotDevices = onCall(
   async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', '認証ユーザーのみが呼び出せます。');
+  await assertPaidFeatureAccess(uid);
 
   const { token, secret } = await loadUserConfig(uid);
   if (!token || !secret) {
@@ -2137,6 +2187,7 @@ export const backfillMyEnvironmentAssessmentsHistory = onCall(
     if (!uid) {
       throw new HttpsError('unauthenticated', 'ログインが必要です。');
     }
+    await assertPaidFeatureAccess(uid);
 
     try {
       const [env, allReadings] = await Promise.all([

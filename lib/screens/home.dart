@@ -13,11 +13,10 @@ import 'package:hamster_project/services/distance_records_repo.dart';
 import 'package:hamster_project/services/environment_status_service.dart';
 import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/services/environment_trend_service.dart';
+import 'package:hamster_project/services/paid_feature_guard_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/func_b.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
-import 'package:hamster_project/screens/subscription_plan_screen.dart';
-import 'package:hamster_project/services/subscription_status_service.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_sparkline.dart';
 import 'package:hamster_project/widgets/wheel_rotation_input_card.dart';
@@ -46,7 +45,7 @@ class HomeScreenState extends State<HomeScreen> {
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _distanceRepo = DistanceRecordsRepo();
   final _dailyStatusSummaryService = const DailyStatusSummaryService();
-  final _subscriptionStatusService = SubscriptionStatusService();
+  final _paidFeatureGuard = PaidFeatureGuardService();
 
   List<HealthRecord> _buildRecentDistanceSeries(
     List<HealthRecord> allRecords, {
@@ -190,46 +189,11 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<bool> _ensurePaidFeature({
     required String featureName,
-  }) async {
-    final status = await _subscriptionStatusService.fetchStatus();
-
-    if (status.isEntitled) {
-      return true;
-    }
-
-    if (!mounted) return false;
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('$featureNameは有料プランの機能です'),
-          content: const Text(
-            'ハムスターの環境管理を継続的に支援するため、この機能は有料プランで利用できます。',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('閉じる'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('利用プランを見る'),
-            ),
-          ],
-        );
-      },
+  }) {
+    return _paidFeatureGuard.ensureCanUsePaidFeature(
+      context,
+      featureName: featureName,
     );
-
-    if (result == true && mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const SubscriptionPlanScreen(),
-        ),
-      );
-    }
-
-    return false;
   }
 
   @override
