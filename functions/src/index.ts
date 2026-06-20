@@ -18,6 +18,7 @@ const STRIPE_PRICE_ID_MONTHLY = defineSecret('STRIPE_PRICE_ID_MONTHLY');
 const STRIPE_SUCCESS_URL = defineSecret('STRIPE_SUCCESS_URL');
 const STRIPE_CANCEL_URL = defineSecret('STRIPE_CANCEL_URL');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
 
 export const createStripeCheckoutSession = onCall(
   {
@@ -2096,17 +2097,39 @@ export const deleteMyAccountAndData = onCall(
 
 /** Debug: token/secret がちゃんと読めているか head/tail を返す */
 export const switchbotDebugEcho = onCall(
-  { 
+  {
     region: 'asia-northeast1',
     secrets: [ENVELOPE_KEY_SECRET],
-  }, 
+  },
   async (req) => {
-    if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-    const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-    const headTail = (s?: string) => (!s ? null : { head: s.slice(0, 5), len: s.length, tail: s.slice(-5) });
-    return { ok: true, uid: req.auth.uid, meterDeviceId, token: headTail(token), secret: headTail(secret) };
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
     }
-  );
+
+    await assertPaidFeatureAccess(uid);
+
+    const { token, secret, meterDeviceId } = await loadUserConfig(uid);
+
+    const headTail = (s?: string) =>
+      !s
+        ? null
+        : {
+            head: s.slice(0, 5),
+            len: s.length,
+            tail: s.slice(-5),
+          };
+
+    return {
+      ok: true,
+      uid,
+      meterDeviceId,
+      token: headTail(token),
+      secret: headTail(secret),
+    };
+  },
+);
 
 export const pollMySwitchbotNow = onCall(
   { 
@@ -2301,12 +2324,33 @@ export const backfillMyEnvironmentAssessmentsHistory = onCall(
 export const switchbotPollNow = onRequest(
   {
     region: 'asia-northeast1',
-    secrets: [ENVELOPE_KEY_SECRET],
+    secrets: [ENVELOPE_KEY_SECRET, SWITCHBOT_MANUAL_POLL_SECRET],
   },
-  async (_req, res) => {
-  const result = await pollAllUsersOnce();
-  res.json({ ok: true, ...result });
-});
+  async (req, res) => {
+    const expectedSecret = process.env.SWITCHBOT_MANUAL_POLL_SECRET;
+
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice('Bearer '.length).trim()
+        : '';
+
+    if (!expectedSecret || bearerToken !== expectedSecret) {
+      logger.warn('switchbotPollNow forbidden', {
+        hasExpectedSecret: !!expectedSecret,
+      });
+
+      res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+      return;
+    }
+
+    const result = await pollAllUsersOnce();
+    res.json({ ok: true, ...result });
+  },
+);
 
 /* ===== Scheduler ===== */
 
