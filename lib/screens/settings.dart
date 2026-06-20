@@ -7,8 +7,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/billing_status_repo.dart';
 import '../services/notification_settings_service.dart';
-import '../services/subscription_status_service.dart';
 import 'switchbot_setup.dart';
 import 'subscription_plan_screen.dart';
 import 'pet_profile_edit_screen.dart';
@@ -26,8 +26,7 @@ class _SettingScreenState extends State<SettingScreen> {
   final NotificationSettingsService _notificationSettingsService =
       NotificationSettingsService();
   final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
-  final SubscriptionStatusService _subscriptionStatusService =
-      SubscriptionStatusService();
+  final BillingStatusRepo _billingStatusRepo = BillingStatusRepo();
 
   PackageInfo? _packageInfo;
 
@@ -337,11 +336,11 @@ class _SettingScreenState extends State<SettingScreen> {
     required String featureName,
     required Widget screen,
   }) async {
-    final status = await _subscriptionStatusService.fetchStatus();
+    final billing = await _billingStatusRepo.fetchBillingStatus();
 
     if (!mounted) return;
 
-    if (status.isEntitled) {
+    if (billing.canUsePaidFeatures) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => screen,
@@ -372,13 +371,14 @@ class _SettingScreenState extends State<SettingScreen> {
       },
     );
 
-    if (result == true && mounted) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const SubscriptionPlanScreen(),
-        ),
-      );
-    }
+    if (result != true) return;
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SubscriptionPlanScreen(),
+      ),
+    );
   }
 
   void _openInfoPage({

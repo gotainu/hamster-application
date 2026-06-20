@@ -13,7 +13,6 @@ class PaidFeatureGate extends StatelessWidget {
     this.lockedTitle,
     this.lockedMessage,
     this.icon = Icons.workspace_premium_rounded,
-    this.actionLabel = '利用プランを確認する',
     this.showBackground = true,
   });
 
@@ -22,16 +21,6 @@ class PaidFeatureGate extends StatelessWidget {
   final String? lockedTitle;
   final String? lockedMessage;
   final IconData icon;
-  final String actionLabel;
-
-  /// true:
-  ///   ロック画面側で背景グラデーションを描く。
-  ///
-  /// false:
-  ///   親画面の背景をそのまま使う。
-  ///
-  /// 画面全体をガードする場合は true、
-  /// カードや一部Widgetだけをガードする場合は false が使いやすいです。
   final bool showBackground;
 
   @override
@@ -41,6 +30,8 @@ class PaidFeatureGate extends StatelessWidget {
     return StreamBuilder<BillingStatus>(
       stream: repo.watchBillingStatus(),
       builder: (context, snapshot) {
+        final billing = snapshot.data ?? BillingStatus.empty();
+
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
           return const Center(
@@ -48,17 +39,15 @@ class PaidFeatureGate extends StatelessWidget {
           );
         }
 
-        final billing = snapshot.data ?? BillingStatus.empty();
-
         if (billing.canUsePaidFeatures) {
           return child;
         }
 
         return _PaidFeatureLockedView(
-          icon: icon,
+          featureName: featureName,
           title: lockedTitle ?? '$featureNameは有料プランの機能です',
           message: lockedMessage ?? 'ハムスターの環境管理を継続的に支援するため、この機能は有料プランで利用できます。',
-          actionLabel: actionLabel,
+          icon: icon,
           showBackground: showBackground,
         );
       },
@@ -68,17 +57,17 @@ class PaidFeatureGate extends StatelessWidget {
 
 class _PaidFeatureLockedView extends StatelessWidget {
   const _PaidFeatureLockedView({
-    required this.icon,
+    required this.featureName,
     required this.title,
     required this.message,
-    required this.actionLabel,
+    required this.icon,
     required this.showBackground,
   });
 
-  final IconData icon;
+  final String featureName;
   final String title;
   final String message;
-  final String actionLabel;
+  final IconData icon;
   final bool showBackground;
 
   void _openPlanPage(BuildContext context) {
@@ -91,14 +80,13 @@ class _PaidFeatureLockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = AppTheme.isDark(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final content = Center(
+    final lockedCard = Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(maxWidth: 520),
           padding: const EdgeInsets.all(24),
           decoration: AppTheme.cardGradient(isDark),
           child: Column(
@@ -132,7 +120,7 @@ class _PaidFeatureLockedView extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: () => _openPlanPage(context),
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: Text(actionLabel),
+                  label: const Text('利用プランを確認する'),
                 ),
               ),
             ],
@@ -142,7 +130,7 @@ class _PaidFeatureLockedView extends StatelessWidget {
     );
 
     if (!showBackground) {
-      return content;
+      return lockedCard;
     }
 
     return Container(
@@ -152,7 +140,7 @@ class _PaidFeatureLockedView extends StatelessWidget {
         gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
       ),
       child: SafeArea(
-        child: content,
+        child: lockedCard,
       ),
     );
   }
