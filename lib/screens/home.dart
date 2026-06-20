@@ -382,8 +382,20 @@ class HomeScreenState extends State<HomeScreen> {
 
                                 widget.onTabSelected(1);
                               },
-                              onOpenGraph: () => widget.onTabSelected(2),
-                              onOpenGraphDirect: () {
+                              onOpenGraph: () async {
+                                final allowed = await _ensurePaidFeature(
+                                    featureName: '走った記録');
+                                if (!allowed) return;
+
+                                widget.onTabSelected(2);
+                              },
+                              onOpenGraphDirect: () async {
+                                final allowed = await _ensurePaidFeature(
+                                    featureName: '走った記録');
+                                if (!allowed) return;
+
+                                if (!context.mounted) return;
+
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => const FuncBScreen(),
