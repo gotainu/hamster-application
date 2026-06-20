@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../models/subscription_status.dart';
+
+import '../models/billing_status.dart';
 import '../screens/subscription_plan_screen.dart';
-import '../services/subscription_status_service.dart';
+import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
 
 class PaidFeatureGate extends StatelessWidget {
@@ -11,36 +12,54 @@ class PaidFeatureGate extends StatelessWidget {
     this.featureName = 'この機能',
     this.lockedTitle,
     this.lockedMessage,
+    this.icon = Icons.workspace_premium_rounded,
+    this.actionLabel = '利用プランを確認する',
+    this.showBackground = true,
   });
 
   final Widget child;
   final String featureName;
   final String? lockedTitle;
   final String? lockedMessage;
+  final IconData icon;
+  final String actionLabel;
+
+  /// true:
+  ///   ロック画面側で背景グラデーションを描く。
+  ///
+  /// false:
+  ///   親画面の背景をそのまま使う。
+  ///
+  /// 画面全体をガードする場合は true、
+  /// カードや一部Widgetだけをガードする場合は false が使いやすいです。
+  final bool showBackground;
 
   @override
   Widget build(BuildContext context) {
-    final service = SubscriptionStatusService();
+    final repo = BillingStatusRepo();
 
-    return StreamBuilder<SubscriptionStatus>(
-      stream: service.watchStatus(),
+    return StreamBuilder<BillingStatus>(
+      stream: repo.watchBillingStatus(),
       builder: (context, snapshot) {
-        final status = snapshot.data ?? SubscriptionStatus.inactive;
-
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(),
           );
         }
 
-        if (status.isEntitled) {
+        final billing = snapshot.data ?? BillingStatus.empty();
+
+        if (billing.canUsePaidFeatures) {
           return child;
         }
 
         return _PaidFeatureLockedView(
-          featureName: featureName,
+          icon: icon,
           title: lockedTitle ?? '$featureNameは有料プランの機能です',
           message: lockedMessage ?? 'ハムスターの環境管理を継続的に支援するため、この機能は有料プランで利用できます。',
+          actionLabel: actionLabel,
+          showBackground: showBackground,
         );
       },
     );
@@ -49,14 +68,18 @@ class PaidFeatureGate extends StatelessWidget {
 
 class _PaidFeatureLockedView extends StatelessWidget {
   const _PaidFeatureLockedView({
-    required this.featureName,
+    required this.icon,
     required this.title,
     required this.message,
+    required this.actionLabel,
+    required this.showBackground,
   });
 
-  final String featureName;
+  final IconData icon;
   final String title;
   final String message;
+  final String actionLabel;
+  final bool showBackground;
 
   void _openPlanPage(BuildContext context) {
     Navigator.of(context).push(
@@ -68,7 +91,59 @@ class _PaidFeatureLockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = AppTheme.isDark(context);
+
+    final content = Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(maxWidth: 520),
+          padding: const EdgeInsets.all(24),
+          decoration: AppTheme.cardGradient(isDark),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                icon,
+                color: AppTheme.accent,
+                size: 48,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      height: 1.35,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.secondaryText(context),
+                      height: 1.6,
+                    ),
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _openPlanPage(context),
+                  icon: const Icon(Icons.arrow_forward_rounded),
+                  label: Text(actionLabel),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!showBackground) {
+      return content;
+    }
 
     return Container(
       width: double.infinity,
@@ -77,52 +152,7 @@ class _PaidFeatureLockedView extends StatelessWidget {
         gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
       ),
       child: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24),
-              decoration: AppTheme.cardGradient(isDark),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(
-                    Icons.workspace_premium_rounded,
-                    color: AppTheme.accent,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                          height: 1.35,
-                        ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.secondaryText(context),
-                          height: 1.6,
-                        ),
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => _openPlanPage(context),
-                      icon: const Icon(Icons.arrow_forward_rounded),
-                      label: const Text('利用プランを確認する'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        child: content,
       ),
     );
   }

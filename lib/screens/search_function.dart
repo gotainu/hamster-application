@@ -7,8 +7,7 @@ import 'dart:async';
 import '../theme/app_theme.dart';
 import '../widgets/shine_border.dart';
 import '../services/ai_chat_history_repo.dart';
-import '../services/billing_status_repo.dart';
-import '../screens/subscription_plan_screen.dart';
+import '../widgets/paid_feature_gate.dart';
 
 class RetrievedChunk {
   final String id;
@@ -97,7 +96,6 @@ class FuncSearchScreen extends StatefulWidget {
 
 class FuncSearchScreenState extends State<FuncSearchScreen> {
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
-  final BillingStatusRepo _billingStatusRepo = BillingStatusRepo();
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -105,8 +103,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   final List<ChatMessage> _messages = [];
 
   bool _isLoading = false;
-  bool _canUseAiChat = false;
-  bool _isCheckingBilling = true;
 
   // ユーザーのメインペット画像URL（users/{uid}/pet_profiles/main_pet.imageUrl）
   String? _userImageUrl;
@@ -128,7 +124,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     super.initState();
     _restoreChatHistory();
     _listenUserAvatar(); // ← ここで購読開始
-    _checkBillingStatus();
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
         setState(() {
@@ -163,45 +158,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
 
     _scrollToBottom();
-  }
-
-  Future<void> _checkBillingStatus() async {
-    setState(() {
-      _isCheckingBilling = true;
-    });
-
-    try {
-      final billing = await _billingStatusRepo.fetchBillingStatus();
-
-      if (!mounted) return;
-
-      setState(() {
-        _canUseAiChat = billing.canUsePaidFeatures;
-      });
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _canUseAiChat = false;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isCheckingBilling = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _openSubscriptionPlan() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SubscriptionPlanScreen(),
-      ),
-    );
-
-    if (!mounted) return;
-    await _checkBillingStatus();
   }
 
   Future<void> _restoreChatHistory() async {
@@ -444,11 +400,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   void _handleSend() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
-
-    if (!_canUseAiChat) {
-      await _openSubscriptionPlan();
-      return;
-    }
 
     setState(() {
       _hasRestoredHistory = false;
@@ -726,163 +677,166 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         ),
         child: SafeArea(
           top: true,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // AnimatedSwitcherをAnimatedContainerで高さ調整して置き換える
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 400),
-                child: _showDescriptionCard
-                    ? AnimatedOpacity(
-                        key: const ValueKey('descCard'),
-                        opacity: _cardOpacity,
-                        duration: const Duration(milliseconds: 400),
-                        onEnd: () {
-                          if (_cardOpacity == 0.0 && mounted) {
-                            setState(() {
-                              _showDescriptionCard = false;
-                            });
-                          }
-                        },
-                        child: AnimatedSlide(
-                          offset: _cardOffset,
+          child: PaidFeatureGate(
+            featureName: 'AI相談',
+            lockedTitle: 'AI相談は有料プランの機能です',
+            lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
+            icon: Icons.smart_toy_rounded,
+            showBackground: false,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // AnimatedSwitcherをAnimatedContainerで高さ調整して置き換える
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  child: _showDescriptionCard
+                      ? AnimatedOpacity(
+                          key: const ValueKey('descCard'),
+                          opacity: _cardOpacity,
                           duration: const Duration(milliseconds: 400),
-                          child: Container(
-                            margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppTheme.cardInnerDark
-                                  : AppTheme.cardInnerLight,
-                              borderRadius: BorderRadius.circular(32),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.accent.withOpacity(0.23),
-                                  blurRadius: 24,
-                                  offset: const Offset(0, 12),
-                                ),
-                              ],
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 18, vertical: 24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Row(
-                                    children: [
-                                      Icon(Icons.chat_bubble_outline,
-                                          color: Colors.blue, size: 28),
-                                      SizedBox(width: 10),
-                                      Text(
-                                        "AI質問チャット",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 22,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Container(
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? AppTheme.cardInnerDark
-                                              .withOpacity(0.88)
-                                          : AppTheme.cardInnerLight
-                                              .withOpacity(0.92),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Text(
-                                      'YouTubeチャンネルで紹介した内容を学習したAIにチャットで相談することができます。\nまた、AIが返答の際に引用した内容も「チャンクを確認」ボタンから確認できます。',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: isDark
-                                                ? AppTheme.cardTextColor
-                                                : AppTheme.lightText
-                                                    .withOpacity(0.88),
-                                            height: 1.6,
-                                          ),
-                                    ),
+                          onEnd: () {
+                            if (_cardOpacity == 0.0 && mounted) {
+                              setState(() {
+                                _showDescriptionCard = false;
+                              });
+                            }
+                          },
+                          child: AnimatedSlide(
+                            offset: _cardOffset,
+                            duration: const Duration(milliseconds: 400),
+                            child: Container(
+                              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppTheme.cardInnerDark
+                                    : AppTheme.cardInnerLight,
+                                borderRadius: BorderRadius.circular(32),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppTheme.accent.withOpacity(0.23),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 12),
                                   ),
                                 ],
                               ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 18, vertical: 24),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Icon(Icons.chat_bubble_outline,
+                                            color: Colors.blue, size: 28),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          "AI質問チャット",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 22,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? AppTheme.cardInnerDark
+                                                .withOpacity(0.88)
+                                            : AppTheme.cardInnerLight
+                                                .withOpacity(0.92),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'YouTubeチャンネルで紹介した内容を学習したAIにチャットで相談することができます。\nまた、AIが返答の際に引用した内容も「チャンクを確認」ボタンから確認できます。',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                              color: isDark
+                                                  ? AppTheme.cardTextColor
+                                                  : AppTheme.lightText
+                                                      .withOpacity(0.88),
+                                              height: 1.6,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                if (!_isRestoringHistory &&
+                    _hasRestoredHistory &&
+                    _messages.isNotEmpty)
+                  _buildHistoryRestoredCard(context),
+                Expanded(
+                  child: _isRestoringHistory
+                      ? const Center(
+                          child: CircularProgressIndicator(),
+                        )
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            return KeyedSubtree(
+                              key: ValueKey(_messages[index].hashCode),
+                              child: _buildMessageBubble(_messages[index]),
+                            );
+                          },
+                        ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    8,
+                    8,
+                    8,
+                    mq.viewInsets.bottom + 8,
+                  ),
+                  child: AnimatedShiningBorder(
+                    borderRadius: 22,
+                    borderWidth: 2.5,
+                    active: _focusNode.hasFocus,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            focusNode: _focusNode,
+                            controller: _textController,
+                            enabled: !_isLoading,
+                            style: const TextStyle(fontSize: 17),
+                            decoration: InputDecoration(
+                              hintText: '質問してみましょう',
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 13),
+                              filled: true,
+                              fillColor:
+                                  Theme.of(context).scaffoldBackgroundColor,
                             ),
                           ),
                         ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              if (!_isRestoringHistory &&
-                  _hasRestoredHistory &&
-                  _messages.isNotEmpty)
-                _buildHistoryRestoredCard(context),
-              Expanded(
-                child: _isRestoringHistory
-                    ? const Center(
-                        child: CircularProgressIndicator(),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) {
-                          return KeyedSubtree(
-                            key: ValueKey(_messages[index].hashCode),
-                            child: _buildMessageBubble(_messages[index]),
-                          );
-                        },
-                      ),
-              ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  8,
-                  8,
-                  8,
-                  mq.viewInsets.bottom + 8,
-                ),
-                child: AnimatedShiningBorder(
-                  borderRadius: 22,
-                  borderWidth: 2.5,
-                  active: _focusNode.hasFocus,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          focusNode: _focusNode,
-                          controller: _textController,
-                          enabled: _canUseAiChat && !_isCheckingBilling,
-                          style: const TextStyle(fontSize: 17),
-                          decoration: InputDecoration(
-                            hintText: _isCheckingBilling
-                                ? '利用状態を確認中...'
-                                : _canUseAiChat
-                                    ? '質問してみましょう'
-                                    : 'AI相談は有料プランで利用できます',
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 13),
-                            filled: true,
-                            fillColor:
-                                Theme.of(context).scaffoldBackgroundColor,
+                        const SizedBox(width: 6),
+                        IconButton(
+                          icon: Icon(
+                            Icons.send,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
+                          onPressed: _isLoading ? null : _handleSend,
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      IconButton(
-                        icon: Icon(
-                          _canUseAiChat ? Icons.send : Icons.lock_rounded,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        onPressed: _isCheckingBilling ? null : _handleSend,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
