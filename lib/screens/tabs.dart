@@ -75,9 +75,17 @@ class TabsScreenState extends State<TabsScreen> {
         featureName: 'AI相談',
         lockedTitle: 'AI相談は有料プランの機能です',
         lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
+        showBackground: false,
         child: FuncSearchScreen(key: _searchKey),
       ),
-      const GraphFunctionScreen(),
+      const PaidFeatureGate(
+        featureName: '走った記録',
+        lockedTitle: '走った記録は有料プランの機能です',
+        lockedMessage: '走行距離の記録、温湿度グラフ、環境評価に使う記録機能は、有料プランで利用できます。',
+        icon: Icons.show_chart_rounded,
+        showBackground: false,
+        child: GraphFunctionScreen(),
+      ),
       const FuncMyPageScreen(),
     ];
   }

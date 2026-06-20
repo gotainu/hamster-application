@@ -28,14 +28,63 @@ class _SwitchbotGuideStep {
   final IconData fallbackIcon;
 }
 
-class SwitchbotSetupScreen extends StatefulWidget {
+class SwitchbotSetupScreen extends StatelessWidget {
   const SwitchbotSetupScreen({super.key});
 
   @override
-  State<SwitchbotSetupScreen> createState() => _SwitchbotSetupScreenState();
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+      ),
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(
+            'SwitchBot連携設定',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient:
+                isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
+          ),
+          child: const SafeArea(
+            top: false,
+            child: PaidFeatureGate(
+              featureName: 'SwitchBot連携',
+              lockedTitle: 'SwitchBot連携は有料プランの機能です',
+              lockedMessage:
+                  '温湿度の自動記録、環境評価、異常検知通知に使うSwitchBot連携は、有料プランで利用できます。',
+              icon: Icons.thermostat_rounded,
+              showBackground: false,
+              child: _SwitchbotSetupContent(),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
+class _SwitchbotSetupContent extends StatefulWidget {
+  const _SwitchbotSetupContent();
+
+  @override
+  State<_SwitchbotSetupContent> createState() => _SwitchbotSetupContentState();
+}
+
+class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
   static const List<_SwitchbotGuideStep> _guideSteps = [
     _SwitchbotGuideStep(
       stepLabel: 'STEP 1',
@@ -1382,91 +1431,55 @@ class _SwitchbotSetupScreenState extends State<SwitchbotSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return PaidFeatureGate(
-      featureName: 'SwitchBot連携',
-      lockedTitle: 'SwitchBot連携は有料プランの機能です',
-      lockedMessage: '温湿度の自動記録、環境評価、異常検知通知に使うSwitchBot連携は、有料プランで利用できます。',
-      child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 96, 20, 32),
+      children: [
+        _headerCard(),
+        _sectionTitle(
+          '現在の状態',
+          'SwitchBot連携の進み具合を確認できます',
         ),
-        child: Scaffold(
-          extendBodyBehindAppBar: true,
-          backgroundColor: Colors.transparent,
-          appBar: AppBar(
-            title: Text(
-              'SwitchBot連携設定',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-          ),
-          body: Container(
-            width: double.infinity,
-            height: double.infinity,
-            decoration: BoxDecoration(
-              gradient:
-                  isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
-            ),
-            child: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-                children: [
-                  _headerCard(),
-                  _sectionTitle(
-                    '現在の状態',
-                    'SwitchBot連携の進み具合を確認できます',
-                  ),
-                  _connectionStateCard(),
-                  _sectionTitle(
-                    '連携ガイド',
-                    'SwitchBotアプリの準備から温湿度計の選択まで確認できます',
-                  ),
-                  _guideEntryCard(),
-                  _sectionTitle(
-                    '認証情報',
-                    'TOKEN/SECRETはサーバ経由で安全に保存します',
-                  ),
-                  if (_loading) ...[
-                    _surfaceCard(
-                      child: const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    ),
-                  ] else if (!_hasSecrets) ...[
-                    _secretsForm(),
-                  ] else ...[
-                    _savedSecretsCard(),
-                  ],
-                  if (_hasSecrets) ...[
-                    _sectionTitle(
-                      '温湿度計の選択',
-                      '記録に使うSwitchBot温湿度計を選択します',
-                    ),
-                    _deviceCard(),
-                  ],
-                  _statusCard(),
-                  _dangerZone(),
-                  const SizedBox(height: 8),
-                  Text(
-                    '※ TOKEN/SECRET はCloud Functions経由で保存されます。安全のため、アプリでは全文を表示しません。',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.tertiaryText(context),
-                        ),
-                  ),
-                ],
+        _connectionStateCard(),
+        _sectionTitle(
+          '連携ガイド',
+          'SwitchBotアプリの準備から温湿度計の選択まで確認できます',
+        ),
+        _guideEntryCard(),
+        _sectionTitle(
+          '認証情報',
+          'TOKEN/SECRETはサーバ経由で安全に保存します',
+        ),
+        if (_loading) ...[
+          _surfaceCard(
+            child: const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(),
               ),
             ),
           ),
+        ] else if (!_hasSecrets) ...[
+          _secretsForm(),
+        ] else ...[
+          _savedSecretsCard(),
+        ],
+        if (_hasSecrets) ...[
+          _sectionTitle(
+            '温湿度計の選択',
+            '記録に使うSwitchBot温湿度計を選択します',
+          ),
+          _deviceCard(),
+        ],
+        _statusCard(),
+        _dangerZone(),
+        const SizedBox(height: 8),
+        Text(
+          '※ TOKEN/SECRET はCloud Functions経由で保存されます。安全のため、アプリでは全文を表示しません。',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppTheme.tertiaryText(context),
+              ),
         ),
-      ),
+      ],
     );
   }
 }
