@@ -17,6 +17,7 @@ const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
 const STRIPE_PRICE_ID_MONTHLY = defineSecret('STRIPE_PRICE_ID_MONTHLY');
 const STRIPE_SUCCESS_URL = defineSecret('STRIPE_SUCCESS_URL');
 const STRIPE_CANCEL_URL = defineSecret('STRIPE_CANCEL_URL');
+const STRIPE_PORTAL_RETURN_URL = defineSecret('STRIPE_PORTAL_RETURN_URL');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
 
@@ -119,6 +120,92 @@ export const createStripeCheckoutSession = onCall(
       ok: true,
       checkoutUrl: session.url,
       sessionId: session.id,
+    };
+  },
+);
+
+export const createStripeCustomerPortalSession = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_PORTAL_RETURN_URL,
+    ],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const returnUrl = process.env.STRIPE_PORTAL_RETURN_URL;
+
+    if (!stripeSecretKey) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SECRET_KEY が設定されていません。',
+      );
+    }
+
+    if (!returnUrl) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_PORTAL_RETURN_URL が設定されていません。',
+      );
+    }
+
+    const billingRef = db
+      .collection('users')
+      .doc(uid)
+      .collection('billing')
+      .doc('subscription');
+
+    const billingSnap = await billingRef.get();
+
+    if (!billingSnap.exists) {
+      throw new HttpsError(
+        'failed-precondition',
+        '契約情報が見つかりません。',
+      );
+    }
+
+    const stripeCustomerId = billingSnap.get('stripeCustomerId') as
+      | string
+      | undefined;
+
+    if (!stripeCustomerId) {
+      throw new HttpsError(
+        'failed-precondition',
+        'Stripe顧客IDが見つかりません。',
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+    });
+
+    const session = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      return_url: returnUrl,
+    });
+
+    if (!session.url) {
+      throw new HttpsError(
+        'internal',
+        'Stripe Customer Portal URL を作成できませんでした。',
+      );
+    }
+
+    logger.info('createStripeCustomerPortalSession completed', {
+      uid,
+      stripeCustomerId,
+    });
+
+    return {
+      ok: true,
+      portalUrl: session.url,
     };
   },
 );
