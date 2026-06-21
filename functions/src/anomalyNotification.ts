@@ -746,6 +746,35 @@ async function saveNotificationLog(params: {
   );
 }
 
+async function fetchPaidFeatureEntitlement(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+): Promise<{
+  isEntitled: boolean;
+  plan: string | null;
+  status: string | null;
+}> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .get();
+
+  const data = snap.data() ?? {};
+  const plan = typeof data.plan === 'string' ? data.plan : null;
+  const status = typeof data.status === 'string' ? data.status : null;
+
+  const isEntitled =
+    plan === 'paid' && (status === 'active' || status === 'trialing');
+
+  return {
+    isEntitled,
+    plan,
+    status,
+  };
+}
+
 async function fetchAnomalyNotificationsEnabled(
   db: FirebaseFirestore.Firestore,
   uid: string,
@@ -834,13 +863,50 @@ export async function executeAnomalyNotificationPipeline(params: {
   windowDays?: number;
   now?: Date;
 }): Promise<AnomalyNotificationExecutionResult> {
-  const {
+    const {
     db,
     messaging,
     uid,
     windowDays = HISTORY_WINDOW_DAYS,
     now = new Date(),
   } = params;
+
+  const paidEntitlement = await fetchPaidFeatureEntitlement(db, uid);
+
+  if (!paidEntitlement.isEntitled) {
+    const detectionResult: AnomalyDetectionResult = {
+      anomalies: [],
+      windowDays,
+      detectedAt: now,
+    };
+
+    const decision: NotificationDecision = {
+      shouldNotify: false,
+      reason: 'inactive',
+      anomaly: null,
+      notificationKey: null,
+      fingerprint: null,
+      message: '有料プランではないため、異常検知通知を送信しません。',
+    };
+
+    logger.info('anomaly notification skipped: not paid', {
+      uid,
+      plan: paidEntitlement.plan,
+      status: paidEntitlement.status,
+    });
+
+    return {
+      uid,
+      detectionResult,
+      decision,
+      message: null,
+      notificationKey: null,
+      tokenCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      noTokens: false,
+    };
+  }
 
   const history = await fetchRecentHistory(db, uid, windowDays);
   const detectionResult = detectAnomalies(history, windowDays, now);

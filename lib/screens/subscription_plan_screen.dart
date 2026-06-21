@@ -22,6 +22,7 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
   final BillingStatusRepo _repo = BillingStatusRepo();
 
   bool _isOpeningCheckout = false;
+  bool _isOpeningPortal = false;
 
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(
         app: Firebase.app(),
@@ -81,6 +82,61 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     }
   }
 
+  Future<void> _openCustomerPortal() async {
+    if (_isOpeningPortal) return;
+
+    setState(() {
+      _isOpeningPortal = true;
+    });
+
+    try {
+      final callable =
+          _functions.httpsCallable('createStripeCustomerPortalSession');
+
+      final result = await callable.call();
+
+      final data = result.data;
+      final portalUrl = data is Map ? data['portalUrl']?.toString() : null;
+
+      if (portalUrl == null || portalUrl.isEmpty) {
+        throw Exception('Customer Portal URL を取得できませんでした。');
+      }
+
+      final uri = Uri.parse(portalUrl);
+
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        throw Exception('Stripe Customer Portal を開けませんでした。');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('利用プラン管理画面の作成に失敗しました: ${e.message ?? e.code}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('利用プラン管理画面を開けませんでした: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isOpeningPortal = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = _repo;
@@ -122,7 +178,9 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
                     _BillingStatusHeroCard(
                       billing: billing,
                       isOpeningCheckout: _isOpeningCheckout,
+                      isOpeningPortal: _isOpeningPortal,
                       onStartCheckout: _startCheckout,
+                      onOpenCustomerPortal: _openCustomerPortal,
                     ),
                     const SizedBox(height: 16),
                     const _PaidPlanFeatureCard(
@@ -171,12 +229,16 @@ class _BillingStatusHeroCard extends StatelessWidget {
   const _BillingStatusHeroCard({
     required this.billing,
     required this.isOpeningCheckout,
+    required this.isOpeningPortal,
     required this.onStartCheckout,
+    required this.onOpenCustomerPortal,
   });
 
   final BillingStatus billing;
   final bool isOpeningCheckout;
+  final bool isOpeningPortal;
   final VoidCallback onStartCheckout;
+  final VoidCallback onOpenCustomerPortal;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +299,33 @@ class _BillingStatusHeroCard extends StatelessWidget {
                   ),
             ),
           ),
-          if (!isPaid) ...[
+          if (isPaid) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: isOpeningPortal ? null : onOpenCustomerPortal,
+                icon: isOpeningPortal
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.manage_accounts_rounded),
+                label: Text(
+                  isOpeningPortal ? '管理画面を準備中...' : 'プランを管理する',
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '解約、支払い方法の変更、請求履歴の確認はStripeの安全な管理画面で行えます。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                    height: 1.45,
+                  ),
+            ),
+          ] else ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
