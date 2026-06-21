@@ -186,6 +186,37 @@ export const createStripeCustomerPortalSession = onCall(
       apiVersion: '2025-02-24.acacia',
     });
 
+    const stripeSubscriptionId = billingSnap.get('stripeSubscriptionId') as
+      | string
+      | undefined;
+
+    if (stripeSubscriptionId) {
+      try {
+        const subscription = await stripe.subscriptions.retrieve(
+          stripeSubscriptionId,
+        );
+
+        await saveStripeSubscriptionToFirestore({
+          uid,
+          subscription,
+        });
+
+        logger.info('Stripe subscription refreshed before portal session', {
+          uid,
+          stripeSubscriptionId,
+          status: subscription.status,
+          cancelAtPeriodEnd: (subscription as any).cancel_at_period_end ?? null,
+          cancelAt: (subscription as any).cancel_at ?? null,
+        });
+      } catch (e: any) {
+        logger.warn('Failed to refresh Stripe subscription before portal session', {
+          uid,
+          stripeSubscriptionId,
+          error: String(e?.message ?? e),
+        });
+      }
+    }
+
     const session = await stripe.billingPortal.sessions.create({
       customer: stripeCustomerId,
       return_url: returnUrl,
@@ -345,7 +376,13 @@ async function saveStripeSubscriptionToFirestore(params: {
     (subscription as any).current_period_end ??
       (subscription.items?.data?.[0] as any)?.current_period_end,
   );
+  const cancelAtPeriodEnd = Boolean(
+    (subscription as any).cancel_at_period_end,
+  );
 
+  const cancelAt = toFirestoreTimestampFromUnixSeconds(
+    (subscription as any).cancel_at,
+  );
   const priceId = subscription.items.data[0]?.price?.id ?? null;
   const productId =
     typeof subscription.items.data[0]?.price?.product === 'string'
@@ -367,6 +404,8 @@ async function saveStripeSubscriptionToFirestore(params: {
     stripePriceId: priceId,
     stripeProductId: productId,
     currentPeriodEnd,
+    cancelAtPeriodEnd,
+    cancelAt,
     checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
     latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -423,6 +462,8 @@ async function markStripeSubscriptionCanceled(
         status: 'canceled',
         stripeSubscriptionId: subscription.id,
         currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        cancelAt: admin.firestore.FieldValue.delete(),
         canceledAt: admin.firestore.FieldValue.serverTimestamp(),
         latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),

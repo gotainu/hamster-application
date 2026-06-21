@@ -250,6 +250,10 @@ class _BillingStatusHeroCard extends StatelessWidget {
         ? null
         : DateFormat('yyyy年M月d日').format(billing.currentPeriodEnd!);
 
+    final cancellationEndText = billing.effectiveCancelAt == null
+        ? null
+        : DateFormat('yyyy年M月d日').format(billing.effectiveCancelAt!);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -291,7 +295,10 @@ class _BillingStatusHeroCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(18),
             ),
             child: Text(
-              _statusText(periodEndText),
+              _statusText(
+                periodEndText: periodEndText,
+                cancellationEndText: cancellationEndText,
+              ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: visual.accentColor,
                     fontWeight: FontWeight.w800,
@@ -357,8 +364,20 @@ class _BillingStatusHeroCard extends StatelessWidget {
     );
   }
 
-  String _statusText(String? periodEndText) {
+  String _statusText({
+    required String? periodEndText,
+    required String? cancellationEndText,
+  }) {
     final base = '現在の状態: ${billing.planLabel} / ${billing.statusLabel}';
+
+    if (billing.isCancellationScheduled) {
+      final endText = cancellationEndText ?? periodEndText;
+      if (endText == null) {
+        return '$base\n解約予約済みです';
+      }
+
+      return '$base\n解約予定日: $endText\nこの日までは有料機能を利用できます';
+    }
 
     if (periodEndText == null) {
       return base;
@@ -390,6 +409,16 @@ class _BillingStatusHeroCard extends StatelessWidget {
     switch (billing.status) {
       case BillingStatusValue.active:
       case BillingStatusValue.trialing:
+        if (billing.isCancellationScheduled) {
+          return const _BillingStatusVisual(
+            icon: Icons.event_busy_rounded,
+            accentColor: Color(0xFFFFB020),
+            title: '解約予約済みです',
+            description: '現在の請求期間が終了するまでは、有料機能を利用できます。',
+            checkoutNote: 'Stripeの安全な管理画面で、解約予約の取り消しや支払い方法の変更ができます。',
+          );
+        }
+
         return const _BillingStatusVisual(
           icon: Icons.verified_rounded,
           accentColor: Color(0xFF00D6A3),

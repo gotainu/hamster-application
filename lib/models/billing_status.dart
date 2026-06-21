@@ -24,6 +24,8 @@ class BillingStatus {
     required this.status,
     required this.provider,
     required this.currentPeriodEnd,
+    required this.cancelAtPeriodEnd,
+    required this.cancelAt,
     required this.updatedAt,
   });
 
@@ -32,6 +34,8 @@ class BillingStatus {
   final String? provider;
   final DateTime? currentPeriodEnd;
   final DateTime? updatedAt;
+  final bool cancelAtPeriodEnd;
+  final DateTime? cancelAt;
 
   bool get isPaid {
     return plan == BillingPlan.paid &&
@@ -41,6 +45,14 @@ class BillingStatus {
 
   bool get canUsePaidFeatures {
     return isPaid && !isExpired;
+  }
+
+  bool get isCancellationScheduled {
+    return canUsePaidFeatures && cancelAtPeriodEnd;
+  }
+
+  DateTime? get effectiveCancelAt {
+    return cancelAt ?? currentPeriodEnd;
   }
 
   bool get needsPaymentAttention {
@@ -94,6 +106,8 @@ class BillingStatus {
       status: BillingStatusValue.none,
       provider: null,
       currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      cancelAt: null,
       updatedAt: null,
     );
   }
@@ -108,6 +122,8 @@ class BillingStatus {
       status: _parseStatus(data['status']),
       provider: data['provider'] as String?,
       currentPeriodEnd: _parseDate(data['currentPeriodEnd']),
+      cancelAtPeriodEnd: data['cancelAtPeriodEnd'] == true,
+      cancelAt: _parseDate(data['cancelAt']),
       updatedAt: _parseDate(data['updatedAt']),
     );
   }
