@@ -9,6 +9,11 @@ import '../widgets/shine_border.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../widgets/paid_feature_gate.dart';
 
+const String _ragApiBaseUrl = String.fromEnvironment(
+  'RAG_API_BASE_URL',
+  defaultValue: 'http://10.0.2.2:8000',
+);
+
 class RetrievedChunk {
   final String id;
   final double score;
@@ -330,7 +335,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   }
 
   Future<ChatApiResult> _fetchAIResponseWithHistory(String userMessage) async {
-    final url = Uri.parse('http://10.0.2.2:8000/chat');
+    final url = Uri.parse('$_ragApiBaseUrl/chat');
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
