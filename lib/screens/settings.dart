@@ -15,7 +15,12 @@ import 'pet_profile_edit_screen.dart';
 import 'breeding_environment_edit_screen.dart';
 
 class SettingScreen extends StatefulWidget {
-  const SettingScreen({super.key});
+  final bool embeddedInTab;
+
+  const SettingScreen({
+    super.key,
+    this.embeddedInTab = false,
+  });
 
   @override
   State<SettingScreen> createState() => _SettingScreenState();
@@ -547,16 +552,18 @@ class _SettingScreenState extends State<SettingScreen> {
         statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
       ),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
+        extendBodyBehindAppBar: !widget.embeddedInTab,
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(
-            'アプリ設定',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+        appBar: widget.embeddedInTab
+            ? null
+            : AppBar(
+                title: Text(
+                  'アプリ設定',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+              ),
         body: Container(
           width: double.infinity,
           height: double.infinity,

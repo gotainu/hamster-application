@@ -10,7 +10,12 @@ import '../widgets/wheel_rotation_input_card.dart';
 import 'switchbot_setup.dart';
 
 class GraphFunctionScreen extends StatefulWidget {
-  const GraphFunctionScreen({super.key});
+  final bool embeddedInTab;
+
+  const GraphFunctionScreen({
+    super.key,
+    this.embeddedInTab = false,
+  });
 
   @override
   State<GraphFunctionScreen> createState() => _GraphFunctionScreenState();
@@ -49,7 +54,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         final hasDevice = cfg?.hasDevice ?? false;
 
         return Scaffold(
-          appBar: AppBar(title: const Text('走った記録')),
+          appBar:
+              widget.embeddedInTab ? null : AppBar(title: const Text('走った記録')),
           body: ListView(
             padding: const EdgeInsets.all(16),
             children: [

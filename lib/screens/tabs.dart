@@ -4,9 +4,9 @@ import 'package:hamster_project/screens/pet_profile_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
 import 'package:hamster_project/screens/search_function.dart';
 import 'package:hamster_project/screens/graph_function.dart';
-import 'package:hamster_project/screens/mypage_function.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
+import 'package:hamster_project/screens/record_screen.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
 class TabsScreen extends StatefulWidget {
@@ -79,14 +79,22 @@ class TabsScreenState extends State<TabsScreen> {
         child: FuncSearchScreen(key: _searchKey),
       ),
       const PaidFeatureGate(
-        featureName: '走った記録',
-        lockedTitle: '走った記録は有料プランの機能です',
-        lockedMessage: '走行距離の記録、温湿度グラフ、環境評価に使う記録機能は、有料プランで利用できます。',
-        icon: Icons.show_chart_rounded,
+        featureName: '記録',
+        lockedTitle: '記録は有料プランの機能です',
+        lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
+        icon: Icons.edit_note_rounded,
         showBackground: false,
-        child: GraphFunctionScreen(),
+        child: RecordScreen(),
       ),
-      const FuncMyPageScreen(),
+      const PaidFeatureGate(
+        featureName: '変化',
+        lockedTitle: '変化の確認は有料プランの機能です',
+        lockedMessage: '走行距離、温湿度、環境評価の推移を確認する機能は、有料プランで利用できます。',
+        icon: Icons.insights_rounded,
+        showBackground: false,
+        child: GraphFunctionScreen(embeddedInTab: true),
+      ),
+      const SettingScreen(embeddedInTab: true),
     ];
   }
 
@@ -114,10 +122,11 @@ class TabsScreenState extends State<TabsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final titles = [
-      'Home',
-      'AIに相談',
-      '走った記録',
-      'マイページ',
+      '今日',
+      '相談',
+      '記録',
+      '変化',
+      '設定',
     ];
 
     return Scaffold(
@@ -150,27 +159,32 @@ class TabsScreenState extends State<TabsScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: _onTabSelected,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(Icons.home_rounded),
+            label: '今日',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.smart_toy),
-            label: 'AIに相談',
+            icon: Icon(Icons.smart_toy_rounded),
+            label: '相談',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.cake_sharp),
-            label: '走った記録',
+            icon: Icon(Icons.edit_note_rounded),
+            label: '記録',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.account_circle_outlined),
-            label: 'マイページ',
+            icon: Icon(Icons.insights_rounded),
+            label: '変化',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.settings_rounded),
+            label: '設定',
           ),
         ],
         selectedItemColor: AppTheme.accent,
         unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.transparent, // グラデ背景を活かす
+        backgroundColor: Colors.transparent,
         elevation: 0,
       ),
     );
