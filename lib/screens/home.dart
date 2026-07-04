@@ -15,12 +15,9 @@ import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/services/environment_trend_service.dart';
 import 'package:hamster_project/services/paid_feature_guard_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
-import 'package:hamster_project/screens/func_b.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_sparkline.dart';
-import 'package:hamster_project/widgets/wheel_rotation_input_card.dart';
-import 'package:hamster_project/widgets/daily_condition_input_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
@@ -355,68 +352,21 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 14),
                             ],
-                            if (!isLoading) ...[
-                              WheelRotationInputCard(
-                                distanceRepo: _distanceRepo,
-                                title: '昨日の走った記録',
-                                subtitle: '昨晩〜今朝の回転数を入れると、活動量評価に反映されます。',
-                                compact: true,
-                              ),
-                              const SizedBox(height: 14),
-                              DailyConditionInputCard(
-                                onSaved: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('今日の様子を保存しました。'),
-                                    ),
-                                  );
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                            _QuickActionsCard(
+                            _HomeNextActionsCard(
                               onOpenAi: () async {
                                 final allowed = await _ensurePaidFeature(
                                     featureName: 'AI相談');
                                 if (!allowed) return;
 
-                                widget.onTabSelected(1);
+                                widget.onTabSelected(1); // 相談
                               },
-                              onOpenGraph: () async {
-                                final allowed = await _ensurePaidFeature(
-                                    featureName: '走った記録');
+                              onOpenRecord: () async {
+                                final allowed =
+                                    await _ensurePaidFeature(featureName: '記録');
                                 if (!allowed) return;
 
-                                widget.onTabSelected(2);
+                                widget.onTabSelected(2); // 記録
                               },
-                              onOpenGraphDirect: () async {
-                                final allowed = await _ensurePaidFeature(
-                                    featureName: '走った記録');
-                                if (!allowed) return;
-
-                                if (!context.mounted) return;
-
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const FuncBScreen(),
-                                  ),
-                                );
-                              },
-                              onOpenSwitchbot: () async {
-                                final allowed = await _ensurePaidFeature(
-                                    featureName: 'SwitchBot連携');
-                                if (!allowed) return;
-
-                                if (!context.mounted) return;
-
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const SwitchbotSetupScreen(),
-                                  ),
-                                );
-                              },
-                              onOpenMyPage: () => widget.onTabSelected(3),
                             ),
                             const SizedBox(height: 18),
                             Center(
@@ -1074,247 +1024,6 @@ class _TodayActionCard extends StatelessWidget {
   }
 }
 
-class _QuickActionsCard extends StatelessWidget {
-  final VoidCallback onOpenAi;
-  final VoidCallback onOpenGraph;
-  final VoidCallback onOpenGraphDirect;
-  final VoidCallback onOpenSwitchbot;
-  final VoidCallback onOpenMyPage;
-
-  const _QuickActionsCard({
-    required this.onOpenAi,
-    required this.onOpenGraph,
-    required this.onOpenGraphDirect,
-    required this.onOpenSwitchbot,
-    required this.onOpenMyPage,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.heroDecorationFill(
-              context,
-              AppTheme.accent,
-              darkOpacity: 0.16,
-              lightOpacity: 0.12,
-            ),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'クイックアクション',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'よく使う機能にすぐアクセスできます',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                ),
-          ),
-          const SizedBox(height: 18),
-          GridView.count(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.55,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _QuickActionTile(
-                icon: Icons.search,
-                title: 'AIに相談',
-                subtitle: '飼育の悩みを聞く',
-                onTap: onOpenAi,
-              ),
-              _QuickActionTile(
-                icon: Icons.show_chart_outlined,
-                title: '走った記録',
-                subtitle: '温湿度と運動を見る',
-                onTap: onOpenGraph,
-              ),
-              _QuickActionTile(
-                icon: Icons.open_in_new,
-                title: '別画面で開く',
-                subtitle: 'グラフ画面へ直接移動',
-                onTap: onOpenGraphDirect,
-              ),
-              _QuickActionTile(
-                icon: Icons.link,
-                title: 'SwitchBot設定',
-                subtitle: '連携や機器設定',
-                onTap: onOpenSwitchbot,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _WideActionTile(
-            icon: Icons.person_2_outlined,
-            title: 'マイページ',
-            subtitle: 'プロフィールや各種設定を見る',
-            onTap: onOpenMyPage,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tileColor = AppTheme.quickActionFill(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: tileColor,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: AppTheme.quickActionBorder(context),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, color: AppTheme.accent, size: 24),
-                const Spacer(),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                        height: 1.25,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WideActionTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _WideActionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final tileColor = AppTheme.quickActionFill(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          decoration: BoxDecoration(
-            color: tileColor,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: AppTheme.quickActionBorder(context),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, color: AppTheme.accent, size: 24),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.secondaryText(context),
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppTheme.tertiaryText(context),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _HomeAnomalyCard extends StatelessWidget {
   final AnomalyDetectionResult result;
   final VoidCallback? onTap;
@@ -1453,6 +1162,76 @@ class _HomeAnomalyCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeNextActionsCard extends StatelessWidget {
+  final VoidCallback onOpenAi;
+  final VoidCallback onOpenRecord;
+
+  const _HomeNextActionsCard({
+    required this.onOpenAi,
+    required this.onOpenRecord,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final surface = AppTheme.cardSurface(context);
+    final secondary = AppTheme.secondaryText(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+            color: AppTheme.softShadow(context),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '次にできること',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '気になることがあれば相談し、日々の様子は記録に残せます。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: secondary,
+                ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onOpenAi,
+                  icon: const Icon(Icons.smart_toy_outlined),
+                  label: const Text('相談する'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onOpenRecord,
+                  icon: const Icon(Icons.edit_note_rounded),
+                  label: const Text('記録する'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -26,7 +26,7 @@ class _RecordScreenState extends State<RecordScreen> {
       child: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
+          padding: const EdgeInsets.fromLTRB(18, 84, 18, 28),
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),

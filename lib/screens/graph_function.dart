@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'package:intl/intl.dart';
-
-import '../services/switchbot_repo.dart';
-import '../services/distance_records_repo.dart';
 import '../models/health_record.dart';
 import '../models/switchbot_reading.dart';
-import '../widgets/wheel_rotation_input_card.dart';
+import '../services/switchbot_repo.dart';
+import '../services/distance_records_repo.dart';
+import '../theme/app_theme.dart';
 import 'switchbot_setup.dart';
 
 class GraphFunctionScreen extends StatefulWidget {
@@ -36,12 +35,6 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     _todayKpiFuture = _buildTodayKpi();
   }
 
-  void _invalidateTodayKpiCache() {
-    setState(() {
-      _todayKpiFuture = _buildTodayKpi();
-    });
-  }
-
   // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
@@ -57,11 +50,18 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
           appBar:
               widget.embeddedInTab ? null : AppBar(title: const Text('走った記録')),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.fromLTRB(
+              16,
+              widget.embeddedInTab ? 84 : 16,
+              16,
+              28,
+            ),
             children: [
+              if (widget.embeddedInTab) ...[
+                _TrendsHeader(),
+                const SizedBox(height: 18),
+              ],
               _todayKPI(),
-              const SizedBox(height: 16),
-              _wheelBlock(),
               const SizedBox(height: 24),
               _distanceChart(),
               const SizedBox(height: 32),
@@ -258,21 +258,6 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   // ---------- Widgets ----------
-  Widget _wheelBlock() {
-    return WheelRotationInputCard(
-      distanceRepo: _distanceRepo,
-      title: '昨日の走った記録',
-      subtitle: '昨晩〜今朝の回転数を入れると、走行距離に換算して保存できます。',
-      onSaved: ({
-        required DateTime date,
-        required int rotations,
-        double? distanceMeters,
-      }) {
-        _invalidateTodayKpiCache();
-      },
-    );
-  }
-
   Widget _distanceChart() {
     return SizedBox(
       height: 280,
@@ -429,4 +414,31 @@ class _TodayKpi {
     required this.avg7Meters,
     required this.deltaPct,
   });
+}
+
+class _TrendsHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '最近の変化',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '走行距離や温湿度の推移を見て、いつもと違う変化に気づきやすくします。',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
 }
