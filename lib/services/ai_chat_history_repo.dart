@@ -50,6 +50,50 @@ class AiChatHistoryMessage {
   }
 }
 
+class AiChatThreadSummary {
+  final String id;
+  final String lastMessage;
+  final String lastRole;
+  final int messageCount;
+  final DateTime? archivedAt;
+  final DateTime? updatedAt;
+
+  const AiChatThreadSummary({
+    required this.id,
+    required this.lastMessage,
+    required this.lastRole,
+    required this.messageCount,
+    this.archivedAt,
+    this.updatedAt,
+  });
+
+  factory AiChatThreadSummary.fromArchiveDoc(
+    QueryDocumentSnapshot<Json> doc,
+  ) {
+    final data = doc.data();
+
+    DateTime? toDate(dynamic value) {
+      return value is Timestamp ? value.toDate().toLocal() : null;
+    }
+
+    return AiChatThreadSummary(
+      id: doc.id,
+      lastMessage: data['lastMessage'] as String? ?? '',
+      lastRole: data['lastRole'] as String? ?? '',
+      messageCount: data['messageCount'] as int? ?? 0,
+      archivedAt: toDate(data['archivedAt']),
+      updatedAt: toDate(data['updatedAt']),
+    );
+  }
+
+  String get title {
+    final text = lastMessage.trim();
+    if (text.isEmpty) return '過去の相談';
+
+    return text.length <= 22 ? text : '${text.substring(0, 22)}…';
+  }
+}
+
 class AiChatHistoryRepo {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -61,6 +105,46 @@ class AiChatHistoryRepo {
         _auth = auth ?? FirebaseAuth.instance;
 
   String? get _uid => _auth.currentUser?.uid;
+
+  Stream<List<AiChatThreadSummary>> watchArchivedThreadSummaries({
+    int limit = 30,
+  }) {
+    final uid = _uid;
+    if (uid == null) {
+      return Stream<List<AiChatThreadSummary>>.value(const []);
+    }
+
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('ai_chat_thread_archives')
+        .orderBy('archivedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) {
+      return snap.docs.map(AiChatThreadSummary.fromArchiveDoc).toList();
+    });
+  }
+
+  Future<List<AiChatHistoryMessage>> fetchArchivedMessages({
+    required String archiveId,
+    int limit = 100,
+  }) async {
+    final uid = _uid;
+    if (uid == null) return const [];
+
+    final qs = await _db
+        .collection('users')
+        .doc(uid)
+        .collection('ai_chat_thread_archives')
+        .doc(archiveId)
+        .collection('messages')
+        .orderBy('createdAt')
+        .limit(limit)
+        .get();
+
+    return qs.docs.map(AiChatHistoryMessage.fromDoc).toList();
+  }
 
   CollectionReference<Json>? _messagesCol() {
     final uid = _uid;

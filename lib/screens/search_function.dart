@@ -1,13 +1,15 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:convert';
-import 'dart:async';
-import '../theme/app_theme.dart';
-import '../widgets/shine_border.dart';
+
 import '../services/ai_chat_history_repo.dart';
+import '../theme/app_theme.dart';
 import '../widgets/paid_feature_gate.dart';
+import '../widgets/shine_border.dart';
 
 const String _ragApiBaseUrl = String.fromEnvironment(
   'RAG_API_BASE_URL',
@@ -73,7 +75,11 @@ class RetrievedChunk {
 class ChatApiResult {
   final String answer;
   final List<RetrievedChunk> chunks;
-  ChatApiResult({required this.answer, required this.chunks});
+
+  ChatApiResult({
+    required this.answer,
+    required this.chunks,
+  });
 }
 
 class ChatMessage {
@@ -100,6 +106,7 @@ class FuncSearchScreen extends StatefulWidget {
 }
 
 class FuncSearchScreenState extends State<FuncSearchScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
 
   final TextEditingController _textController = TextEditingController();
@@ -107,28 +114,32 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   final FocusNode _focusNode = FocusNode();
   final List<ChatMessage> _messages = [];
 
+  String? _activeArchiveId;
+
   bool _isLoading = false;
-
-  // ユーザーのメインペット画像URL（users/{uid}/pet_profiles/main_pet.imageUrl）
-  String? _userImageUrl;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _avatarSub;
-
-  // ドットアニメ用
-  int _dotCount = 1;
-  Timer? _dotTimer;
-
-  final List<Map<String, String>> _conversationHistory = [];
   bool _isRestoringHistory = true;
   bool _hasRestoredHistory = false;
   bool _showDescriptionCard = true;
+
+  String? _userImageUrl;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _avatarSub;
+
+  int _dotCount = 1;
+  Timer? _dotTimer;
+
   double _cardOpacity = 1.0;
   Offset _cardOffset = Offset.zero;
+
+  final List<Map<String, String>> _conversationHistory = [];
+
+  bool get _isViewingArchivedThread => _activeArchiveId != null;
 
   @override
   void initState() {
     super.initState();
     _restoreChatHistory();
-    _listenUserAvatar(); // ← ここで購読開始
+    _listenUserAvatar();
+
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
         setState(() {
@@ -144,6 +155,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     if (trimmed.isEmpty) return;
 
     setState(() {
+      _activeArchiveId = null;
       _textController.text = trimmed;
       _textController.selection = TextSelection.fromPosition(
         TextPosition(offset: _textController.text.length),
@@ -206,12 +218,17 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           ..clear()
           ..addAll(restoredHistory);
 
+        _activeArchiveId = null;
         _hasRestoredHistory = restoredMessages.isNotEmpty;
 
         if (_messages.isNotEmpty) {
           _showDescriptionCard = false;
           _cardOpacity = 0.0;
           _cardOffset = const Offset(0, -0.15);
+        } else {
+          _showDescriptionCard = true;
+          _cardOpacity = 1.0;
+          _cardOffset = Offset.zero;
         }
       });
 
@@ -265,6 +282,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
     setState(() {
       _isRestoringHistory = true;
+      _activeArchiveId = null;
     });
 
     try {
@@ -282,7 +300,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         _textController.clear();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('新しい相談を始めました。'),
         ),
@@ -290,7 +309,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
         SnackBar(
           content: Text('新しい相談の開始に失敗しました: $e'),
         ),
@@ -304,13 +324,113 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
   }
 
-  Widget _aiAvatar() => const CircleAvatar(
-        radius: 30,
-        backgroundImage: AssetImage('assets/images/roi.png'),
-        backgroundColor: Colors.transparent,
+  Future<void> _openArchivedThread(AiChatThreadSummary thread) async {
+    if (_isLoading || _isRestoringHistory) return;
+
+    Navigator.of(context).maybePop();
+
+    setState(() {
+      _isRestoringHistory = true;
+    });
+
+    try {
+      final savedMessages = await _chatHistoryRepo.fetchArchivedMessages(
+        archiveId: thread.id,
+        limit: 100,
       );
 
-  /// users/{uid}/pet_profiles/main_pet をリアルタイム購読して imageUrl を反映
+      if (!mounted) return;
+
+      final restoredMessages = <ChatMessage>[];
+      final restoredHistory = <Map<String, String>>[];
+
+      for (final m in savedMessages) {
+        final chunks = m.chunks.map((e) => RetrievedChunk.fromJson(e)).toList();
+
+        restoredMessages.add(
+          ChatMessage(
+            content: m.content,
+            isUser: m.isUser,
+            chunks: chunks,
+            originalQuery: m.originalQuery,
+          ),
+        );
+
+        restoredHistory.add({
+          'role': m.role,
+          'content': m.content,
+        });
+      }
+
+      setState(() {
+        _messages
+          ..clear()
+          ..addAll(restoredMessages);
+
+        _conversationHistory
+          ..clear()
+          ..addAll(restoredHistory);
+
+        _activeArchiveId = thread.id;
+        _hasRestoredHistory = false;
+        _showDescriptionCard = false;
+        _cardOpacity = 0.0;
+        _cardOffset = const Offset(0, -0.15);
+        _textController.clear();
+      });
+
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('過去の相談を読み込めませんでした: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRestoringHistory = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _returnToMainThread() async {
+    if (_isLoading || _isRestoringHistory) return;
+
+    setState(() {
+      _activeArchiveId = null;
+    });
+
+    await _restoreChatHistory();
+  }
+
+  Widget _aiAvatar() {
+    return const CircleAvatar(
+      radius: 22,
+      backgroundImage: AssetImage('assets/images/roi.png'),
+      backgroundColor: Colors.transparent,
+    );
+  }
+
+  Widget _userAvatar() {
+    return CircleAvatar(
+      radius: 22,
+      backgroundImage:
+          _userImageUrl != null ? NetworkImage(_userImageUrl!) : null,
+      backgroundColor: AppTheme.cardSurface(context),
+      child: _userImageUrl == null
+          ? Icon(
+              Icons.person_rounded,
+              size: 24,
+              color: AppTheme.secondaryText(context),
+            )
+          : null,
+    );
+  }
+
   void _listenUserAvatar() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
@@ -329,7 +449,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         });
       }
     }, onError: (_) {
-      // 失敗時はデフォルトアイコンに戻す
       if (mounted) setState(() => _userImageUrl = null);
     });
   }
@@ -357,8 +476,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     );
 
     final requestBody = json.encode({
-      "query": userMessage,
-      "history": historyToSend,
+      'query': userMessage,
+      'history': historyToSend,
     });
 
     final res = await http.post(
@@ -373,25 +492,37 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     if (res.statusCode == 200) {
       final decoded =
           json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
-      final answer = (decoded["answer"] ?? "") as String;
+      final answer = (decoded['answer'] ?? '') as String;
 
-      final rawChunks = (decoded["chunks"] as List<dynamic>? ?? []);
+      final rawChunks = decoded['chunks'] as List<dynamic>? ?? [];
       final chunks = rawChunks
           .map((e) => RetrievedChunk.fromJson(e as Map<String, dynamic>))
           .toList();
 
       return ChatApiResult(answer: answer, chunks: chunks);
-    } else if (res.statusCode == 401) {
-      throw Exception('認証に失敗しました。ログインし直してください。');
-    } else {
-      throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
     }
+
+    if (res.statusCode == 401) {
+      throw Exception('認証に失敗しました。ログインし直してください。');
+    }
+
+    if (res.statusCode == 429) {
+      throw Exception('AI相談の利用上限に達している可能性があります。少し時間をおいて再度お試しください。');
+    }
+
+    if (res.statusCode >= 500) {
+      throw Exception('AIサーバー側で一時的なエラーが発生しました。少し時間をおいて再度お試しください。');
+    }
+
+    throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
   }
 
   void _startDotTimer() {
     _dotTimer?.cancel();
     _dotCount = 1;
     _dotTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+      if (!mounted) return;
+
       setState(() {
         _dotCount = _dotCount % 3 + 1;
       });
@@ -400,22 +531,27 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
   void _stopDotTimer() {
     _dotTimer?.cancel();
+    _dotTimer = null;
   }
 
   void _handleSend() async {
+    if (_isViewingArchivedThread) return;
+
     final text = _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
     setState(() {
       _hasRestoredHistory = false;
       _messages.add(ChatMessage(content: text, isUser: true));
-      _conversationHistory.add({"role": "user", "content": text});
+      _conversationHistory.add({'role': 'user', 'content': text});
       _isLoading = true;
-      _messages.add(ChatMessage(
-        content: '',
-        isUser: false,
-        isLoading: true,
-      ));
+      _messages.add(
+        ChatMessage(
+          content: '',
+          isUser: false,
+          isLoading: true,
+        ),
+      );
     });
 
     unawaited(_chatHistoryRepo.addUserMessage(content: text));
@@ -426,16 +562,22 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     try {
       final result = await _fetchAIResponseWithHistory(text);
 
+      if (!mounted) return;
+
       setState(() {
         _messages.removeWhere((msg) => msg.isLoading);
-        _messages.add(ChatMessage(
-          content: result.answer,
-          isUser: false,
-          chunks: result.chunks,
-          originalQuery: text,
-        ));
-        _conversationHistory
-            .add({"role": "assistant", "content": result.answer});
+        _messages.add(
+          ChatMessage(
+            content: result.answer,
+            isUser: false,
+            chunks: result.chunks,
+            originalQuery: text,
+          ),
+        );
+        _conversationHistory.add({
+          'role': 'assistant',
+          'content': result.answer,
+        });
       });
 
       unawaited(
@@ -445,17 +587,28 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           chunks: result.chunks.map((e) => e.toJson()).toList(),
         ),
       );
+
       _scrollToBottom();
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         _messages.removeWhere((msg) => msg.isLoading);
-        _messages.add(ChatMessage(content: 'エラー: $e', isUser: false));
+        _messages.add(
+          ChatMessage(
+            content: 'エラー: $e',
+            isUser: false,
+          ),
+        );
       });
+
       _scrollToBottom();
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
       _stopDotTimer();
     }
   }
@@ -474,13 +627,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
   Future<void> _showChunksDialog(List<RetrievedChunk> chunks) async {
     if (chunks.isEmpty) return;
+
     showDialog(
       context: context,
       builder: (_) {
         return DefaultTabController(
           length: chunks.length,
           child: AlertDialog(
-            title: const Text('引用チャンク'),
+            title: const Text('参照された内容'),
             content: SizedBox(
               width: double.maxFinite,
               height: 420,
@@ -489,28 +643,43 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                   TabBar(
                     isScrollable: true,
                     tabs: List.generate(
-                        chunks.length, (i) => Tab(text: 'チャンク${i + 1}')),
+                      chunks.length,
+                      (i) => Tab(text: '資料${i + 1}'),
+                    ),
                   ),
                   Expanded(
                     child: TabBarView(
                       children: chunks.map((c) {
                         return SingleChildScrollView(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('score: ${c.score}'),
-                              Text('id: ${c.id}'),
-                              if (c.filename.isNotEmpty)
-                                Text('file: ${c.filename}'),
-                              if (c.lineStart != null && c.lineEnd != null)
-                                Text('lines: ${c.lineStart}-${c.lineEnd}'),
-                              if (c.semanticTitle.isNotEmpty)
-                                Text('title: ${c.semanticTitle}'),
-                              if (c.sectionName.isNotEmpty)
-                                Text('section: ${c.sectionName}'),
-                              const SizedBox(height: 8),
-                              Text(c.text),
-                            ],
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (c.semanticTitle.isNotEmpty)
+                                  Text(
+                                    c.semanticTitle,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                if (c.sectionName.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text('section: ${c.sectionName}'),
+                                ],
+                                if (c.filename.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text('file: ${c.filename}'),
+                                ],
+                                if (c.lineStart != null &&
+                                    c.lineEnd != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text('lines: ${c.lineStart}-${c.lineEnd}'),
+                                ],
+                                const SizedBox(height: 12),
+                                Text(c.text),
+                              ],
+                            ),
                           ),
                         );
                       }).toList(),
@@ -521,8 +690,9 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
             ),
             actions: [
               TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('閉じる')),
+                onPressed: () => Navigator.pop(context),
+                child: const Text('閉じる'),
+              ),
             ],
           ),
         );
@@ -534,11 +704,11 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: AppTheme.quickActionBorder(context),
         ),
@@ -581,91 +751,318 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage msg) {
-    final hasChunks = (msg.chunks?.isNotEmpty ?? false);
-    if (msg.isLoading) {
-      return Row(
+  Widget _buildDescriptionCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accent.withValues(alpha: 0.16),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _aiAvatar(),
-          // const CircleAvatar(
-          //     radius: 30, child: Icon(Icons.smart_toy, size: 45)),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[200],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(
-                List.filled(_dotCount, '・').join(''),
-                style: const TextStyle(
-                  fontSize: 22,
-                  color: Colors.black54,
-                  letterSpacing: 2,
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppTheme.quickActionFill(context),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: AppTheme.accent,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '気になることを相談できます',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
-              ),
+                const SizedBox(height: 6),
+                Text(
+                  '飼育環境・温湿度・記録を踏まえて、今確認したいことを一緒に整理します。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        height: 1.5,
+                      ),
+                ),
+              ],
             ),
           ),
         ],
-      );
-    }
-    return Column(
-      crossAxisAlignment:
-          msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment:
-              msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!msg.isUser) ...[
-              // const CircleAvatar(
-              //   radius: 30,
-              //   child: Icon(Icons.smart_toy, size: 45),
-              // ),
-              _aiAvatar(),
-              const SizedBox(width: 18),
-            ],
-            Flexible(
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: msg.isUser ? Colors.blueAccent : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(16),
+      ),
+    );
+  }
+
+  Widget _buildChatHeader(BuildContext context) {
+    final subtitle = _isViewingArchivedThread ? '過去の相談を表示中' : '気になることを相談できます';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI相談',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
-                child: Text(msg.content,
-                    style: TextStyle(
-                        fontSize: 18,
-                        color: msg.isUser ? Colors.white : Colors.black)),
-              ),
-            ),
-            if (msg.isUser) ...[
-              const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 30,
-                backgroundImage:
-                    _userImageUrl != null ? NetworkImage(_userImageUrl!) : null,
-                child: _userImageUrl == null
-                    ? const Icon(Icons.person, size: 30)
-                    : null,
-              ),
-            ],
-          ],
-        ),
-        if (!msg.isUser && hasChunks)
-          TextButton(
-            onPressed: () => _showChunksDialog(msg.chunks!),
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
-              child: const Text('引用に使われたYouTubeシナリオを確認'),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                      ),
+                ),
+              ],
             ),
           ),
+          if (_isViewingArchivedThread)
+            TextButton(
+              onPressed: _returnToMainThread,
+              child: const Text('現在の相談へ'),
+            ),
+          IconButton(
+            tooltip: '相談履歴',
+            onPressed: () {
+              _scaffoldKey.currentState?.openEndDrawer();
+            },
+            icon: const Icon(Icons.history_rounded),
+          ),
+          IconButton(
+            tooltip: '新しく相談',
+            onPressed: _confirmStartNewChat,
+            icon: const Icon(Icons.add_comment_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatHistoryDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.history_rounded, color: AppTheme.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '相談履歴',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline_rounded),
+              title: const Text('現在の相談'),
+              subtitle: const Text('今の相談に戻る'),
+              selected: !_isViewingArchivedThread,
+              onTap: () {
+                Navigator.of(context).maybePop();
+                _returnToMainThread();
+              },
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: StreamBuilder<List<AiChatThreadSummary>>(
+                stream:
+                    _chatHistoryRepo.watchArchivedThreadSummaries(limit: 30),
+                builder: (context, snap) {
+                  final threads = snap.data ?? const <AiChatThreadSummary>[];
+
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (threads.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          '保存された過去の相談はまだありません。',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.secondaryText(context),
+                                  ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: threads.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final thread = threads[index];
+                      final isSelected = thread.id == _activeArchiveId;
+
+                      return ListTile(
+                        selected: isSelected,
+                        leading: const Icon(Icons.forum_outlined),
+                        title: Text(
+                          thread.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Text(
+                          '${thread.messageCount}件のメッセージ',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => _openArchivedThread(thread),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingBubble(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _aiAvatar(),
+        const SizedBox(width: 10),
+        Flexible(
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.cardSurface(context),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text(
+              List.filled(_dotCount, '・').join(''),
+              style: TextStyle(
+                fontSize: 22,
+                color: AppTheme.secondaryText(context),
+                letterSpacing: 2,
+              ),
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildMessageBubble(ChatMessage msg) {
+    final hasChunks = msg.chunks?.isNotEmpty ?? false;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (msg.isLoading) {
+      return _buildLoadingBubble(context);
+    }
+
+    final bubbleColor = msg.isUser
+        ? AppTheme.accent
+        : isDark
+            ? AppTheme.cardInnerDark
+            : Colors.white;
+
+    final textColor = msg.isUser ? Colors.white : AppTheme.primaryText(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment:
+            msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment:
+                msg.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!msg.isUser) ...[
+                _aiAvatar(),
+                const SizedBox(width: 10),
+              ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: bubbleColor,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(18),
+                      topRight: const Radius.circular(18),
+                      bottomLeft: Radius.circular(msg.isUser ? 18 : 6),
+                      bottomRight: Radius.circular(msg.isUser ? 6 : 18),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.softShadow(context),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    msg.content,
+                    style: TextStyle(
+                      fontSize: 16,
+                      height: 1.55,
+                      color: textColor,
+                      fontWeight:
+                          msg.isUser ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              if (msg.isUser) ...[
+                const SizedBox(width: 10),
+                _userAvatar(),
+              ],
+            ],
+          ),
+          if (!msg.isUser && hasChunks)
+            Padding(
+              padding: const EdgeInsets.only(left: 54, top: 6),
+              child: ActionChip(
+                avatar: const Icon(Icons.article_outlined, size: 18),
+                label: const Text('参照された内容を見る'),
+                onPressed: () => _showChunksDialog(msg.chunks!),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -675,7 +1072,9 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     final mq = MediaQuery.of(context);
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: Colors.transparent,
+      endDrawer: _buildChatHistoryDrawer(context),
       body: Container(
         decoration: BoxDecoration(
           gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
@@ -691,7 +1090,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // AnimatedSwitcherをAnimatedContainerで高さ調整して置き換える
+                _buildChatHeader(context),
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 400),
                   child: _showDescriptionCard
@@ -709,77 +1108,15 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                           child: AnimatedSlide(
                             offset: _cardOffset,
                             duration: const Duration(milliseconds: 400),
-                            child: Container(
-                              margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                              decoration: BoxDecoration(
-                                color: isDark
-                                    ? AppTheme.cardInnerDark
-                                    : AppTheme.cardInnerLight,
-                                borderRadius: BorderRadius.circular(32),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.accent.withOpacity(0.23),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 12),
-                                  ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 24),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Row(
-                                      children: [
-                                        Icon(Icons.chat_bubble_outline,
-                                            color: Colors.blue, size: 28),
-                                        SizedBox(width: 10),
-                                        Text(
-                                          "AI質問チャット",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 22,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: isDark
-                                            ? AppTheme.cardInnerDark
-                                                .withOpacity(0.88)
-                                            : AppTheme.cardInnerLight
-                                                .withOpacity(0.92),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'YouTubeチャンネルで紹介した内容を学習したAIにチャットで相談することができます。\nまた、AIが返答の際に引用した内容も「チャンクを確認」ボタンから確認できます。',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              color: isDark
-                                                  ? AppTheme.cardTextColor
-                                                  : AppTheme.lightText
-                                                      .withOpacity(0.88),
-                                              height: 1.6,
-                                            ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+                            child: _buildDescriptionCard(context),
                           ),
                         )
                       : const SizedBox.shrink(),
                 ),
                 if (!_isRestoringHistory &&
                     _hasRestoredHistory &&
-                    _messages.isNotEmpty)
+                    _messages.isNotEmpty &&
+                    !_isViewingArchivedThread)
                   _buildHistoryRestoredCard(context),
                 Expanded(
                   child: _isRestoringHistory
@@ -788,7 +1125,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                         )
                       : ListView.builder(
                           controller: _scrollController,
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                           itemCount: _messages.length,
                           itemBuilder: (context, index) {
                             return KeyedSubtree(
@@ -800,43 +1137,67 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
+                    12,
                     8,
-                    8,
-                    8,
-                    mq.viewInsets.bottom + 8,
+                    12,
+                    mq.viewInsets.bottom + 10,
                   ),
                   child: AnimatedShiningBorder(
-                    borderRadius: 22,
-                    borderWidth: 2.5,
-                    active: _focusNode.hasFocus,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            focusNode: _focusNode,
-                            controller: _textController,
-                            enabled: !_isLoading,
-                            style: const TextStyle(fontSize: 17),
-                            decoration: InputDecoration(
-                              hintText: '質問してみましょう',
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 13),
-                              filled: true,
-                              fillColor:
-                                  Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: 24,
+                    borderWidth: 2.2,
+                    active: _focusNode.hasFocus && !_isViewingArchivedThread,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardSurface(context),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.softShadow(context),
+                            blurRadius: 16,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              focusNode: _focusNode,
+                              controller: _textController,
+                              enabled: !_isLoading && !_isViewingArchivedThread,
+                              minLines: 1,
+                              maxLines: 4,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: AppTheme.primaryText(context),
+                              ),
+                              decoration: InputDecoration(
+                                hintText: _isViewingArchivedThread
+                                    ? '過去の相談を表示中です'
+                                    : '気になることを相談する',
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 13,
+                                ),
+                                filled: true,
+                                fillColor: Colors.transparent,
+                                hintStyle: TextStyle(
+                                  color: AppTheme.weakText(context),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          icon: Icon(
-                            Icons.send,
-                            color: Theme.of(context).colorScheme.primary,
+                          const SizedBox(width: 4),
+                          IconButton.filled(
+                            icon: const Icon(Icons.send_rounded),
+                            onPressed: (_isLoading || _isViewingArchivedThread)
+                                ? null
+                                : _handleSend,
                           ),
-                          onPressed: _isLoading ? null : _handleSend,
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -854,7 +1215,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     _scrollController.dispose();
     _focusNode.dispose();
     _dotTimer?.cancel();
-    _avatarSub?.cancel(); // ← 購読解除
+    _avatarSub?.cancel();
     _avatarSub = null;
     super.dispose();
   }
