@@ -14,7 +14,8 @@ import 'package:hamster_project/services/paid_feature_guard_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/theme/app_theme.dart';
-import 'package:hamster_project/widgets/semantic_sparkline.dart';
+import 'package:hamster_project/widgets/semantic_trend_chart.dart';
+import 'package:hamster_project/widgets/status_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
@@ -389,52 +390,34 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
   String _levelJudgement(String? level) {
     switch (level) {
       case '良好':
-        return '今日は安定しています';
+        return '飼育環境は安定しています';
       case '危険':
-        return '今日はすぐ確認したい状態です';
+        return '飼育環境をすぐ確認してください';
       case '注意':
-        return '今日は少し注意です';
+        return '飼育環境は少し注意です';
       default:
-        return 'まだ判断できません';
+        return '飼育環境はまだ判断できません';
     }
   }
 
-  String _levelShortText(String? level) {
-    switch (level) {
-      case '良好':
-        return '良好';
-      case '注意':
-        return '注意';
-      case '危険':
-        return '危険';
-      default:
-        return '未評価';
-    }
-  }
+  String _environmentSummary(EnvironmentAssessment assessment) {
+    final parts = <String>[];
 
-  IconData _levelIcon(String? level) {
-    switch (level) {
-      case '良好':
-        return Icons.check_circle_rounded;
-      case '危険':
-        return Icons.warning_amber_rounded;
-      case '注意':
-        return Icons.info_rounded;
-      default:
-        return Icons.help_outline_rounded;
-    }
-  }
-
-  String _mainMessage(
-    EnvironmentAssessment assessment,
-    EnvironmentHeroViewData heroData,
-  ) {
-    final headline = assessment.headline?.trim();
-    if (headline != null && headline.isNotEmpty) {
-      return headline;
+    final temp = assessment.avgTemp;
+    if (temp != null) {
+      parts.add('平均${temp.toStringAsFixed(1)}℃');
     }
 
-    return '${heroData.metricLabel}は${heroData.metricSubText}です。';
+    final hum = assessment.avgHum;
+    if (hum != null) {
+      parts.add('平均${hum.round()}%');
+    }
+
+    if (parts.isEmpty) {
+      return '温湿度データを確認中です';
+    }
+
+    return parts.join(' / ');
   }
 
   String _primaryAction(EnvironmentAssessment assessment) {
@@ -455,17 +438,115 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
     }
   }
 
-  List<double> _buildSparkValues(EnvironmentAssessment a) {
-    final validHistory = history.where((e) => e.hasCoreData).toList();
-    if (validHistory.isEmpty) return const [];
-
-    final heroData = _environmentStatusService.buildHeroViewData(a);
-
-    if (heroData.metricKind == EnvironmentMetricKind.humidity) {
-      return validHistory.map((e) => e.avgHum).whereType<double>().toList();
+  List<SemanticTrendBand> _heroChartBands(
+    EnvironmentMetricKind metricKind,
+  ) {
+    if (metricKind == EnvironmentMetricKind.temperature) {
+      return [
+        SemanticTrendBand(
+          start: 18,
+          end: EnvironmentStatusService.tempMin,
+          label: '低め',
+          color: Colors.blue.withValues(alpha: 0.07),
+          labelColor: Colors.blue.shade200,
+        ),
+        SemanticTrendBand(
+          start: EnvironmentStatusService.tempMin,
+          end: EnvironmentStatusService.tempMax,
+          label: '適正',
+          color: Colors.green.withValues(alpha: 0.07),
+          labelColor: Colors.green.shade200,
+        ),
+        SemanticTrendBand(
+          start: EnvironmentStatusService.tempMax,
+          end: 28,
+          label: '高め',
+          color: Colors.orange.withValues(alpha: 0.08),
+          labelColor: Colors.orange.shade200,
+        ),
+      ];
     }
 
-    return validHistory.map((e) => e.avgTemp).whereType<double>().toList();
+    return [
+      SemanticTrendBand(
+        start: 30,
+        end: EnvironmentStatusService.humMin,
+        label: '低め',
+        color: Colors.blue.withValues(alpha: 0.07),
+        labelColor: Colors.blue.shade200,
+      ),
+      SemanticTrendBand(
+        start: EnvironmentStatusService.humMin,
+        end: EnvironmentStatusService.humMax,
+        label: '適正',
+        color: Colors.green.withValues(alpha: 0.07),
+        labelColor: Colors.green.shade200,
+      ),
+      SemanticTrendBand(
+        start: EnvironmentStatusService.humMax,
+        end: 75,
+        label: '高め',
+        color: Colors.orange.withValues(alpha: 0.08),
+        labelColor: Colors.orange.shade200,
+      ),
+    ];
+  }
+
+  DateTime? _parseHistoryDate(String? rawDate) {
+    final value = rawDate?.trim();
+    if (value == null || value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toLocal();
+  }
+
+  Color _heroTrendColor(
+    EnvironmentMetricKind metricKind,
+    double latestValue,
+  ) {
+    if (metricKind == EnvironmentMetricKind.temperature) {
+      if (latestValue < EnvironmentStatusService.tempMin) {
+        return Colors.blue.shade400;
+      }
+      if (latestValue > EnvironmentStatusService.tempMax) {
+        return Colors.orange.shade400;
+      }
+      return AppTheme.envGood;
+    }
+
+    if (latestValue < EnvironmentStatusService.humMin) {
+      return Colors.blue.shade400;
+    }
+    if (latestValue > EnvironmentStatusService.humMax) {
+      return Colors.orange.shade400;
+    }
+    return AppTheme.envGood;
+  }
+
+  List<SemanticTrendPoint> _buildTrendPoints(
+    EnvironmentAssessment assessment,
+  ) {
+    final heroData = _environmentStatusService.buildHeroViewData(assessment);
+    final points = <SemanticTrendPoint>[];
+
+    for (final item in history.where((e) => e.hasCoreData)) {
+      final date = _parseHistoryDate(item.date);
+      if (date == null) continue;
+
+      final value = heroData.metricKind == EnvironmentMetricKind.humidity
+          ? item.avgHum
+          : item.avgTemp;
+
+      if (value == null) continue;
+
+      points.add(
+        SemanticTrendPoint(
+          x: date,
+          y: value,
+        ),
+      );
+    }
+
+    points.sort((a, b) => a.x.compareTo(b.x));
+    return points;
   }
 
   Widget _metricPill(
@@ -619,12 +700,17 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
       mainMetricLabel: label,
     );
 
-    final sparkValues = _buildSparkValues(a);
-    final sparkBands = heroData.chartBands;
+    final trendPoints = _buildTrendPoints(a);
+    final trendColor = trendPoints.isEmpty
+        ? AppTheme.environmentAccentForContext(context, a.level)
+        : _heroTrendColor(
+            heroData.metricKind,
+            trendPoints.last.y,
+          );
     final accent = AppTheme.environmentAccentForContext(context, a.level);
 
     final judgement = _levelJudgement(a.level);
-    final message = _mainMessage(a, heroData);
+    final summary = _environmentSummary(a);
     final action = _primaryAction(a);
 
     return Material(
@@ -652,58 +738,6 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          color: accent.withValues(
-                            alpha: AppTheme.isDark(context) ? 0.16 : 0.18,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Icon(
-                          _levelIcon(a.level),
-                          color: accent,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          '今日の飼育環境',
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: AppTheme.secondaryText(context),
-                                  ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(
-                            color: accent.withValues(alpha: 0.24),
-                          ),
-                        ),
-                        child: Text(
-                          _levelShortText(a.level),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: accent,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
                   Text(
                     judgement,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -714,7 +748,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    message,
+                    summary,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.secondaryText(context),
                           fontWeight: FontWeight.w700,
@@ -780,7 +814,7 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (sparkValues.length >= 2) ...[
+                  if (trendPoints.length >= 2) ...[
                     const SizedBox(height: 14),
                     Text(
                       trend.deltaText,
@@ -797,11 +831,28 @@ class _EnvironmentAssessmentHero extends StatelessWidget {
                           ),
                     ),
                     const SizedBox(height: 10),
-                    SemanticSparkline(
-                      values: sparkValues,
-                      color: accent,
-                      bands: sparkBands,
-                      height: 36,
+                    SemanticTrendChart(
+                      points: trendPoints,
+                      bands: _heroChartBands(
+                        heroData.metricKind,
+                      ),
+                      unit: heroData.metricKind ==
+                              EnvironmentMetricKind.temperature
+                          ? '℃'
+                          : '%',
+                      minimum: heroData.metricKind ==
+                              EnvironmentMetricKind.temperature
+                          ? 18
+                          : 30,
+                      maximum: heroData.metricKind ==
+                              EnvironmentMetricKind.temperature
+                          ? 28
+                          : 75,
+                      height: 64,
+                      mode: SemanticTrendChartMode.compact,
+                      showBandLabels: false,
+                      showLatestVerticalLine: false,
+                      lineColor: trendColor,
                     ),
                   ],
                   const SizedBox(height: 18),
@@ -924,133 +975,65 @@ class _HomeAnomalyCard extends StatelessWidget {
     this.onAskAi,
   });
 
-  String _severityText(AnomalySeverity severity) {
-    switch (severity) {
-      case AnomalySeverity.info:
-        return '軽微';
-      case AnomalySeverity.low:
-        return '低';
-      case AnomalySeverity.medium:
-        return '中';
-      case AnomalySeverity.high:
-        return '高';
-    }
-  }
-
-  Color _severityColor(BuildContext context, AnomalySeverity severity) {
-    switch (severity) {
-      case AnomalySeverity.info:
-        return AppTheme.secondaryText(context);
-      case AnomalySeverity.low:
-        return AppTheme.envCaution;
-      case AnomalySeverity.medium:
-        return AppTheme.envDanger;
-      case AnomalySeverity.high:
-        return AppTheme.envDanger;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final top = result.topAnomaly!;
-    final color = _severityColor(context, top.severity);
+    final level = top.severity == AnomalySeverity.high
+        ? StatusCardLevel.danger
+        : StatusCardLevel.caution;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.cardSurface(context),
-            borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-                color: AppTheme.softShadow(context),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return StatusCard(
+      level: level,
+      onTap: onTap,
+      emphasize: top.severity == AnomalySeverity.high,
+      radius: 22,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: AppTheme.chipFill(
-                    color,
-                    context,
-                    opacity: AppTheme.isDark(context) ? 0.14 : 0.12,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.warning_amber_rounded,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '最近の気になる変化',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      top.title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: color,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      top.description,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '重要度: ${_severityText(top.severity)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: color,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    if (onAskAi != null) ...[
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: onAskAi,
-                          icon: const Icon(Icons.smart_toy_outlined, size: 18),
-                          label: const Text('この変化をAIに相談'),
-                        ),
+                child: Text(
+                  '最近の気になる変化',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-                  ],
                 ),
               ),
-              const SizedBox(width: 8),
               Icon(
                 Icons.chevron_right_rounded,
                 color: AppTheme.tertiaryText(context),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          Text(
+            top.title,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.35,
+                ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            top.description,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
+          ),
+          if (onAskAi != null) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: onAskAi,
+              icon: const Icon(Icons.smart_toy_outlined, size: 18),
+              label: const Text('この変化をAIに相談'),
+            ),
+          ],
+        ],
       ),
     );
   }

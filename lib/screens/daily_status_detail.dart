@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -15,7 +16,8 @@ import '../services/environment_assessment_repo.dart';
 import '../services/distance_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../services/daily_status_summary_service.dart';
-import '../widgets/semantic_sparkline.dart';
+import '../widgets/semantic_trend_chart.dart';
+import '../widgets/status_card.dart';
 import '../theme/app_theme.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
@@ -101,7 +103,10 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('サマリーの詳細'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark
+            ? const Color(0xFF20253C)
+            : const Color.fromARGB(255, 242, 244, 248),
+        foregroundColor: isDark ? Colors.white : AppTheme.primaryText(context),
         elevation: 0,
       ),
       body: Container(
@@ -173,11 +178,37 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                       const _StatItem('対象期間', '過去7日'),
                       _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
                     ],
-                    sparkValues: bundle.history
-                        .map((e) => e.avgTemp)
-                        .whereType<double>()
-                        .toList(),
+                    trendPoints: _historyTrendPoints(
+                      history: bundle.history,
+                      valueOf: (e) => e.avgTemp,
+                    ),
                     accent: AppTheme.environmentAccent(a.level),
+                    unit: '℃',
+                    chartMinimum: 18,
+                    chartMaximum: 28,
+                    chartBands: [
+                      SemanticTrendBand(
+                        start: 18,
+                        end: EnvironmentStatusService.tempMin,
+                        label: '低め',
+                        color: Colors.blue.withValues(alpha: 0.07),
+                        labelColor: Colors.blue.shade200,
+                      ),
+                      SemanticTrendBand(
+                        start: EnvironmentStatusService.tempMin,
+                        end: EnvironmentStatusService.tempMax,
+                        label: '適正',
+                        color: Colors.green.withValues(alpha: 0.07),
+                        labelColor: Colors.green.shade200,
+                      ),
+                      SemanticTrendBand(
+                        start: EnvironmentStatusService.tempMax,
+                        end: 28,
+                        label: '高め',
+                        color: Colors.orange.withValues(alpha: 0.08),
+                        labelColor: Colors.orange.shade200,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   _MetricDetailCard(
@@ -187,11 +218,37 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                       const _StatItem('対象期間', '過去7日'),
                       _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
                     ],
-                    sparkValues: bundle.history
-                        .map((e) => e.avgHum)
-                        .whereType<double>()
-                        .toList(),
+                    trendPoints: _historyTrendPoints(
+                      history: bundle.history,
+                      valueOf: (e) => e.avgHum,
+                    ),
                     accent: AppTheme.environmentAccent(a.level),
+                    unit: '%',
+                    chartMinimum: 30,
+                    chartMaximum: 75,
+                    chartBands: [
+                      SemanticTrendBand(
+                        start: 30,
+                        end: EnvironmentStatusService.humMin,
+                        label: '低め',
+                        color: Colors.blue.withValues(alpha: 0.07),
+                        labelColor: Colors.blue.shade200,
+                      ),
+                      SemanticTrendBand(
+                        start: EnvironmentStatusService.humMin,
+                        end: EnvironmentStatusService.humMax,
+                        label: '適正',
+                        color: Colors.green.withValues(alpha: 0.07),
+                        labelColor: Colors.green.shade200,
+                      ),
+                      SemanticTrendBand(
+                        start: EnvironmentStatusService.humMax,
+                        end: 75,
+                        label: '高め',
+                        color: Colors.orange.withValues(alpha: 0.08),
+                        labelColor: Colors.orange.shade200,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 20),
                   _SectionLabel(title: '活動量'),
@@ -215,9 +272,28 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                         ),
                       ),
                     ],
-                    sparkValues:
-                        bundle.distanceSeries.map((e) => e.distance).toList(),
+                    trendPoints: bundle.distanceSeries
+                        .map(
+                          (e) => SemanticTrendPoint(
+                            x: e.date.toLocal(),
+                            y: e.distance,
+                          ),
+                        )
+                        .toList(),
                     accent: AppTheme.accent,
+                    unit: 'm',
+                    chartMinimum: 0,
+                    chartMaximum: _activityChartMaximum(
+                      bundle.distanceSeries,
+                      bundle.activitySummary.avg7DistanceMeters,
+                    ),
+                    chartBands: _activityChartBands(
+                      bundle.activitySummary.avg7DistanceMeters,
+                      _activityChartMaximum(
+                        bundle.distanceSeries,
+                        bundle.activitySummary.avg7DistanceMeters,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   if (bundle.activitySummary.distribution != null)
@@ -234,6 +310,87 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
         ),
       ),
     );
+  }
+
+  static DateTime? _parseHistoryDate(String? rawDate) {
+    final value = rawDate?.trim();
+    if (value == null || value.isEmpty) return null;
+    return DateTime.tryParse(value)?.toLocal();
+  }
+
+  static List<SemanticTrendPoint> _historyTrendPoints({
+    required List<EnvironmentAssessmentHistory> history,
+    required double? Function(EnvironmentAssessmentHistory item) valueOf,
+  }) {
+    final points = <SemanticTrendPoint>[];
+
+    for (final item in history) {
+      final date = _parseHistoryDate(item.date);
+      final value = valueOf(item);
+
+      if (date == null || value == null) continue;
+
+      points.add(
+        SemanticTrendPoint(
+          x: date,
+          y: value,
+        ),
+      );
+    }
+
+    points.sort((a, b) => a.x.compareTo(b.x));
+    return points;
+  }
+
+  static double _activityChartMaximum(
+    List<HealthRecord> records,
+    double baseline,
+  ) {
+    final dataMaximum = records.isEmpty
+        ? 0.0
+        : records
+            .map((record) => record.distance)
+            .reduce((a, b) => a > b ? a : b);
+
+    final baselineMaximum = baseline > 0 ? baseline * 1.6 : 0.0;
+    final maximum =
+        dataMaximum > baselineMaximum ? dataMaximum : baselineMaximum;
+
+    return maximum <= 0 ? 1000 : maximum * 1.12;
+  }
+
+  static List<SemanticTrendBand> _activityChartBands(
+    double baseline,
+    double maximum,
+  ) {
+    if (baseline <= 0) return const [];
+
+    final lowEnd = baseline * 0.7;
+    final normalEnd = baseline * 1.3;
+
+    return [
+      SemanticTrendBand(
+        start: 0,
+        end: lowEnd,
+        label: '少なめ',
+        color: Colors.orange.withValues(alpha: 0.07),
+        labelColor: Colors.orange.shade200,
+      ),
+      SemanticTrendBand(
+        start: lowEnd,
+        end: normalEnd,
+        label: '普段の範囲',
+        color: Colors.green.withValues(alpha: 0.07),
+        labelColor: Colors.green.shade200,
+      ),
+      SemanticTrendBand(
+        start: normalEnd,
+        end: maximum,
+        label: '多め',
+        color: Colors.blue.withValues(alpha: 0.06),
+        labelColor: Colors.blue.shade200,
+      ),
+    ];
   }
 
   static String _formatTime(DateTime? dt) {
@@ -267,67 +424,103 @@ class _OverallSummaryCard extends StatelessWidget {
 
   const _OverallSummaryCard({required this.assessment});
 
+  String _cleanHeadline(String raw) {
+    return raw
+        .trim()
+        .replaceFirst(
+          RegExp(r'^[⚠️❗❕‼️!！△▲\s]+'),
+          '',
+        )
+        .replaceFirst(
+          RegExp(r'^(良好|注意|警戒|危険)\s*[：:・\-]?\s*'),
+          '',
+        )
+        .trim();
+  }
+
+  StatusCardLevel _level(String? level) {
+    switch (level) {
+      case '良好':
+        return StatusCardLevel.good;
+      case '注意':
+        return StatusCardLevel.caution;
+      case '危険':
+        return StatusCardLevel.danger;
+      default:
+        return StatusCardLevel.unavailable;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final accent =
         AppTheme.environmentAccentForContext(context, assessment.level);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            offset: Offset(0, 8),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
+    return StatusCard(
+      level: _level(assessment.level),
+      emphasize: assessment.level == '危険',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '総合サマリー',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w900,
                 ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            '総合評価: ${assessment.level ?? '未評価'}',
-            style: TextStyle(
-              color: accent,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          if ((assessment.headline ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
+          if (_cleanHeadline(assessment.headline ?? '').isNotEmpty) ...[
+            const SizedBox(height: 16),
             Text(
-              assessment.headline!,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+              _cleanHeadline(assessment.headline ?? ''),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    height: 1.25,
                   ),
             ),
           ],
           if ((assessment.todayAction ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              '今日やること',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.task_alt_rounded,
+                  color: accent,
+                  size: 22,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '今日やること',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        assessment.todayAction!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              height: 1.5,
+                            ),
+                      ),
+                    ],
                   ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(assessment.todayAction!),
           ],
           if ((assessment.why ?? '').trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             Text(
               assessment.why!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppTheme.secondaryText(context),
+                    height: 1.45,
                   ),
             ),
           ],
@@ -396,19 +589,6 @@ class _SensorEvaluationCard extends StatelessWidget {
     }
   }
 
-  Color _stateColor(BuildContext context, MetricState state) {
-    switch (state) {
-      case MetricState.unknown:
-        return AppTheme.secondaryText(context);
-      case MetricState.good:
-        return AppTheme.envGood;
-      case MetricState.caution:
-        return AppTheme.envCaution;
-      case MetricState.alert:
-        return AppTheme.envDanger;
-    }
-  }
-
   String _flagText(EvaluationFlag flag) {
     switch (flag) {
       case EvaluationFlag.tempLow:
@@ -432,6 +612,8 @@ class _SensorEvaluationCard extends StatelessWidget {
 
   Color _flagColor(BuildContext context, EvaluationFlag flag) {
     switch (flag) {
+      case EvaluationFlag.activityMissing:
+        return AppTheme.secondaryText(context);
       case EvaluationFlag.tempLow:
       case EvaluationFlag.tempHigh:
       case EvaluationFlag.humidityLow:
@@ -440,99 +622,64 @@ class _SensorEvaluationCard extends StatelessWidget {
       case EvaluationFlag.activityHigh:
       case EvaluationFlag.activityDrop:
         return AppTheme.envDanger;
-
-      case EvaluationFlag.activityMissing:
-        return AppTheme.secondaryText(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final stateColor = _stateColor(context, evaluation.overallState);
+    final accent = AppTheme.sensorStateAccent(evaluation.overallState);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
         child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.cardSurface(context),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-                color: AppTheme.softShadow(context),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+          decoration: AppTheme.statusCardDecoration(
+            context,
+            accent: accent,
+            strength: evaluation.overallState == MetricState.good ? 0.58 : 0.9,
+            radius: 26,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Text(
-                    'センサー総合評価（仮）',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'センサー総合評価',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
                   ),
-                  const Spacer(),
                   Icon(
                     Icons.chevron_right_rounded,
                     color: AppTheme.tertiaryText(context),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${evaluation.overallScore}',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                  ),
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      '/ 100',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                          ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.chipFill(stateColor, context),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      _stateText(evaluation.overallState),
-                      style: TextStyle(
-                        color: stateColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
               const SizedBox(height: 10),
+              Center(
+                child: _StatusGauge(
+                  score: evaluation.overallScore,
+                  stateText: _stateText(evaluation.overallState),
+                  accent: accent,
+                ),
+              ),
+              const SizedBox(height: 2),
               Text(
                 evaluation.summary,
+                textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.secondaryText(context),
+                      color: AppTheme.primaryText(context),
+                      fontWeight: FontWeight.w700,
+                      height: 1.45,
                     ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
@@ -581,71 +728,168 @@ class _SensorEvaluationCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: evaluation.flags.isEmpty
-                    ? [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.chipFill(
-                              AppTheme.envGood,
-                              context,
-                              opacity: AppTheme.isDark(context) ? 0.10 : 0.08,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            '注意フラグなし',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                          ),
-                        ),
-                      ]
-                    : evaluation.flags.map(
-                        (flag) {
-                          final flagColor = _flagColor(context, flag);
+              if (evaluation.flags.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: evaluation.flags.map((flag) {
+                    final flagColor = _flagColor(context, flag);
 
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 8,
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.chipFill(
+                          flagColor,
+                          context,
+                          opacity: AppTheme.isDark(context) ? 0.14 : 0.10,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _flagText(flag),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: flagColor,
+                              fontWeight: FontWeight.w800,
                             ),
-                            decoration: BoxDecoration(
-                              color: AppTheme.chipFill(
-                                flagColor,
-                                context,
-                                opacity: AppTheme.isDark(context) ? 0.10 : 0.08,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Text(
-                              _flagText(flag),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: flagColor,
-                                  ),
-                            ),
-                          );
-                        },
-                      ).toList(),
-              ),
-              const SizedBox(height: 12),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+}
+
+class _StatusGauge extends StatelessWidget {
+  final int score;
+  final String stateText;
+  final Color accent;
+
+  const _StatusGauge({
+    required this.score,
+    required this.stateText,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 250,
+      height: 150,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            size: const Size(250, 150),
+            painter: _StatusGaugePainter(
+              progress: (score.clamp(0, 100)) / 100,
+              accent: accent,
+              trackColor: AppTheme.isDark(context)
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.08),
+            ),
+          ),
+          Positioned(
+            top: 43,
+            child: Column(
+              children: [
+                Text(
+                  '$score',
+                  style: TextStyle(
+                    fontSize: 48,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -2,
+                    color: AppTheme.primaryText(context),
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    stateText,
+                    style: TextStyle(
+                      color: accent,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusGaugePainter extends CustomPainter {
+  final double progress;
+  final Color accent;
+  final Color trackColor;
+
+  const _StatusGaugePainter({
+    required this.progress,
+    required this.accent,
+    required this.trackColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromLTWH(
+      20,
+      20,
+      size.width - 40,
+      size.height * 1.34,
+    );
+
+    final trackPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 17
+      ..strokeCap = StrokeCap.round
+      ..color = trackColor;
+
+    final progressPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 17
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: math.pi,
+        endAngle: math.pi * 2,
+        colors: [
+          accent.withValues(alpha: 0.45),
+          accent,
+        ],
+      ).createShader(rect);
+
+    canvas.drawArc(rect, math.pi, math.pi, false, trackPaint);
+    canvas.drawArc(
+      rect,
+      math.pi,
+      math.pi * progress.clamp(0.0, 1.0),
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _StatusGaugePainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.accent != accent ||
+        oldDelegate.trackColor != trackColor;
   }
 }
 
@@ -713,85 +957,105 @@ class _MetricDetailCard extends StatelessWidget {
   final String title;
   final MetricCardViewData card;
   final List<_StatItem> secondaryStats;
-  final List<double> sparkValues;
+  final List<SemanticTrendPoint> trendPoints;
+  final String unit;
+  final double chartMinimum;
+  final double chartMaximum;
+  final List<SemanticTrendBand> chartBands;
   final Color accent;
 
   const _MetricDetailCard({
     required this.title,
     required this.card,
     required this.secondaryStats,
-    required this.sparkValues,
+    required this.trendPoints,
     required this.accent,
+    required this.unit,
+    required this.chartMinimum,
+    required this.chartMaximum,
+    required this.chartBands,
   });
+
+  Color _semanticAccent(BuildContext context) {
+    final state = card.stateText;
+
+    if (state.contains('危険') || state.contains('警戒') || state.contains('かなり')) {
+      return AppTheme.envDanger;
+    }
+
+    if (state.contains('高め') || state.contains('低め') || state.contains('注意')) {
+      return AppTheme.envCaution;
+    }
+
+    if (state.contains('適正') ||
+        state.contains('理想') ||
+        state.contains('良好') ||
+        state.contains('普段')) {
+      return AppTheme.envGood;
+    }
+
+    return accent;
+  }
+
+  StatusCardLevel _statusLevel() {
+    final state = card.stateText;
+
+    if (state.contains('危険') || state.contains('警戒') || state.contains('かなり')) {
+      return StatusCardLevel.danger;
+    }
+    if (state.contains('高め') || state.contains('低め') || state.contains('注意')) {
+      return StatusCardLevel.caution;
+    }
+    if (state.contains('適正') ||
+        state.contains('理想') ||
+        state.contains('良好') ||
+        state.contains('普段')) {
+      return StatusCardLevel.good;
+    }
+    return StatusCardLevel.neutral;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
+    final semanticAccent = _semanticAccent(context);
+
+    return StatusCard(
+      level: _statusLevel(),
+      emphasize: _statusLevel() == StatusCardLevel.danger,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppTheme.chipFill(accent, context),
-                  borderRadius: BorderRadius.circular(999),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
-                child: Text(
-                  card.stateText,
-                  style: TextStyle(
-                    color: accent,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 14),
           Text(
             card.currentValueText,
-            style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+            style: Theme.of(context).textTheme.displaySmall?.copyWith(
                   fontWeight: FontWeight.w900,
+                  letterSpacing: -1.4,
+                  height: 1,
                 ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 10,
-            runSpacing: 10,
+            spacing: 8,
+            runSpacing: 8,
             children: secondaryStats
                 .map(
                   (s) => Container(
                     padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                     decoration: BoxDecoration(
                       color: AppTheme.chipFill(
-                        AppTheme.accent,
+                        semanticAccent,
                         context,
-                        opacity: AppTheme.isDark(context) ? 0.08 : 0.06,
+                        opacity: AppTheme.isDark(context) ? 0.10 : 0.07,
                       ),
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       '${s.label}: ${s.value}',
@@ -803,35 +1067,44 @@ class _MetricDetailCard extends StatelessWidget {
                 )
                 .toList(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Text(
-            card.deltaText,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            card.summaryText,
+            card.summaryText.trim().isNotEmpty
+                ? card.summaryText
+                : card.deltaText,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppTheme.secondaryText(context),
+                  fontWeight: FontWeight.w700,
+                  height: 1.45,
                 ),
           ),
-          const SizedBox(height: 14),
-          if (card.hasChart && sparkValues.length >= 2)
-            SemanticSparkline(
-              values: sparkValues,
-              color: accent,
-              bands: card.chartBands,
-              height: 56,
+          const SizedBox(height: 16),
+          if (card.hasChart && trendPoints.length >= 2)
+            SemanticTrendChart(
+              points: trendPoints,
+              bands: chartBands,
+              unit: unit,
+              minimum: chartMinimum,
+              maximum: chartMaximum,
+              height: 220,
+              mode: SemanticTrendChartMode.full,
+              dateFormat: DateFormat('M/d'),
+              showBandLabels: true,
+              lineColor: AppTheme.isDark(context)
+                  ? Colors.white
+                  : const Color(0xFF374151),
             )
           else
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
               decoration: BoxDecoration(
-                color: AppTheme.chipFill(accent, context),
-                borderRadius: BorderRadius.circular(16),
+                color: AppTheme.chipFill(
+                  semanticAccent,
+                  context,
+                  opacity: AppTheme.isDark(context) ? 0.10 : 0.07,
+                ),
+                borderRadius: BorderRadius.circular(18),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -839,11 +1112,11 @@ class _MetricDetailCard extends StatelessWidget {
                   Text(
                     card.emptyChartText ?? 'まだデータがありません',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                         ),
                   ),
                   if ((card.emptyChartSubtext ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       card.emptyChartSubtext!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1100,17 +1373,6 @@ class _SensorEvaluationBreakdownScreen extends StatelessWidget {
     return _stateText(state);
   }
 
-  String _metricScoreText({
-    required String metricKey,
-    required int score,
-    required MetricState state,
-  }) {
-    if (metricKey == 'activity' && state == MetricState.unknown) {
-      return '—';
-    }
-    return '$score';
-  }
-
   String _stateText(MetricState state) {
     switch (state) {
       case MetricState.unknown:
@@ -1155,10 +1417,29 @@ class _SensorEvaluationBreakdownScreen extends StatelessWidget {
       case EvaluationFlag.activityHigh:
       case EvaluationFlag.activityDrop:
         return AppTheme.envDanger;
-
       case EvaluationFlag.activityMissing:
         return AppTheme.secondaryText(context);
     }
+  }
+
+  List<EvaluationFlag> _flagsForMetric(String metricKey) {
+    return evaluation.flags.where((flag) {
+      switch (metricKey) {
+        case 'temperature':
+          return flag == EvaluationFlag.tempLow ||
+              flag == EvaluationFlag.tempHigh;
+        case 'humidity':
+          return flag == EvaluationFlag.humidityLow ||
+              flag == EvaluationFlag.humidityHigh;
+        case 'activity':
+          return flag == EvaluationFlag.activityMissing ||
+              flag == EvaluationFlag.activityLow ||
+              flag == EvaluationFlag.activityHigh ||
+              flag == EvaluationFlag.activityDrop;
+        default:
+          return false;
+      }
+    }).toList();
   }
 
   @override
@@ -1168,148 +1449,74 @@ class _SensorEvaluationBreakdownScreen extends StatelessWidget {
         isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor:
+          isDark ? const Color(0xFF20253C) : const Color(0xFFF2F4F8),
       appBar: AppBar(
         title: const Text('センサー評価の内訳'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark
+            ? const Color(0xFF20253C)
+            : const Color.fromARGB(255, 242, 244, 248),
+        foregroundColor: isDark ? Colors.white : AppTheme.primaryText(context),
         elevation: 0,
       ),
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
-          children: [
-            _SensorMetricBreakdownCard(
-              title: '温度',
-              scoreText: _metricScoreText(
-                metricKey: 'temperature',
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+            children: [
+              _SensorMetricBreakdownCard(
+                title: '温度',
                 score: evaluation.temperature.score,
                 state: evaluation.temperature.state,
+                stateText: _metricStateText(
+                  metricKey: 'temperature',
+                  state: evaluation.temperature.state,
+                ),
+                reason: evaluation.temperature.reason,
+                flags: _flagsForMetric('temperature'),
+                flagText: _flagText,
+                flagColor: _flagColor,
               ),
-              stateText: _metricStateText(
-                metricKey: 'temperature',
-                state: evaluation.temperature.state,
-              ),
-              reason: evaluation.temperature.reason,
-            ),
-            const SizedBox(height: 14),
-            _SensorMetricBreakdownCard(
-              title: '湿度',
-              scoreText: _metricScoreText(
-                metricKey: 'humidity',
+              const SizedBox(height: 14),
+              _SensorMetricBreakdownCard(
+                title: '湿度',
                 score: evaluation.humidity.score,
                 state: evaluation.humidity.state,
+                stateText: _metricStateText(
+                  metricKey: 'humidity',
+                  state: evaluation.humidity.state,
+                ),
+                reason: evaluation.humidity.reason,
+                flags: _flagsForMetric('humidity'),
+                flagText: _flagText,
+                flagColor: _flagColor,
               ),
-              stateText: _metricStateText(
-                metricKey: 'humidity',
-                state: evaluation.humidity.state,
-              ),
-              reason: evaluation.humidity.reason,
-            ),
-            const SizedBox(height: 14),
-            _SensorMetricBreakdownCard(
-              title: '活動量',
-              scoreText: _metricScoreText(
-                metricKey: 'activity',
-                score: evaluation.activity.score,
+              const SizedBox(height: 14),
+              _SensorMetricBreakdownCard(
+                title: '活動量',
+                score: evaluation.activity.state == MetricState.unknown
+                    ? null
+                    : evaluation.activity.score,
                 state: evaluation.activity.state,
+                stateText: _metricStateText(
+                  metricKey: 'activity',
+                  state: evaluation.activity.state,
+                ),
+                reason: evaluation.activity.reason,
+                flags: _flagsForMetric('activity'),
+                flagText: _flagText,
+                flagColor: _flagColor,
               ),
-              stateText: _metricStateText(
-                metricKey: 'activity',
-                state: evaluation.activity.state,
+              const SizedBox(height: 18),
+              _DetectedFlagsCard(
+                flags: evaluation.flags,
+                flagText: _flagText,
+                flagColor: _flagColor,
               ),
-              reason: evaluation.activity.reason,
-            ),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.cardSurface(context),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                    color: AppTheme.softShadow(context),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '検出フラグ',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: evaluation.flags.isEmpty
-                        ? [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppTheme.chipFill(
-                                  AppTheme.envGood,
-                                  context,
-                                  opacity:
-                                      AppTheme.isDark(context) ? 0.10 : 0.08,
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Text(
-                                '注意フラグなし',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                          ]
-                        : evaluation.flags.map(
-                            (flag) {
-                              final flagColor = _flagColor(context, flag);
-
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.chipFill(
-                                    flagColor,
-                                    context,
-                                    opacity:
-                                        AppTheme.isDark(context) ? 0.10 : 0.08,
-                                  ),
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                child: Text(
-                                  _flagText(flag),
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: flagColor,
-                                      ),
-                                ),
-                              );
-                            },
-                          ).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1318,61 +1525,289 @@ class _SensorEvaluationBreakdownScreen extends StatelessWidget {
 
 class _SensorMetricBreakdownCard extends StatelessWidget {
   final String title;
-  final String scoreText;
+  final int? score;
+  final MetricState state;
   final String stateText;
   final String reason;
+  final List<EvaluationFlag> flags;
+  final String Function(EvaluationFlag) flagText;
+  final Color Function(BuildContext, EvaluationFlag) flagColor;
 
   const _SensorMetricBreakdownCard({
     required this.title,
-    required this.scoreText,
+    required this.score,
+    required this.state,
     required this.stateText,
     required this.reason,
+    required this.flags,
+    required this.flagText,
+    required this.flagColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final accent = AppTheme.sensorStateAccent(state);
+
     return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      decoration: AppTheme.statusCardDecoration(
+        context,
+        accent: accent,
+        strength: state == MetricState.unknown ? 0.46 : 0.78,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  stateText,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            scoreText == '—' ? '—' : '$scoreText / 100',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+          const SizedBox(height: 2),
+          Center(
+            child: _MetricStatusGauge(
+              score: score,
+              stateText: stateText,
+              accent: accent,
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            stateText,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                state == MetricState.good
+                    ? Icons.check_circle_outline_rounded
+                    : state == MetricState.unknown
+                        ? Icons.schedule_rounded
+                        : Icons.info_outline_rounded,
+                size: 21,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  reason,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            reason,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
+          if (flags.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: flags.map((flag) {
+                final color = flagColor(context, flag);
+                return Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppTheme.chipFill(
+                      color,
+                      context,
+                      opacity: AppTheme.isDark(context) ? 0.14 : 0.10,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    flagText(flag),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricStatusGauge extends StatelessWidget {
+  final int? score;
+  final String stateText;
+  final Color accent;
+
+  const _MetricStatusGauge({
+    required this.score,
+    required this.stateText,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      height: 132,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
+            size: const Size(220, 132),
+            painter: _StatusGaugePainter(
+              progress: score == null ? 0 : score!.clamp(0, 100) / 100,
+              accent: accent,
+              trackColor: AppTheme.isDark(context)
+                  ? Colors.white.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.08),
+            ),
+          ),
+          Positioned(
+            top: 39,
+            child: Column(
+              children: [
+                Text(
+                  score == null ? '—' : '${score!}',
+                  style: TextStyle(
+                    fontSize: 42,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: score == null ? 0 : -1.8,
+                    color: AppTheme.primaryText(context),
+                  ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  score == null ? stateText : '/ 100',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: score == null
+                            ? accent
+                            : AppTheme.secondaryText(context),
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetectedFlagsCard extends StatelessWidget {
+  final List<EvaluationFlag> flags;
+  final String Function(EvaluationFlag) flagText;
+  final Color Function(BuildContext, EvaluationFlag) flagColor;
+
+  const _DetectedFlagsCard({
+    required this.flags,
+    required this.flagText,
+    required this.flagColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = flags.isEmpty ? AppTheme.envGood : AppTheme.envDanger;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: AppTheme.statusCardDecoration(
+        context,
+        accent: accent,
+        strength: flags.isEmpty ? 0.42 : 0.58,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                flags.isEmpty ? Icons.verified_outlined : Icons.flag_outlined,
+                color: accent,
+              ),
+              const SizedBox(width: 9),
+              Text(
+                '検出フラグ',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: flags.isEmpty
+                ? [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.chipFill(
+                          AppTheme.envGood,
+                          context,
+                          opacity: AppTheme.isDark(context) ? 0.12 : 0.09,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '注意フラグなし',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.envGood,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ),
+                  ]
+                : flags.map((flag) {
+                    final color = flagColor(context, flag);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.chipFill(
+                          color,
+                          context,
+                          opacity: AppTheme.isDark(context) ? 0.14 : 0.10,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        flagText(flag),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: color,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    );
+                  }).toList(),
           ),
         ],
       ),
@@ -1389,170 +1824,54 @@ class _AnomalyDetectionCard extends StatelessWidget {
     this.onTap,
   });
 
-  String _severityText(AnomalySeverity severity) {
-    switch (severity) {
-      case AnomalySeverity.info:
-        return '軽微';
-      case AnomalySeverity.low:
-        return '低';
-      case AnomalySeverity.medium:
-        return '中';
-      case AnomalySeverity.high:
-        return '高';
-    }
-  }
-
-  Color _severityColor(BuildContext context, AnomalySeverity severity) {
-    switch (severity) {
-      case AnomalySeverity.info:
-        return AppTheme.secondaryText(context);
-      case AnomalySeverity.low:
-        return AppTheme.envCaution;
-      case AnomalySeverity.medium:
-        return AppTheme.envDanger;
-      case AnomalySeverity.high:
-        return AppTheme.envDanger;
-    }
-  }
-
-  String _flagText(AnomalyFlag flag) {
-    switch (flag) {
-      case AnomalyFlag.highHumidityStreak:
-        return '高湿が継続';
-      case AnomalyFlag.lowTemperatureStreak:
-        return '低温が継続';
-      case AnomalyFlag.highTemperatureStreak:
-        return '高温が継続';
-      case AnomalyFlag.dangerMinutesDetected:
-        return '危険域への滞在';
-      case AnomalyFlag.tempSpikeDetected:
-        return '温度急変';
-      case AnomalyFlag.humiditySpikeDetected:
-        return '湿度急変';
-      case AnomalyFlag.tempRatioWorsened:
-        return '温度指標が悪化';
-      case AnomalyFlag.humidityRatioWorsened:
-        return '湿度指標が悪化';
-      case AnomalyFlag.cautionLevelStreak:
-        return '注意評価が継続';
-      case AnomalyFlag.dangerLevelDetected:
-        return '危険評価を検出';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final top = result.topAnomaly!;
-    final severityColor = _severityColor(context, top.severity);
+    final level = top.severity == AnomalySeverity.high
+        ? StatusCardLevel.danger
+        : StatusCardLevel.caution;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: AppTheme.cardSurface(context),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-                color: AppTheme.softShadow(context),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return StatusCard(
+      level: level,
+      onTap: onTap,
+      emphasize: top.severity == AnomalySeverity.high,
+      radius: 26,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Row(
-                children: [
-                  Text(
-                    '異常検知結果',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppTheme.tertiaryText(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      top.title,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppTheme.chipFill(severityColor, context),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '重要度: ${_severityText(top.severity)}',
-                      style: TextStyle(
-                        color: severityColor,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
+              Expanded(
+                child: Text(
+                  '異常検知結果',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
                       ),
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                top.description,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.secondaryText(context),
-                    ),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: result.anomalies
-                    .take(3)
-                    .map(
-                      (a) => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppTheme.chipFill(
-                            _severityColor(context, a.severity),
-                            context,
-                            opacity: AppTheme.isDark(context) ? 0.10 : 0.08,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          _flagText(a.flag),
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: _severityColor(context, a.severity),
-                                  ),
-                        ),
-                      ),
-                    )
-                    .toList(),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.tertiaryText(context),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 16),
+          Text(
+            top.title,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.25,
+                ),
+          ),
+          const SizedBox(height: 9),
+          Text(
+            top.description,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.5,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -1578,42 +1897,40 @@ class _AnomalyDetectionBreakdownScreen extends StatelessWidget {
     }
   }
 
-  Color _severityColor(BuildContext context, AnomalySeverity severity) {
-    switch (severity) {
-      case AnomalySeverity.info:
-        return AppTheme.secondaryText(context);
-      case AnomalySeverity.low:
-        return AppTheme.envCaution;
-      case AnomalySeverity.medium:
-        return AppTheme.envDanger;
-      case AnomalySeverity.high:
-        return AppTheme.envDanger;
+  IconData _anomalyIcon(AnomalyFlag flag) {
+    switch (flag) {
+      case AnomalyFlag.highHumidityStreak:
+      case AnomalyFlag.humiditySpikeDetected:
+      case AnomalyFlag.humidityRatioWorsened:
+        return Icons.water_drop_rounded;
+      case AnomalyFlag.lowTemperatureStreak:
+        return Icons.ac_unit_rounded;
+      case AnomalyFlag.highTemperatureStreak:
+      case AnomalyFlag.tempSpikeDetected:
+      case AnomalyFlag.tempRatioWorsened:
+        return Icons.thermostat_rounded;
+      case AnomalyFlag.dangerMinutesDetected:
+      case AnomalyFlag.dangerLevelDetected:
+        return Icons.warning_amber_rounded;
+      case AnomalyFlag.cautionLevelStreak:
+        return Icons.notification_important_rounded;
     }
   }
 
-  String _flagText(AnomalyFlag flag) {
-    switch (flag) {
-      case AnomalyFlag.highHumidityStreak:
-        return '高湿が継続';
-      case AnomalyFlag.lowTemperatureStreak:
-        return '低温が継続';
-      case AnomalyFlag.highTemperatureStreak:
-        return '高温が継続';
-      case AnomalyFlag.dangerMinutesDetected:
-        return '危険域への滞在';
-      case AnomalyFlag.tempSpikeDetected:
-        return '温度急変';
-      case AnomalyFlag.humiditySpikeDetected:
-        return '湿度急変';
-      case AnomalyFlag.tempRatioWorsened:
-        return '温度指標が悪化';
-      case AnomalyFlag.humidityRatioWorsened:
-        return '湿度指標が悪化';
-      case AnomalyFlag.cautionLevelStreak:
-        return '注意評価が継続';
-      case AnomalyFlag.dangerLevelDetected:
-        return '危険評価を検出';
-    }
+  String _dateLabel(String raw) {
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    return DateFormat('M/d').format(parsed);
+  }
+
+  String? _periodText({
+    required String? startDateKey,
+    required String? endDateKey,
+  }) {
+    final start = startDateKey;
+    final end = endDateKey;
+    if (start == null || end == null) return null;
+    return '${_dateLabel(start)}〜${_dateLabel(end)}';
   }
 
   @override
@@ -1626,7 +1943,10 @@ class _AnomalyDetectionBreakdownScreen extends StatelessWidget {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('異常検知の内訳'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark
+            ? const Color(0xFF20253C)
+            : const Color.fromARGB(255, 242, 244, 248),
+        foregroundColor: isDark ? Colors.white : AppTheme.primaryText(context),
         elevation: 0,
       ),
       body: Container(
@@ -1637,93 +1957,129 @@ class _AnomalyDetectionBreakdownScreen extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 14),
           itemBuilder: (context, index) {
             final anomaly = result.anomalies[index];
-            final color = _severityColor(context, anomaly.severity);
+            final accent = AppTheme.anomalySeverityAccent(anomaly.severity);
+            final period = _periodText(
+              startDateKey: anomaly.startDateKey,
+              endDateKey: anomaly.endDateKey,
+            );
 
             return Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppTheme.cardSurface(context),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                    color: AppTheme.softShadow(context),
-                  ),
-                ],
+              padding: const EdgeInsets.all(20),
+              decoration: AppTheme.statusCardDecoration(
+                context,
+                accent: accent,
+                strength:
+                    anomaly.severity == AnomalySeverity.high ? 0.92 : 0.68,
+                radius: 26,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          anomaly.title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(
+                            alpha: AppTheme.isDark(context) ? 0.18 : 0.12,
+                          ),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Icon(
+                          _anomalyIcon(anomaly.flag),
+                          color: accent,
                         ),
                       ),
                       const SizedBox(width: 12),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 5),
+                          child: Text(
+                            anomaly.title,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.25,
+                                ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: AppTheme.chipFill(color, context),
+                          color: accent.withValues(
+                            alpha: AppTheme.isDark(context) ? 0.18 : 0.12,
+                          ),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          '重要度: ${_severityText(anomaly.severity)}',
+                          '重要度 ${_severityText(anomaly.severity)}',
                           style: TextStyle(
-                            color: color,
-                            fontWeight: FontWeight.w800,
+                            color: accent,
+                            fontWeight: FontWeight.w900,
                             fontSize: 12,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _flagText(anomaly.flag),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: color,
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
                   Text(
                     anomaly.description,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: AppTheme.secondaryText(context),
+                          height: 1.55,
+                          fontWeight: FontWeight.w600,
                         ),
                   ),
-                  if (anomaly.startDateKey != null ||
-                      anomaly.endDateKey != null ||
+                  if (period != null ||
                       anomaly.count != null ||
                       anomaly.value != null) ...[
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        if (anomaly.startDateKey != null &&
-                            anomaly.endDateKey != null)
-                          _DetailChip(
-                            text:
-                                '期間: ${anomaly.startDateKey} 〜 ${anomaly.endDateKey}',
-                          ),
-                        if (anomaly.count != null)
-                          _DetailChip(text: '件数: ${anomaly.count}'),
-                        if (anomaly.value != null)
-                          _DetailChip(
-                            text: '値: ${anomaly.value!.toStringAsFixed(1)}',
-                          ),
-                      ],
+                    const SizedBox(height: 16),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(
+                          alpha: AppTheme.isDark(context) ? 0.10 : 0.07,
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Wrap(
+                        spacing: 16,
+                        runSpacing: 10,
+                        children: [
+                          if (period != null)
+                            _AnomalyFact(
+                              icon: Icons.calendar_today_rounded,
+                              label: '期間',
+                              value: period,
+                            ),
+                          if (anomaly.count != null)
+                            _AnomalyFact(
+                              icon: Icons.repeat_rounded,
+                              label: '継続',
+                              value: '${anomaly.count}日',
+                            ),
+                          if (anomaly.value != null)
+                            _AnomalyFact(
+                              icon: Icons.analytics_rounded,
+                              label: '最新値',
+                              value: anomaly.value!.toStringAsFixed(1),
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -1732,6 +2088,39 @@ class _AnomalyDetectionBreakdownScreen extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _AnomalyFact extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _AnomalyFact({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          icon,
+          size: 16,
+          color: AppTheme.secondaryText(context),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          '$label $value',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+        ),
+      ],
     );
   }
 }

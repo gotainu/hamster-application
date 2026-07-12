@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/semantic_chart_band.dart';
+import '../models/sensor_evaluation.dart';
+import '../models/anomaly_detection.dart';
 
 class AppTheme {
   // ===== Environment Assessment Visual =====
@@ -92,7 +94,7 @@ class AppTheme {
   }
 
   static Color environmentSoftFill(String? level, {double opacity = 0.16}) {
-    return environmentAccent(level).withOpacity(opacity);
+    return environmentAccent(level).withValues(alpha: opacity);
   }
 
   // ---- グラデーションカラー（OuraRing風） ----
@@ -130,6 +132,81 @@ class AppTheme {
     ],
   );
 
+  static Gradient statusCardGradient(
+    BuildContext context, {
+    required Color accent,
+    double strength = 1.0,
+  }) {
+    final dark = isDark(context);
+    final clamped = strength.clamp(0.0, 1.0);
+
+    final base = dark ? darkCard : const Color(0xFFF7F9FC);
+    final firstAlpha = dark ? 0.30 * clamped : 0.16 * clamped;
+    final secondAlpha = dark ? 0.13 * clamped : 0.06 * clamped;
+
+    return LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [
+        Color.alphaBlend(accent.withValues(alpha: firstAlpha), base),
+        Color.alphaBlend(accent.withValues(alpha: secondAlpha), base),
+        base,
+      ],
+      stops: const [0.0, 0.58, 1.0],
+    );
+  }
+
+  static BoxDecoration statusCardDecoration(
+    BuildContext context, {
+    required Color accent,
+    double strength = 1.0,
+    double radius = 24,
+  }) {
+    return BoxDecoration(
+      gradient: statusCardGradient(
+        context,
+        accent: accent,
+        strength: strength,
+      ),
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(
+        color: accent.withValues(alpha: isDark(context) ? 0.22 : 0.16),
+      ),
+      boxShadow: [
+        BoxShadow(
+          blurRadius: 18,
+          offset: const Offset(0, 9),
+          color: softShadow(context),
+        ),
+      ],
+    );
+  }
+
+  static Color sensorStateAccent(MetricState state) {
+    switch (state) {
+      case MetricState.unknown:
+        return const Color(0xFF8A94A6);
+      case MetricState.good:
+        return envGood;
+      case MetricState.caution:
+        return envCaution;
+      case MetricState.alert:
+        return envDanger;
+    }
+  }
+
+  static Color anomalySeverityAccent(AnomalySeverity severity) {
+    switch (severity) {
+      case AnomalySeverity.info:
+        return const Color(0xFF8A94A6);
+      case AnomalySeverity.low:
+        return envCaution;
+      case AnomalySeverity.medium:
+      case AnomalySeverity.high:
+        return envDanger;
+    }
+  }
+
   // ===== Shared semantic helpers =====
   static bool isDark(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark;
@@ -147,8 +224,8 @@ class AppTheme {
       isDark(context) ? Colors.white38 : const Color(0xFF9AA3AF);
 
   static Color softBorder(BuildContext context) => isDark(context)
-      ? Colors.white.withOpacity(0.14)
-      : Colors.black.withOpacity(0.08);
+      ? Colors.white.withValues(alpha: 0.14)
+      : Colors.black.withValues(alpha: 0.08);
 
   static Color softShadow(BuildContext context) =>
       isDark(context) ? const Color(0x1A000000) : const Color(0x12000000);
@@ -156,16 +233,16 @@ class AppTheme {
   static Color chipFill(Color accentColor, BuildContext context,
       {double? opacity}) {
     final value = opacity ?? (isDark(context) ? 0.12 : 0.10);
-    return accentColor.withOpacity(value);
+    return accentColor.withValues(alpha: value);
   }
 
   static Color chartAxis(BuildContext context) => isDark(context)
-      ? Colors.white.withOpacity(0.25)
-      : Colors.black.withOpacity(0.22);
+      ? Colors.white.withValues(alpha: 0.25)
+      : Colors.black.withValues(alpha: 0.22);
 
   static Color chartGrid(BuildContext context) => isDark(context)
-      ? Colors.white.withOpacity(0.08)
-      : Colors.black.withOpacity(0.08);
+      ? Colors.white.withValues(alpha: 0.08)
+      : Colors.black.withValues(alpha: 0.08);
 
   static Color cardSurface(BuildContext context) =>
       Theme.of(context).colorScheme.surface;
@@ -176,26 +253,26 @@ class AppTheme {
     double darkOpacity = 0.10,
     double lightOpacity = 0.08,
   }) {
-    return accentColor.withOpacity(
-      isDark(context) ? darkOpacity : lightOpacity,
+    return accentColor.withValues(
+      alpha: isDark(context) ? darkOpacity : lightOpacity,
     );
   }
 
   static Color heroPetIcon(BuildContext context) => isDark(context)
-      ? Colors.white.withOpacity(0.05)
-      : Colors.black.withOpacity(0.04);
+      ? Colors.white.withValues(alpha: 0.05)
+      : Colors.black.withValues(alpha: 0.04);
 
   static Color quickActionFill(BuildContext context) =>
-      accent.withOpacity(isDark(context) ? 0.09 : 0.08);
+      accent.withValues(alpha: isDark(context) ? 0.09 : 0.08);
 
   static Color quickActionBorder(BuildContext context) =>
-      accent.withOpacity(isDark(context) ? 0.18 : 0.14);
+      accent.withValues(alpha: isDark(context) ? 0.18 : 0.14);
 
   static Color chartGlow(Color base, BuildContext context) =>
-      base.withOpacity(isDark(context) ? 0.18 : 0.14);
+      base.withValues(alpha: isDark(context) ? 0.18 : 0.14);
 
   static Color emptyStateFill(BuildContext context, Color accentColor) =>
-      accentColor.withOpacity(isDark(context) ? 0.08 : 0.06);
+      accentColor.withValues(alpha: isDark(context) ? 0.08 : 0.06);
 
   static Color semanticBandColor(
     BuildContext context,
@@ -250,7 +327,8 @@ class AppTheme {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: isDark ? Colors.black.withOpacity(0.22) : Colors.black12,
+            color:
+                isDark ? Colors.black.withValues(alpha: 0.22) : Colors.black12,
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -338,7 +416,7 @@ class AppTheme {
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
       ),
-      hintStyle: TextStyle(color: lightText.withOpacity(0.4)),
+      hintStyle: TextStyle(color: lightText.withValues(alpha: 0.4)),
       contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
     ),
     cardTheme: const CardThemeData(
