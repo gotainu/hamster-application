@@ -13,6 +13,7 @@ import 'package:hamster_project/services/environment_trend_service.dart';
 import 'package:hamster_project/services/paid_feature_guard_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
+import 'package:hamster_project/screens/record_screen.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_trend_chart.dart';
 import 'package:hamster_project/widgets/status_card.dart';
@@ -20,11 +21,13 @@ import 'package:hamster_project/widgets/status_card.dart';
 class HomeScreen extends StatefulWidget {
   final void Function(int) onTabSelected;
   final Future<void> Function(String draftText)? onOpenAiWithDraft;
+  final Future<void> Function()? onOpenRecord;
 
   const HomeScreen({
     super.key,
     required this.onTabSelected,
     this.onOpenAiWithDraft,
+    this.onOpenRecord,
   });
 
   @override
@@ -133,6 +136,23 @@ class HomeScreenState extends State<HomeScreen> {
     }
 
     widget.onTabSelected(1);
+  }
+
+  Future<void> _openRecord() async {
+    final allowed = await _ensurePaidFeature(featureName: '記録');
+    if (!allowed || !mounted) return;
+
+    final handler = widget.onOpenRecord;
+    if (handler != null) {
+      await handler();
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const RecordScreen(),
+      ),
+    );
   }
 
   Future<bool> _ensurePaidFeature({
@@ -278,14 +298,7 @@ class HomeScreenState extends State<HomeScreen> {
 
                                 widget.onTabSelected(1);
                               },
-                              onOpenRecord: () async {
-                                final allowed = await _ensurePaidFeature(
-                                  featureName: '記録',
-                                );
-                                if (!allowed) return;
-
-                                widget.onTabSelected(2);
-                              },
+                              onOpenRecord: _openRecord,
                             ),
                             const SizedBox(height: 18),
                             Center(

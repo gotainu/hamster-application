@@ -70,6 +70,7 @@ class TabsScreenState extends State<TabsScreen> {
           });
         },
         onOpenAiWithDraft: openAiWithDraft,
+        onOpenRecord: _openRecordScreen,
       ),
       PaidFeatureGate(
         featureName: 'AI相談',
@@ -79,14 +80,6 @@ class TabsScreenState extends State<TabsScreen> {
         child: FuncSearchScreen(key: _searchKey),
       ),
       const PaidFeatureGate(
-        featureName: '記録',
-        lockedTitle: '記録は有料プランの機能です',
-        lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
-        icon: Icons.edit_note_rounded,
-        showBackground: false,
-        child: RecordScreen(),
-      ),
-      const PaidFeatureGate(
         featureName: '変化',
         lockedTitle: '変化の確認は有料プランの機能です',
         lockedMessage: '走行距離、温湿度、環境評価の推移を確認する機能は、有料プランで利用できます。',
@@ -94,8 +87,34 @@ class TabsScreenState extends State<TabsScreen> {
         showBackground: false,
         child: GraphFunctionScreen(embeddedInTab: true),
       ),
-      const SettingScreen(embeddedInTab: true),
     ];
+  }
+
+  Widget _buildRecordDestination() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('記録'),
+        centerTitle: true,
+      ),
+      body: const PaidFeatureGate(
+        featureName: '記録',
+        lockedTitle: '記録は有料プランの機能です',
+        lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
+        icon: Icons.edit_note_rounded,
+        showBackground: false,
+        child: RecordScreen(),
+      ),
+    );
+  }
+
+  Future<void> _openRecordScreen() async {
+    if (!mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _buildRecordDestination(),
+      ),
+    );
   }
 
   void _onTabSelected(int index) {
@@ -106,27 +125,36 @@ class TabsScreenState extends State<TabsScreen> {
 
   void _setScreen(String identifier) {
     Navigator.of(context).pop();
-    if (identifier == 'settings') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (ctx) => const SettingScreen()),
-      );
-    } else if (identifier == 'pets_profile') {
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (ctx) => const PetProfileScreen()),
-      );
+
+    late final Widget screen;
+
+    switch (identifier) {
+      case 'record':
+        screen = _buildRecordDestination();
+        break;
+      case 'settings':
+        screen = const SettingScreen();
+        break;
+      case 'pets_profile':
+        screen = const PetProfileScreen();
+        break;
+      default:
+        return;
     }
+
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (context) => screen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final titles = [
+    const titles = [
       '今日',
       '相談',
-      '記録',
       '変化',
-      '設定',
     ];
 
     return Scaffold(
@@ -170,16 +198,8 @@ class TabsScreenState extends State<TabsScreen> {
             label: '相談',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.edit_note_rounded),
-            label: '記録',
-          ),
-          BottomNavigationBarItem(
             icon: Icon(Icons.insights_rounded),
             label: '変化',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_rounded),
-            label: '設定',
           ),
         ],
         selectedItemColor: AppTheme.accent,
