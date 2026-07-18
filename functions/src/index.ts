@@ -2742,3 +2742,13 @@ export const switchbotPoller = onSchedule(
     await pollAllUsersOnce();
   },
 );
+
+
+export {
+  healthWeightRecordWritten,
+  healthDistanceRecordWritten,
+  healthDailyCheckinWritten,
+  healthEnvironmentHistoryWritten,
+  healthEnvironmentLatestWritten,
+  rebuildMyHealthArchitecture,
+} from './health/healthTriggers';
