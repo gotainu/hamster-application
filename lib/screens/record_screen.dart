@@ -4,6 +4,7 @@ import '../services/distance_records_repo.dart';
 import '../theme/app_theme.dart';
 import '../widgets/daily_condition_input_card.dart';
 import '../widgets/wheel_rotation_input_card.dart';
+import '../widgets/weight_input_card.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key});
@@ -61,6 +62,26 @@ class _RecordScreenState extends State<RecordScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('今日の様子を保存しました。'),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                '定期的な記録',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            WeightInputCard(
+              onSaved: (_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('体重を保存しました。'),
                   ),
                 );
               },

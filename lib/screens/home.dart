@@ -6,11 +6,13 @@ import 'package:intl/intl.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
 import 'package:hamster_project/models/anomaly_detection.dart';
+import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/services/anomaly_detection_service.dart';
 import 'package:hamster_project/services/environment_status_service.dart';
 import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/services/environment_trend_service.dart';
 import 'package:hamster_project/services/paid_feature_guard_service.dart';
+import 'package:hamster_project/services/daily_record_completion_service.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/screens/record_screen.dart';
@@ -41,6 +43,7 @@ class HomeScreenState extends State<HomeScreen> {
   final _assessmentRepo = EnvironmentAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _paidFeatureGuard = PaidFeatureGuardService();
+  final _recordCompletionService = DailyRecordCompletionService();
 
   Stream<String?> _watchMainPetName() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -289,18 +292,25 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             ],
                             const SizedBox(height: 14),
-                            _HomeNextActionsCard(
-                              onOpenAi: () async {
-                                final allowed = await _ensurePaidFeature(
-                                  featureName: 'AI相談',
-                                );
-                                if (!allowed) return;
+                            StreamBuilder<DailyRecordCompletion>(
+                              stream: _recordCompletionService.watch(),
+                              builder: (context, completionSnapshot) {
+                                final completion = completionSnapshot.data;
 
-                                widget.onTabSelected(1);
+                                if (completion == null ||
+                                    !completion.shouldShowPrompt) {
+                                  return const SizedBox.shrink();
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 18),
+                                  child: _HomeRecordPromptCard(
+                                    completion: completion,
+                                    onOpenRecord: _openRecord,
+                                  ),
+                                );
                               },
-                              onOpenRecord: _openRecord,
                             ),
-                            const SizedBox(height: 18),
                             Center(
                               child: Text(
                                 '© 2025 Go / hamster well-being',
@@ -1052,69 +1062,119 @@ class _HomeAnomalyCard extends StatelessWidget {
   }
 }
 
-class _HomeNextActionsCard extends StatelessWidget {
-  final VoidCallback onOpenAi;
+class _HomeRecordPromptCard extends StatelessWidget {
+  final DailyRecordCompletion completion;
   final VoidCallback onOpenRecord;
 
-  const _HomeNextActionsCard({
-    required this.onOpenAi,
+  const _HomeRecordPromptCard({
+    required this.completion,
     required this.onOpenRecord,
   });
 
   @override
   Widget build(BuildContext context) {
-    final surface = AppTheme.cardSurface(context);
-    final secondary = AppTheme.secondaryText(context);
+    final dailyItems = completion.incompleteDailyLabels;
+    final showWeight = completion.weightDue;
 
-    return Container(
-      width: double.infinity,
+    final title = dailyItems.isNotEmpty
+        ? completion.remainingDailyCount == 1
+            ? '今日の記録があと1件あります'
+            : '今日の記録が残っています'
+        : 'そろそろ体重を記録しませんか？';
+
+    return StatusCard(
+      level: StatusCardLevel.neutral,
+      radius: 24,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
+      onTap: onOpenRecord,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '次にできること',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '気になることがあれば相談し、日々の様子は記録に残せます。',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: secondary,
-                ),
-          ),
-          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onOpenAi,
-                  icon: const Icon(Icons.smart_toy_outlined),
-                  label: const Text('相談する'),
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: onOpenRecord,
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: const Text('記録する'),
-                ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppTheme.tertiaryText(context),
               ),
             ],
+          ),
+          const SizedBox(height: 12),
+          if (dailyItems.isNotEmpty)
+            ...dailyItems.map(
+              (label) => _PromptRow(
+                icon: label.contains('走った')
+                    ? Icons.directions_run_rounded
+                    : Icons.favorite_border_rounded,
+                label: label,
+                trailing: '未入力',
+              ),
+            ),
+          if (showWeight)
+            _PromptRow(
+              icon: Icons.monitor_weight_outlined,
+              label: completion.weightPromptLabel,
+              trailing: '任意',
+            ),
+          const SizedBox(height: 10),
+          Text(
+            dailyItems.isNotEmpty
+                ? '入力が完了すると、このカードは自動で消えます。'
+                : '体重は毎日の必須記録ではありません。',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromptRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String trailing;
+
+  const _PromptRow({
+    required this.icon,
+    required this.label,
+    required this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: AppTheme.accent,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+          Text(
+            trailing,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  fontWeight: FontWeight.w800,
+                ),
           ),
         ],
       ),

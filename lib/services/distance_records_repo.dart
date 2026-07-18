@@ -156,6 +156,26 @@ class DistanceRecordsRepo {
     );
   }
 
+  Stream<DailyDistanceRecord?> watchDailyRecord(DateTime dayLocal) {
+    final doc = _docByLocalDate(dayLocal);
+    if (doc == null) {
+      return Stream<DailyDistanceRecord?>.value(null);
+    }
+
+    return doc.snapshots().map((snapshot) {
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) return null;
+
+      final day = _readLocalDay(data) ?? _normalizeLocalDay(dayLocal);
+
+      return DailyDistanceRecord.fromJson(
+        data,
+        fallbackDayKey: snapshot.id,
+        fallbackDate: day,
+      );
+    });
+  }
+
   // -------------------------
   // 全日分の距離時系列
   // -------------------------

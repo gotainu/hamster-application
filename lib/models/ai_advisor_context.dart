@@ -1,17 +1,20 @@
 import 'package:hamster_project/models/anomaly_detection.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/sensor_evaluation.dart';
+import 'package:hamster_project/models/weight_trend_evaluation.dart';
 
 class AiAdvisorContext {
   final EnvironmentAssessment? environment;
   final SensorEvaluation? sensorEvaluation;
   final AnomalyDetectionResult? anomalyDetection;
+  final WeightTrendEvaluation? weightTrend;
   final String promptText;
 
   const AiAdvisorContext({
     required this.environment,
     required this.sensorEvaluation,
     required this.anomalyDetection,
+    this.weightTrend,
     required this.promptText,
   });
 
@@ -43,6 +46,20 @@ class AiAdvisorContext {
           : {
               'overallState': sensorEvaluation!.overallState.name,
               'flags': sensorEvaluation!.flags.map((e) => e.name).toList(),
+            },
+      'weightTrend': weightTrend == null
+          ? null
+          : {
+              'state': weightTrend!.state.name,
+              'latestWeightGrams': weightTrend!.latest?.weightGrams,
+              'latestDate': weightTrend!.latest?.date.toIso8601String(),
+              'previousDifferenceGrams': weightTrend!.previousDifferenceGrams,
+              'previousChangeRate': weightTrend!.previousChangeRate,
+              'periodChangeRate': weightTrend!.periodChangeRate,
+              'recordCount': weightTrend!.records.length,
+              'daysSinceLatest': weightTrend!.daysSinceLatest,
+              'headline': weightTrend!.headline,
+              'message': weightTrend!.message,
             },
       'anomalyDetection': anomalyDetection == null
           ? null

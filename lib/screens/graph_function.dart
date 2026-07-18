@@ -3,10 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../models/health_record.dart';
+import '../models/weight_record.dart';
 import '../models/switchbot_reading.dart';
 import '../services/distance_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../services/switchbot_repo.dart';
+import '../services/weight_records_repo.dart';
+import '../services/weight_trend_evaluation_service.dart';
 import '../theme/app_theme.dart';
 import 'switchbot_setup.dart';
 
@@ -14,6 +17,7 @@ enum _TrendMetric {
   activity,
   temperature,
   humidity,
+  weight,
 }
 
 enum _TrendPeriod {
@@ -38,9 +42,12 @@ class GraphFunctionScreen extends StatefulWidget {
 class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   final DistanceRecordsRepo _distanceRepo = DistanceRecordsRepo();
   final SwitchbotRepo _sbRepo = SwitchbotRepo();
+  final WeightRecordsRepo _weightRepo = WeightRecordsRepo();
 
   static const EnvironmentStatusService _environmentStatusService =
       EnvironmentStatusService();
+  static const WeightTrendEvaluationService _weightTrendService =
+      WeightTrendEvaluationService();
 
   _TrendMetric _selectedMetric = _TrendMetric.activity;
   _TrendPeriod _selectedPeriod = _TrendPeriod.days7;
@@ -80,7 +87,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                 linked: linked,
                 hasDevice: hasDevice,
               ),
-              if (_selectedMetric != _TrendMetric.activity) ...[
+              if (_selectedMetric == _TrendMetric.temperature ||
+                  _selectedMetric == _TrendMetric.humidity) ...[
                 const SizedBox(height: 16),
                 if (!linked)
                   _switchbotBlock(hasSwitchBot: false)
@@ -121,12 +129,21 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
           icon: Icon(Icons.water_drop_outlined),
           label: Text('湿度'),
         ),
+        ButtonSegment<_TrendMetric>(
+          value: _TrendMetric.weight,
+          icon: Icon(Icons.monitor_weight_outlined),
+          label: Text('体重'),
+        ),
       ],
       selected: {_selectedMetric},
       showSelectedIcon: false,
       onSelectionChanged: (selection) {
         setState(() {
           _selectedMetric = selection.first;
+          if (_selectedMetric == _TrendMetric.weight &&
+              _selectedPeriod == _TrendPeriod.hours24) {
+            _selectedPeriod = _TrendPeriod.days30;
+          }
         });
       },
     );
@@ -136,20 +153,21 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     return SizedBox(
       width: double.infinity,
       child: SegmentedButton<_TrendPeriod>(
-        segments: const [
-          ButtonSegment<_TrendPeriod>(
-            value: _TrendPeriod.hours24,
-            label: Text('24時間'),
-          ),
-          ButtonSegment<_TrendPeriod>(
+        segments: [
+          if (_selectedMetric != _TrendMetric.weight)
+            const ButtonSegment<_TrendPeriod>(
+              value: _TrendPeriod.hours24,
+              label: Text('24時間'),
+            ),
+          const ButtonSegment<_TrendPeriod>(
             value: _TrendPeriod.days7,
             label: Text('7日'),
           ),
-          ButtonSegment<_TrendPeriod>(
+          const ButtonSegment<_TrendPeriod>(
             value: _TrendPeriod.days30,
             label: Text('30日'),
           ),
-          ButtonSegment<_TrendPeriod>(
+          const ButtonSegment<_TrendPeriod>(
             value: _TrendPeriod.all,
             label: Text('全期間'),
           ),
@@ -227,6 +245,9 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         return _buildEnvironmentPanel(
           metric: _TrendMetric.humidity,
         );
+
+      case _TrendMetric.weight:
+        return _buildWeightPanel();
     }
   }
 
@@ -442,6 +463,88 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                 minimum: bounds.minimum,
                 maximum: bounds.maximum,
               ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWeightPanel() {
+    return StreamBuilder<List<WeightRecord>>(
+      stream: _weightRepo.watchAll(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return _buildLoadingPanel();
+        }
+
+        final allRecords = [...(snapshot.data ?? const <WeightRecord>[])]
+          ..sort((a, b) => a.date.compareTo(b.date));
+
+        final allPoints = allRecords
+            .map((record) => _Point(record.date.toLocal(), record.weightGrams))
+            .toList();
+
+        final points = _filterPointsBySelectedPeriod(allPoints);
+
+        if (points.isEmpty) {
+          return _buildEmptyPanel(
+            title: '体重の記録がありません',
+            message: '記録画面で体重を入力すると、個体自身の変化を表示できます。',
+            icon: Icons.monitor_weight_outlined,
+          );
+        }
+
+        final filteredRecords = allRecords.where((record) {
+          return points.any(
+            (point) =>
+                point.x.year == record.date.year &&
+                point.x.month == record.date.month &&
+                point.x.day == record.date.day,
+          );
+        }).toList();
+
+        final evaluation = _weightTrendService.evaluate(filteredRecords);
+        final latest = points.last;
+        final smoothed =
+            points.length >= 3 ? _buildEmaSeries(points, alpha: 0.45) : points;
+
+        final values = points.map((point) => point.y).toList();
+        final minimumValue = values.reduce((a, b) => a < b ? a : b);
+        final maximumValue = values.reduce((a, b) => a > b ? a : b);
+        final padding = (maximumValue - minimumValue).abs() < 1
+            ? 5.0
+            : (maximumValue - minimumValue) * 0.25;
+
+        final difference = evaluation.previousDifferenceGrams;
+        final differenceText = difference == null
+            ? '比較データを蓄積中'
+            : '前回比 ${difference >= 0 ? '+' : ''}${difference.toStringAsFixed(1)}g';
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildStatusCard(
+              icon: Icons.monitor_weight_outlined,
+              title: '体重',
+              valueCaption: '最新',
+              currentValue: '${latest.y.toStringAsFixed(1)} g',
+              detailText: differenceText,
+              summaryText: evaluation.message,
+            ),
+            const SizedBox(height: 16),
+            _buildChartCard(
+              title: '体重の推移',
+              subtitle: '実測値を中心に、個体自身の変化を確認します',
+              points: points,
+              smoothedPoints: smoothed,
+              latestPoint: latest,
+              unit: 'g',
+              yMinimum:
+                  (minimumValue - padding).clamp(0, double.infinity).toDouble(),
+              yMaximum: maximumValue + padding,
+              plotBands: const [],
             ),
           ],
         );

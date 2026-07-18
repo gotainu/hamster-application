@@ -21,6 +21,211 @@ const STRIPE_PORTAL_RETURN_URL = defineSecret('STRIPE_PORTAL_RETURN_URL');
 const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
 
+
+type ResolveStripeCustomerMode = 'create-if-missing' | 'require-existing';
+
+type ResolvedStripeCustomer = {
+  customerId: string;
+  reused: boolean;
+  recreatedFromCustomerId: string | null;
+};
+
+function isHttpsError(error: unknown): error is HttpsError {
+  return error instanceof HttpsError;
+}
+
+function stripeErrorDetails(error: unknown): {
+  type: string | null;
+  code: string | null;
+  param: string | null;
+  message: string;
+  requestId: string | null;
+} {
+  const value = error as {
+    type?: unknown;
+    code?: unknown;
+    param?: unknown;
+    message?: unknown;
+    requestId?: unknown;
+    raw?: {
+      requestId?: unknown;
+    };
+  };
+
+  return {
+    type: typeof value?.type === 'string' ? value.type : null,
+    code: typeof value?.code === 'string' ? value.code : null,
+    param: typeof value?.param === 'string' ? value.param : null,
+    message:
+      typeof value?.message === 'string'
+        ? value.message
+        : String(error),
+    requestId:
+      typeof value?.requestId === 'string'
+        ? value.requestId
+        : typeof value?.raw?.requestId === 'string'
+          ? value.raw.requestId
+          : null,
+  };
+}
+
+function isMissingStripeCustomerError(error: unknown): boolean {
+  const details = stripeErrorDetails(error);
+
+  return (
+    details.code === 'resource_missing' &&
+    details.param === 'customer'
+  );
+}
+
+function toHttpsError(params: {
+  error: unknown;
+  operation: 'checkout' | 'portal';
+}): HttpsError {
+  const { error, operation } = params;
+
+  if (isHttpsError(error)) {
+    return error;
+  }
+
+  const details = stripeErrorDetails(error);
+
+  logger.error('Stripe operation failed', {
+    operation,
+    type: details.type,
+    code: details.code,
+    param: details.param,
+    requestId: details.requestId,
+    error: details.message,
+  });
+
+  const message =
+    operation === 'checkout'
+      ? '購入ページを作成できませんでした。しばらくしてから再度お試しください。'
+      : '契約管理ページを作成できませんでした。しばらくしてから再度お試しください。';
+
+  return new HttpsError('internal', message, {
+    stripeCode: details.code,
+    stripeType: details.type,
+    stripeParam: details.param,
+    stripeRequestId: details.requestId,
+  });
+}
+
+async function resolveStripeCustomer(params: {
+  stripe: Stripe;
+  uid: string;
+  email?: string;
+  mode: ResolveStripeCustomerMode;
+}): Promise<ResolvedStripeCustomer> {
+  const { stripe, uid, email, mode } = params;
+
+  const billingRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription');
+
+  const billingSnap = await billingRef.get();
+  const storedValue = billingSnap.exists
+    ? billingSnap.get('stripeCustomerId')
+    : undefined;
+
+  const storedCustomerId =
+    typeof storedValue === 'string' && storedValue.trim().length > 0
+      ? storedValue.trim()
+      : null;
+
+  if (storedCustomerId) {
+    try {
+      const customer = await stripe.customers.retrieve(storedCustomerId);
+
+      if (!customer.deleted) {
+        logger.info('Existing Stripe customer reused', {
+          uid,
+          stripeCustomerId: customer.id,
+        });
+
+        return {
+          customerId: customer.id,
+          reused: true,
+          recreatedFromCustomerId: null,
+        };
+      }
+
+      logger.warn('Stored Stripe customer was deleted', {
+        uid,
+        storedStripeCustomerId: storedCustomerId,
+      });
+    } catch (error: unknown) {
+      if (!isMissingStripeCustomerError(error)) {
+        throw error;
+      }
+
+      const details = stripeErrorDetails(error);
+
+      logger.warn('Stored Stripe customer does not exist', {
+        uid,
+        storedStripeCustomerId: storedCustomerId,
+        stripeRequestId: details.requestId,
+      });
+    }
+
+    await billingRef.set(
+      {
+        stripeCustomerId: admin.firestore.FieldValue.delete(),
+        stripeCustomerInvalidatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  if (mode === 'require-existing') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Stripeの顧客情報が見つかりません。プラン登録画面から再度お手続きください。',
+    );
+  }
+
+  const customer = await stripe.customers.create({
+    email:
+      typeof email === 'string' && email.trim().length > 0
+        ? email.trim()
+        : undefined,
+    metadata: {
+      firebaseUid: uid,
+    },
+  });
+
+  await billingRef.set(
+    {
+      provider: 'stripe',
+      stripeCustomerId: customer.id,
+      stripeCustomerCreatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+      stripeCustomerRecoveredFromId: storedCustomerId,
+      stripeCustomerInvalidatedAt:
+        admin.firestore.FieldValue.delete(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  logger.info('Stripe customer created', {
+    uid,
+    stripeCustomerId: customer.id,
+    recreatedFromCustomerId: storedCustomerId,
+  });
+
+  return {
+    customerId: customer.id,
+    reused: false,
+    recreatedFromCustomerId: storedCustomerId,
+  };
+}
+
 export const createStripeCheckoutSession = onCall(
   {
     region: 'asia-northeast1',
@@ -38,89 +243,121 @@ export const createStripeCheckoutSession = onCall(
       throw new HttpsError('unauthenticated', 'ログインが必要です。');
     }
 
-    const email = req.auth?.token?.email;
+    const email =
+      typeof req.auth?.token?.email === 'string'
+        ? req.auth.token.email
+        : undefined;
     const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
     const priceId = process.env.STRIPE_PRICE_ID_MONTHLY;
     const successUrl = process.env.STRIPE_SUCCESS_URL;
     const cancelUrl = process.env.STRIPE_CANCEL_URL;
 
     if (!stripeSecretKey) {
-      throw new HttpsError('failed-precondition', 'STRIPE_SECRET_KEY が設定されていません。');
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SECRET_KEY が設定されていません。',
+      );
     }
 
     if (!priceId) {
-      throw new HttpsError('failed-precondition', 'STRIPE_PRICE_ID_MONTHLY が設定されていません。');
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_PRICE_ID_MONTHLY が設定されていません。',
+      );
     }
 
     if (!successUrl || !cancelUrl) {
-      throw new HttpsError('failed-precondition', 'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL が設定されていません。');
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL が設定されていません。',
+      );
     }
 
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-02-24.acacia',
     });
 
-    const userRef = db.collection('users').doc(uid);
-    const billingRef = userRef.collection('billing').doc('subscription');
-    const billingSnap = await billingRef.get();
+    const billingRef = db
+      .collection('users')
+      .doc(uid)
+      .collection('billing')
+      .doc('subscription');
 
-    const existingStripeCustomerId = billingSnap.exists
-      ? billingSnap.get('stripeCustomerId') as string | undefined
-      : undefined;
+    try {
+      const resolvedCustomer = await resolveStripeCustomer({
+        stripe,
+        uid,
+        email,
+        mode: 'create-if-missing',
+      });
 
-    logger.info('createStripeCheckoutSession started', {
-      uid,
-      hasExistingStripeCustomerId: !!existingStripeCustomerId,
-    });
+      logger.info('createStripeCheckoutSession started', {
+        uid,
+        stripeCustomerId: resolvedCustomer.customerId,
+        reusedStripeCustomer: resolvedCustomer.reused,
+        recreatedFromCustomerId:
+          resolvedCustomer.recreatedFromCustomerId,
+      });
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      client_reference_id: uid,
-      customer: existingStripeCustomerId,
-      customer_email: existingStripeCustomerId ? undefined : email,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: {
-        firebaseUid: uid,
-      },
-      subscription_data: {
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        client_reference_id: uid,
+        customer: resolvedCustomer.customerId,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: {
           firebaseUid: uid,
         },
-      },
-      allow_promotion_codes: true,
-    });
+        subscription_data: {
+          metadata: {
+            firebaseUid: uid,
+          },
+        },
+        allow_promotion_codes: true,
+      });
 
-    if (!session.url) {
-      throw new HttpsError('internal', 'Stripe Checkout URL を作成できませんでした。');
+      if (!session.url) {
+        throw new HttpsError(
+          'internal',
+          'Stripe Checkout URL を作成できませんでした。',
+        );
+      }
+
+      await billingRef.set(
+        {
+          provider: 'stripe',
+          stripeCustomerId: resolvedCustomer.customerId,
+          checkoutSessionId: session.id,
+          checkoutCreatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      logger.info('createStripeCheckoutSession completed', {
+        uid,
+        sessionId: session.id,
+        stripeCustomerId: resolvedCustomer.customerId,
+      });
+
+      return {
+        ok: true,
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      };
+    } catch (error: unknown) {
+      throw toHttpsError({
+        error,
+        operation: 'checkout',
+      });
     }
-
-    await billingRef.set(
-      {
-        provider: 'stripe',
-        checkoutSessionId: session.id,
-        checkoutCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-    logger.info('createStripeCheckoutSession completed', {
-      uid,
-      sessionId: session.id,
-    });
-
-    return {
-      ok: true,
-      checkoutUrl: session.url,
-      sessionId: session.id,
-    };
   },
 );
 
@@ -171,73 +408,86 @@ export const createStripeCustomerPortalSession = onCall(
       );
     }
 
-    const stripeCustomerId = billingSnap.get('stripeCustomerId') as
-      | string
-      | undefined;
-
-    if (!stripeCustomerId) {
-      throw new HttpsError(
-        'failed-precondition',
-        'Stripe顧客IDが見つかりません。',
-      );
-    }
-
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-02-24.acacia',
     });
 
-    const stripeSubscriptionId = billingSnap.get('stripeSubscriptionId') as
-      | string
-      | undefined;
+    try {
+      const resolvedCustomer = await resolveStripeCustomer({
+        stripe,
+        uid,
+        mode: 'require-existing',
+      });
 
-    if (stripeSubscriptionId) {
-      try {
-        const subscription = await stripe.subscriptions.retrieve(
-          stripeSubscriptionId,
-        );
+      const stripeSubscriptionId = billingSnap.get(
+        'stripeSubscriptionId',
+      ) as string | undefined;
 
-        await saveStripeSubscriptionToFirestore({
-          uid,
-          subscription,
-        });
+      if (stripeSubscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(
+            stripeSubscriptionId,
+          );
 
-        logger.info('Stripe subscription refreshed before portal session', {
-          uid,
-          stripeSubscriptionId,
-          status: subscription.status,
-          cancelAtPeriodEnd: (subscription as any).cancel_at_period_end ?? null,
-          cancelAt: (subscription as any).cancel_at ?? null,
-        });
-      } catch (e: any) {
-        logger.warn('Failed to refresh Stripe subscription before portal session', {
-          uid,
-          stripeSubscriptionId,
-          error: String(e?.message ?? e),
-        });
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+          });
+
+          logger.info(
+            'Stripe subscription refreshed before portal session',
+            {
+              uid,
+              stripeSubscriptionId,
+              status: subscription.status,
+              cancelAtPeriodEnd:
+                (subscription as any).cancel_at_period_end ?? null,
+              cancelAt: (subscription as any).cancel_at ?? null,
+            },
+          );
+        } catch (error: unknown) {
+          const details = stripeErrorDetails(error);
+
+          logger.warn(
+            'Failed to refresh Stripe subscription before portal session',
+            {
+              uid,
+              stripeSubscriptionId,
+              stripeCode: details.code,
+              stripeRequestId: details.requestId,
+              error: details.message,
+            },
+          );
+        }
       }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: resolvedCustomer.customerId,
+        return_url: returnUrl,
+      });
+
+      if (!session.url) {
+        throw new HttpsError(
+          'internal',
+          'Stripe Customer Portal URL を作成できませんでした。',
+        );
+      }
+
+      logger.info('createStripeCustomerPortalSession completed', {
+        uid,
+        stripeCustomerId: resolvedCustomer.customerId,
+      });
+
+      return {
+        ok: true,
+        portalUrl: session.url,
+      };
+    } catch (error: unknown) {
+      throw toHttpsError({
+        error,
+        operation: 'portal',
+      });
     }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer: stripeCustomerId,
-      return_url: returnUrl,
-    });
-
-    if (!session.url) {
-      throw new HttpsError(
-        'internal',
-        'Stripe Customer Portal URL を作成できませんでした。',
-      );
-    }
-
-    logger.info('createStripeCustomerPortalSession completed', {
-      uid,
-      stripeCustomerId,
-    });
-
-    return {
-      ok: true,
-      portalUrl: session.url,
-    };
   },
 );
 

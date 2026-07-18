@@ -9,6 +9,8 @@ import '../models/environment_assessment_history.dart';
 import '../models/health_record.dart';
 import '../models/metric_card_view_data.dart';
 import '../models/sensor_evaluation.dart';
+import '../models/weight_record.dart';
+import '../models/weight_trend_evaluation.dart';
 import '../models/anomaly_detection.dart';
 import '../services/activity_trend_service.dart';
 import '../services/anomaly_detection_service.dart';
@@ -16,6 +18,8 @@ import '../services/environment_assessment_repo.dart';
 import '../services/distance_records_repo.dart';
 import '../services/environment_status_service.dart';
 import '../services/daily_status_summary_service.dart';
+import '../services/weight_records_repo.dart';
+import '../services/weight_trend_evaluation_service.dart';
 import '../widgets/semantic_trend_chart.dart';
 import '../widgets/status_card.dart';
 import '../theme/app_theme.dart';
@@ -35,6 +39,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
   final _distanceRepo = DistanceRecordsRepo();
   final _environmentStatusService = const EnvironmentStatusService();
   final _dailyStatusSummaryService = const DailyStatusSummaryService();
+  final _weightRepo = WeightRecordsRepo();
+  final _weightTrendService = const WeightTrendEvaluationService();
 
   Future<_DetailBundle> _loadBundle() async {
     final latest = await _assessmentRepo.fetchLatest();
@@ -82,6 +88,9 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
       history: anomalyHistory,
     );
 
+    final weightRecords = await _weightRepo.fetchAll();
+    final weightEvaluation = _weightTrendService.evaluate(weightRecords);
+
     return _DetailBundle(
       assessment: latest,
       history: history,
@@ -90,6 +99,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
       sensorEvaluation: sensorEvaluation,
       anomalyDetection: anomalyDetection,
       activityReferenceDate: referenceDay,
+      weightRecords: weightRecords,
+      weightEvaluation: weightEvaluation,
     );
   }
 
@@ -168,6 +179,13 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                       ),
                     ],
                   ],
+                  const SizedBox(height: 18),
+                  _SectionLabel(title: '身体の変化'),
+                  const SizedBox(height: 10),
+                  _WeightTrendCard(
+                    evaluation: bundle.weightEvaluation,
+                    records: bundle.weightRecords,
+                  ),
                   const SizedBox(height: 18),
                   _SectionLabel(title: '環境'),
                   const SizedBox(height: 10),
@@ -407,6 +425,8 @@ class _DetailBundle {
   final SensorEvaluation? sensorEvaluation;
   final AnomalyDetectionResult anomalyDetection;
   final DateTime activityReferenceDate;
+  final List<WeightRecord> weightRecords;
+  final WeightTrendEvaluation weightEvaluation;
 
   _DetailBundle({
     required this.assessment,
@@ -416,7 +436,138 @@ class _DetailBundle {
     required this.sensorEvaluation,
     required this.anomalyDetection,
     required this.activityReferenceDate,
+    required this.weightRecords,
+    required this.weightEvaluation,
   });
+}
+
+class _WeightTrendCard extends StatelessWidget {
+  final WeightTrendEvaluation evaluation;
+  final List<WeightRecord> records;
+
+  const _WeightTrendCard({
+    required this.evaluation,
+    required this.records,
+  });
+
+  StatusCardLevel _level() {
+    switch (evaluation.state) {
+      case WeightTrendState.stable:
+        return StatusCardLevel.good;
+      case WeightTrendState.changed:
+        return StatusCardLevel.caution;
+      case WeightTrendState.caution:
+        return StatusCardLevel.danger;
+      case WeightTrendState.insufficientData:
+        return StatusCardLevel.unavailable;
+    }
+  }
+
+  String _formatWeight(double value) {
+    return value == value.roundToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(1);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = evaluation.latest;
+    final difference = evaluation.previousDifferenceGrams;
+    final trendPoints = records
+        .map(
+          (record) => SemanticTrendPoint(
+            x: record.date.toLocal(),
+            y: record.weightGrams,
+          ),
+        )
+        .toList()
+      ..sort((a, b) => a.x.compareTo(b.x));
+
+    final values = trendPoints.map((point) => point.y).toList();
+    final minimumValue =
+        values.isEmpty ? 0.0 : values.reduce((a, b) => a < b ? a : b);
+    final maximumValue =
+        values.isEmpty ? 100.0 : values.reduce((a, b) => a > b ? a : b);
+    final padding = (maximumValue - minimumValue).abs() < 1
+        ? 5.0
+        : (maximumValue - minimumValue) * 0.25;
+
+    return StatusCard(
+      level: _level(),
+      emphasize: evaluation.shouldEmphasize,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '体重',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            latest == null ? '—' : '${_formatWeight(latest.weightGrams)}g',
+            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                ),
+          ),
+          if (latest != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _DetailChip(
+                  text:
+                      '記録日 ${DateFormat('M/d').format(latest.date.toLocal())}',
+                ),
+                if (difference != null)
+                  _DetailChip(
+                    text:
+                        '前回比 ${difference >= 0 ? '+' : ''}${difference.toStringAsFixed(1)}g',
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 14),
+          Text(
+            evaluation.headline,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  height: 1.4,
+                ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            evaluation.message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
+          ),
+          if (trendPoints.length >= 2) ...[
+            const SizedBox(height: 16),
+            SemanticTrendChart(
+              points: trendPoints,
+              bands: const [],
+              unit: 'g',
+              minimum:
+                  (minimumValue - padding).clamp(0, double.infinity).toDouble(),
+              maximum: maximumValue + padding,
+              height: 210,
+              mode: SemanticTrendChartMode.full,
+              dateFormat: DateFormat('M/d'),
+              showBandLabels: false,
+              lineColor: AppTheme.isDark(context)
+                  ? Colors.white
+                  : const Color(0xFF374151),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _OverallSummaryCard extends StatelessWidget {
