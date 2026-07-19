@@ -7,10 +7,22 @@ export type HealthAssessmentState =
   | 'alert'
   | 'insufficientData';
 
+export type HealthAssessmentConfidence =
+  | 'insufficient'
+  | 'low'
+  | 'medium'
+  | 'high';
+
 export type EnvironmentFeatureSourceKind =
   | 'history'
   | 'latest'
   | 'none';
+
+export type EnvironmentTrendDirection =
+  | 'improving'
+  | 'stable'
+  | 'worsening'
+  | 'unknown';
 
 export interface EnvironmentHealthFeatures {
   sourceKind: EnvironmentFeatureSourceKind;
@@ -30,9 +42,24 @@ export interface EnvironmentHealthFeatures {
   sourceDocCount: number | null;
   assessmentVersion: number | null;
   sourceEvaluatedAt: Date | null;
+  windowDays: number;
+  windowRecordCount: number;
+  highTemperatureDays: number;
+  lowTemperatureDays: number;
+  highHumidityDays: number;
+  lowHumidityDays: number;
+  latestDailyTemp: number | null;
+  latestDailyHum: number | null;
+  temperatureTrend: EnvironmentTrendDirection;
+  humidityTrend: EnvironmentTrendDirection;
 }
 
 export interface ActivityHealthFeatures {
+  assessmentDateKey: string;
+  sourceDateKey: string;
+  lagDays: number;
+  windowStartDateKey: string;
+  windowEndDateKey: string;
   hasRecord: boolean;
   distanceMeters: number | null;
   rotations: number | null;
@@ -93,6 +120,13 @@ export interface DailyHealthFeatures {
   generatedAt: Date;
 }
 
+export interface HealthScoreComponent {
+  score: number | null;
+  state: HealthAssessmentState;
+  summary: string;
+  flags: string[];
+}
+
 export interface HealthDomainAssessment {
   state: HealthAssessmentState;
   score: number | null;
@@ -100,6 +134,7 @@ export interface HealthDomainAssessment {
   summary: string;
   recommendedActions: string[];
   sourceUpdatedAt: Date | null;
+  components?: Record<string, HealthScoreComponent>;
 }
 
 export interface HealthAssessmentDomains {
@@ -113,9 +148,14 @@ export interface HealthAssessmentDomains {
 export interface HealthOverallAssessment {
   state: HealthAssessmentState;
   score: number | null;
+  observedState: HealthAssessmentState;
+  observedScore: number | null;
+  confidence: HealthAssessmentConfidence;
+  isProvisional: boolean;
   flags: string[];
   summary: string;
   recommendedActions: string[];
+  primaryFactor: string | null;
 }
 
 export interface HealthAssessmentDataQuality {
@@ -197,10 +237,21 @@ export interface EnvironmentAssessmentSource {
   sourceDocCount: number | null;
   version: number | null;
   evaluatedAt: Date | null;
+  windowDays: number;
+  windowRecordCount: number;
+  highTemperatureDays: number;
+  lowTemperatureDays: number;
+  highHumidityDays: number;
+  lowHumidityDays: number;
+  latestDailyTemp: number | null;
+  latestDailyHum: number | null;
+  temperatureTrend: EnvironmentTrendDirection;
+  humidityTrend: EnvironmentTrendDirection;
 }
 
 export interface HealthSourceData {
   environment: EnvironmentAssessmentSource;
+  activitySourceDateKey: string;
   distanceWindow: DistanceRecordSource[];
   weightRecords: WeightRecordSource[];
   dailyCheckin: DailyCheckinSource;

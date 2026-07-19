@@ -70,19 +70,35 @@ export const healthDistanceRecordWritten = onDocumentWritten(
       event.params.sourceDateKey,
     );
     const todayDateKey = formatDateKey(new Date());
-    const endDateKeyCandidate =
-      addDaysToDateKey(sourceDateKey, 6);
-    const endDateKey =
-      endDateKeyCandidate < todayDateKey
-        ? endDateKeyCandidate
+    // distance_records/S is the completed activity for day S.
+    // It becomes the primary activity input for assessment S+1 and
+    // remains inside that assessment's rolling window through S+7.
+    const firstAffectedDateKey =
+      addDaysToDateKey(sourceDateKey, 1);
+    const lastAffectedCandidate =
+      addDaysToDateKey(sourceDateKey, 7);
+
+    if (firstAffectedDateKey > todayDateKey) {
+      logger.info(
+        'Distance record saved before its assessment date',
+        {
+          uid,
+          sourceDateKey,
+          firstAffectedDateKey,
+          todayDateKey,
+        },
+      );
+      return;
+    }
+
+    const lastAffectedDateKey =
+      lastAffectedCandidate < todayDateKey
+        ? lastAffectedCandidate
         : todayDateKey;
 
     const affectedDateKeys = enumerateDateKeys({
-      startDateKey: sourceDateKey,
-      endDateKey:
-        sourceDateKey > todayDateKey
-          ? sourceDateKey
-          : endDateKey,
+      startDateKey: firstAffectedDateKey,
+      endDateKey: lastAffectedDateKey,
       maxDays: 7,
     });
 

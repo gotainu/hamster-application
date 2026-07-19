@@ -40,11 +40,40 @@ export function buildDailyHealthFeatures(params: {
     sourceDocCount: params.source.environment.sourceDocCount,
     assessmentVersion: params.source.environment.version,
     sourceEvaluatedAt: params.source.environment.evaluatedAt,
+    windowDays: params.source.environment.windowDays,
+    windowRecordCount:
+      params.source.environment.windowRecordCount,
+    highTemperatureDays:
+      params.source.environment.highTemperatureDays,
+    lowTemperatureDays:
+      params.source.environment.lowTemperatureDays,
+    highHumidityDays:
+      params.source.environment.highHumidityDays,
+    lowHumidityDays:
+      params.source.environment.lowHumidityDays,
+    latestDailyTemp:
+      params.source.environment.latestDailyTemp,
+    latestDailyHum:
+      params.source.environment.latestDailyHum,
+    temperatureTrend:
+      params.source.environment.temperatureTrend,
+    humidityTrend:
+      params.source.environment.humidityTrend,
   };
 
+  const activitySourceDateKey =
+    params.source.activitySourceDateKey;
   const targetDistance = params.source.distanceWindow.find(
-    (record) => record.dayKey === dateKey,
+    (record) =>
+      record.dayKey === activitySourceDateKey,
   );
+  const windowStartDateKey =
+    params.source.distanceWindow[0]?.dayKey ??
+    activitySourceDateKey;
+  const windowEndDateKey =
+    params.source.distanceWindow[
+      params.source.distanceWindow.length - 1
+    ]?.dayKey ?? activitySourceDateKey;
 
   const distanceTotal = params.source.distanceWindow.reduce(
     (sum, record) =>
@@ -72,6 +101,11 @@ export function buildDailyHealthFeatures(params: {
       : null;
 
   const activity = {
+    assessmentDateKey: dateKey,
+    sourceDateKey: activitySourceDateKey,
+    lagDays: 1,
+    windowStartDateKey,
+    windowEndDateKey,
     hasRecord: targetDistance?.exists ?? false,
     distanceMeters,
     rotations: targetDistance?.rotations ?? null,
@@ -158,7 +192,7 @@ export function buildDailyHealthFeatures(params: {
       staleDomains,
       completeness,
     },
-    schemaVersion: 1,
+    schemaVersion: 3,
     generatedAt: params.generatedAt ?? new Date(),
   };
 

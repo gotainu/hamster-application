@@ -4,14 +4,20 @@ import * as logger from 'firebase-functions/logger';
 import { buildDailyHealthFeatures } from './dailyHealthFeatures';
 import { fetchHealthSourceData } from './firestoreReaders';
 import { buildHealthAssessment } from './healthAssessment';
-import { normalizeDateKey } from './dateKey';
+import { formatDateKey, normalizeDateKey } from './dateKey';
+import { executeGoldHealthNotificationPipeline } from './goldHealthNotification';
 
 export interface HealthPipelineResult {
   uid: string;
   dateKey: string;
   overallState: string;
   overallScore: number | null;
+  observedState: string;
+  observedScore: number | null;
+  confidence: string;
+  isProvisional: boolean;
   featureCompleteness: number;
+  primaryFactor: string | null;
   updatedLatest: boolean;
 }
 
@@ -68,7 +74,7 @@ export async function rebuildHealthForDate(params: {
       featureRef,
       {
         ...featureResult.features,
-        source: 'health_pipeline_v1',
+        source: 'health_pipeline_v4',
         triggerReason: params.reason,
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
@@ -80,7 +86,7 @@ export async function rebuildHealthForDate(params: {
       historyRef,
       {
         ...assessment,
-        source: 'health_pipeline_v1',
+        source: 'health_pipeline_v4',
         triggerReason: params.reason,
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
@@ -93,7 +99,7 @@ export async function rebuildHealthForDate(params: {
         latestRef,
         {
           ...assessment,
-          source: 'health_pipeline_v1',
+          source: 'health_pipeline_v4',
           triggerReason: params.reason,
           updatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
@@ -105,12 +111,53 @@ export async function rebuildHealthForDate(params: {
     }
   });
 
+  if (updatedLatest && dateKey === formatDateKey(generatedAt)) {
+    try {
+      const notificationResult =
+        await executeGoldHealthNotificationPipeline({
+          db,
+          messaging: admin.messaging(),
+          uid: params.uid,
+          assessment,
+          triggerReason: params.reason,
+          now: generatedAt,
+        });
+
+      logger.info('Gold health notification pipeline completed', {
+        uid: params.uid,
+        dateKey,
+        triggerReason: params.reason,
+        reason: notificationResult.reason,
+        notificationKey: notificationResult.notificationKey,
+        tokenCount: notificationResult.tokenCount,
+        sentCount: notificationResult.sentCount,
+        failedCount: notificationResult.failedCount,
+        noTokens: notificationResult.noTokens,
+      });
+    } catch (error: unknown) {
+      logger.error('Gold health notification pipeline failed', {
+        uid: params.uid,
+        dateKey,
+        triggerReason: params.reason,
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      });
+    }
+  }
+
   logger.info('Health architecture rebuilt', {
     uid: params.uid,
     dateKey,
     reason: params.reason,
     overallState: assessment.overall.state,
     overallScore: assessment.overall.score,
+    observedState: assessment.overall.observedState,
+    observedScore: assessment.overall.observedScore,
+    confidence: assessment.overall.confidence,
+    isProvisional: assessment.overall.isProvisional,
+    primaryFactor: assessment.overall.primaryFactor,
     completeness:
       featureResult.features.dataQuality.completeness,
     updatedLatest,
@@ -121,8 +168,13 @@ export async function rebuildHealthForDate(params: {
     dateKey,
     overallState: assessment.overall.state,
     overallScore: assessment.overall.score,
+    observedState: assessment.overall.observedState,
+    observedScore: assessment.overall.observedScore,
+    confidence: assessment.overall.confidence,
+    isProvisional: assessment.overall.isProvisional,
     featureCompleteness:
       featureResult.features.dataQuality.completeness,
+    primaryFactor: assessment.overall.primaryFactor,
     updatedLatest,
   };
 }

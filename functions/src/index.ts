@@ -6,7 +6,6 @@ import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
 import Stripe from 'stripe';
-import { executeAnomalyNotificationPipeline } from './anomalyNotification';
 import { defineSecret } from 'firebase-functions/params';
 
 
@@ -2223,32 +2222,7 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     aiAdvisorContextStatus: aiAdvisorContext.status,
   });
 
-  // ===== 異常検知通知パイプライン =====
-  try {
-    const notificationResult = await executeAnomalyNotificationPipeline({
-      db,
-      messaging: admin.messaging(),
-      uid,
-      windowDays: 14,
-      now: evaluatedAt,
-    });
 
-    logger.info('executeAnomalyNotificationPipeline done', {
-      uid,
-      shouldNotify: notificationResult.decision.shouldNotify,
-      reason: notificationResult.decision.reason,
-      notificationKey: notificationResult.notificationKey,
-      tokenCount: notificationResult.tokenCount,
-      sentCount: notificationResult.sentCount,
-      failedCount: notificationResult.failedCount,
-      noTokens: notificationResult.noTokens,
-    });
-  } catch (e: any) {
-    logger.error('executeAnomalyNotificationPipeline error', {
-      uid,
-      error: String(e?.message ?? e),
-    });
-  }
 }
 
 async function saveEnvironmentAssessmentHistoryDaily(

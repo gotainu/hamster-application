@@ -1,27 +1,71 @@
 import 'package:hamster_project/models/anomaly_detection.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
+import 'package:hamster_project/models/health_assessment.dart';
 import 'package:hamster_project/models/sensor_evaluation.dart';
 import 'package:hamster_project/models/weight_trend_evaluation.dart';
 
+enum AiAdvisorContextSource {
+  healthAssessment,
+  legacyLocalEvaluation,
+  none,
+}
+
 class AiAdvisorContext {
+  final AiAdvisorContextSource source;
+  final HealthAssessment? healthAssessment;
   final EnvironmentAssessment? environment;
   final SensorEvaluation? sensorEvaluation;
   final AnomalyDetectionResult? anomalyDetection;
   final WeightTrendEvaluation? weightTrend;
+  final String? status;
+  final String? priority;
+  final String? summary;
   final String promptText;
 
   const AiAdvisorContext({
+    this.source = AiAdvisorContextSource.legacyLocalEvaluation,
+    this.healthAssessment,
     required this.environment,
     required this.sensorEvaluation,
     required this.anomalyDetection,
     this.weightTrend,
+    this.status,
+    this.priority,
+    this.summary,
     required this.promptText,
   });
 
+  factory AiAdvisorContext.fromHealthAssessment(
+    HealthAssessment assessment,
+  ) {
+    final context = assessment.aiAdvisorContext;
+
+    return AiAdvisorContext(
+      source: AiAdvisorContextSource.healthAssessment,
+      healthAssessment: assessment,
+      environment: null,
+      sensorEvaluation: null,
+      anomalyDetection: null,
+      weightTrend: null,
+      status: context?.status,
+      priority: context?.priority,
+      summary: context?.summary ?? assessment.overall.summary,
+      promptText: context?.promptText ?? '',
+    );
+  }
+
   bool get hasAnyContext => promptText.trim().isNotEmpty;
+
+  bool get usesGoldAssessment =>
+      source == AiAdvisorContextSource.healthAssessment;
 
   Map<String, dynamic> toJson() {
     return {
+      'source': source.name,
+      'healthAssessment': healthAssessment?.toMap(),
+      'status': status,
+      'priority': priority,
+      'summary': summary,
       'environment': environment == null
           ? null
           : {
@@ -74,6 +118,7 @@ class AiAdvisorContext {
                       'description': anomalyDetection!.topAnomaly!.description,
                     },
             },
+      'promptText': promptText,
     };
   }
 }

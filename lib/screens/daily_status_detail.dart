@@ -7,6 +7,7 @@ import '../models/activity_summary.dart';
 import '../models/environment_assessment.dart';
 import '../models/environment_assessment_history.dart';
 import '../models/health_record.dart';
+import '../models/health_assessment.dart';
 import '../models/metric_card_view_data.dart';
 import '../models/sensor_evaluation.dart';
 import '../models/weight_record.dart';
@@ -20,8 +21,11 @@ import '../services/environment_status_service.dart';
 import '../services/daily_status_summary_service.dart';
 import '../services/weight_records_repo.dart';
 import '../services/weight_trend_evaluation_service.dart';
+import '../services/health_assessment_repo.dart';
 import '../widgets/semantic_trend_chart.dart';
 import '../widgets/status_card.dart';
+import '../widgets/health_score_gauge.dart';
+import '../widgets/health_score_trend_chart.dart';
 import '../theme/app_theme.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
@@ -34,6 +38,7 @@ class DailyStatusDetailScreen extends StatefulWidget {
 
 class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
   final _assessmentRepo = EnvironmentAssessmentRepo();
+  final _healthAssessmentRepo = HealthAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _activityTrendService = const ActivityTrendService();
   final _distanceRepo = DistanceRecordsRepo();
@@ -43,6 +48,9 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
   final _weightTrendService = const WeightTrendEvaluationService();
 
   Future<_DetailBundle> _loadBundle() async {
+    final healthAssessment = await _healthAssessmentRepo.fetchLatest();
+    final healthHistory =
+        await _healthAssessmentRepo.fetchRecentHistory(limit: 7);
     final latest = await _assessmentRepo.fetchLatest();
     final history = await _assessmentRepo.fetchRecentHistory(limit: 7);
     final anomalyHistory = await _assessmentRepo.fetchRecentHistory(limit: 14);
@@ -92,6 +100,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
     final weightEvaluation = _weightTrendService.evaluate(weightRecords);
 
     return _DetailBundle(
+      healthAssessment: healthAssessment,
+      healthHistory: healthHistory,
       assessment: latest,
       history: history,
       activitySummary: activitySummary,
@@ -133,23 +143,49 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
 
               final bundle = snap.data!;
               final a = bundle.assessment;
+              final healthAssessment = bundle.healthAssessment;
+              final hasEnvironment = a?.hasData == true;
+              final hasHealth =
+                  healthAssessment?.hasMeaningfulAssessment == true;
 
-              if (a == null || !a.hasData) {
+              if (!hasEnvironment && !hasHealth) {
                 return const Center(
                   child: Text('評価データがまだありません'),
                 );
               }
 
-              final tempStatus =
-                  _environmentStatusService.buildTemperatureStatus(a.avgTemp);
-              final humStatus =
-                  _environmentStatusService.buildHumidityStatus(a.avgHum);
+              final tempStatus = hasEnvironment
+                  ? _environmentStatusService.buildTemperatureStatus(a!.avgTemp)
+                  : null;
+              final humStatus = hasEnvironment
+                  ? _environmentStatusService.buildHumidityStatus(a!.avgHum)
+                  : null;
 
               return ListView(
                 padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
                 children: [
-                  _OverallSummaryCard(assessment: a),
-                  if (bundle.sensorEvaluation != null) ...[
+                  if (hasHealth)
+                    _HealthOverallSummaryCard(
+                      assessment: healthAssessment!,
+                      history: bundle.healthHistory,
+                    )
+                  else
+                    _OverallSummaryCard(assessment: a!),
+                  if (hasHealth) ...[
+                    const SizedBox(height: 18),
+                    _HealthAssessmentBreakdownCard(
+                      assessment: healthAssessment!,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => _HealthAssessmentBreakdownScreen(
+                              assessment: healthAssessment,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ] else if (bundle.sensorEvaluation != null) ...[
                     const SizedBox(height: 18),
                     _SensorEvaluationCard(
                       evaluation: bundle.sensorEvaluation!,
@@ -163,164 +199,179 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                         );
                       },
                     ),
-                    if (bundle.anomalyDetection.hasAnomaly) ...[
-                      const SizedBox(height: 18),
-                      _AnomalyDetectionCard(
-                        result: bundle.anomalyDetection,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => _AnomalyDetectionBreakdownScreen(
-                                result: bundle.anomalyDetection,
-                              ),
+                  ],
+                  if (!hasHealth && bundle.anomalyDetection.hasAnomaly) ...[
+                    const SizedBox(height: 18),
+                    _AnomalyDetectionCard(
+                      result: bundle.anomalyDetection,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => _AnomalyDetectionBreakdownScreen(
+                              result: bundle.anomalyDetection,
                             ),
-                          );
-                        },
-                      ),
-                    ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                   const SizedBox(height: 18),
-                  _SectionLabel(title: '身体の変化'),
+                  _SectionLabel(title: '身体・活動の変化'),
                   const SizedBox(height: 10),
                   _WeightTrendCard(
                     evaluation: bundle.weightEvaluation,
                     records: bundle.weightRecords,
                   ),
-                  const SizedBox(height: 18),
-                  _SectionLabel(title: '環境'),
-                  const SizedBox(height: 10),
-                  _MetricDetailCard(
-                    title: '過去7日間の平均温度',
-                    card: tempStatus.card,
-                    secondaryStats: [
-                      const _StatItem('対象期間', '過去7日'),
-                      _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
-                    ],
-                    trendPoints: _historyTrendPoints(
-                      history: bundle.history,
-                      valueOf: (e) => e.avgTemp,
-                    ),
-                    accent: AppTheme.environmentAccent(a.level),
-                    unit: '℃',
-                    chartMinimum: 18,
-                    chartMaximum: 28,
-                    chartBands: [
-                      SemanticTrendBand(
-                        start: 18,
-                        end: EnvironmentStatusService.tempMin,
-                        label: '低め',
-                        color: Colors.blue.withValues(alpha: 0.07),
-                        labelColor: Colors.blue.shade200,
-                      ),
-                      SemanticTrendBand(
-                        start: EnvironmentStatusService.tempMin,
-                        end: EnvironmentStatusService.tempMax,
-                        label: '適正',
-                        color: Colors.green.withValues(alpha: 0.07),
-                        labelColor: Colors.green.shade200,
-                      ),
-                      SemanticTrendBand(
-                        start: EnvironmentStatusService.tempMax,
-                        end: 28,
-                        label: '高め',
-                        color: Colors.orange.withValues(alpha: 0.08),
-                        labelColor: Colors.orange.shade200,
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 14),
-                  _MetricDetailCard(
-                    title: '過去7日間の平均湿度',
-                    card: humStatus.card,
-                    secondaryStats: [
-                      const _StatItem('対象期間', '過去7日'),
-                      _StatItem('評価時刻', _formatTime(a.evaluatedAt)),
-                    ],
-                    trendPoints: _historyTrendPoints(
-                      history: bundle.history,
-                      valueOf: (e) => e.avgHum,
-                    ),
-                    accent: AppTheme.environmentAccent(a.level),
-                    unit: '%',
-                    chartMinimum: 30,
-                    chartMaximum: 75,
-                    chartBands: [
-                      SemanticTrendBand(
-                        start: 30,
-                        end: EnvironmentStatusService.humMin,
-                        label: '低め',
-                        color: Colors.blue.withValues(alpha: 0.07),
-                        labelColor: Colors.blue.shade200,
-                      ),
-                      SemanticTrendBand(
-                        start: EnvironmentStatusService.humMin,
-                        end: EnvironmentStatusService.humMax,
-                        label: '適正',
-                        color: Colors.green.withValues(alpha: 0.07),
-                        labelColor: Colors.green.shade200,
-                      ),
-                      SemanticTrendBand(
-                        start: EnvironmentStatusService.humMax,
-                        end: 75,
-                        label: '高め',
-                        color: Colors.orange.withValues(alpha: 0.08),
-                        labelColor: Colors.orange.shade200,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  _SectionLabel(title: '活動量'),
-                  const SizedBox(height: 10),
-                  _MetricDetailCard(
-                    title: '昨日の走った距離',
-                    card: bundle.activitySummary.card,
-                    secondaryStats: [
-                      _StatItem(
-                        '昨日',
-                        '${bundle.activitySummary.todayDistanceMeters.toStringAsFixed(0)} m',
-                      ),
-                      _StatItem(
-                        '7日平均',
-                        '${bundle.activitySummary.avg7DistanceMeters.toStringAsFixed(0)} m',
-                      ),
-                      _StatItem(
-                        '基準日',
-                        DateFormat('M/d').format(
-                          bundle.activityReferenceDate.toLocal(),
+                  if (bundle.activitySummary.todayHasRecord)
+                    _MetricDetailCard(
+                      title: '昨日の走った距離',
+                      card: bundle.activitySummary.card,
+                      secondaryStats: [
+                        _StatItem(
+                          '昨日',
+                          '${bundle.activitySummary.todayDistanceMeters.toStringAsFixed(0)} m',
                         ),
-                      ),
-                    ],
-                    trendPoints: bundle.distanceSeries
-                        .map(
-                          (e) => SemanticTrendPoint(
-                            x: e.date.toLocal(),
-                            y: e.distance,
+                        _StatItem(
+                          '7日平均',
+                          '${bundle.activitySummary.avg7DistanceMeters.toStringAsFixed(0)} m',
+                        ),
+                        _StatItem(
+                          '基準日',
+                          DateFormat('M/d').format(
+                            bundle.activityReferenceDate.toLocal(),
                           ),
-                        )
-                        .toList(),
-                    accent: AppTheme.accent,
-                    unit: 'm',
-                    chartMinimum: 0,
-                    chartMaximum: _activityChartMaximum(
-                      bundle.distanceSeries,
-                      bundle.activitySummary.avg7DistanceMeters,
-                    ),
-                    chartBands: _activityChartBands(
-                      bundle.activitySummary.avg7DistanceMeters,
-                      _activityChartMaximum(
+                        ),
+                      ],
+                      trendPoints: bundle.distanceSeries
+                          .map(
+                            (e) => SemanticTrendPoint(
+                              x: e.date.toLocal(),
+                              y: e.distance,
+                            ),
+                          )
+                          .toList(),
+                      accent: AppTheme.accent,
+                      unit: 'm',
+                      chartMinimum: 0,
+                      chartMaximum: _activityChartMaximum(
                         bundle.distanceSeries,
                         bundle.activitySummary.avg7DistanceMeters,
                       ),
+                      chartBands: _activityChartBands(
+                        bundle.activitySummary.avg7DistanceMeters,
+                        _activityChartMaximum(
+                          bundle.distanceSeries,
+                          bundle.activitySummary.avg7DistanceMeters,
+                        ),
+                      ),
+                    )
+                  else
+                    _ActivityMissingCard(
+                      referenceDate: bundle.activityReferenceDate,
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  if (bundle.activitySummary.distribution != null)
+                  if (bundle.activitySummary.distribution != null) ...[
+                    const SizedBox(height: 14),
                     _ActivityDistributionCard(
                       distribution: bundle.activitySummary.distribution!,
                       referenceDate: bundle.activitySummary.referenceDate,
                       referenceDayHasRecord:
                           bundle.activitySummary.todayHasRecord,
                     ),
+                  ],
+                  if (a != null &&
+                      a.hasData &&
+                      tempStatus != null &&
+                      humStatus != null) ...[
+                    const SizedBox(height: 18),
+                    _SectionLabel(title: '環境'),
+                    const SizedBox(height: 10),
+                    _MetricDetailCard(
+                      title: '過去7日間の平均温度',
+                      card: tempStatus.card,
+                      secondaryStats: [
+                        const _StatItem('対象期間', '過去7日'),
+                        _StatItem(
+                          '評価時刻',
+                          _formatTime(a.evaluatedAt),
+                        ),
+                      ],
+                      trendPoints: _historyTrendPoints(
+                        history: bundle.history,
+                        valueOf: (e) => e.avgTemp,
+                      ),
+                      accent: AppTheme.environmentAccent(a.level),
+                      unit: '℃',
+                      chartMinimum: 18,
+                      chartMaximum: 28,
+                      chartBands: [
+                        SemanticTrendBand(
+                          start: 18,
+                          end: EnvironmentStatusService.tempMin,
+                          label: '低め',
+                          color: Colors.blue.withValues(alpha: 0.07),
+                          labelColor: Colors.blue.shade200,
+                        ),
+                        SemanticTrendBand(
+                          start: EnvironmentStatusService.tempMin,
+                          end: EnvironmentStatusService.tempMax,
+                          label: '適正',
+                          color: Colors.green.withValues(alpha: 0.07),
+                          labelColor: Colors.green.shade200,
+                        ),
+                        SemanticTrendBand(
+                          start: EnvironmentStatusService.tempMax,
+                          end: 28,
+                          label: '高め',
+                          color: Colors.orange.withValues(alpha: 0.08),
+                          labelColor: Colors.orange.shade200,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _MetricDetailCard(
+                      title: '過去7日間の平均湿度',
+                      card: humStatus.card,
+                      secondaryStats: [
+                        const _StatItem('対象期間', '過去7日'),
+                        _StatItem(
+                          '評価時刻',
+                          _formatTime(a.evaluatedAt),
+                        ),
+                      ],
+                      trendPoints: _historyTrendPoints(
+                        history: bundle.history,
+                        valueOf: (e) => e.avgHum,
+                      ),
+                      accent: AppTheme.environmentAccent(a.level),
+                      unit: '%',
+                      chartMinimum: 30,
+                      chartMaximum: 75,
+                      chartBands: [
+                        SemanticTrendBand(
+                          start: 30,
+                          end: EnvironmentStatusService.humMin,
+                          label: '低め',
+                          color: Colors.blue.withValues(alpha: 0.07),
+                          labelColor: Colors.blue.shade200,
+                        ),
+                        SemanticTrendBand(
+                          start: EnvironmentStatusService.humMin,
+                          end: EnvironmentStatusService.humMax,
+                          label: '適正',
+                          color: Colors.green.withValues(alpha: 0.07),
+                          labelColor: Colors.green.shade200,
+                        ),
+                        SemanticTrendBand(
+                          start: EnvironmentStatusService.humMax,
+                          end: 75,
+                          label: '高め',
+                          color: Colors.orange.withValues(alpha: 0.08),
+                          labelColor: Colors.orange.shade200,
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               );
             },
@@ -418,6 +469,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
 }
 
 class _DetailBundle {
+  final HealthAssessment? healthAssessment;
+  final List<HealthAssessment> healthHistory;
   final EnvironmentAssessment? assessment;
   final List<EnvironmentAssessmentHistory> history;
   final ActivitySummary activitySummary;
@@ -429,6 +482,8 @@ class _DetailBundle {
   final WeightTrendEvaluation weightEvaluation;
 
   _DetailBundle({
+    required this.healthAssessment,
+    required this.healthHistory,
     required this.assessment,
     required this.history,
     required this.activitySummary,
@@ -570,6 +625,236 @@ class _WeightTrendCard extends StatelessWidget {
   }
 }
 
+class _HealthOverallSummaryCard extends StatelessWidget {
+  final HealthAssessment assessment;
+  final List<HealthAssessment> history;
+
+  const _HealthOverallSummaryCard({
+    required this.assessment,
+    this.history = const [],
+  });
+
+  StatusCardLevel _level() {
+    switch (assessment.overall.observedState) {
+      case HealthAssessmentState.alert:
+        return StatusCardLevel.danger;
+      case HealthAssessmentState.caution:
+      case HealthAssessmentState.changed:
+        return StatusCardLevel.caution;
+      case HealthAssessmentState.good:
+      case HealthAssessmentState.stable:
+        return StatusCardLevel.good;
+      case HealthAssessmentState.unknown:
+      case HealthAssessmentState.insufficientData:
+        return StatusCardLevel.unavailable;
+    }
+  }
+
+  String _confidenceLabel() {
+    switch (assessment.overall.confidence) {
+      case HealthAssessmentConfidence.high:
+        return '高';
+      case HealthAssessmentConfidence.medium:
+        return '中';
+      case HealthAssessmentConfidence.low:
+        return '低';
+      case HealthAssessmentConfidence.insufficient:
+        return '不足';
+    }
+  }
+
+  String _deltaText(int delta) {
+    if (delta > 0) return '+$delta';
+    return '$delta';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final completeness =
+        (assessment.dataQuality.completeness * 100).clamp(0, 100).round();
+    final trend = buildHealthScoreTrendSummary(
+      history: history,
+      latest: assessment,
+      days: 7,
+    );
+    final primaryFactor = assessment.overall.primaryFactor?.trim();
+
+    return StatusCard(
+      level: _level(),
+      emphasize:
+          assessment.overall.observedState == HealthAssessmentState.alert,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '統合コンディション評価',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Center(
+            child: HealthScoreGauge(
+              score:
+                  assessment.overall.score ?? assessment.overall.observedScore,
+              state: assessment.overall.state,
+              isProvisional: assessment.overall.isProvisional,
+              width: 280,
+              height: 166,
+              strokeWidth: 18,
+              scoreFontSize: 54,
+              stateFontSize: 16,
+              showProvisionalCaption: true,
+            ),
+          ),
+          Text(
+            assessment.overall.summary,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.45,
+                ),
+          ),
+          if (primaryFactor != null && primaryFactor.isNotEmpty) ...[
+            const SizedBox(height: 13),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: AppTheme.cardSurface(context).withValues(
+                  alpha: AppTheme.isDark(context) ? 0.25 : 0.55,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.insights_rounded,
+                    size: 19,
+                    color: healthAssessmentAccent(
+                      context,
+                      assessment.overall.observedState,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '主な要因：$primaryFactor',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.4,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text(
+            '直近7日間の総合推移',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          if (trend.averageScore != null || trend.previousDayDelta != null) ...[
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 7,
+              runSpacing: 7,
+              children: [
+                if (trend.averageScore != null)
+                  _DetailChip(text: '7日平均 ${trend.averageScore}'),
+                if (trend.previousDayDelta != null)
+                  _DetailChip(
+                    text: '前日比 ${_deltaText(trend.previousDayDelta!)}',
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          HealthScoreTrendChart(
+            summary: trend,
+            height: 170,
+            showThresholdLabels: true,
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _DetailChip(
+                text: '評価信頼度 ${_confidenceLabel()}',
+              ),
+              _DetailChip(text: 'データ充足率 $completeness%'),
+              if (assessment.overall.isProvisional)
+                const _DetailChip(text: '暫定評価'),
+              _DetailChip(text: '評価日 ${assessment.dateKey}'),
+            ],
+          ),
+          if (assessment.overall.flags.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              '注意フラグ',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              assessment.overall.flags.map(_healthFlagText).join('・'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    height: 1.45,
+                  ),
+            ),
+          ],
+          if (assessment.overall.recommendedActions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(
+              '確認したいこと',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                    fontWeight: FontWeight.w900,
+                  ),
+            ),
+            const SizedBox(height: 7),
+            ...assessment.overall.recommendedActions.take(3).map(
+                  (action) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            action,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(height: 1.45),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _OverallSummaryCard extends StatelessWidget {
   final EnvironmentAssessment assessment;
 
@@ -681,6 +966,69 @@ class _OverallSummaryCard extends StatelessWidget {
   }
 }
 
+class _ActivityMissingCard extends StatelessWidget {
+  final DateTime referenceDate;
+
+  const _ActivityMissingCard({
+    required this.referenceDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StatusCard(
+      level: StatusCardLevel.unavailable,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '昨日の走った距離',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '未入力',
+            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                Icons.directions_run_rounded,
+                size: 19,
+                color: AppTheme.secondaryText(context),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '走行距離を記録すると、7日平均との比較と推移を表示します。',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        fontWeight: FontWeight.w700,
+                        height: 1.45,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '基準日 ${DateFormat('M/d').format(referenceDate.toLocal())}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.tertiaryText(context),
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   final String title;
 
@@ -693,6 +1041,448 @@ class _SectionLabel extends StatelessWidget {
       style: Theme.of(context).textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
           ),
+    );
+  }
+}
+
+String _healthStateText(HealthAssessmentState state) {
+  switch (state) {
+    case HealthAssessmentState.alert:
+      return '警戒';
+    case HealthAssessmentState.caution:
+      return '注意';
+    case HealthAssessmentState.changed:
+      return '変化あり';
+    case HealthAssessmentState.good:
+      return '良好';
+    case HealthAssessmentState.stable:
+      return '安定';
+    case HealthAssessmentState.insufficientData:
+      return '記録待ち';
+    case HealthAssessmentState.unknown:
+      return '未評価';
+  }
+}
+
+Color _healthStateAccent(
+  BuildContext context,
+  HealthAssessmentState state,
+) {
+  switch (state) {
+    case HealthAssessmentState.alert:
+      return AppTheme.envDanger;
+    case HealthAssessmentState.caution:
+    case HealthAssessmentState.changed:
+      return AppTheme.envCaution;
+    case HealthAssessmentState.good:
+    case HealthAssessmentState.stable:
+      return AppTheme.envGood;
+    case HealthAssessmentState.insufficientData:
+    case HealthAssessmentState.unknown:
+      return AppTheme.secondaryText(context);
+  }
+}
+
+String _healthFlagText(String flag) {
+  const labels = <String, String>{
+    'environmentMissing': '環境データなし',
+    'activityMissing': '活動記録なし',
+    'activityComparisonMissing': '活動比較データ不足',
+    'activityLow': '活動量少なめ',
+    'activityDrop': '活動量低下',
+    'activityHigh': '活動量多め',
+    'conditionMissing': '今日の様子未入力',
+    'conditionSlightlyConcerned': '少し気になる',
+    'conditionVeryConcerned': 'かなり心配',
+    'weightMissing': '体重記録なし',
+    'weightComparisonMissing': '体重比較データ不足',
+    'weightStale': '体重記録が古い',
+    'weightDecreaseModerate': '体重減少',
+    'weightDecreaseLarge': '体重大幅減少',
+    'weightIncreaseModerate': '体重増加',
+    'weightIncreaseLarge': '体重大幅増加',
+    'temperatureLow': '温度低め',
+    'temperatureHigh': '温度高め',
+    'humidityLow': '湿度低め',
+    'humidityHigh': '湿度高め',
+  };
+
+  return labels[flag] ?? flag;
+}
+
+class _HealthAssessmentBreakdownCard extends StatelessWidget {
+  final HealthAssessment assessment;
+  final VoidCallback? onTap;
+
+  const _HealthAssessmentBreakdownCard({
+    required this.assessment,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final domains = assessment.domains;
+    final accent = _healthStateAccent(
+      context,
+      assessment.overall.observedState,
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(26),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+          decoration: AppTheme.statusCardDecoration(
+            context,
+            accent: accent,
+            strength: 0.58,
+            radius: 26,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '統合評価の内訳',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppTheme.tertiaryText(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 7),
+              Text(
+                '環境・体重・活動量・今日の様子を個別に確認できます。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.secondaryText(context),
+                      height: 1.4,
+                    ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _HealthDomainGaugeTile(
+                      label: '環境',
+                      domain: domains.environment,
+                      isProvisional: assessment.overall.isProvisional,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: _HealthDomainGaugeTile(
+                      label: '体重',
+                      domain: domains.body,
+                      isProvisional: assessment.overall.isProvisional,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _HealthDomainGaugeTile(
+                      label: '活動',
+                      domain: domains.activity,
+                      isProvisional: assessment.overall.isProvisional,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: _HealthDomainGaugeTile(
+                      label: '今日の様子',
+                      domain: domains.condition,
+                      isProvisional: assessment.overall.isProvisional,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HealthDomainGaugeTile extends StatelessWidget {
+  final String label;
+  final HealthDomainAssessment domain;
+  final bool isProvisional;
+
+  const _HealthDomainGaugeTile({
+    required this.label,
+    required this.domain,
+    required this.isProvisional,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _healthStateAccent(context, domain.state);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(7, 11, 7, 8),
+      decoration: BoxDecoration(
+        color: AppTheme.chipFill(
+          accent,
+          context,
+          opacity: AppTheme.isDark(context) ? 0.12 : 0.075,
+        ),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.16),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          HealthScoreGauge(
+            score: domain.score,
+            state: domain.state,
+            isProvisional: isProvisional,
+            width: 128,
+            height: 92,
+            strokeWidth: 10,
+            scoreFontSize: 30,
+            stateFontSize: 12,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HealthAssessmentBreakdownScreen extends StatelessWidget {
+  final HealthAssessment assessment;
+
+  const _HealthAssessmentBreakdownScreen({
+    required this.assessment,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final gradient =
+        isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
+
+    return Scaffold(
+      backgroundColor:
+          isDark ? const Color(0xFF20253C) : const Color(0xFFF2F4F8),
+      appBar: AppBar(
+        title: const Text('統合評価の内訳'),
+        backgroundColor: isDark
+            ? const Color(0xFF20253C)
+            : const Color.fromARGB(255, 242, 244, 248),
+        foregroundColor: isDark ? Colors.white : AppTheme.primaryText(context),
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(gradient: gradient),
+        child: SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+            children: [
+              _HealthDomainBreakdownCard(
+                title: '環境',
+                domain: assessment.domains.environment,
+              ),
+              const SizedBox(height: 14),
+              _HealthDomainBreakdownCard(
+                title: '体重',
+                domain: assessment.domains.body,
+              ),
+              const SizedBox(height: 14),
+              _HealthDomainBreakdownCard(
+                title: '活動量',
+                domain: assessment.domains.activity,
+              ),
+              const SizedBox(height: 14),
+              _HealthDomainBreakdownCard(
+                title: '今日の様子',
+                domain: assessment.domains.condition,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HealthDomainBreakdownCard extends StatelessWidget {
+  final String title;
+  final HealthDomainAssessment domain;
+
+  const _HealthDomainBreakdownCard({
+    required this.title,
+    required this.domain,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _healthStateAccent(context, domain.state);
+    final stateText = _healthStateText(domain.state);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      decoration: AppTheme.statusCardDecoration(
+        context,
+        accent: accent,
+        strength: domain.state == HealthAssessmentState.insufficientData
+            ? 0.46
+            : 0.78,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  stateText,
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Center(
+            child: _MetricStatusGauge(
+              score: domain.score,
+              stateText: stateText,
+              accent: accent,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                domain.state == HealthAssessmentState.good ||
+                        domain.state == HealthAssessmentState.stable
+                    ? Icons.check_circle_outline_rounded
+                    : domain.state == HealthAssessmentState.insufficientData
+                        ? Icons.schedule_rounded
+                        : Icons.info_outline_rounded,
+                size: 21,
+                color: accent,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  domain.summary,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+          if (domain.flags.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: domain.flags
+                  .map(
+                    (flag) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.chipFill(
+                          accent,
+                          context,
+                          opacity: AppTheme.isDark(context) ? 0.14 : 0.10,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _healthFlagText(flag),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: accent,
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          if (domain.recommendedActions.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            ...domain.recommendedActions.take(2).map(
+                  (action) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.task_alt_rounded,
+                          size: 18,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            action,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ],
+      ),
     );
   }
 }

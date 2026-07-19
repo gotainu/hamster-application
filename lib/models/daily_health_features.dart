@@ -87,6 +87,16 @@ class EnvironmentHealthFeatures {
   final int? sourceDocCount;
   final int? assessmentVersion;
   final DateTime? sourceEvaluatedAt;
+  final int windowDays;
+  final int windowRecordCount;
+  final int highTemperatureDays;
+  final int lowTemperatureDays;
+  final int highHumidityDays;
+  final int lowHumidityDays;
+  final double? latestDailyTemp;
+  final double? latestDailyHum;
+  final String temperatureTrend;
+  final String humidityTrend;
 
   const EnvironmentHealthFeatures({
     required this.avgTemp,
@@ -99,6 +109,16 @@ class EnvironmentHealthFeatures {
     required this.sourceDocCount,
     required this.assessmentVersion,
     required this.sourceEvaluatedAt,
+    required this.windowDays,
+    required this.windowRecordCount,
+    required this.highTemperatureDays,
+    required this.lowTemperatureDays,
+    required this.highHumidityDays,
+    required this.lowHumidityDays,
+    required this.latestDailyTemp,
+    required this.latestDailyHum,
+    required this.temperatureTrend,
+    required this.humidityTrend,
   });
 
   factory EnvironmentHealthFeatures.fromMap(Json map) {
@@ -113,6 +133,16 @@ class EnvironmentHealthFeatures {
       sourceDocCount: _integer(map['sourceDocCount']),
       assessmentVersion: _integer(map['assessmentVersion']),
       sourceEvaluatedAt: _dateTime(map['sourceEvaluatedAt']),
+      windowDays: _integer(map['windowDays']) ?? 7,
+      windowRecordCount: _integer(map['windowRecordCount']) ?? 0,
+      highTemperatureDays: _integer(map['highTemperatureDays']) ?? 0,
+      lowTemperatureDays: _integer(map['lowTemperatureDays']) ?? 0,
+      highHumidityDays: _integer(map['highHumidityDays']) ?? 0,
+      lowHumidityDays: _integer(map['lowHumidityDays']) ?? 0,
+      latestDailyTemp: _double(map['latestDailyTemp']),
+      latestDailyHum: _double(map['latestDailyHum']),
+      temperatureTrend: _string(map['temperatureTrend']) ?? 'unknown',
+      humidityTrend: _string(map['humidityTrend']) ?? 'unknown',
     );
   }
 
@@ -134,11 +164,28 @@ class EnvironmentHealthFeatures {
       'sourceDocCount': sourceDocCount,
       'assessmentVersion': assessmentVersion,
       if (sourceEvaluatedAt != null) 'sourceEvaluatedAt': sourceEvaluatedAt,
+      'windowDays': windowDays,
+      'windowRecordCount': windowRecordCount,
+      'highTemperatureDays': highTemperatureDays,
+      'lowTemperatureDays': lowTemperatureDays,
+      'highHumidityDays': highHumidityDays,
+      'lowHumidityDays': lowHumidityDays,
+      'latestDailyTemp': latestDailyTemp,
+      'latestDailyHum': latestDailyHum,
+      'temperatureTrend': temperatureTrend,
+      'humidityTrend': humidityTrend,
     };
   }
 }
 
 class ActivityHealthFeatures {
+  final String? assessmentDateKey;
+  final String? sourceDateKey;
+  final int lagDays;
+  final String? windowStartDateKey;
+  final String? windowEndDateKey;
+  final int windowDays;
+  final int windowRecordCount;
   final bool hasRecord;
   final double? distanceMeters;
   final int? rotations;
@@ -148,6 +195,13 @@ class ActivityHealthFeatures {
   final DateTime? recordDate;
 
   const ActivityHealthFeatures({
+    this.assessmentDateKey,
+    this.sourceDateKey,
+    this.lagDays = 1,
+    this.windowStartDateKey,
+    this.windowEndDateKey,
+    this.windowDays = 7,
+    this.windowRecordCount = 0,
     required this.hasRecord,
     required this.distanceMeters,
     required this.rotations,
@@ -159,6 +213,13 @@ class ActivityHealthFeatures {
 
   factory ActivityHealthFeatures.fromMap(Json map) {
     return ActivityHealthFeatures(
+      assessmentDateKey: _string(map['assessmentDateKey']),
+      sourceDateKey: _string(map['sourceDateKey']),
+      lagDays: _integer(map['lagDays']) ?? 1,
+      windowStartDateKey: _string(map['windowStartDateKey']),
+      windowEndDateKey: _string(map['windowEndDateKey']),
+      windowDays: _integer(map['windowDays']) ?? 7,
+      windowRecordCount: _integer(map['windowRecordCount']) ?? 0,
       hasRecord: _boolean(map['hasRecord']) ?? false,
       distanceMeters: _double(map['distanceMeters']),
       rotations: _integer(map['rotations']),
@@ -173,6 +234,13 @@ class ActivityHealthFeatures {
 
   Json toMap() {
     return {
+      if (assessmentDateKey != null) 'assessmentDateKey': assessmentDateKey,
+      if (sourceDateKey != null) 'sourceDateKey': sourceDateKey,
+      'lagDays': lagDays,
+      if (windowStartDateKey != null) 'windowStartDateKey': windowStartDateKey,
+      if (windowEndDateKey != null) 'windowEndDateKey': windowEndDateKey,
+      'windowDays': windowDays,
+      'windowRecordCount': windowRecordCount,
       'hasRecord': hasRecord,
       'distanceMeters': distanceMeters,
       'rotations': rotations,

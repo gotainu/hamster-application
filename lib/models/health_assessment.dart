@@ -12,6 +12,13 @@ enum HealthAssessmentState {
   insufficientData,
 }
 
+enum HealthAssessmentConfidence {
+  insufficient,
+  low,
+  medium,
+  high,
+}
+
 class HealthAssessment {
   final String dateKey;
   final String featureDateKey;
@@ -60,7 +67,7 @@ class HealthAssessment {
   }
 
   bool get hasMeaningfulAssessment =>
-      overall.state != HealthAssessmentState.unknown ||
+      overall.observedState != HealthAssessmentState.unknown ||
       overall.flags.isNotEmpty ||
       domains.hasAnyKnownDomain;
 
@@ -137,6 +144,38 @@ class HealthAssessmentDomains {
   }
 }
 
+class HealthScoreComponent {
+  final int? score;
+  final HealthAssessmentState state;
+  final String summary;
+  final List<String> flags;
+
+  const HealthScoreComponent({
+    required this.score,
+    required this.state,
+    required this.summary,
+    required this.flags,
+  });
+
+  factory HealthScoreComponent.fromMap(Json map) {
+    return HealthScoreComponent(
+      score: _integer(map['score']),
+      state: parseHealthAssessmentState(map['state']),
+      summary: _string(map['summary']) ?? '',
+      flags: _stringList(map['flags']),
+    );
+  }
+
+  Json toMap() {
+    return {
+      'score': score,
+      'state': state.name,
+      'summary': summary,
+      'flags': flags,
+    };
+  }
+}
+
 class HealthDomainAssessment {
   final HealthAssessmentState state;
   final int? score;
@@ -144,6 +183,7 @@ class HealthDomainAssessment {
   final String summary;
   final List<String> recommendedActions;
   final DateTime? sourceUpdatedAt;
+  final Map<String, HealthScoreComponent> components;
 
   const HealthDomainAssessment({
     required this.state,
@@ -152,9 +192,12 @@ class HealthDomainAssessment {
     required this.summary,
     required this.recommendedActions,
     required this.sourceUpdatedAt,
+    required this.components,
   });
 
   factory HealthDomainAssessment.fromMap(Json map) {
+    final componentMap = _json(map['components']);
+
     return HealthDomainAssessment(
       state: parseHealthAssessmentState(map['state']),
       score: _integer(map['score']),
@@ -162,8 +205,16 @@ class HealthDomainAssessment {
       summary: _string(map['summary']) ?? '',
       recommendedActions: _stringList(map['recommendedActions']),
       sourceUpdatedAt: _dateTime(map['sourceUpdatedAt']),
+      components: componentMap.map(
+        (key, value) => MapEntry(
+          key,
+          HealthScoreComponent.fromMap(_json(value)),
+        ),
+      ),
     );
   }
+
+  HealthScoreComponent? component(String key) => components[key];
 
   Json toMap() {
     return {
@@ -173,6 +224,10 @@ class HealthDomainAssessment {
       'summary': summary,
       'recommendedActions': recommendedActions,
       if (sourceUpdatedAt != null) 'sourceUpdatedAt': sourceUpdatedAt,
+      if (components.isNotEmpty)
+        'components': components.map(
+          (key, value) => MapEntry(key, value.toMap()),
+        ),
     };
   }
 }
@@ -180,35 +235,64 @@ class HealthDomainAssessment {
 class HealthOverallAssessment {
   final HealthAssessmentState state;
   final int? score;
+  final HealthAssessmentState observedState;
+  final int? observedScore;
+  final HealthAssessmentConfidence confidence;
+  final bool isProvisional;
   final List<String> flags;
   final String summary;
   final List<String> recommendedActions;
+  final String? primaryFactor;
 
   const HealthOverallAssessment({
     required this.state,
     required this.score,
+    required this.observedState,
+    required this.observedScore,
+    required this.confidence,
+    required this.isProvisional,
     required this.flags,
     required this.summary,
     required this.recommendedActions,
+    required this.primaryFactor,
   });
 
   factory HealthOverallAssessment.fromMap(Json map) {
+    final state = parseHealthAssessmentState(map['state']);
+    final score = _integer(map['score']);
+
     return HealthOverallAssessment(
-      state: parseHealthAssessmentState(map['state']),
-      score: _integer(map['score']),
+      state: state,
+      score: score,
+      observedState: map.containsKey('observedState')
+          ? parseHealthAssessmentState(map['observedState'])
+          : state,
+      observedScore: map.containsKey('observedScore')
+          ? _integer(map['observedScore'])
+          : score,
+      confidence: parseHealthAssessmentConfidence(map['confidence']),
+      isProvisional: _boolean(map['isProvisional']) ?? false,
       flags: _stringList(map['flags']),
       summary: _string(map['summary']) ?? '',
       recommendedActions: _stringList(map['recommendedActions']),
+      primaryFactor: _string(map['primaryFactor']),
     );
   }
+
+  bool get hasPublishableScore => score != null;
 
   Json toMap() {
     return {
       'state': state.name,
       'score': score,
+      'observedState': observedState.name,
+      'observedScore': observedScore,
+      'confidence': confidence.name,
+      'isProvisional': isProvisional,
       'flags': flags,
       'summary': summary,
       'recommendedActions': recommendedActions,
+      'primaryFactor': primaryFactor,
     };
   }
 }
@@ -315,6 +399,24 @@ HealthAssessmentState parseHealthAssessmentState(dynamic value) {
   }
 }
 
+HealthAssessmentConfidence parseHealthAssessmentConfidence(
+  dynamic value,
+) {
+  final normalized = value?.toString().trim().toLowerCase();
+
+  switch (normalized) {
+    case 'high':
+      return HealthAssessmentConfidence.high;
+    case 'medium':
+      return HealthAssessmentConfidence.medium;
+    case 'low':
+      return HealthAssessmentConfidence.low;
+    case 'insufficient':
+    default:
+      return HealthAssessmentConfidence.insufficient;
+  }
+}
+
 Json _json(dynamic value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) {
@@ -341,6 +443,15 @@ int? _integer(dynamic value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value);
+  return null;
+}
+
+bool? _boolean(dynamic value) {
+  if (value is bool) return value;
+  if (value is String) {
+    if (value.toLowerCase() == 'true') return true;
+    if (value.toLowerCase() == 'false') return false;
+  }
   return null;
 }
 
