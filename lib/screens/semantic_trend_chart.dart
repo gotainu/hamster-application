@@ -92,9 +92,7 @@ class SemanticTrendChart extends StatelessWidget {
     final effectiveLineColor =
         lineColor ?? (isDark ? Colors.white : const Color(0xFF374151));
     final rawLineColor = effectiveLineColor.withValues(
-      alpha: compact
-          ? (isDark ? 0.34 : 0.26)
-          : (isDark ? 0.24 : 0.18),
+      alpha: compact ? (isDark ? 0.34 : 0.26) : (isDark ? 0.24 : 0.18),
     );
     final areaGradient = LinearGradient(
       begin: Alignment.topCenter,

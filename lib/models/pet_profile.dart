@@ -31,6 +31,13 @@ class PetProfile {
     );
   }
 
+  String get displayName => name.trim().isEmpty ? 'ハムスター' : name.trim();
+
+  bool get hasImage => imageUrl?.trim().isNotEmpty == true;
+
+  bool get hasAvatarIdentity =>
+      species.trim().isNotEmpty && color?.trim().isNotEmpty == true;
+
   Map<String, dynamic> toMapForSave() => {
         'name': name.trim(),
         'birthday': birthday != null ? Timestamp.fromDate(birthday!) : null,

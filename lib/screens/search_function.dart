@@ -1,13 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import '../models/hamster_avatar.dart';
+import '../models/pet_profile.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
+import '../services/pet_profile_repo.dart';
 import '../theme/app_theme.dart';
+import '../widgets/hamster_avatar_view.dart';
+import '../widgets/floating_bottom_navigation.dart';
 import '../widgets/paid_feature_gate.dart';
 import '../widgets/shine_border.dart';
 
@@ -108,6 +114,12 @@ class FuncSearchScreen extends StatefulWidget {
 class FuncSearchScreenState extends State<FuncSearchScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
+  final PetProfileRepo _petProfileRepo = PetProfileRepo();
+
+  static const HamsterAvatarAppearanceResolver _avatarAppearanceResolver =
+      HamsterAvatarAppearanceResolver();
+  static const HamsterAvatarAssetResolver _avatarAssetResolver =
+      HamsterAvatarAssetResolver();
 
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -121,8 +133,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   bool _hasRestoredHistory = false;
   bool _showDescriptionCard = true;
 
-  String? _userImageUrl;
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _avatarSub;
+  PetProfile? _petProfile;
+  StreamSubscription<PetProfile?>? _avatarSub;
 
   int _dotCount = 1;
   Timer? _dotTimer;
@@ -175,6 +187,20 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
 
     _scrollToBottom();
+  }
+
+  void openChatHistory() {
+    if (!mounted) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  void requestStartNewChat() {
+    if (!mounted) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(_confirmStartNewChat());
   }
 
   Future<void> _restoreChatHistory() async {
@@ -407,50 +433,132 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     await _restoreChatHistory();
   }
 
+  static const double _chatAvatarRadius = 35;
+  static const double _chatAvatarSize = _chatAvatarRadius * 2;
+  static const double _generatedAvatarZoom = 1.38;
+
   Widget _aiAvatar() {
     return const CircleAvatar(
-      radius: 22,
+      radius: _chatAvatarRadius,
       backgroundImage: AssetImage('assets/images/roi.png'),
       backgroundColor: Colors.transparent,
     );
   }
 
-  Widget _userAvatar() {
+  HamsterAvatarPresentation _stableAvatarPresentation(
+    PetProfile profile,
+  ) {
+    final appearance = _avatarAppearanceResolver.resolve(profile);
+
+    return _avatarAssetResolver.resolve(
+      appearance: appearance,
+      conditionResult: const HamsterAvatarConditionResult(
+        condition: HamsterAvatarCondition.stable,
+        cause: HamsterAvatarCause.none,
+        message: '登録された種類と毛色に応じたアバターです。',
+        animateBreathing: false,
+      ),
+    );
+  }
+
+  Widget _avatarOrUnregisteredIcon(PetProfile? profile) {
+    if (profile?.hasAvatarIdentity == true) {
+      final zoomedSize = _chatAvatarSize * _generatedAvatarZoom;
+
+      return Semantics(
+        label: '登録された種類と毛色のペットアバター',
+        image: true,
+        child: Container(
+          width: _chatAvatarSize,
+          height: _chatAvatarSize,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppTheme.cardSurface(context),
+            border: Border.all(
+              color: AppTheme.envGood.withValues(alpha: 0.72),
+              width: 1.5,
+            ),
+          ),
+          child: OverflowBox(
+            minWidth: 0,
+            minHeight: 0,
+            maxWidth: zoomedSize,
+            maxHeight: zoomedSize,
+            child: Transform.translate(
+              offset: const Offset(0, 5),
+              child: HamsterAvatarView(
+                presentation: _stableAvatarPresentation(profile!),
+                size: zoomedSize,
+                showMessage: false,
+                showDebugLabel: false,
+                showBackdrop: false,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return CircleAvatar(
-      radius: 22,
-      backgroundImage:
-          _userImageUrl != null ? NetworkImage(_userImageUrl!) : null,
+      radius: _chatAvatarRadius,
       backgroundColor: AppTheme.cardSurface(context),
-      child: _userImageUrl == null
-          ? Icon(
-              Icons.person_rounded,
-              size: 24,
-              color: AppTheme.secondaryText(context),
-            )
-          : null,
+      child: Icon(
+        Icons.pets_rounded,
+        size: 36,
+        color: AppTheme.secondaryText(context),
+      ),
+    );
+  }
+
+  Widget _userAvatar() {
+    final profile = _petProfile;
+    final imageUrl = profile?.imageUrl?.trim();
+
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      return Semantics(
+        label: '登録されたペットの写真',
+        image: true,
+        child: SizedBox.square(
+          dimension: _chatAvatarSize,
+          child: ClipOval(
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              width: _chatAvatarSize,
+              height: _chatAvatarSize,
+              errorBuilder: (_, __, ___) => _avatarOrUnregisteredIcon(profile),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Semantics(
+      label: profile?.hasAvatarIdentity == true
+          ? '登録された種類と毛色のペットアバター'
+          : 'ペットプロフィール未登録',
+      image: true,
+      child: _avatarOrUnregisteredIcon(profile),
     );
   }
 
   void _listenUserAvatar() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-
-    final docRef = FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('pet_profiles')
-        .doc('main_pet');
-
-    _avatarSub = docRef.snapshots().listen((snap) {
-      final url = snap.data()?['imageUrl'] as String?;
-      if (mounted) {
+    _avatarSub?.cancel();
+    _avatarSub = _petProfileRepo.watchMainPet().listen(
+      (profile) {
+        if (!mounted) return;
         setState(() {
-          _userImageUrl = (url != null && url.isNotEmpty) ? url : null;
+          _petProfile = profile;
         });
-      }
-    }, onError: (_) {
-      if (mounted) setState(() => _userImageUrl = null);
-    });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _petProfile = null;
+        });
+      },
+    );
   }
 
   Future<ChatApiResult> _fetchAIResponseWithHistory(String userMessage) async {
@@ -818,23 +926,11 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI相談',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                      ),
-                ),
-              ],
+            child: Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                  ),
             ),
           ),
           if (_isViewingArchivedThread)
@@ -842,18 +938,6 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
               onPressed: _returnToMainThread,
               child: const Text('現在の相談へ'),
             ),
-          IconButton(
-            tooltip: '相談履歴',
-            onPressed: () {
-              _scaffoldKey.currentState?.openEndDrawer();
-            },
-            icon: const Icon(Icons.history_rounded),
-          ),
-          IconButton(
-            tooltip: '新しく相談',
-            onPressed: _confirmStartNewChat,
-            icon: const Icon(Icons.add_comment_rounded),
-          ),
         ],
       ),
     );
@@ -958,7 +1042,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _aiAvatar(),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Flexible(
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 6),
@@ -1010,7 +1094,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
             children: [
               if (!msg.isUser) ...[
                 _aiAvatar(),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
               ],
               Flexible(
                 child: Container(
@@ -1047,14 +1131,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                 ),
               ),
               if (msg.isUser) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 _userAvatar(),
               ],
             ],
           ),
           if (!msg.isUser && hasChunks)
             Padding(
-              padding: const EdgeInsets.only(left: 54, top: 6),
+              padding: const EdgeInsets.only(left: 82, top: 6),
               child: ActionChip(
                 avatar: const Icon(Icons.article_outlined, size: 18),
                 label: const Text('参照された内容を見る'),
@@ -1068,142 +1152,163 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final mq = MediaQuery.of(context);
+    final keyboardVisible = mq.viewInsets.bottom > 0;
+    final topContentInset = mq.padding.top + kToolbarHeight + 12;
+    final composerBottomPadding =
+        keyboardVisible ? 10.0 : FloatingBottomNavigation.contentClearance + 10;
 
     return Scaffold(
       key: _scaffoldKey,
       backgroundColor: Colors.transparent,
       endDrawer: _buildChatHistoryDrawer(context),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
-        ),
-        child: SafeArea(
-          top: true,
-          child: PaidFeatureGate(
-            featureName: 'AI相談',
-            lockedTitle: 'AI相談は有料プランの機能です',
-            lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
-            icon: Icons.smart_toy_rounded,
-            showBackground: false,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildChatHeader(context),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  child: _showDescriptionCard
-                      ? AnimatedOpacity(
-                          key: const ValueKey('descCard'),
-                          opacity: _cardOpacity,
-                          duration: const Duration(milliseconds: 400),
-                          onEnd: () {
-                            if (_cardOpacity == 0.0 && mounted) {
-                              setState(() {
-                                _showDescriptionCard = false;
-                              });
-                            }
-                          },
-                          child: AnimatedSlide(
-                            offset: _cardOffset,
-                            duration: const Duration(milliseconds: 400),
-                            child: _buildDescriptionCard(context),
-                          ),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                if (!_isRestoringHistory &&
-                    _hasRestoredHistory &&
-                    _messages.isNotEmpty &&
-                    !_isViewingArchivedThread)
-                  _buildHistoryRestoredCard(context),
-                Expanded(
-                  child: _isRestoringHistory
-                      ? const Center(
-                          child: CircularProgressIndicator(),
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) {
+      body: PaidFeatureGate(
+        featureName: 'AI相談',
+        lockedTitle: 'AI相談は有料プランの機能です',
+        lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
+        icon: Icons.smart_toy_rounded,
+        showBackground: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: CustomScrollView(
+                controller: _scrollController,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: topContentInset),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _buildChatHeader(context),
+                  ),
+                  SliverToBoxAdapter(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 400),
+                      child: _showDescriptionCard
+                          ? AnimatedOpacity(
+                              key: const ValueKey('descCard'),
+                              opacity: _cardOpacity,
+                              duration: const Duration(milliseconds: 400),
+                              onEnd: () {
+                                if (_cardOpacity == 0.0 && mounted) {
+                                  setState(() {
+                                    _showDescriptionCard = false;
+                                  });
+                                }
+                              },
+                              child: AnimatedSlide(
+                                offset: _cardOffset,
+                                duration: const Duration(milliseconds: 400),
+                                child: _buildDescriptionCard(context),
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
+                  if (!_isRestoringHistory &&
+                      _hasRestoredHistory &&
+                      _messages.isNotEmpty &&
+                      !_isViewingArchivedThread)
+                    SliverToBoxAdapter(
+                      child: _buildHistoryRestoredCard(context),
+                    ),
+                  if (_isRestoringHistory)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
                             return KeyedSubtree(
                               key: ValueKey(_messages[index].hashCode),
                               child: _buildMessageBubble(_messages[index]),
                             );
                           },
+                          childCount: _messages.length,
                         ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    12,
-                    8,
-                    12,
-                    mq.viewInsets.bottom + 10,
-                  ),
-                  child: AnimatedShiningBorder(
-                    borderRadius: 24,
-                    borderWidth: 2.2,
-                    active: _focusNode.hasFocus && !_isViewingArchivedThread,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppTheme.cardSurface(context),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.softShadow(context),
-                            blurRadius: 16,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              focusNode: _focusNode,
-                              controller: _textController,
-                              enabled: !_isLoading && !_isViewingArchivedThread,
-                              minLines: 1,
-                              maxLines: 4,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppTheme.primaryText(context),
-                              ),
-                              decoration: InputDecoration(
-                                hintText: _isViewingArchivedThread
-                                    ? '過去の相談を表示中です'
-                                    : '気になることを相談する',
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 13,
-                                ),
-                                filled: true,
-                                fillColor: Colors.transparent,
-                                hintStyle: TextStyle(
-                                  color: AppTheme.weakText(context),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          IconButton.filled(
-                            icon: const Icon(Icons.send_rounded),
-                            onPressed: (_isLoading || _isViewingArchivedThread)
-                                ? null
-                                : _handleSend,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
                       ),
                     ),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 12),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                8,
+                12,
+                composerBottomPadding,
+              ),
+              child: AnimatedShiningBorder(
+                borderRadius: 24,
+                borderWidth: 2.2,
+                active: _focusNode.hasFocus && !_isViewingArchivedThread,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardSurface(context),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppTheme.softShadow(context),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          focusNode: _focusNode,
+                          controller: _textController,
+                          enabled: !_isLoading && !_isViewingArchivedThread,
+                          minLines: 1,
+                          maxLines: 4,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppTheme.primaryText(context),
+                          ),
+                          decoration: InputDecoration(
+                            hintText: _isViewingArchivedThread
+                                ? '過去の相談を表示中です'
+                                : '気になることを相談する',
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 13,
+                            ),
+                            filled: true,
+                            fillColor: Colors.transparent,
+                            hintStyle: TextStyle(
+                              color: AppTheme.weakText(context),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton.filled(
+                        icon: const Icon(Icons.send_rounded),
+                        onPressed: (_isLoading || _isViewingArchivedThread)
+                            ? null
+                            : _handleSend,
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

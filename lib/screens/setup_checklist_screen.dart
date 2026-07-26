@@ -86,6 +86,7 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
     if (pet == null) return false;
     return pet.name.trim().isNotEmpty &&
         pet.species.trim().isNotEmpty &&
+        pet.color?.trim().isNotEmpty == true &&
         pet.birthday != null;
   }
 
@@ -212,7 +213,7 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
                   _ChecklistTile(
                     icon: Icons.pets_rounded,
                     title: 'ペットプロフィールを登録',
-                    subtitle: '名前・種類・誕生日を登録します',
+                    subtitle: '名前・種類・毛色・誕生日を登録します',
                     requiredLabel: '必須',
                     completed: status.hasPetProfile,
                     onTap: _openPetProfileEdit,

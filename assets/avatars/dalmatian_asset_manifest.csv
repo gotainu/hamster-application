@@ -1,0 +1,9 @@
+body_type,color_variant,condition,asset_path
+syrian,dalmatian,happy,assets/avatars/syrian/dalmatian/happy.png
+syrian,dalmatian,stable,assets/avatars/syrian/dalmatian/stable.png
+syrian,dalmatian,worried,assets/avatars/syrian/dalmatian/worried.png
+syrian,dalmatian,alert,assets/avatars/syrian/dalmatian/alert.png
+syrian,dalmatian,insufficient_data,assets/avatars/syrian/dalmatian/insufficient_data.png
+syrian,dalmatian,environment_discomfort,assets/avatars/syrian/dalmatian/environment_discomfort.png
+syrian,dalmatian,activity_high,assets/avatars/syrian/dalmatian/activity_high.png
+syrian,dalmatian,condition_concerned,assets/avatars/syrian/dalmatian/condition_concerned.png

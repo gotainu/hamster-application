@@ -11,6 +11,7 @@ import '../services/switchbot_repo.dart';
 import '../services/weight_records_repo.dart';
 import '../services/weight_trend_evaluation_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/floating_bottom_navigation.dart';
 import 'switchbot_setup.dart';
 
 enum _TrendMetric {
@@ -54,6 +55,9 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final topContentInset =
+        MediaQuery.paddingOf(context).top + kToolbarHeight + 12;
+
     return StreamBuilder<SwitchbotConfig?>(
       stream: _sbRepo.watchSwitchbotConfig(),
       builder: (context, configSnap) {
@@ -62,6 +66,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
         final hasDevice = config?.hasDevice ?? false;
 
         return Scaffold(
+          backgroundColor: Colors.transparent,
           appBar: widget.embeddedInTab
               ? null
               : AppBar(
@@ -70,9 +75,11 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
           body: ListView(
             padding: EdgeInsets.fromLTRB(
               16,
-              widget.embeddedInTab ? 84 : 16,
+              widget.embeddedInTab ? topContentInset : 16,
               16,
-              28,
+              widget.embeddedInTab
+                  ? 28 + FloatingBottomNavigation.contentClearance
+                  : 28,
             ),
             children: [
               if (widget.embeddedInTab) ...[
@@ -1493,24 +1500,12 @@ class _TrendsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '最近の変化',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '現在の状態と最近の傾向を見て、いつもと違う変化に気づきやすくします。',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                  height: 1.5,
-                ),
-          ),
-        ],
+      child: Text(
+        '現在の状態と最近の傾向を見て、いつもと違う変化に気づきやすくします。',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.secondaryText(context),
+              height: 1.5,
+            ),
       ),
     );
   }

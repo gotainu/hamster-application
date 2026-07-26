@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:hamster_project/widgets/paid_feature_gate.dart';
+import 'package:flutter/services.dart';
 import 'package:hamster_project/screens/pet_profile_screen.dart';
-import 'package:hamster_project/widgets/main_drawer.dart';
 import 'package:hamster_project/screens/search_function.dart';
 import 'package:hamster_project/screens/graph_function.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/screens/record_screen.dart';
+import 'package:hamster_project/services/daily_record_completion_service.dart';
+import 'package:hamster_project/models/daily_record_completion.dart';
+import 'package:hamster_project/widgets/main_drawer.dart';
+import 'package:hamster_project/widgets/paid_feature_gate.dart';
+import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
+import 'package:hamster_project/widgets/quick_record_sheet.dart';
+import 'package:hamster_project/widgets/screen_edge_fade.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
 class TabsScreen extends StatefulWidget {
@@ -23,6 +31,13 @@ class TabsScreenState extends State<TabsScreen> {
   final GlobalKey<HomeScreenState> _homeKey = GlobalKey<HomeScreenState>();
   final GlobalKey<FuncSearchScreenState> _searchKey =
       GlobalKey<FuncSearchScreenState>();
+
+  final DailyRecordCompletionService _recordCompletionService =
+      DailyRecordCompletionService();
+  final ValueNotifier<DailyRecordCompletion?> _recordCompletionNotifier =
+      ValueNotifier<DailyRecordCompletion?>(null);
+
+  StreamSubscription<DailyRecordCompletion>? _recordCompletionSubscription;
 
   Future<void> openHomeAnomalyCard() async {
     if (!mounted) return;
@@ -61,9 +76,20 @@ class TabsScreenState extends State<TabsScreen> {
   @override
   void initState() {
     super.initState();
+
+    _recordCompletionSubscription = _recordCompletionService.watch().listen(
+      (completion) {
+        _recordCompletionNotifier.value = completion;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        debugPrint('Daily record completion watch failed: $error');
+      },
+    );
+
     _pages = [
       HomeScreen(
         key: _homeKey,
+        recordCompletionListenable: _recordCompletionNotifier,
         onTabSelected: (index) {
           setState(() {
             selectedIndex = index;
@@ -117,7 +143,28 @@ class TabsScreenState extends State<TabsScreen> {
     );
   }
 
+  Future<void> _showQuickRecordSheet() async {
+    if (!mounted) return;
+
+    final result = await showModalBottomSheet<QuickRecordSheetResult>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.50),
+      builder: (context) => const QuickRecordSheet(),
+    );
+
+    if (!mounted) return;
+
+    if (result == QuickRecordSheetResult.openAllRecords) {
+      await _openRecordScreen();
+    }
+  }
+
   void _onTabSelected(int index) {
+    if (index == selectedIndex) return;
+
     setState(() {
       selectedIndex = index;
     });
@@ -148,8 +195,17 @@ class TabsScreenState extends State<TabsScreen> {
   }
 
   @override
+  void dispose() {
+    _recordCompletionSubscription?.cancel();
+    _recordCompletionNotifier.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final appBarForeground = AppTheme.overlayAppBarForeground(context);
 
     const titles = [
       '今日',
@@ -158,54 +214,105 @@ class TabsScreenState extends State<TabsScreen> {
     ];
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
+      extendBody: true,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(
           titles[selectedIndex],
-          style: Theme.of(context).textTheme.titleLarge,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: appBarForeground,
+                fontWeight: FontWeight.w800,
+              ),
         ),
         centerTitle: true,
-        backgroundColor: Colors.transparent, // ← 背景を完全透明に
+        actions: selectedIndex == 1
+            ? [
+                IconButton(
+                  tooltip: '相談履歴',
+                  onPressed: () {
+                    _searchKey.currentState?.openChatHistory();
+                  },
+                  icon: const Icon(Icons.history_rounded),
+                ),
+                IconButton(
+                  tooltip: '新しく相談',
+                  onPressed: () {
+                    _searchKey.currentState?.requestStartNewChat();
+                  },
+                  icon: const Icon(Icons.add_comment_rounded),
+                ),
+                const SizedBox(width: 4),
+              ]
+            : null,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        foregroundColor: appBarForeground,
+        iconTheme: IconThemeData(
+          color: appBarForeground,
+        ),
+        actionsIconTheme: IconThemeData(
+          color: appBarForeground,
+        ),
         elevation: 0,
-        // flexibleSpaceは完全削除（グラデはbodyで行う！）
+        scrolledUnderElevation: 0,
+        forceMaterialTransparency: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
       drawer: MainDrawer(
         onSelectScreen: _setScreen,
       ),
-      // ===== グラデ背景はbodyで統一！ =====
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
-        ),
-        width: double.infinity,
-        height: double.infinity,
-        child: SafeArea(
-          top: false, // AppBarの裏まで伸ばす
-          child: _pages[selectedIndex],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: selectedIndex,
-        onTap: _onTabSelected,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: '今日',
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient:
+                  isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
+            ),
+            width: double.infinity,
+            height: double.infinity,
+            child: SafeArea(
+              top: false,
+              child: _pages[selectedIndex],
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.smart_toy_rounded),
-            label: '相談',
+          Positioned.fill(
+            child: ScreenEdgeFade(
+              showBottom: !keyboardVisible,
+            ),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.insights_rounded),
-            label: '変化',
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              ignoring: keyboardVisible,
+              child: AnimatedSlide(
+                offset: keyboardVisible ? const Offset(0, 1.35) : Offset.zero,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: AnimatedOpacity(
+                  opacity: keyboardVisible ? 0 : 1,
+                  duration: const Duration(milliseconds: 140),
+                  child: ValueListenableBuilder<DailyRecordCompletion?>(
+                    valueListenable: _recordCompletionNotifier,
+                    builder: (context, completion, _) {
+                      return FloatingBottomNavigation(
+                        currentIndex: selectedIndex,
+                        onTabSelected: _onTabSelected,
+                        onQuickRecord: _showQuickRecordSheet,
+                        highlightQuickRecord:
+                            completion?.shouldShowPrompt == true,
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
-        selectedItemColor: AppTheme.accent,
-        unselectedItemColor: Colors.grey,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
       ),
     );
   }

@@ -1,22 +1,20 @@
 // lib/screens/home.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
 import 'package:hamster_project/models/anomaly_detection.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
-import 'package:hamster_project/models/daily_health_features.dart';
 import 'package:hamster_project/models/health_assessment.dart';
+import 'package:hamster_project/models/pet_profile.dart';
 import 'package:hamster_project/services/anomaly_detection_service.dart';
 import 'package:hamster_project/services/environment_status_service.dart';
 import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/services/environment_trend_service.dart';
 import 'package:hamster_project/services/paid_feature_guard_service.dart';
-import 'package:hamster_project/services/daily_record_completion_service.dart';
-import 'package:hamster_project/services/daily_health_features_repo.dart';
 import 'package:hamster_project/services/health_assessment_repo.dart';
+import 'package:hamster_project/services/pet_profile_repo.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
 import 'package:hamster_project/screens/record_screen.dart';
@@ -25,14 +23,18 @@ import 'package:hamster_project/widgets/semantic_trend_chart.dart';
 import 'package:hamster_project/widgets/status_card.dart';
 import 'package:hamster_project/widgets/health_score_gauge.dart';
 import 'package:hamster_project/widgets/health_score_trend_chart.dart';
+import 'package:hamster_project/widgets/hamster_avatar_hero.dart';
+import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
+  final ValueListenable<DailyRecordCompletion?> recordCompletionListenable;
   final void Function(int) onTabSelected;
   final Future<void> Function(String draftText)? onOpenAiWithDraft;
   final Future<void> Function()? onOpenRecord;
 
   const HomeScreen({
     super.key,
+    required this.recordCompletionListenable,
     required this.onTabSelected,
     this.onOpenAiWithDraft,
     this.onOpenRecord,
@@ -48,34 +50,9 @@ class HomeScreenState extends State<HomeScreen> {
 
   final _assessmentRepo = EnvironmentAssessmentRepo();
   final _healthAssessmentRepo = HealthAssessmentRepo();
-  final _dailyHealthFeaturesRepo = DailyHealthFeaturesRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _paidFeatureGuard = PaidFeatureGuardService();
-  final _recordCompletionService = DailyRecordCompletionService();
-
-  Stream<String?> _watchMainPetName() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return Stream<String?>.value(null);
-    }
-
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .collection('pet_profiles')
-        .doc('main_pet')
-        .snapshots()
-        .map((snap) {
-      final data = snap.data();
-      if (data == null) return null;
-
-      final rawName = data['name'] ?? data['petName'] ?? data['nickname'];
-      final name = rawName?.toString().trim();
-
-      if (name == null || name.isEmpty) return null;
-      return name;
-    });
-  }
+  final _petProfileRepo = PetProfileRepo();
 
   String _homeSubtitle({
     required String? petName,
@@ -183,229 +160,199 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final gradient =
-        isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
+    final topContentInset =
+        MediaQuery.paddingOf(context).top + kToolbarHeight + 12;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: null,
-      body: Container(
-        decoration: BoxDecoration(gradient: gradient),
-        width: double.infinity,
-        height: double.infinity,
-        child: SafeArea(
-          child: StreamBuilder<String?>(
-            stream: _watchMainPetName(),
-            builder: (context, petSnap) {
-              final petName = petSnap.data;
+    return StreamBuilder<PetProfile?>(
+      stream: _petProfileRepo.watchMainPet(),
+      builder: (context, petSnap) {
+        final petProfile = petSnap.data;
+        final petName = petProfile?.name;
 
-              return StreamBuilder<HealthAssessment?>(
-                stream: _healthAssessmentRepo.watchLatest(),
-                builder: (context, healthSnap) {
-                  final healthAssessment = healthSnap.data;
-                  final hasGoldAssessment =
-                      healthAssessment?.hasMeaningfulAssessment == true;
-                  final isLoadingHealth =
-                      healthSnap.connectionState == ConnectionState.waiting;
+        return StreamBuilder<HealthAssessment?>(
+          stream: _healthAssessmentRepo.watchLatest(),
+          builder: (context, healthSnap) {
+            final healthAssessment = healthSnap.data;
+            final hasGoldAssessment =
+                healthAssessment?.hasMeaningfulAssessment == true;
+            final isLoadingHealth =
+                healthSnap.connectionState == ConnectionState.waiting;
 
-                  return StreamBuilder<EnvironmentAssessment?>(
-                    stream: _assessmentRepo.watchLatest(),
-                    builder: (context, latestSnap) {
-                      final assessment = latestSnap.data;
-                      final isLoadingLatest =
-                          latestSnap.connectionState == ConnectionState.waiting;
+            return StreamBuilder<EnvironmentAssessment?>(
+              stream: _assessmentRepo.watchLatest(),
+              builder: (context, latestSnap) {
+                final assessment = latestSnap.data;
+                final isLoadingLatest =
+                    latestSnap.connectionState == ConnectionState.waiting;
 
-                      return StreamBuilder<List<EnvironmentAssessmentHistory>>(
-                        stream: _assessmentRepo.watchRecentHistory(limit: 14),
-                        builder: (context, historySnap) {
-                          final history = historySnap.data ??
-                              const <EnvironmentAssessmentHistory>[];
-                          final isLoading =
-                              (isLoadingHealth && healthAssessment == null) ||
-                                  (!hasGoldAssessment && isLoadingLatest);
+                return StreamBuilder<List<EnvironmentAssessmentHistory>>(
+                  stream: _assessmentRepo.watchRecentHistory(limit: 14),
+                  builder: (context, historySnap) {
+                    final history = historySnap.data ??
+                        const <EnvironmentAssessmentHistory>[];
+                    final isLoading =
+                        (isLoadingHealth && healthAssessment == null) ||
+                            (!hasGoldAssessment && isLoadingLatest);
 
-                          final anomalyDetection = _buildHomeAnomalyDetection(
-                            history: history,
-                          );
+                    final anomalyDetection = _buildHomeAnomalyDetection(
+                      history: history,
+                    );
 
-                          return SingleChildScrollView(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.fromLTRB(
-                              18,
-                              20,
-                              18,
-                              24,
+                    return SingleChildScrollView(
+                      controller: _scrollController,
+                      padding: EdgeInsets.fromLTRB(
+                        18,
+                        topContentInset,
+                        18,
+                        24 + FloatingBottomNavigation.contentClearance,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _HomeHeader(
+                            subtitle: _homeSubtitle(
+                              petName: petName,
+                              hasAssessmentData: hasGoldAssessment ||
+                                  assessment?.hasData == true,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _HomeHeader(
-                                  title: '今日の状態',
-                                  subtitle: _homeSubtitle(
-                                    petName: petName,
-                                    hasAssessmentData: hasGoldAssessment ||
-                                        assessment?.hasData == true,
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                if (isLoading)
-                                  _EnvironmentAssessmentHero.loading()
-                                else if (hasGoldAssessment)
-                                  StreamBuilder<List<HealthAssessment>>(
-                                    stream: _healthAssessmentRepo
-                                        .watchRecentHistory(limit: 7),
-                                    builder: (context, healthHistorySnap) {
-                                      final healthHistory =
-                                          healthHistorySnap.data ??
-                                              const <HealthAssessment>[];
+                          ),
+                          const SizedBox(height: 18),
+                          if (isLoading)
+                            _EnvironmentAssessmentHero.loading()
+                          else if (hasGoldAssessment)
+                            StreamBuilder<List<HealthAssessment>>(
+                              stream: _healthAssessmentRepo.watchRecentHistory(
+                                  limit: 7),
+                              builder: (context, healthHistorySnap) {
+                                final healthHistory = healthHistorySnap.data ??
+                                    const <HealthAssessment>[];
 
-                                      return StreamBuilder<
-                                          DailyHealthFeatures?>(
-                                        stream: _dailyHealthFeaturesRepo
-                                            .watchLatest(),
-                                        builder: (context, featureSnap) {
-                                          return _HealthAssessmentHero(
-                                            assessment: healthAssessment!,
-                                            history: healthHistory,
-                                            features: featureSnap.data,
-                                            onTap: () {
-                                              Navigator.of(context).push(
-                                                MaterialPageRoute(
-                                                  builder: (_) =>
-                                                      const DailyStatusDetailScreen(),
-                                                ),
-                                              );
-                                            },
-                                            onAskAi: () {
-                                              _openAiWithDraft(
-                                                '今日の総合コンディション評価を踏まえて、優先して確認すべきことを教えてください。',
-                                              );
-                                            },
-                                          );
-                                        },
-                                      );
-                                    },
-                                  )
-                                else if (assessment == null ||
-                                    !assessment.hasData)
-                                  _EnvironmentAssessmentHero.empty(
-                                    onOpenSetup: () async {
-                                      final allowed = await _ensurePaidFeature(
-                                        featureName: 'SwitchBot連携',
-                                      );
-                                      if (!allowed) return;
-
-                                      if (!context.mounted) return;
-
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const SwitchbotSetupScreen(),
-                                        ),
-                                      );
-                                    },
-                                  )
-                                else
-                                  _EnvironmentAssessmentHero(
-                                    assessment: assessment,
-                                    history: history,
-                                    onTap: () {
-                                      Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) =>
-                                              const DailyStatusDetailScreen(),
-                                        ),
-                                      );
-                                    },
-                                    onAskAi: () {
-                                      _openAiWithDraft(
-                                        '今日の飼育環境の評価を踏まえて、今確認すべきことと優先順位を教えてください。',
-                                      );
-                                    },
-                                  ),
-                                if (!isLoading &&
-                                    anomalyDetection.hasAnomaly) ...[
-                                  const SizedBox(height: 14),
-                                  Container(
-                                    key: _anomalyCardKey,
-                                    child: _HomeAnomalyCard(
-                                      result: anomalyDetection,
-                                      onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                const DailyStatusDetailScreen(),
-                                          ),
-                                        );
-                                      },
-                                      onAskAi: () {
-                                        final top = anomalyDetection.topAnomaly;
-
-                                        _openAiWithDraft(
-                                          top == null
-                                              ? '最近の気になる変化について、原因候補と今日確認すべきことを教えてください。'
-                                              : '最近の気になる変化「${top.title}」について、原因候補と今日確認すべきことを教えてください。',
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 14),
-                                StreamBuilder<DailyRecordCompletion>(
-                                  stream: _recordCompletionService.watch(),
-                                  builder: (
-                                    context,
-                                    completionSnapshot,
-                                  ) {
-                                    final completion = completionSnapshot.data;
-
-                                    if (completion == null ||
-                                        !completion.shouldShowPrompt) {
-                                      return const SizedBox.shrink();
-                                    }
-
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        bottom: 18,
-                                      ),
-                                      child: _HomeRecordPromptCard(
-                                        completion: completion,
-                                        onOpenRecord: _openRecord,
+                                return _HealthAssessmentHero(
+                                  profile: petProfile,
+                                  assessment: healthAssessment!,
+                                  history: healthHistory,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const DailyStatusDetailScreen(),
                                       ),
                                     );
                                   },
-                                ),
-                                Center(
-                                  child: Text(
-                                    '© 2025 Go / hamster well-being',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                  onAskAi: () {
+                                    _openAiWithDraft(
+                                      '今日の総合コンディション評価を踏まえて、優先して確認すべきことを教えてください。',
+                                    );
+                                  },
+                                );
+                              },
+                            )
+                          else if (assessment == null || !assessment.hasData)
+                            _EnvironmentAssessmentHero.empty(
+                              onOpenSetup: () async {
+                                final allowed = await _ensurePaidFeature(
+                                  featureName: 'SwitchBot連携',
+                                );
+                                if (!allowed) return;
+
+                                if (!context.mounted) return;
+
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const SwitchbotSetupScreen(),
                                   ),
-                                ),
-                              ],
+                                );
+                              },
+                            )
+                          else
+                            _EnvironmentAssessmentHero(
+                              assessment: assessment,
+                              history: history,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const DailyStatusDetailScreen(),
+                                  ),
+                                );
+                              },
+                              onAskAi: () {
+                                _openAiWithDraft(
+                                  '今日の飼育環境の評価を踏まえて、今確認すべきことと優先順位を教えてください。',
+                                );
+                              },
                             ),
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          ),
-        ),
-      ),
+                          if (!isLoading && anomalyDetection.hasAnomaly) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              key: _anomalyCardKey,
+                              child: _HomeAnomalyCard(
+                                result: anomalyDetection,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const DailyStatusDetailScreen(),
+                                    ),
+                                  );
+                                },
+                                onAskAi: () {
+                                  final top = anomalyDetection.topAnomaly;
+
+                                  _openAiWithDraft(
+                                    top == null
+                                        ? '最近の気になる変化について、原因候補と今日確認すべきことを教えてください。'
+                                        : '最近の気になる変化「${top.title}」について、原因候補と今日確認すべきことを教えてください。',
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 14),
+                          ValueListenableBuilder<DailyRecordCompletion?>(
+                            valueListenable: widget.recordCompletionListenable,
+                            builder: (context, completion, _) {
+                              if (completion == null ||
+                                  !completion.shouldShowPrompt) {
+                                return const SizedBox.shrink();
+                              }
+
+                              return Padding(
+                                padding: const EdgeInsets.only(
+                                  bottom: 18,
+                                ),
+                                child: _HomeRecordPromptCard(
+                                  completion: completion,
+                                  onOpenRecord: _openRecord,
+                                ),
+                              );
+                            },
+                          ),
+                          Center(
+                            child: Text(
+                              '© 2025 Go / hamster well-being',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
     );
   }
 }
 
 class _HomeHeader extends StatelessWidget {
-  final String title;
   final String subtitle;
 
   const _HomeHeader({
-    required this.title,
     required this.subtitle,
   });
 
@@ -413,39 +360,27 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                ),
-          ),
-        ],
+      child: Text(
+        subtitle,
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppTheme.secondaryText(context),
+            ),
       ),
     );
   }
 }
 
 class _HealthAssessmentHero extends StatelessWidget {
+  final PetProfile? profile;
   final HealthAssessment assessment;
   final List<HealthAssessment> history;
-  final DailyHealthFeatures? features;
   final VoidCallback? onTap;
   final VoidCallback? onAskAi;
 
   const _HealthAssessmentHero({
+    required this.profile,
     required this.assessment,
     this.history = const [],
-    this.features,
     this.onTap,
     this.onAskAi,
   });
@@ -466,50 +401,11 @@ class _HealthAssessmentHero extends StatelessWidget {
     }
   }
 
-  String _formatWeight(double value) {
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(1);
-  }
-
-  String? _snapshotText() {
-    final parts = <String>[];
-    final environment = features?.environment;
-    final body = features?.body;
-
-    final environmentParts = <String>[];
-    final temp = environment?.avgTemp;
-    final hum = environment?.avgHum;
-
-    if (temp != null) {
-      environmentParts.add('${temp.toStringAsFixed(1)}℃');
-    }
-    if (hum != null) {
-      environmentParts.add('${hum.toStringAsFixed(1)}%');
-    }
-    if (environmentParts.isNotEmpty) {
-      parts.add('環境 ${environmentParts.join(' / ')}');
-    }
-
-    final weight = body?.latestWeightGrams;
-    if (weight != null) {
-      parts.add('体重 ${_formatWeight(weight)}g');
-    }
-
-    if (parts.isEmpty) return null;
-    return parts.join('  ・  ');
-  }
-
   @override
   Widget build(BuildContext context) {
-    final snapshotText = _snapshotText();
     final action = assessment.overall.recommendedActions.isEmpty
         ? null
         : assessment.overall.recommendedActions.first;
-    final primaryFactor = assessment.overall.primaryFactor?.trim();
-    final showPrimaryFactor = primaryFactor != null &&
-        primaryFactor.isNotEmpty &&
-        primaryFactor != assessment.overall.summary;
     final trend = buildHealthScoreTrendSummary(
       history: history,
       latest: assessment,
@@ -526,11 +422,15 @@ class _HealthAssessmentHero extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '総合コンディション',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                '総合コンディション',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
             ),
             const SizedBox(height: 4),
             Center(
@@ -539,49 +439,25 @@ class _HealthAssessmentHero extends StatelessWidget {
                     assessment.overall.observedScore,
                 state: assessment.overall.state,
                 isProvisional: assessment.overall.isProvisional,
-                width: 270,
-                height: 158,
-                strokeWidth: 17,
-                scoreFontSize: 52,
-                stateFontSize: 16,
+                width: 236,
+                height: 138,
+                strokeWidth: 15,
+                scoreFontSize: 44,
+                stateFontSize: 14,
               ),
             ),
-            Text(
-              assessment.overall.summary,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    height: 1.45,
-                  ),
-            ),
-            if (showPrimaryFactor) ...[
-              const SizedBox(height: 11),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.insights_rounded,
-                    size: 18,
-                    color: healthAssessmentAccent(
-                      context,
-                      assessment.overall.observedState,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      '主な要因：$primaryFactor',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                            fontWeight: FontWeight.w700,
-                            height: 1.4,
-                          ),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 6),
+            Center(
+              child: HamsterAvatarHero(
+                profile: profile,
+                assessment: assessment,
+                avatarSize: 190,
+                showMessage: false,
+                showDebugLabel: false,
+                showBackdrop: false,
               ),
-            ],
-            const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
@@ -610,30 +486,6 @@ class _HealthAssessmentHero extends StatelessWidget {
               compact: true,
               showThresholdLabels: false,
             ),
-            if (snapshotText != null) ...[
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.monitor_heart_outlined,
-                    size: 18,
-                    color: AppTheme.secondaryText(context),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      snapshotText,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                            fontWeight: FontWeight.w700,
-                            height: 1.4,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
             if (action != null) ...[
               const SizedBox(height: 14),
               Row(

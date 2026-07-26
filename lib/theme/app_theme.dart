@@ -268,6 +268,55 @@ class AppTheme {
   static Color quickActionBorder(BuildContext context) =>
       accent.withValues(alpha: isDark(context) ? 0.18 : 0.14);
 
+  // ===== Transparent AppBar / screen-edge fade =====
+  static Color overlayAppBarForeground(BuildContext context) => Colors.white;
+
+  static Color screenEdgeFadeTint(BuildContext context) =>
+      isDark(context) ? const Color(0xA8121721) : const Color(0xA6151C27);
+
+  // AppBarの内側へ約30%入るまでは、ブラーも暗転も始めません。
+  static const double screenEdgeTopClearFraction = 0.30;
+
+  // 下側は既存の見え方を維持します。
+  static const double screenEdgeBottomClearFraction = 0.06;
+
+  // ===== Floating navigation / quick record sheet =====
+  static Color floatingNavigationSurface(BuildContext context) =>
+      isDark(context) ? const Color(0xEB30343B) : const Color(0xF2FFFFFF);
+
+  static Color floatingNavigationBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.13)
+      : Colors.black.withValues(alpha: 0.08);
+
+  static Color floatingNavigationSelected(BuildContext context) =>
+      isDark(context) ? Colors.white : accent;
+
+  static Color floatingNavigationUnselected(BuildContext context) =>
+      isDark(context) ? Colors.white60 : const Color(0xFF66717F);
+
+  static Color floatingNavigationLabel(BuildContext context) =>
+      floatingNavigationUnselected(context);
+
+  // 選択状態はアイコン色だけで表現し、背景の塗り分けは行いません。
+  static Color floatingNavigationSelectedFill(BuildContext context) =>
+      Colors.transparent;
+
+  static Color floatingRecordButtonSurface(BuildContext context) =>
+      isDark(context) ? const Color(0xFF34383F) : const Color(0xFFFFFFFF);
+
+  static Color quickRecordSheetSurface(BuildContext context) =>
+      isDark(context) ? const Color(0xFF20242D) : const Color(0xFFF6F8FB);
+
+  static List<BoxShadow> floatingNavigationShadows(BuildContext context) => [
+        BoxShadow(
+          color: Colors.black.withValues(
+            alpha: isDark(context) ? 0.34 : 0.16,
+          ),
+          blurRadius: 26,
+          offset: const Offset(0, 12),
+        ),
+      ];
+
   static Color chartGlow(Color base, BuildContext context) =>
       base.withValues(alpha: isDark(context) ? 0.18 : 0.14);
 

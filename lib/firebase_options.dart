@@ -65,5 +65,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'hamster-breeding-app.firebasestorage.app',
     iosBundleId: 'com.example.hamsterProject',
   );
-
 }
