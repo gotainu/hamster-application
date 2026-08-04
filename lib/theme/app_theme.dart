@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/hamster_avatar.dart';
 import '../models/semantic_chart_band.dart';
 import '../models/sensor_evaluation.dart';
 import '../models/anomaly_detection.dart';
@@ -132,6 +133,102 @@ class AppTheme {
     ],
   );
 
+  // ===== Hamster habitat background =====
+  // 背景画像・表示濃度・位置・視認性オーバーレイはここへ集約します。
+  //
+  // 背景の原因判定そのものは HamsterAvatarConditionResolver に集約し、
+  // ここでは原因と画像ファイルの対応だけを管理します。
+  // これにより、アバターの表情・原因バッジ・背景画像が同じ判定結果を使います。
+  static String habitatBackgroundAsset(
+    BuildContext context, {
+    HamsterAvatarCause cause = HamsterAvatarCause.none,
+  }) {
+    final isNight = isDark(context);
+
+    switch (cause) {
+      case HamsterAvatarCause.heat:
+        return isNight
+            ? 'assets/images/theme/bg_heat_night.webp'
+            : 'assets/images/theme/bg_heat_day.webp';
+      case HamsterAvatarCause.cold:
+        return isNight
+            ? 'assets/images/theme/bg_cold_night.webp'
+            : 'assets/images/theme/bg_cold_day.webp';
+      case HamsterAvatarCause.humidityHigh:
+        return isNight
+            ? 'assets/images/theme/bg_humidity_high_night.webp'
+            : 'assets/images/theme/bg_humidity_high_day.webp';
+      case HamsterAvatarCause.humidityLow:
+        return isNight
+            ? 'assets/images/theme/bg_humidity_low_night.webp'
+            : 'assets/images/theme/bg_humidity_low_day.webp';
+      case HamsterAvatarCause.activityHigh:
+        return isNight
+            ? 'assets/images/theme/bg_activity_high_night.webp'
+            : 'assets/images/theme/bg_activity_high_day.webp';
+      case HamsterAvatarCause.activityLow:
+        return isNight
+            ? 'assets/images/theme/bg_activity_low_night.webp'
+            : 'assets/images/theme/bg_activity_low_day.webp';
+      case HamsterAvatarCause.conditionConcern:
+        return isNight
+            ? 'assets/images/theme/bg_condition_concern_night.webp'
+            : 'assets/images/theme/bg_condition_concern_day.webp';
+      case HamsterAvatarCause.insufficientData:
+        return isNight
+            ? 'assets/images/theme/bg_insufficient_data_night.webp'
+            : 'assets/images/theme/bg_insufficient_data_day.webp';
+      case HamsterAvatarCause.overallAlert:
+        return isNight
+            ? 'assets/images/theme/bg_overall_alert_night.webp'
+            : 'assets/images/theme/bg_overall_alert_day.webp';
+      case HamsterAvatarCause.weightChanged:
+        // 現時点では体重変化専用画像がないため、標準背景へ戻します。
+        return isNight
+            ? 'assets/images/theme/bg_default_night.webp'
+            : 'assets/images/theme/bg_default_day.webp';
+      case HamsterAvatarCause.none:
+        return isNight
+            ? 'assets/images/theme/bg_default_night.webp'
+            : 'assets/images/theme/bg_default_day.webp';
+    }
+  }
+
+  // 横長画像をスマートフォンへ cover 表示するため、空を中心に残します。
+  static Alignment habitatBackgroundAlignment(BuildContext context) =>
+      Alignment.topCenter;
+
+  // 昼・夜それぞれの画像素材側で明るさを調整しているため、
+  // アプリ側では減光せず、そのままの発色とコントラストを活かします。
+  static double habitatBackgroundOpacity(BuildContext context) => 1.0;
+
+  // 常時ブラーは背景全体を白っぽく霞ませるため無効化します。
+  // AppBar／下部ナビ付近の局所ブラーは ScreenEdgeFade が担当します。
+  static double habitatBackgroundBlurSigma(BuildContext context) => 0.0;
+
+  // cover表示時の端切れ防止に必要な最小限の拡大だけを残します。
+  static const double habitatBackgroundScale = 1.01;
+
+  static Duration get habitatBackgroundTransitionDuration =>
+      const Duration(milliseconds: 520);
+
+  static Curve get habitatBackgroundTransitionCurve => Curves.easeOutCubic;
+
+  static Gradient habitatReadabilityOverlay(BuildContext context) {
+    final dimColor = Colors.black.withValues(
+      alpha: isDark(context) ? 0.2 : 0.3,
+    );
+
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        dimColor,
+        dimColor,
+      ],
+    );
+  }
+
   static Gradient statusCardGradient(
     BuildContext context, {
     required Color accent,
@@ -182,6 +279,19 @@ class AppTheme {
     );
   }
 
+  static BoxDecoration transparentStatusCardDecoration(
+    BuildContext context, {
+    double radius = 24,
+  }) {
+    return BoxDecoration(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(radius),
+      // 完全透過カードでは、輪郭線だけでなく外周シャドウも描画しません。
+      // 透明な矩形の存在感を消し、背景画像と自然につなげます。
+      border: Border.all(color: Colors.transparent),
+    );
+  }
+
   static Color sensorStateAccent(MetricState state) {
     switch (state) {
       case MetricState.unknown:
@@ -216,6 +326,89 @@ class AppTheme {
 
   static Color secondaryText(BuildContext context) =>
       isDark(context) ? Colors.white70 : const Color(0xFF5F6B7A);
+
+  // ===== Text directly over habitat images =====
+  // 背景透過領域専用。通常カード内の配色には影響させません。
+  static Color habitatForegroundPrimary(BuildContext context) =>
+      isDark(context) ? Colors.white : const Color(0xFF4A1F2B);
+
+  static Color habitatForegroundSecondary(BuildContext context) =>
+      isDark(context)
+          ? Colors.white.withValues(alpha: 0.88)
+          : const Color(0xFF5E3A45);
+
+  static Color habitatForegroundMuted(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.76)
+      : const Color(0xFF6E5660);
+
+  static List<Shadow> habitatForegroundShadows(BuildContext context) {
+    if (isDark(context)) {
+      return [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.72),
+          blurRadius: 7,
+          offset: const Offset(0, 2),
+        ),
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.36),
+          blurRadius: 2,
+          offset: const Offset(0, 1),
+        ),
+      ];
+    }
+
+    return [
+      Shadow(
+        color: Colors.white.withValues(alpha: 0.96),
+        blurRadius: 8,
+      ),
+      Shadow(
+        color: Colors.white.withValues(alpha: 0.72),
+        blurRadius: 3,
+      ),
+      Shadow(
+        color: Colors.black.withValues(alpha: 0.14),
+        blurRadius: 2,
+        offset: const Offset(0, 1),
+      ),
+    ];
+  }
+
+  // ===== Transparent overall-condition hero =====
+  // 背景画像の上へ直接表示する総合コンディション領域専用です。
+  // ライト／ダークを問わず白系へ統一し、状態色は背景画像や文言で伝えます。
+  static Color overallConditionForeground(BuildContext context) => Colors.white;
+
+  static Color overallConditionSecondary(BuildContext context) =>
+      Colors.white.withValues(alpha: 0.92);
+
+  static Color overallConditionMuted(BuildContext context) =>
+      Colors.white.withValues(alpha: 0.82);
+
+  static Color overallConditionGaugeTrack(BuildContext context) =>
+      Colors.white.withValues(alpha: 0.24);
+
+  static Color overallConditionChartGrid(BuildContext context) =>
+      Colors.white.withValues(alpha: 0.22);
+
+  static Color overallConditionPointFill(BuildContext context) =>
+      Colors.white.withValues(alpha: 0.16);
+
+  static List<Shadow> overallConditionForegroundShadows(
+    BuildContext context,
+  ) =>
+      [
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.76),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+        Shadow(
+          color: Colors.black.withValues(alpha: 0.38),
+          blurRadius: 3,
+          offset: const Offset(0, 1),
+        ),
+      ];
 
   static Color tertiaryText(BuildContext context) =>
       isDark(context) ? Colors.white54 : const Color(0xFF7E8896);
@@ -279,6 +472,95 @@ class AppTheme {
 
   // 下側は既存の見え方を維持します。
   static const double screenEdgeBottomClearFraction = 0.06;
+
+  // ===== Habitat glass drawer =====
+  static const double drawerBlurSigma = 18.0;
+
+  static Color drawerSurface(BuildContext context) => isDark(context)
+      ? const Color.fromARGB(124, 18, 25, 36)
+      : const Color.fromARGB(111, 247, 249, 252);
+
+  static Color drawerOuterBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.16)
+      : const Color(0xFF243C5A).withValues(alpha: 0.12);
+
+  static Gradient drawerStatusBarOverlay(BuildContext context) {
+    final color = isDark(context)
+        ? Colors.black.withValues(alpha: 0.22)
+        : const Color(0xFF183044).withValues(alpha: 0.42);
+
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        color,
+        Colors.transparent,
+      ],
+    );
+  }
+
+  static Color drawerGroupSurface(BuildContext context) => isDark(context)
+      ? const Color(0xFF222A38).withValues(alpha: 0.9)
+      : Colors.white.withValues(alpha: 0.8);
+
+  static Color drawerGroupBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.15)
+      : const Color(0xFF243C5A).withValues(alpha: 0.14);
+
+  static List<BoxShadow> drawerGroupShadows(BuildContext context) => [
+        BoxShadow(
+          color: Colors.black.withValues(
+            alpha: isDark(context) ? 0.18 : 0.08,
+          ),
+          blurRadius: 18,
+          offset: const Offset(0, 9),
+        ),
+      ];
+
+  static Color drawerHeaderIconSurface(BuildContext context) =>
+      Colors.white.withValues(alpha: isDark(context) ? 0.10 : 0.62);
+
+  static Color drawerHeaderIconBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.22)
+      : const Color(0xFF27435F).withValues(alpha: 0.16);
+
+  static Color drawerItemIconSurface(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.075)
+      : const Color(0xFF23405F).withValues(alpha: 0.07);
+
+  static Color drawerItemIconBorder(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.18)
+      : const Color(0xFF23405F).withValues(alpha: 0.16);
+
+  static Color drawerIconForeground(BuildContext context) =>
+      isDark(context) ? Colors.white : const Color(0xFF27435F);
+
+  static Color drawerPrimaryText(BuildContext context) =>
+      isDark(context) ? Colors.white : const Color(0xFF1D2935);
+
+  static Color drawerSecondaryText(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.74)
+      : const Color(0xFF526273);
+
+  static Color drawerSectionLabel(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.76)
+      : const Color(0xFF4B5C6E);
+
+  static Color drawerChevron(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.50)
+      : const Color(0xFF506174).withValues(alpha: 0.82);
+
+  static Color drawerDivider(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.10)
+      : const Color(0xFF243C5A).withValues(alpha: 0.11);
+
+  static Color drawerInteractionFill(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.07)
+      : const Color(0xFF27435F).withValues(alpha: 0.065);
+
+  static Color drawerFooterText(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.48)
+      : const Color(0xFF526170).withValues(alpha: 0.88);
 
   // ===== Floating navigation / quick record sheet =====
   static Color floatingNavigationSurface(BuildContext context) =>

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
@@ -119,77 +121,83 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   Widget _buildMetricSelector() {
-    return SegmentedButton<_TrendMetric>(
-      segments: const [
-        ButtonSegment<_TrendMetric>(
-          value: _TrendMetric.activity,
-          icon: Icon(Icons.directions_run_rounded),
-          label: Text('活動量'),
-        ),
-        ButtonSegment<_TrendMetric>(
-          value: _TrendMetric.temperature,
-          icon: Icon(Icons.thermostat_rounded),
-          label: Text('温度'),
-        ),
-        ButtonSegment<_TrendMetric>(
-          value: _TrendMetric.humidity,
-          icon: Icon(Icons.water_drop_outlined),
-          label: Text('湿度'),
-        ),
-        ButtonSegment<_TrendMetric>(
-          value: _TrendMetric.weight,
-          icon: Icon(Icons.monitor_weight_outlined),
-          label: Text('体重'),
-        ),
-      ],
-      selected: {_selectedMetric},
-      showSelectedIcon: false,
-      onSelectionChanged: (selection) {
-        setState(() {
-          _selectedMetric = selection.first;
-          if (_selectedMetric == _TrendMetric.weight &&
-              _selectedPeriod == _TrendPeriod.hours24) {
-            _selectedPeriod = _TrendPeriod.days30;
-          }
-        });
-      },
+    const items = [
+      _MetricSelectorItem(
+        metric: _TrendMetric.activity,
+        icon: Icons.directions_run_rounded,
+        label: '活動量',
+      ),
+      _MetricSelectorItem(
+        metric: _TrendMetric.temperature,
+        icon: Icons.thermostat_rounded,
+        label: '温度',
+      ),
+      _MetricSelectorItem(
+        metric: _TrendMetric.humidity,
+        icon: Icons.water_drop_outlined,
+        label: '湿度',
+      ),
+      _MetricSelectorItem(
+        metric: _TrendMetric.weight,
+        icon: Icons.monitor_weight_outlined,
+        label: '体重',
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          for (final item in items)
+            _MetricCircleSelector(
+              icon: item.icon,
+              label: item.label,
+              selected: _selectedMetric == item.metric,
+              onTap: () {
+                setState(() {
+                  _selectedMetric = item.metric;
+                  if (_selectedMetric == _TrendMetric.weight &&
+                      _selectedPeriod == _TrendPeriod.hours24) {
+                    _selectedPeriod = _TrendPeriod.days30;
+                  }
+                });
+              },
+            ),
+        ],
+      ),
     );
   }
 
   Widget _buildPeriodSelector() {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<_TrendPeriod>(
-        segments: [
-          if (_selectedMetric != _TrendMetric.weight)
-            const ButtonSegment<_TrendPeriod>(
-              value: _TrendPeriod.hours24,
-              label: Text('24時間'),
-            ),
-          const ButtonSegment<_TrendPeriod>(
-            value: _TrendPeriod.days7,
-            label: Text('7日'),
-          ),
-          const ButtonSegment<_TrendPeriod>(
-            value: _TrendPeriod.days30,
-            label: Text('30日'),
-          ),
-          const ButtonSegment<_TrendPeriod>(
-            value: _TrendPeriod.all,
-            label: Text('全期間'),
-          ),
-        ],
-        selected: {_selectedPeriod},
-        showSelectedIcon: false,
-        style: const ButtonStyle(
-          visualDensity: VisualDensity.compact,
+    final items = <_PeriodSelectorItem>[
+      if (_selectedMetric != _TrendMetric.weight)
+        const _PeriodSelectorItem(
+          period: _TrendPeriod.hours24,
+          label: '24時間',
         ),
-        onSelectionChanged: (selection) {
-          setState(() {
-            _selectedPeriod = selection.first;
-          });
-        },
+      const _PeriodSelectorItem(
+        period: _TrendPeriod.days7,
+        label: '7日',
       ),
+      const _PeriodSelectorItem(
+        period: _TrendPeriod.days30,
+        label: '30日',
+      ),
+      const _PeriodSelectorItem(
+        period: _TrendPeriod.all,
+        label: '全期間',
+      ),
+    ];
+
+    return _OuraPeriodSelector(
+      items: items,
+      selectedPeriod: _selectedPeriod,
+      onSelected: (period) {
+        setState(() {
+          _selectedPeriod = period;
+        });
+      },
     );
   }
 
@@ -567,102 +575,93 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     required String summaryText,
     required String valueCaption,
   }) {
-    final accent = Theme.of(context).colorScheme.primary;
+    final isDark = AppTheme.isDark(context);
+    final foreground = isDark ? Colors.white : const Color(0xFF18212C);
+    final secondary = foreground.withValues(alpha: isDark ? 0.72 : 0.66);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
-      child: Row(
+    return _TrendGlassCard(
+      padding: const EdgeInsets.fromLTRB(20, 19, 20, 20),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              icon,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: 13),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          valueCaption,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.secondaryText(context),
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            currentValue,
-                            style: TextStyle(
-                              fontSize: 34,
-                              height: 1.05,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -1.0,
-                              color: accent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: foreground.withValues(alpha: isDark ? 0.10 : 0.08),
+                  border: Border.all(
+                    color: foreground.withValues(alpha: isDark ? 0.42 : 0.22),
+                    width: 1.2,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  detailText,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.primaryText(context),
+                child: Icon(
+                  icon,
+                  color: foreground,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.2,
+                      ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    valueCaption,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: secondary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      currentValue,
+                      style: TextStyle(
+                        fontSize: 36,
+                        height: 1.02,
                         fontWeight: FontWeight.w800,
-                        height: 1.4,
+                        letterSpacing: -1.2,
+                        color: foreground,
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            detailText,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w800,
+                  height: 1.35,
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  summaryText,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                        height: 1.45,
-                      ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            summaryText,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: secondary,
+                  fontWeight: FontWeight.w500,
+                  height: 1.45,
                 ),
-              ],
-            ),
           ),
         ],
       ),
@@ -694,19 +693,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
       points: points,
     );
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 18, 12, 12),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
+    return _TrendGlassCard(
+      padding: const EdgeInsets.fromLTRB(16, 19, 14, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -714,8 +702,10 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: chartColor,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: -0.2,
                   ),
             ),
           ),
@@ -724,8 +714,9 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
               subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: secondaryText,
+                    fontWeight: FontWeight.w500,
                   ),
             ),
           ),
@@ -1275,19 +1266,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     required String message,
     required IconData icon,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 18,
-            offset: const Offset(0, 9),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
-      ),
+    return _TrendGlassCard(
+      padding: const EdgeInsets.all(22),
       child: Column(
         children: [
           Icon(
@@ -1317,13 +1297,9 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   Widget _buildLoadingPanel() {
-    return Container(
+    return const _TrendGlassCard(
       height: 220,
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: const Center(
+      child: Center(
         child: CircularProgressIndicator(),
       ),
     );
@@ -1334,12 +1310,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
     required String message,
     required IconData icon,
   }) {
-    return Container(
+    return _TrendGlassCard(
       padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(24),
-      ),
       child: Column(
         children: [
           Icon(
@@ -1371,12 +1343,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   Widget _switchbotBlock({
     required bool hasSwitchBot,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(22),
-      ),
+    return _TrendGlassCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1408,12 +1376,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   }
 
   Widget _switchbotNeedDeviceBlock() {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(22),
-      ),
+    return _TrendGlassCard(
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1493,6 +1457,274 @@ class _DateBounds {
   });
 }
 
+class _TrendGlassCard extends StatelessWidget {
+  const _TrendGlassCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(20),
+    this.height,
+    this.radius = 28,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double? height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = AppTheme.isDark(context);
+    final surface = dark
+        ? const Color(0xFF171D28).withValues(alpha: 0.74)
+        : Colors.white.withValues(alpha: 0.82);
+    final border = dark
+        ? Colors.white.withValues(alpha: 0.16)
+        : Colors.white.withValues(alpha: 0.72);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: 10,
+          sigmaY: 10,
+        ),
+        child: Container(
+          width: double.infinity,
+          height: height,
+          padding: padding,
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(radius),
+            border: Border.all(
+              color: border,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.24 : 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _PeriodSelectorItem {
+  final _TrendPeriod period;
+  final String label;
+
+  const _PeriodSelectorItem({
+    required this.period,
+    required this.label,
+  });
+}
+
+class _OuraPeriodSelector extends StatelessWidget {
+  const _OuraPeriodSelector({
+    required this.items,
+    required this.selectedPeriod,
+    required this.onSelected,
+  });
+
+  final List<_PeriodSelectorItem> items;
+  final _TrendPeriod selectedPeriod;
+  final ValueChanged<_TrendPeriod> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppTheme.isDark(context);
+
+    final outerFill = Colors.black.withValues(
+      alpha: isDark ? 0.20 : 0.12,
+    );
+    final outerBorder = Colors.white.withValues(
+      alpha: isDark ? 0.42 : 0.55,
+    );
+    final unselectedText = Colors.white.withValues(alpha: 0.92);
+    final selectedText =
+        isDark ? const Color(0xFF171A20) : const Color(0xFF20242B);
+
+    return Container(
+      width: double.infinity,
+      height: 48,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: outerFill,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: outerBorder,
+          width: 1.2,
+        ),
+      ),
+      child: Row(
+        children: [
+          for (final item in items)
+            Expanded(
+              child: Semantics(
+                button: true,
+                selected: item.period == selectedPeriod,
+                label: '${item.label}の期間を表示',
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () => onSelected(item.period),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: item.period == selectedPeriod
+                            ? Colors.white.withValues(alpha: 0.98)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(999),
+                        boxShadow: item.period == selectedPeriod
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.18),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: item.period == selectedPeriod
+                                  ? selectedText
+                                  : unselectedText,
+                              fontWeight: item.period == selectedPeriod
+                                  ? FontWeight.w900
+                                  : FontWeight.w700,
+                              letterSpacing: 0.1,
+                              shadows: item.period == selectedPeriod
+                                  ? null
+                                  : const [
+                                      Shadow(
+                                        color: Color(0x66000000),
+                                        blurRadius: 6,
+                                        offset: Offset(0, 1),
+                                      ),
+                                    ],
+                            ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricSelectorItem {
+  final _TrendMetric metric;
+  final IconData icon;
+  final String label;
+
+  const _MetricSelectorItem({
+    required this.metric,
+    required this.icon,
+    required this.label,
+  });
+}
+
+class _MetricCircleSelector extends StatelessWidget {
+  const _MetricCircleSelector({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppTheme.isDark(context);
+    final ringColor = selected
+        ? Colors.white.withValues(alpha: 0.96)
+        : Colors.white.withValues(alpha: isDark ? 0.34 : 0.48);
+    final fillColor = selected
+        ? Colors.white.withValues(alpha: isDark ? 0.18 : 0.28)
+        : Colors.black.withValues(alpha: isDark ? 0.16 : 0.08);
+    final iconColor = Colors.white.withValues(alpha: selected ? 1.0 : 0.88);
+    final labelColor = Colors.white.withValues(alpha: selected ? 1.0 : 0.82);
+
+    return SizedBox(
+      width: 78,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: fillColor,
+                border: Border.all(
+                  color: ringColor,
+                  width: selected ? 1.8 : 1.2,
+                ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.22),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Icon(
+                icon,
+                size: 30,
+                color: iconColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: labelColor,
+                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                height: 1.2,
+                shadows: const [
+                  Shadow(
+                    color: Color(0x66000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 1),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TrendsHeader extends StatelessWidget {
   const _TrendsHeader();
 
@@ -1503,9 +1735,17 @@ class _TrendsHeader extends StatelessWidget {
       child: Text(
         '現在の状態と最近の傾向を見て、いつもと違う変化に気づきやすくします。',
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.secondaryText(context),
-              height: 1.5,
+          color: Colors.white.withValues(alpha: 0.82),
+          fontWeight: FontWeight.w500,
+          height: 1.5,
+          shadows: const [
+            Shadow(
+              color: Color(0x80000000),
+              blurRadius: 8,
+              offset: Offset(0, 1),
             ),
+          ],
+        ),
       ),
     );
   }

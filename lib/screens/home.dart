@@ -362,8 +362,11 @@ class _HomeHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Text(
         subtitle,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.secondaryText(context),
+        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: AppTheme.overallConditionSecondary(context),
+              fontWeight: FontWeight.w800,
+              height: 1.4,
+              shadows: AppTheme.overallConditionForegroundShadows(context),
             ),
       ),
     );
@@ -417,6 +420,7 @@ class _HealthAssessmentHero extends StatelessWidget {
       borderRadius: BorderRadius.circular(28),
       child: StatusCard(
         level: _level(),
+        transparentBackground: true,
         emphasize:
             assessment.overall.observedState == HealthAssessmentState.alert,
         child: Column(
@@ -427,8 +431,13 @@ class _HealthAssessmentHero extends StatelessWidget {
               child: Text(
                 '総合コンディション',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppTheme.overallConditionForeground(context),
+                      fontSize: 21,
                       fontWeight: FontWeight.w900,
+                      letterSpacing: 0.2,
+                      shadows:
+                          AppTheme.overallConditionForegroundShadows(context),
                     ),
               ),
             ),
@@ -439,11 +448,17 @@ class _HealthAssessmentHero extends StatelessWidget {
                     assessment.overall.observedScore,
                 state: assessment.overall.state,
                 isProvisional: assessment.overall.isProvisional,
-                width: 236,
-                height: 138,
-                strokeWidth: 15,
-                scoreFontSize: 44,
-                stateFontSize: 14,
+                width: 248,
+                height: 144,
+                strokeWidth: 16,
+                scoreFontSize: 50,
+                stateFontSize: 16,
+                accentColor: AppTheme.overallConditionForeground(context),
+                foregroundColor: AppTheme.overallConditionForeground(context),
+                trackColor: AppTheme.overallConditionGaugeTrack(context),
+                endpointFillColor: AppTheme.overallConditionPointFill(context),
+                textShadows:
+                    AppTheme.overallConditionForegroundShadows(context),
               ),
             ),
             const SizedBox(height: 6),
@@ -463,18 +478,22 @@ class _HealthAssessmentHero extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '直近7日間の推移',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.secondaryText(context),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.overallConditionMuted(context),
                           fontWeight: FontWeight.w900,
+                          shadows: AppTheme.overallConditionForegroundShadows(
+                              context),
                         ),
                   ),
                 ),
                 if (trend.averageScore != null)
                   Text(
                     '平均 ${trend.averageScore}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.secondaryText(context),
-                          fontWeight: FontWeight.w800,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.overallConditionMuted(context),
+                          fontWeight: FontWeight.w900,
+                          shadows: AppTheme.overallConditionForegroundShadows(
+                              context),
                         ),
                   ),
               ],
@@ -485,23 +504,33 @@ class _HealthAssessmentHero extends StatelessWidget {
               height: 94,
               compact: true,
               showThresholdLabels: false,
+              monochrome: true,
+              foregroundColor: AppTheme.overallConditionForeground(context),
+              mutedForegroundColor: AppTheme.overallConditionMuted(context),
+              gridColor: AppTheme.overallConditionChartGrid(context),
+              pointFillColor: AppTheme.overallConditionPointFill(context),
+              labelShadows: AppTheme.overallConditionForegroundShadows(context),
             ),
             if (action != null) ...[
               const SizedBox(height: 14),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.task_alt_rounded,
-                    size: 20,
+                    size: 22,
+                    color: AppTheme.overallConditionForeground(context),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       action,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            height: 1.45,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.overallConditionForeground(context),
+                            fontWeight: FontWeight.w800,
+                            height: 1.5,
+                            shadows: AppTheme.overallConditionForegroundShadows(
+                                context),
                           ),
                     ),
                   ),
@@ -514,8 +543,15 @@ class _HealthAssessmentHero extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
                   onPressed: onAskAi,
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                        AppTheme.overallConditionForeground(context),
+                  ),
                   icon: const Icon(Icons.auto_awesome_rounded),
-                  label: const Text('AIに相談'),
+                  label: const Text(
+                    'AIに相談',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ],

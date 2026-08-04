@@ -53,6 +53,11 @@ class HealthScoreGauge extends StatelessWidget {
   final double scoreFontSize;
   final double stateFontSize;
   final bool showProvisionalCaption;
+  final Color? accentColor;
+  final Color? foregroundColor;
+  final Color? trackColor;
+  final Color? endpointFillColor;
+  final List<Shadow>? textShadows;
 
   const HealthScoreGauge({
     super.key,
@@ -65,16 +70,23 @@ class HealthScoreGauge extends StatelessWidget {
     this.scoreFontSize = 50,
     this.stateFontSize = 15,
     this.showProvisionalCaption = false,
+    this.accentColor,
+    this.foregroundColor,
+    this.trackColor,
+    this.endpointFillColor,
+    this.textShadows,
   });
 
   @override
   Widget build(BuildContext context) {
-    final accent = healthAssessmentAccent(context, state);
+    final accent = accentColor ?? healthAssessmentAccent(context, state);
     final stateLabel = healthAssessmentStateLabel(state);
-    final trackColor = AppTheme.isDark(context)
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.black.withValues(alpha: 0.08);
-    final surfaceColor = AppTheme.cardSurface(context);
+    final resolvedForeground = foregroundColor ?? AppTheme.primaryText(context);
+    final resolvedTrackColor = trackColor ??
+        (AppTheme.isDark(context)
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08));
+    final surfaceColor = endpointFillColor ?? AppTheme.cardSurface(context);
 
     return Semantics(
       label: score == null
@@ -93,7 +105,7 @@ class HealthScoreGauge extends StatelessWidget {
                 hasScore: score != null,
                 isProvisional: isProvisional,
                 accent: accent,
-                trackColor: trackColor,
+                trackColor: resolvedTrackColor,
                 surfaceColor: surfaceColor,
                 strokeWidth: strokeWidth,
               ),
@@ -110,15 +122,17 @@ class HealthScoreGauge extends StatelessWidget {
                       height: 1,
                       fontWeight: FontWeight.w900,
                       letterSpacing: score == null ? 0 : -2,
-                      color: AppTheme.primaryText(context),
+                      color: resolvedForeground,
+                      shadows: textShadows,
                     ),
                   ),
                   SizedBox(height: height < 110 ? 4 : 7),
                   Text(
                     stateLabel,
                     style: TextStyle(
-                      color: accent,
+                      color: foregroundColor ?? accent,
                       fontSize: stateFontSize,
+                      shadows: textShadows,
                       height: 1.1,
                       fontWeight: FontWeight.w900,
                     ),
@@ -128,8 +142,11 @@ class HealthScoreGauge extends StatelessWidget {
                     Text(
                       '暫定',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.tertiaryText(context),
+                            color: foregroundColor == null
+                                ? AppTheme.tertiaryText(context)
+                                : resolvedForeground.withValues(alpha: 0.82),
                             fontWeight: FontWeight.w700,
+                            shadows: textShadows,
                           ),
                     ),
                   ],

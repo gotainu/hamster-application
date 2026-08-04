@@ -119,6 +119,12 @@ class HealthScoreTrendChart extends StatelessWidget {
   final double height;
   final bool compact;
   final bool showThresholdLabels;
+  final bool monochrome;
+  final Color? foregroundColor;
+  final Color? mutedForegroundColor;
+  final Color? gridColor;
+  final Color? pointFillColor;
+  final List<Shadow>? labelShadows;
 
   const HealthScoreTrendChart({
     super.key,
@@ -126,6 +132,12 @@ class HealthScoreTrendChart extends StatelessWidget {
     this.height = 112,
     this.compact = false,
     this.showThresholdLabels = true,
+    this.monochrome = false,
+    this.foregroundColor,
+    this.mutedForegroundColor,
+    this.gridColor,
+    this.pointFillColor,
+    this.labelShadows,
   });
 
   @override
@@ -137,7 +149,9 @@ class HealthScoreTrendChart extends StatelessWidget {
           child: Text(
             '総合スコアの履歴を蓄積中です',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.secondaryText(context),
+                  color:
+                      mutedForegroundColor ?? AppTheme.secondaryText(context),
+                  shadows: labelShadows,
                 ),
           ),
         ),
@@ -150,7 +164,16 @@ class HealthScoreTrendChart extends StatelessWidget {
           orElse: () => summary.points.last,
         )
         .state;
-    final accent = healthAssessmentAccent(context, latestState);
+    final resolvedForeground = foregroundColor ?? Colors.white;
+    final accent = monochrome
+        ? resolvedForeground
+        : healthAssessmentAccent(context, latestState);
+    final resolvedGridColor = gridColor ??
+        (monochrome
+            ? resolvedForeground.withValues(alpha: 0.22)
+            : AppTheme.isDark(context)
+                ? Colors.white.withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.09));
     final chartHeight = math.max(48.0, height - 25).toDouble();
 
     return Semantics(
@@ -164,13 +187,13 @@ class HealthScoreTrendChart extends StatelessWidget {
               painter: _HealthScoreTrendPainter(
                 points: summary.points,
                 accent: accent,
-                surfaceColor: AppTheme.cardSurface(context),
-                gridColor: AppTheme.isDark(context)
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.09),
-                goodColor: AppTheme.envGood,
-                cautionColor: AppTheme.envCaution,
-                alertColor: AppTheme.envDanger,
+                surfaceColor: pointFillColor ?? AppTheme.cardSurface(context),
+                gridColor: resolvedGridColor,
+                goodColor: monochrome ? resolvedForeground : AppTheme.envGood,
+                cautionColor:
+                    monochrome ? resolvedForeground : AppTheme.envCaution,
+                alertColor:
+                    monochrome ? resolvedForeground : AppTheme.envDanger,
                 showThresholdLabels: showThresholdLabels && !compact,
               ),
             ),
@@ -179,6 +202,8 @@ class HealthScoreTrendChart extends StatelessWidget {
           _TrendDateLabels(
             points: summary.points,
             compact: compact,
+            color: mutedForegroundColor,
+            shadows: labelShadows,
           ),
         ],
       ),
@@ -189,10 +214,14 @@ class HealthScoreTrendChart extends StatelessWidget {
 class _TrendDateLabels extends StatelessWidget {
   final List<HealthScoreTrendPoint> points;
   final bool compact;
+  final Color? color;
+  final List<Shadow>? shadows;
 
   const _TrendDateLabels({
     required this.points,
     required this.compact,
+    this.color,
+    this.shadows,
   });
 
   @override
@@ -215,9 +244,10 @@ class _TrendDateLabels extends StatelessWidget {
             (date) => Text(
               dateFormat.format(date),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.tertiaryText(context),
+                    color: color ?? AppTheme.tertiaryText(context),
                     fontSize: compact ? 10 : null,
                     fontWeight: FontWeight.w700,
+                    shadows: shadows,
                   ),
             ),
           )

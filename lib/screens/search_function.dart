@@ -19,7 +19,7 @@ import '../widgets/shine_border.dart';
 
 const String _ragApiBaseUrl = String.fromEnvironment(
   'RAG_API_BASE_URL',
-  defaultValue: 'http://10.0.2.2:8000',
+  defaultValue: 'https://hamster-rag-api-797691641198.asia-northeast1.run.app',
 );
 
 class RetrievedChunk {

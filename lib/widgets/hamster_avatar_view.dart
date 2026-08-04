@@ -10,6 +10,7 @@ class HamsterAvatarView extends StatefulWidget {
   final bool showMessage;
   final bool showDebugLabel;
   final bool showBackdrop;
+  final bool showCauseBadge;
 
   const HamsterAvatarView({
     super.key,
@@ -18,6 +19,7 @@ class HamsterAvatarView extends StatefulWidget {
     this.showMessage = false,
     this.showDebugLabel = false,
     this.showBackdrop = true,
+    this.showCauseBadge = false,
   });
 
   @override
@@ -160,15 +162,16 @@ class _HamsterAvatarViewState extends State<HamsterAvatarView>
                 ),
               ),
             ),
-            Positioned(
-              right: widget.size * 0.035,
-              bottom: widget.size * 0.055,
-              child: _CauseBadge(
-                cause: presentation.cause,
-                accent: accent,
-                size: widget.size * 0.25,
+            if (widget.showCauseBadge)
+              Positioned(
+                right: widget.size * 0.035,
+                bottom: widget.size * 0.055,
+                child: _CauseBadge(
+                  cause: presentation.cause,
+                  accent: accent,
+                  size: widget.size * 0.25,
+                ),
               ),
-            ),
             if (widget.showDebugLabel && kDebugMode)
               Positioned(
                 left: 4,

@@ -20,6 +20,7 @@ class StatusCard extends StatelessWidget {
   final Widget child;
   final VoidCallback? onTap;
   final bool emphasize;
+  final bool transparentBackground;
   final double radius;
   final EdgeInsetsGeometry padding;
   final double? strength;
@@ -30,6 +31,7 @@ class StatusCard extends StatelessWidget {
     required this.child,
     this.onTap,
     this.emphasize = false,
+    this.transparentBackground = false,
     this.radius = 26,
     this.padding = const EdgeInsets.all(20),
     this.strength,
@@ -71,12 +73,17 @@ class StatusCard extends StatelessWidget {
     Widget content = Container(
       width: double.infinity,
       padding: padding,
-      decoration: AppTheme.statusCardDecoration(
-        context,
-        accent: accent,
-        strength: strength ?? _defaultStrength,
-        radius: radius,
-      ),
+      decoration: transparentBackground
+          ? AppTheme.transparentStatusCardDecoration(
+              context,
+              radius: radius,
+            )
+          : AppTheme.statusCardDecoration(
+              context,
+              accent: accent,
+              strength: strength ?? _defaultStrength,
+              radius: radius,
+            ),
       child: child,
     );
 

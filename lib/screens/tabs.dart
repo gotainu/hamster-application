@@ -15,6 +15,7 @@ import 'package:hamster_project/widgets/paid_feature_gate.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
 import 'package:hamster_project/widgets/quick_record_sheet.dart';
 import 'package:hamster_project/widgets/screen_edge_fade.dart';
+import 'package:hamster_project/widgets/app_habitat_background.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
 class TabsScreen extends StatefulWidget {
@@ -203,7 +204,6 @@ class TabsScreenState extends State<TabsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final appBarForeground = AppTheme.overlayAppBarForeground(context);
 
@@ -262,17 +262,12 @@ class TabsScreenState extends State<TabsScreen> {
       ),
       drawer: MainDrawer(
         onSelectScreen: _setScreen,
+        recordCompletionListenable: _recordCompletionNotifier,
       ),
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient:
-                  isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
-            ),
-            width: double.infinity,
-            height: double.infinity,
+          AppHabitatBackground(
             child: SafeArea(
               top: false,
               child: _pages[selectedIndex],
