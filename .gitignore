@@ -50,3 +50,6 @@ android_bak/
 android_broken_*/
 .firebase/
 functions/_backups/
+
+# Android generated build reports
+android/build/
