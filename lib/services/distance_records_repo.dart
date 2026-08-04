@@ -17,6 +17,41 @@ class MissingWheelDiameterException implements Exception {
   String toString() => message;
 }
 
+class DailyDistanceRecord {
+  final String dayKey;
+  final DateTime date;
+  final double distance;
+  final int? rotations;
+  final double? wheelDiameterCm;
+
+  const DailyDistanceRecord({
+    required this.dayKey,
+    required this.date,
+    required this.distance,
+    this.rotations,
+    this.wheelDiameterCm,
+  });
+
+  factory DailyDistanceRecord.fromJson(
+    Json json, {
+    required String fallbackDayKey,
+    required DateTime fallbackDate,
+  }) {
+    final distanceRaw = json['distance'];
+    final rotationsRaw = json['rotations'];
+    final wheelDiameterRaw = json['wheelDiameterCm'];
+
+    return DailyDistanceRecord(
+      dayKey: json['dayKey'] as String? ?? fallbackDayKey,
+      date: fallbackDate,
+      distance: distanceRaw is num ? distanceRaw.toDouble() : 0,
+      rotations: rotationsRaw is num ? rotationsRaw.toInt() : null,
+      wheelDiameterCm:
+          wheelDiameterRaw is num ? wheelDiameterRaw.toDouble() : null,
+    );
+  }
+}
+
 class DistanceRecordsRepo {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
@@ -100,6 +135,45 @@ class DistanceRecordsRepo {
     if (data == null) return 0;
 
     return _readDistance(data);
+  }
+
+  Future<DailyDistanceRecord?> fetchDailyRecord(DateTime dayLocal) async {
+    final doc = _docByLocalDate(dayLocal);
+    if (doc == null) return null;
+
+    final snap = await doc.get();
+    if (!snap.exists) return null;
+
+    final data = snap.data();
+    if (data == null) return null;
+
+    final day = _readLocalDay(data) ?? _normalizeLocalDay(dayLocal);
+
+    return DailyDistanceRecord.fromJson(
+      data,
+      fallbackDayKey: doc.id,
+      fallbackDate: day,
+    );
+  }
+
+  Stream<DailyDistanceRecord?> watchDailyRecord(DateTime dayLocal) {
+    final doc = _docByLocalDate(dayLocal);
+    if (doc == null) {
+      return Stream<DailyDistanceRecord?>.value(null);
+    }
+
+    return doc.snapshots().map((snapshot) {
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) return null;
+
+      final day = _readLocalDay(data) ?? _normalizeLocalDay(dayLocal);
+
+      return DailyDistanceRecord.fromJson(
+        data,
+        fallbackDayKey: snapshot.id,
+        fallbackDate: day,
+      );
+    });
   }
 
   // -------------------------

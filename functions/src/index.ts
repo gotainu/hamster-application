@@ -5,10 +5,934 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
-import { executeAnomalyNotificationPipeline } from './anomalyNotification';
+import Stripe from 'stripe';
+import { defineSecret } from 'firebase-functions/params';
+
 
 admin.initializeApp();
 const db = admin.firestore();
+const ENVELOPE_KEY_SECRET = defineSecret('ENVELOPE_KEY');
+const STRIPE_SECRET_KEY = defineSecret('STRIPE_SECRET_KEY');
+const STRIPE_PRICE_ID_MONTHLY = defineSecret('STRIPE_PRICE_ID_MONTHLY');
+const STRIPE_SUCCESS_URL = defineSecret('STRIPE_SUCCESS_URL');
+const STRIPE_CANCEL_URL = defineSecret('STRIPE_CANCEL_URL');
+const STRIPE_PORTAL_RETURN_URL = defineSecret('STRIPE_PORTAL_RETURN_URL');
+const STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
+const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
+
+
+type ResolveStripeCustomerMode = 'create-if-missing' | 'require-existing';
+
+type ResolvedStripeCustomer = {
+  customerId: string;
+  reused: boolean;
+  recreatedFromCustomerId: string | null;
+};
+
+function isHttpsError(error: unknown): error is HttpsError {
+  return error instanceof HttpsError;
+}
+
+function stripeErrorDetails(error: unknown): {
+  type: string | null;
+  code: string | null;
+  param: string | null;
+  message: string;
+  requestId: string | null;
+} {
+  const value = error as {
+    type?: unknown;
+    code?: unknown;
+    param?: unknown;
+    message?: unknown;
+    requestId?: unknown;
+    raw?: {
+      requestId?: unknown;
+    };
+  };
+
+  return {
+    type: typeof value?.type === 'string' ? value.type : null,
+    code: typeof value?.code === 'string' ? value.code : null,
+    param: typeof value?.param === 'string' ? value.param : null,
+    message:
+      typeof value?.message === 'string'
+        ? value.message
+        : String(error),
+    requestId:
+      typeof value?.requestId === 'string'
+        ? value.requestId
+        : typeof value?.raw?.requestId === 'string'
+          ? value.raw.requestId
+          : null,
+  };
+}
+
+function isMissingStripeCustomerError(error: unknown): boolean {
+  const details = stripeErrorDetails(error);
+
+  return (
+    details.code === 'resource_missing' &&
+    details.param === 'customer'
+  );
+}
+
+function toHttpsError(params: {
+  error: unknown;
+  operation: 'checkout' | 'portal';
+}): HttpsError {
+  const { error, operation } = params;
+
+  if (isHttpsError(error)) {
+    return error;
+  }
+
+  const details = stripeErrorDetails(error);
+
+  logger.error('Stripe operation failed', {
+    operation,
+    type: details.type,
+    code: details.code,
+    param: details.param,
+    requestId: details.requestId,
+    error: details.message,
+  });
+
+  const message =
+    operation === 'checkout'
+      ? '購入ページを作成できませんでした。しばらくしてから再度お試しください。'
+      : '契約管理ページを作成できませんでした。しばらくしてから再度お試しください。';
+
+  return new HttpsError('internal', message, {
+    stripeCode: details.code,
+    stripeType: details.type,
+    stripeParam: details.param,
+    stripeRequestId: details.requestId,
+  });
+}
+
+async function resolveStripeCustomer(params: {
+  stripe: Stripe;
+  uid: string;
+  email?: string;
+  mode: ResolveStripeCustomerMode;
+}): Promise<ResolvedStripeCustomer> {
+  const { stripe, uid, email, mode } = params;
+
+  const billingRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription');
+
+  const billingSnap = await billingRef.get();
+  const storedValue = billingSnap.exists
+    ? billingSnap.get('stripeCustomerId')
+    : undefined;
+
+  const storedCustomerId =
+    typeof storedValue === 'string' && storedValue.trim().length > 0
+      ? storedValue.trim()
+      : null;
+
+  if (storedCustomerId) {
+    try {
+      const customer = await stripe.customers.retrieve(storedCustomerId);
+
+      if (!customer.deleted) {
+        logger.info('Existing Stripe customer reused', {
+          uid,
+          stripeCustomerId: customer.id,
+        });
+
+        return {
+          customerId: customer.id,
+          reused: true,
+          recreatedFromCustomerId: null,
+        };
+      }
+
+      logger.warn('Stored Stripe customer was deleted', {
+        uid,
+        storedStripeCustomerId: storedCustomerId,
+      });
+    } catch (error: unknown) {
+      if (!isMissingStripeCustomerError(error)) {
+        throw error;
+      }
+
+      const details = stripeErrorDetails(error);
+
+      logger.warn('Stored Stripe customer does not exist', {
+        uid,
+        storedStripeCustomerId: storedCustomerId,
+        stripeRequestId: details.requestId,
+      });
+    }
+
+    await billingRef.set(
+      {
+        stripeCustomerId: admin.firestore.FieldValue.delete(),
+        stripeCustomerInvalidatedAt:
+          admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
+
+  if (mode === 'require-existing') {
+    throw new HttpsError(
+      'failed-precondition',
+      'Stripeの顧客情報が見つかりません。プラン登録画面から再度お手続きください。',
+    );
+  }
+
+  const customer = await stripe.customers.create({
+    email:
+      typeof email === 'string' && email.trim().length > 0
+        ? email.trim()
+        : undefined,
+    metadata: {
+      firebaseUid: uid,
+    },
+  });
+
+  await billingRef.set(
+    {
+      provider: 'stripe',
+      stripeCustomerId: customer.id,
+      stripeCustomerCreatedAt:
+        admin.firestore.FieldValue.serverTimestamp(),
+      stripeCustomerRecoveredFromId: storedCustomerId,
+      stripeCustomerInvalidatedAt:
+        admin.firestore.FieldValue.delete(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  logger.info('Stripe customer created', {
+    uid,
+    stripeCustomerId: customer.id,
+    recreatedFromCustomerId: storedCustomerId,
+  });
+
+  return {
+    customerId: customer.id,
+    reused: false,
+    recreatedFromCustomerId: storedCustomerId,
+  };
+}
+
+export const createStripeCheckoutSession = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_PRICE_ID_MONTHLY,
+      STRIPE_SUCCESS_URL,
+      STRIPE_CANCEL_URL,
+    ],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    const email =
+      typeof req.auth?.token?.email === 'string'
+        ? req.auth.token.email
+        : undefined;
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const priceId = process.env.STRIPE_PRICE_ID_MONTHLY;
+    const successUrl = process.env.STRIPE_SUCCESS_URL;
+    const cancelUrl = process.env.STRIPE_CANCEL_URL;
+
+    if (!stripeSecretKey) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SECRET_KEY が設定されていません。',
+      );
+    }
+
+    if (!priceId) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_PRICE_ID_MONTHLY が設定されていません。',
+      );
+    }
+
+    if (!successUrl || !cancelUrl) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL が設定されていません。',
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+    });
+
+    const billingRef = db
+      .collection('users')
+      .doc(uid)
+      .collection('billing')
+      .doc('subscription');
+
+    try {
+      const resolvedCustomer = await resolveStripeCustomer({
+        stripe,
+        uid,
+        email,
+        mode: 'create-if-missing',
+      });
+
+      logger.info('createStripeCheckoutSession started', {
+        uid,
+        stripeCustomerId: resolvedCustomer.customerId,
+        reusedStripeCustomer: resolvedCustomer.reused,
+        recreatedFromCustomerId:
+          resolvedCustomer.recreatedFromCustomerId,
+      });
+
+      const session = await stripe.checkout.sessions.create({
+        mode: 'subscription',
+        client_reference_id: uid,
+        customer: resolvedCustomer.customerId,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          firebaseUid: uid,
+        },
+        subscription_data: {
+          metadata: {
+            firebaseUid: uid,
+          },
+        },
+        allow_promotion_codes: true,
+      });
+
+      if (!session.url) {
+        throw new HttpsError(
+          'internal',
+          'Stripe Checkout URL を作成できませんでした。',
+        );
+      }
+
+      await billingRef.set(
+        {
+          provider: 'stripe',
+          stripeCustomerId: resolvedCustomer.customerId,
+          checkoutSessionId: session.id,
+          checkoutCreatedAt:
+            admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      logger.info('createStripeCheckoutSession completed', {
+        uid,
+        sessionId: session.id,
+        stripeCustomerId: resolvedCustomer.customerId,
+      });
+
+      return {
+        ok: true,
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      };
+    } catch (error: unknown) {
+      throw toHttpsError({
+        error,
+        operation: 'checkout',
+      });
+    }
+  },
+);
+
+export const createStripeCustomerPortalSession = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_PORTAL_RETURN_URL,
+    ],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const returnUrl = process.env.STRIPE_PORTAL_RETURN_URL;
+
+    if (!stripeSecretKey) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_SECRET_KEY が設定されていません。',
+      );
+    }
+
+    if (!returnUrl) {
+      throw new HttpsError(
+        'failed-precondition',
+        'STRIPE_PORTAL_RETURN_URL が設定されていません。',
+      );
+    }
+
+    const billingRef = db
+      .collection('users')
+      .doc(uid)
+      .collection('billing')
+      .doc('subscription');
+
+    const billingSnap = await billingRef.get();
+
+    if (!billingSnap.exists) {
+      throw new HttpsError(
+        'failed-precondition',
+        '契約情報が見つかりません。',
+      );
+    }
+
+    const stripe = new Stripe(stripeSecretKey, {
+      apiVersion: '2025-02-24.acacia',
+    });
+
+    try {
+      const resolvedCustomer = await resolveStripeCustomer({
+        stripe,
+        uid,
+        mode: 'require-existing',
+      });
+
+      const stripeSubscriptionId = billingSnap.get(
+        'stripeSubscriptionId',
+      ) as string | undefined;
+
+      if (stripeSubscriptionId) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(
+            stripeSubscriptionId,
+          );
+
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+          });
+
+          logger.info(
+            'Stripe subscription refreshed before portal session',
+            {
+              uid,
+              stripeSubscriptionId,
+              status: subscription.status,
+              cancelAtPeriodEnd:
+                (subscription as any).cancel_at_period_end ?? null,
+              cancelAt: (subscription as any).cancel_at ?? null,
+            },
+          );
+        } catch (error: unknown) {
+          const details = stripeErrorDetails(error);
+
+          logger.warn(
+            'Failed to refresh Stripe subscription before portal session',
+            {
+              uid,
+              stripeSubscriptionId,
+              stripeCode: details.code,
+              stripeRequestId: details.requestId,
+              error: details.message,
+            },
+          );
+        }
+      }
+
+      const session = await stripe.billingPortal.sessions.create({
+        customer: resolvedCustomer.customerId,
+        return_url: returnUrl,
+      });
+
+      if (!session.url) {
+        throw new HttpsError(
+          'internal',
+          'Stripe Customer Portal URL を作成できませんでした。',
+        );
+      }
+
+      logger.info('createStripeCustomerPortalSession completed', {
+        uid,
+        stripeCustomerId: resolvedCustomer.customerId,
+      });
+
+      return {
+        ok: true,
+        portalUrl: session.url,
+      };
+    } catch (error: unknown) {
+      throw toHttpsError({
+        error,
+        operation: 'portal',
+      });
+    }
+  },
+);
+
+function createStripeClient(): Stripe {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+
+  if (!stripeSecretKey) {
+    throw new Error('STRIPE_SECRET_KEY is not set');
+  }
+
+  return new Stripe(stripeSecretKey, {
+    apiVersion: '2025-02-24.acacia',
+  });
+}
+
+function toFirestoreTimestampFromUnixSeconds(
+  seconds: number | null | undefined,
+): FirebaseFirestore.Timestamp | null {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    return null;
+  }
+
+  return admin.firestore.Timestamp.fromMillis(seconds * 1000);
+}
+
+function mapStripeSubscriptionStatus(
+  status: Stripe.Subscription.Status | string | null | undefined,
+): string {
+  switch (status) {
+    case 'active':
+      return 'active';
+    case 'trialing':
+      return 'trialing';
+    case 'past_due':
+      return 'past_due';
+    case 'canceled':
+      return 'canceled';
+    case 'unpaid':
+      return 'unpaid';
+    case 'incomplete':
+      return 'incomplete';
+    case 'incomplete_expired':
+      return 'incomplete';
+    case 'paused':
+      return 'unpaid';
+    default:
+      return 'unknown';
+  }
+}
+
+async function findUidByStripeSubscription(
+  subscription: Stripe.Subscription,
+): Promise<string | null> {
+  const metadataUid = subscription.metadata?.firebaseUid;
+  if (metadataUid) return metadataUid;
+
+  const subId = subscription.id;
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+
+  const bySubSnap = await db
+    .collectionGroup('billing')
+    .where('stripeSubscriptionId', '==', subId)
+    .limit(1)
+    .get();
+
+  if (!bySubSnap.empty) {
+    const doc = bySubSnap.docs[0];
+    return doc.ref.parent.parent?.id ?? null;
+  }
+
+  if (customerId) {
+    const byCustomerSnap = await db
+      .collectionGroup('billing')
+      .where('stripeCustomerId', '==', customerId)
+      .limit(1)
+      .get();
+
+    if (!byCustomerSnap.empty) {
+      const doc = byCustomerSnap.docs[0];
+      return doc.ref.parent.parent?.id ?? null;
+    }
+  }
+
+  return null;
+}
+
+async function assertPaidFeatureAccess(uid: string): Promise<void> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .get();
+
+  const data = snap.data() ?? {};
+  const plan = data.plan;
+  const status = data.status;
+
+  const isEntitled =
+    plan === 'paid' &&
+    (status === 'active' || status === 'trialing');
+
+  if (!isEntitled) {
+    logger.warn('Paid feature access denied', {
+      uid,
+      plan,
+      status,
+    });
+
+    throw new HttpsError(
+      'permission-denied',
+      'この機能は有料プランで利用できます。',
+    );
+  }
+}
+
+async function saveStripeSubscriptionToFirestore(params: {
+  uid: string;
+  subscription: Stripe.Subscription;
+  checkoutSessionId?: string | null;
+}): Promise<void> {
+  const { uid, subscription, checkoutSessionId } = params;
+
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+
+  const status = mapStripeSubscriptionStatus(subscription.status);
+  const isPaid = status === 'active' || status === 'trialing';
+
+  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
+    (subscription as any).current_period_end ??
+      (subscription.items?.data?.[0] as any)?.current_period_end,
+  );
+  const cancelAtPeriodEnd = Boolean(
+    (subscription as any).cancel_at_period_end,
+  );
+
+  const cancelAt = toFirestoreTimestampFromUnixSeconds(
+    (subscription as any).cancel_at,
+  );
+  const priceId = subscription.items.data[0]?.price?.id ?? null;
+  const productId =
+    typeof subscription.items.data[0]?.price?.product === 'string'
+      ? subscription.items.data[0]?.price?.product
+      : subscription.items.data[0]?.price?.product?.id ?? null;
+
+  const billingRef = db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription');
+
+  const updateData: FirebaseFirestore.DocumentData = {
+    provider: 'stripe',
+    plan: isPaid ? 'paid' : 'none',
+    status,
+    stripeCustomerId: customerId,
+    stripeSubscriptionId: subscription.id,
+    stripePriceId: priceId,
+    stripeProductId: productId,
+    currentPeriodEnd,
+    cancelAtPeriodEnd,
+    cancelAt,
+    checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
+    latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (isPaid) {
+    updateData.canceledAt = admin.firestore.FieldValue.delete();
+  }
+
+  await billingRef.set(updateData, { merge: true });
+
+
+  logger.info('Stripe subscription saved to Firestore', {
+    uid,
+    status,
+    plan: isPaid ? 'paid' : 'none',
+    subscriptionId: subscription.id,
+    customerId,
+    priceId,
+    currentPeriodEnd: currentPeriodEnd?.toDate().toISOString() ?? null,
+  });
+}
+
+async function markStripeSubscriptionCanceled(
+  subscription: Stripe.Subscription,
+): Promise<void> {
+  const uid = await findUidByStripeSubscription(subscription);
+
+  if (!uid) {
+    logger.warn('Could not find uid for canceled Stripe subscription', {
+      subscriptionId: subscription.id,
+      customer:
+        typeof subscription.customer === 'string'
+          ? subscription.customer
+          : subscription.customer?.id ?? null,
+    });
+    return;
+  }
+
+  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
+    (subscription as any).current_period_end ??
+      (subscription.items?.data?.[0] as any)?.current_period_end,
+  );
+
+  await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .set(
+      {
+        provider: 'stripe',
+        plan: 'none',
+        status: 'canceled',
+        stripeSubscriptionId: subscription.id,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        cancelAt: admin.firestore.FieldValue.delete(),
+        canceledAt: admin.firestore.FieldValue.serverTimestamp(),
+        latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+  logger.info('Stripe subscription marked canceled', {
+    uid,
+    subscriptionId: subscription.id,
+  });
+}
+
+async function updateStripeSubscriptionFromInvoice(
+  invoice: Stripe.Invoice,
+): Promise<void> {
+  const stripe = createStripeClient();
+
+  const subscriptionId =
+    typeof (invoice as any).subscription === 'string'
+      ? (invoice as any).subscription
+      : (invoice as any).subscription?.id ??
+        (invoice as any).parent?.subscription_details?.subscription ??
+        null;
+
+  if (!subscriptionId) {
+    logger.warn('invoice event missing subscription id', {
+      invoiceId: invoice.id,
+      customer:
+        typeof invoice.customer === 'string'
+          ? invoice.customer
+          : invoice.customer?.id ?? null,
+      status: invoice.status,
+    });
+    return;
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const uid = await findUidByStripeSubscription(subscription);
+
+  if (!uid) {
+    logger.warn('Could not find uid for invoice subscription event', {
+      invoiceId: invoice.id,
+      subscriptionId,
+      subscriptionStatus: subscription.status,
+    });
+    return;
+  }
+
+  await saveStripeSubscriptionToFirestore({
+    uid,
+    subscription,
+  });
+
+  logger.info('Stripe invoice subscription status synced', {
+    uid,
+    invoiceId: invoice.id,
+    subscriptionId,
+    subscriptionStatus: subscription.status,
+    invoiceStatus: invoice.status,
+  });
+}
+
+export const stripeWebhook = onRequest(
+  {
+    region: 'asia-northeast1',
+    secrets: [
+      STRIPE_SECRET_KEY,
+      STRIPE_WEBHOOK_SECRET,
+    ],
+  },
+  async (req, res) => {
+    if (req.method !== 'POST') {
+      res.status(405).send('Method Not Allowed');
+      return;
+    }
+
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripeSecretKey || !webhookSecret) {
+      logger.error('Stripe webhook secrets are not set', {
+        hasStripeSecretKey: !!stripeSecretKey,
+        hasWebhookSecret: !!webhookSecret,
+      });
+      res.status(500).send('Webhook secrets are not configured');
+      return;
+    }
+
+    const stripe = createStripeClient();
+    const signature = req.headers['stripe-signature'];
+
+    if (typeof signature !== 'string') {
+      logger.warn('Stripe webhook missing signature');
+      res.status(400).send('Missing stripe-signature header');
+      return;
+    }
+
+    let event: Stripe.Event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        signature,
+        webhookSecret,
+      );
+    } catch (e: any) {
+      logger.warn('Stripe webhook signature verification failed', {
+        error: String(e?.message ?? e),
+      });
+      res.status(400).send(`Webhook Error: ${String(e?.message ?? e)}`);
+      return;
+    }
+
+    logger.info('Stripe webhook received', {
+      eventId: event.id,
+      type: event.type,
+    });
+
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed': {
+          const session = event.data.object as Stripe.Checkout.Session;
+
+          const uid =
+            session.client_reference_id ||
+            session.metadata?.firebaseUid ||
+            null;
+
+          if (!uid) {
+            logger.warn('checkout.session.completed missing firebase uid', {
+              sessionId: session.id,
+            });
+            break;
+          }
+
+          const subscriptionId =
+            typeof session.subscription === 'string'
+              ? session.subscription
+              : session.subscription?.id;
+
+          if (!subscriptionId) {
+            logger.warn('checkout.session.completed missing subscription id', {
+              uid,
+              sessionId: session.id,
+            });
+            break;
+          }
+
+          const subscription = await stripe.subscriptions.retrieve(
+            subscriptionId,
+          );
+
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+            checkoutSessionId: session.id,
+          });
+
+          break;
+        }
+
+        case 'customer.subscription.created':
+        case 'customer.subscription.updated': {
+          const subscription = event.data.object as Stripe.Subscription;
+          const uid = await findUidByStripeSubscription(subscription);
+
+          if (!uid) {
+            logger.warn('Could not find uid for Stripe subscription update', {
+              subscriptionId: subscription.id,
+              status: subscription.status,
+            });
+            break;
+          }
+
+          await saveStripeSubscriptionToFirestore({
+            uid,
+            subscription,
+          });
+
+          break;
+        }
+
+        case 'customer.subscription.deleted': {
+          const subscription = event.data.object as Stripe.Subscription;
+          await markStripeSubscriptionCanceled(subscription);
+          break;
+        }
+
+        case 'invoice.payment_failed': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await updateStripeSubscriptionFromInvoice(invoice);
+          break;
+        }
+
+        case 'invoice.payment_succeeded': {
+          const invoice = event.data.object as Stripe.Invoice;
+          await updateStripeSubscriptionFromInvoice(invoice);
+          break;
+        }
+
+        default:
+          logger.info('Stripe webhook ignored event type', {
+            eventId: event.id,
+            type: event.type,
+          });
+      }
+
+      res.status(200).json({ received: true });
+    } catch (e: any) {
+      logger.error('Stripe webhook handler failed', {
+        eventId: event.id,
+        type: event.type,
+        error: String(e?.message ?? e),
+      });
+
+      res.status(500).send('Webhook handler failed');
+    }
+  },
+);
 
 function getProjectId(): string | null {
   return (
@@ -48,6 +972,43 @@ function unwrapIfWrapped(b64OrPlain?: string): string | undefined {
     // ignore
   }
   return b64OrPlain;
+}
+
+function wrapSecret(plain: string): string {
+  const key = getEnvelopeKey();
+  const iv = crypto.randomBytes(12);
+
+  const enc = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([
+    enc.update(plain, 'utf8'),
+    enc.final(),
+  ]);
+
+  const tag = enc.getAuthTag();
+
+  // format: base64(iv + ciphertext + tag)
+  return Buffer.concat([iv, ct, tag]).toString('base64');
+}
+
+function unwrapSecret(b64: string): string {
+  const key = getEnvelopeKey();
+  const buf = Buffer.from(b64, 'base64');
+
+  if (buf.length < 12 + 16 + 1) {
+    throw new Error('encrypted secret is too short');
+  }
+
+  const iv = buf.subarray(0, 12);
+  const tag = buf.subarray(buf.length - 16);
+  const ct = buf.subarray(12, buf.length - 16);
+
+  const dec = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  dec.setAuthTag(tag);
+
+  return Buffer.concat([
+    dec.update(ct),
+    dec.final(),
+  ]).toString('utf8');
 }
 
 /** SwitchBot auth header (v1.1)
@@ -95,12 +1056,16 @@ async function verifySwitchbotTokenSecret(token: string, secret: string): Promis
   throw new HttpsError('unavailable', `SwitchBot API エラー(${res.status}): ${text.slice(0, 300)}`);
 }
 
-/** ★ TOKEN / SECRET を “検証してから” 平文保存（v1_plain） */
+/** ★ TOKEN / SECRET を “検証してから” 暗号化保存（v2_encrypted） */
 export const registerSwitchbotSecrets = onCall(
-  { region: 'asia-northeast1' },
+  { 
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+   },
   async (req) => {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    await assertPaidFeatureAccess(uid);
 
     const token = String(req.data?.token ?? '').trim();
     const secret = String(req.data?.secret ?? '').trim();
@@ -114,44 +1079,70 @@ export const registerSwitchbotSecrets = onCall(
 
     await verifySwitchbotTokenSecret(token, secret);
 
-    const docRef = db
-      .collection('users')
-      .doc(uid)
-      .collection('integrations')
-      .doc('switchbot_secrets');
+    const userRef = db.collection('users').doc(uid);
+    const integCol = userRef.collection('integrations');
+    const secretsRef = integCol.doc('switchbot_secrets');
+    const switchbotRef = integCol.doc('switchbot');
+    const switchbotUserRef = db.collection('switchbot_users').doc(uid);
 
-    await docRef.set(
+    const encryptedToken = wrapSecret(token);
+    const encryptedSecret = wrapSecret(secret);
+
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    const batch = db.batch();
+
+    batch.set(
+      secretsRef,
       {
-        v1_plain: {
-          token,
-          secret,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        v2_encrypted: {
+          token: encryptedToken,
+          secret: encryptedSecret,
+          algorithm: 'aes-256-gcm',
+          keyRef: 'functions-secret:ENVELOPE_KEY',
+          updatedAt: now,
         },
+        v1_plain: admin.firestore.FieldValue.delete(),
+        v1: admin.firestore.FieldValue.delete(),
         disabledAt: admin.firestore.FieldValue.delete(),
       },
       { merge: true },
     );
 
-    await db.collection('switchbot_users').doc(uid).set(
+    batch.set(
+      switchbotRef,
+      {
+        enabled: true,
+        hasSecrets: true,
+        authVersion: 'v2_encrypted',
+        secretsUpdatedAt: now,
+        disabledAt: admin.firestore.FieldValue.delete(),
+      },
+      { merge: true },
+    );
+
+    batch.set(
+      switchbotUserRef,
       {
         hasSwitchbot: true,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: now,
         disabledAt: admin.firestore.FieldValue.delete(),
       },
       { merge: true },
     );
 
-    const verifySnap = await docRef.get();
+    await batch.commit();
+
+    const verifySnap = await secretsRef.get();
 
     return {
       ok: true,
       verified: true,
       uid,
       projectId: process.env.GCLOUD_PROJECT ?? null,
-      debugMarker: 'registerSwitchbotSecrets_v2_20260301',
+      debugMarker: 'registerSwitchbotSecrets_v2_encrypted_20260523',
       savedDocExists: verifySnap.exists,
-      savedDocData: verifySnap.data() ?? null,
-      savedPath: docRef.path,
+      savedPath: secretsRef.path,
     };
   },
 );
@@ -165,11 +1156,30 @@ async function loadUserConfig(uid: string) {
   let token: string | undefined;
   let secret: string | undefined;
 
-  // prefer v1_plain
-  const v1p = (secSnap.exists ? (secSnap.get('v1_plain') as any) : null) ?? null;
-  if (v1p && typeof v1p === 'object') {
-    token = typeof v1p.token === 'string' ? v1p.token : undefined;
-    secret = typeof v1p.secret === 'string' ? v1p.secret : undefined;
+  // prefer v2_encrypted
+  const v2 = (secSnap.exists ? (secSnap.get('v2_encrypted') as any) : null) ?? null;
+  if (v2 && typeof v2 === 'object') {
+    try {
+      const t = typeof v2.token === 'string' ? unwrapSecret(v2.token) : undefined;
+      const s = typeof v2.secret === 'string' ? unwrapSecret(v2.secret) : undefined;
+
+      if (typeof t === 'string') token = t;
+      if (typeof s === 'string') secret = s;
+    } catch (e: any) {
+      logger.error('failed to decrypt v2_encrypted switchbot secrets', {
+        uid,
+        error: String(e?.message ?? e),
+      });
+    }
+  }
+
+  // fallback to v1_plain during migration
+  if (!token || !secret) {
+    const v1p = (secSnap.exists ? (secSnap.get('v1_plain') as any) : null) ?? null;
+    if (v1p && typeof v1p === 'object') {
+      token = typeof v1p.token === 'string' ? v1p.token : token;
+      secret = typeof v1p.secret === 'string' ? v1p.secret : secret;
+    }
   }
 
   // fallback to legacy v1
@@ -244,6 +1254,20 @@ type BreedingEnvironment = {
   temperatureControl?: string | null;
 };
 
+type HistoryRow = {
+  dateKey?: string;
+  level?: string | null;
+  avgTemp?: number | null;
+  avgHum?: number | null;
+  tempRatio?: number | null;
+  humRatio?: number | null;
+  dangerMinutes?: number | null;
+  spikesTemp?: number | null;
+  spikesHum?: number | null;
+  lastEvaluatedAt?: Date | null;
+  updatedAt?: Date | null;
+};
+
 const WINDOW_DAYS = 7;
 const TEMP_MIN = 20.0;
 const TEMP_MAX = 26.0;
@@ -316,6 +1340,78 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
     out.push(arr.slice(i, i + size));
   }
   return out;
+}
+
+type DeepDeleteStats = {
+  deletedDocuments: number;
+  deletedBatches: number;
+  touchedCollections: Set<string>;
+  deletedRootDocuments: string[];
+};
+
+function createDeepDeleteStats(): DeepDeleteStats {
+  return {
+    deletedDocuments: 0,
+    deletedBatches: 0,
+    touchedCollections: new Set<string>(),
+    deletedRootDocuments: [],
+  };
+}
+
+async function deleteCollectionDeep(
+  colRef: FirebaseFirestore.CollectionReference,
+  stats: DeepDeleteStats,
+  batchSize = 200,
+): Promise<void> {
+  while (true) {
+    const snap = await colRef.limit(batchSize).get();
+
+    if (snap.empty) {
+      return;
+    }
+
+    stats.touchedCollections.add(colRef.path);
+
+    // 先に各ドキュメントのサブコレクションを削除する
+    for (const doc of snap.docs) {
+      const subcollections = await doc.ref.listCollections();
+
+      for (const subcol of subcollections) {
+        await deleteCollectionDeep(subcol, stats, batchSize);
+      }
+    }
+
+    const batch = db.batch();
+
+    for (const doc of snap.docs) {
+      batch.delete(doc.ref);
+    }
+
+    await batch.commit();
+
+    stats.deletedDocuments += snap.size;
+    stats.deletedBatches += 1;
+
+    if (snap.size < batchSize) {
+      return;
+    }
+  }
+}
+
+async function deleteDocumentDeep(
+  docRef: FirebaseFirestore.DocumentReference,
+  stats: DeepDeleteStats,
+): Promise<void> {
+  const subcollections = await docRef.listCollections();
+
+  for (const subcol of subcollections) {
+    await deleteCollectionDeep(subcol, stats);
+  }
+
+  await docRef.delete();
+
+  stats.deletedDocuments += 1;
+  stats.deletedRootDocuments.push(docRef.path);
 }
 
 function mean(values: number[]): number | null {
@@ -564,13 +1660,10 @@ function buildEnvironmentAssessment(params: {
   } else if (spikesTemp > 0 && temperatureControl === 'エアコン') {
     todayAction = 'エアコンの風がケージに直接当たっていないか確認してください。';
     why = '温度の急変が空調由来で起きている可能性があるからです。';
-  } else if (humRatio < 0.7 && beddingThickness !== null && beddingThickness >= 5) {
-    todayAction = '床材が厚めなら、通気性を少し改善して湿気のこもりを減らしてみてください。';
-    why = '平均湿度が高めで、厚い床材は湿気がこもりやすいからです。';
   } else if (humRatio < 0.7 && humState === '高め') {
-    todayAction = 'ケージ周辺の通気を少し見直して、湿度がこもりすぎないか確認してください。';
-    why = '湿度がやや高めで推移しているからです。';
-  }
+  todayAction = 'まずは部屋全体の湿度・ケージ周辺の風通し・濡れた床材がないかを確認してください。床材の厚み自体は、掘る行動を支える大切な要素なので、安易に減らす必要はありません。';
+  why = '平均湿度が高めで推移していますが、床材の厚さそのものよりも、部屋の湿度・通気・局所的な濡れや汚れが影響している可能性を先に確認したいからです。';
+}
 
   const notes: string[] = [];
   if (temperatureControl) notes.push(`現在の温度管理方法：${temperatureControl}`);
@@ -621,6 +1714,430 @@ function buildEnvironmentAssessment(params: {
   };
 }
 
+type EnvironmentAssessmentForAi = ReturnType<typeof buildEnvironmentAssessment>;
+
+type TrendDirection = 'improving' | 'worsening' | 'stable' | 'unknown';
+type TrendMainMetric = 'temperature' | 'humidity' | 'overall';
+
+type LatestTrendSummary = {
+  direction: TrendDirection;
+  mainMetric: TrendMainMetric;
+  summary: string;
+  deltaText: string;
+  currentHumRatio: number | null;
+  previousHumRatio: number | null;
+  currentTempRatio: number | null;
+  previousTempRatio: number | null;
+};
+
+type LatestAnomalySummary = {
+  hasAnomaly: boolean;
+  topTitle: string | null;
+  severity: 'info' | 'low' | 'medium' | 'high' | null;
+  description: string | null;
+  flags: string[];
+};
+
+type SensorEvaluationSummary = {
+  overallState: 'good' | 'caution' | 'alert' | 'unknown';
+  flags: string[];
+};
+
+type AiAdvisorContext = {
+  status: 'available' | 'insufficient_data';
+  summary: string;
+  priority: string | null;
+  promptText: string;
+  generatedAt: FirebaseFirestore.Timestamp;
+  version: number;
+};
+
+async function fetchRecentEnvironmentHistory(
+  uid: string,
+  limit: number,
+): Promise<HistoryRow[]> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('environment_assessments_history')
+    .orderBy('dateKey', 'desc')
+    .limit(limit)
+    .get();
+
+  const rows = snap.docs.map((d) => {
+    const m = d.data() ?? {};
+    return {
+      dateKey: asString(m.dateKey) ?? d.id,
+      level: asString(m.level),
+      avgTemp: asNumber(m.avgTemp),
+      avgHum: asNumber(m.avgHum),
+      tempRatio: asNumber(m.tempRatio),
+      humRatio: asNumber(m.humRatio),
+      dangerMinutes: asNumber(m.dangerMinutes),
+      spikesTemp: asNumber(m.spikesTemp),
+      spikesHum: asNumber(m.spikesHum),
+      lastEvaluatedAt: null,
+      updatedAt: null,
+    } as HistoryRow;
+  });
+
+  rows.sort((a, b) => String(a.dateKey ?? '').localeCompare(String(b.dateKey ?? '')));
+  return rows;
+}
+
+function averageNullable(values: Array<number | null | undefined>): number | null {
+  const nums = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  if (nums.length === 0) return null;
+  return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function buildTrendSummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  history: HistoryRow[];
+}): LatestTrendSummary {
+  const { latest, history } = params;
+
+  const currentTempRatio =
+    typeof latest.tempRatio === 'number' ? latest.tempRatio : null;
+  const currentHumRatio =
+    typeof latest.humRatio === 'number' ? latest.humRatio : null;
+
+  if (history.length < 4 || currentTempRatio == null || currentHumRatio == null) {
+    return {
+      direction: 'unknown',
+      mainMetric: 'overall',
+      summary: '推移を判断するには、もう少し履歴データが必要です。',
+      deltaText: '比較データ不足',
+      currentHumRatio,
+      previousHumRatio: null,
+      currentTempRatio,
+      previousTempRatio: null,
+    };
+  }
+
+  const recent = history.slice(-3);
+  const previous = history.slice(0, Math.max(0, history.length - 3));
+
+  const previousTempRatio = averageNullable(previous.map((e) => e.tempRatio));
+  const previousHumRatio = averageNullable(previous.map((e) => e.humRatio));
+
+  if (previousTempRatio == null || previousHumRatio == null) {
+    return {
+      direction: 'unknown',
+      mainMetric: 'overall',
+      summary: '過去平均との差分を判断するには、もう少し履歴データが必要です。',
+      deltaText: '比較データ不足',
+      currentHumRatio,
+      previousHumRatio,
+      currentTempRatio,
+      previousTempRatio,
+    };
+  }
+
+  const recentTempRatio = averageNullable(recent.map((e) => e.tempRatio)) ?? currentTempRatio;
+  const recentHumRatio = averageNullable(recent.map((e) => e.humRatio)) ?? currentHumRatio;
+
+  const tempDelta = recentTempRatio - previousTempRatio;
+  const humDelta = recentHumRatio - previousHumRatio;
+
+  const absTempDelta = Math.abs(tempDelta);
+  const absHumDelta = Math.abs(humDelta);
+
+  const mainMetric: TrendMainMetric =
+    absHumDelta >= absTempDelta ? 'humidity' : 'temperature';
+
+  const mainDelta = mainMetric === 'humidity' ? humDelta : tempDelta;
+  const mainLabel = mainMetric === 'humidity' ? '湿度' : '温度';
+  const deltaPt = Math.round(mainDelta * 100);
+
+  let direction: TrendDirection = 'stable';
+  if (mainDelta >= 0.10) {
+    direction = 'improving';
+  } else if (mainDelta <= -0.10) {
+    direction = 'worsening';
+  }
+
+  const deltaText =
+    direction === 'stable'
+      ? `${mainLabel}の適正率は大きく変わっていません。`
+      : `${mainLabel}の適正率が過去平均との差で${deltaPt >= 0 ? '+' : ''}${deltaPt}pt変化しています。`;
+
+  let summary = '温湿度の推移はおおむね安定しています。';
+
+  if (direction === 'improving') {
+    summary = `${mainLabel}は以前より改善傾向です。`;
+  } else if (direction === 'worsening') {
+    summary = `${mainLabel}は以前より悪化傾向です。`;
+  } else if (currentHumRatio !== null && currentHumRatio < 0.6) {
+    summary = '湿度はまだ不安定ですが、急激な悪化は見られません。';
+  }
+
+  return {
+    direction,
+    mainMetric,
+    summary,
+    deltaText,
+    currentHumRatio,
+    previousHumRatio,
+    currentTempRatio,
+    previousTempRatio,
+  };
+}
+
+function buildLightweightAnomalySummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  history: HistoryRow[];
+}): LatestAnomalySummary {
+  const { latest, history } = params;
+  const flags: string[] = [];
+
+  const sorted = [...history].sort((a, b) =>
+    String(a.dateKey ?? '').localeCompare(String(b.dateKey ?? '')),
+  );
+
+  const tailCount = (predicate: (row: HistoryRow) => boolean): number => {
+    let count = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (predicate(sorted[i])) count++;
+      else break;
+    }
+    return count;
+  };
+
+  const highHumStreak = tailCount(
+    (e) => (e.avgHum ?? Number.NEGATIVE_INFINITY) > HUM_MAX,
+  );
+  const lowTempStreak = tailCount(
+    (e) => (e.avgTemp ?? Number.POSITIVE_INFINITY) < TEMP_MIN,
+  );
+  const highTempStreak = tailCount(
+    (e) => (e.avgTemp ?? Number.NEGATIVE_INFINITY) > TEMP_MAX,
+  );
+  const cautionStreak = tailCount((e) => e.level === '注意');
+
+  const recent3 = sorted.length <= 3 ? sorted : sorted.slice(sorted.length - 3);
+  const dangerHit = recent3.some((e) => e.level === '危険');
+  const dangerMinutesMax = recent3.reduce(
+    (max, e) => Math.max(max, e.dangerMinutes ?? 0),
+    0,
+  );
+  const tempSpikeTotal = recent3.reduce((sum, e) => sum + (e.spikesTemp ?? 0), 0);
+  const humSpikeTotal = recent3.reduce((sum, e) => sum + (e.spikesHum ?? 0), 0);
+
+  if (highHumStreak >= 3) flags.push('humidityHighStreak');
+  if (lowTempStreak >= 3) flags.push('temperatureLowStreak');
+  if (highTempStreak >= 3) flags.push('temperatureHighStreak');
+  if (cautionStreak >= 3) flags.push('cautionLevelStreak');
+  if (dangerHit || dangerMinutesMax > 0) flags.push('dangerDetected');
+  if (tempSpikeTotal >= 3) flags.push('temperatureSpike');
+  if (humSpikeTotal >= 3) flags.push('humiditySpike');
+
+  if (dangerHit || dangerMinutesMax >= 30) {
+    return {
+      hasAnomaly: true,
+      topTitle: '危険評価が検出されています',
+      severity: 'high',
+      description: '直近の環境評価で危険サインが出ています。温度・湿度・行動の変化を優先して確認してください。',
+      flags,
+    };
+  }
+
+  if (highHumStreak >= 5) {
+    const hum =
+      typeof latest.avgHum === 'number' ? Math.round(latest.avgHum) : null;
+    return {
+      hasAnomaly: true,
+      topTitle: '高湿が続いています',
+      severity: 'high',
+      description:
+        hum != null
+          ? `湿度が高めの状態が${highHumStreak}日連続です。最新の平均湿度は${hum}%です。`
+          : `湿度が高めの状態が${highHumStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (highTempStreak >= 5 || lowTempStreak >= 5) {
+    const isHigh = highTempStreak >= 5;
+    const streak = isHigh ? highTempStreak : lowTempStreak;
+    return {
+      hasAnomaly: true,
+      topTitle: isHigh ? '高温が続いています' : '低温が続いています',
+      severity: 'high',
+      description: `温度が${isHigh ? '高め' : '低め'}の状態が${streak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (highHumStreak >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '湿度が高めです',
+      severity: 'medium',
+      description: `湿度が高めの状態が${highHumStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  if (tempSpikeTotal >= 3 || humSpikeTotal >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '温湿度の急変が見られます',
+      severity: tempSpikeTotal >= 6 || humSpikeTotal >= 6 ? 'high' : 'medium',
+      description: `直近3日で温度急変${tempSpikeTotal}回、湿度急変${humSpikeTotal}回が記録されています。`,
+      flags,
+    };
+  }
+
+  if (cautionStreak >= 3) {
+    return {
+      hasAnomaly: true,
+      topTitle: '注意評価が続いています',
+      severity: cautionStreak >= 5 ? 'high' : 'medium',
+      description: `環境評価の「注意」が${cautionStreak}日連続です。`,
+      flags,
+    };
+  }
+
+  return {
+    hasAnomaly: false,
+    topTitle: null,
+    severity: null,
+    description: null,
+    flags,
+  };
+}
+
+function buildSensorEvaluationSummary(params: {
+  latest: EnvironmentAssessmentForAi;
+  anomaly: LatestAnomalySummary;
+}): SensorEvaluationSummary {
+  const { latest, anomaly } = params;
+  const flags = new Set<string>(anomaly.flags);
+
+  if (latest.humState === '高め') flags.add('humidityHigh');
+  if (latest.humState === '低め') flags.add('humidityLow');
+  if (latest.tempState === '高め') flags.add('temperatureHigh');
+  if (latest.tempState === '低め') flags.add('temperatureLow');
+  if ((latest.dangerMinutes ?? 0) > 0) flags.add('dangerMinutesDetected');
+  if ((latest.spikesTemp ?? 0) > 0) flags.add('temperatureSpike');
+  if ((latest.spikesHum ?? 0) > 0) flags.add('humiditySpike');
+
+  let overallState: SensorEvaluationSummary['overallState'] = 'unknown';
+
+  if (latest.status !== 'ok') {
+    overallState = 'unknown';
+  } else if (latest.level === '危険' || anomaly.severity === 'high') {
+    overallState = 'alert';
+  } else if (latest.level === '注意' || anomaly.hasAnomaly) {
+    overallState = 'caution';
+  } else if (latest.level === '良好') {
+    overallState = 'good';
+  }
+
+  return {
+    overallState,
+    flags: Array.from(flags),
+  };
+}
+
+function buildAiAdvisorContext(params: {
+  latest: EnvironmentAssessmentForAi;
+  trend: LatestTrendSummary;
+  anomaly: LatestAnomalySummary;
+  sensorEvaluation: SensorEvaluationSummary;
+  evaluatedAt: Date;
+}): AiAdvisorContext {
+  const { latest, trend, anomaly, sensorEvaluation, evaluatedAt } = params;
+
+  if (latest.status !== 'ok') {
+    return {
+      status: 'insufficient_data',
+      summary: '温湿度データが不足しているため、AI相談で参照できる環境評価は限定的です。',
+      priority: 'SwitchBotの記録が継続して入っているか確認してください。',
+      promptText:
+        '【現在のセンサー評価】\n' +
+        '温湿度データが不足しています。環境評価は参考程度に扱ってください。\n' +
+        `状態: ${latest.headline}\n` +
+        `今日やること: ${latest.todayAction}\n`,
+      generatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
+      version: 1,
+    };
+  }
+
+  const avgTempText =
+    typeof latest.avgTemp === 'number' ? `${latest.avgTemp.toFixed(1)}℃` : '不明';
+  const avgHumText =
+    typeof latest.avgHum === 'number' ? `${Math.round(latest.avgHum)}%` : '不明';
+
+  const tempRatioText =
+    typeof latest.tempRatio === 'number' ? fmtPct01(latest.tempRatio) : '不明';
+  const humRatioText =
+    typeof latest.humRatio === 'number' ? fmtPct01(latest.humRatio) : '不明';
+
+  const anomalyText = anomaly.hasAnomaly
+    ? [
+        anomaly.topTitle ?? '気になる変化があります',
+        anomaly.description ?? '',
+        anomaly.severity ? `重要度: ${anomaly.severity}` : '',
+      ].filter(Boolean).join('\n')
+    : '目立った異常検知はありません。';
+
+  const priority =
+    anomaly.severity === 'high'
+      ? anomaly.description
+      : latest.todayAction ?? null;
+
+  const promptText = [
+    '【現在のセンサー評価】',
+    `総合評価: ${latest.level}`,
+    `見出し: ${latest.headline}`,
+    `平均温度: ${avgTempText}`,
+    `平均湿度: ${avgHumText}`,
+    `温度適正率: ${tempRatioText}`,
+    `湿度適正率: ${humRatioText}`,
+    `温度の解釈: ${latest.tempInterpretation ?? ''}`,
+    `湿度の解釈: ${latest.humInterpretation ?? ''}`,
+    `今日やること: ${latest.todayAction}`,
+    `理由: ${latest.why}`,
+    '',
+    '【最近の推移】',
+    trend.summary,
+    trend.deltaText,
+    '',
+    '【最近の気になる変化】',
+    anomalyText,
+    '',
+    '【注意フラグ】',
+    sensorEvaluation.flags.length > 0
+      ? sensorEvaluation.flags.join(', ')
+      : '特になし',
+    '',
+    '【回答方針】',
+'ユーザーの質問に関係する場合だけ、上記のセンサー評価を自然に参照してください。',
+'関係ない質問では、無理に温湿度や異常検知へ言及しないでください。',
+'体調不良の可能性がある相談では、センサー情報だけで病気や原因を断定しないでください。',
+'必要に応じて「環境要因としては」という表現で、観察・環境調整・受診検討を分けて提案してください。',
+'床材が十分に深い場合は、その厚みをまず肯定してください。',
+'高湿対策として、床材を安易に減らす・掘り返す・全交換する提案は避けてください。',
+'湿度が高い場合は、まず部屋全体の湿度、ケージ周辺の風通し、エアコンや除湿、濡れた床材・汚れた部分の局所確認を優先してください。',
+'床材の交換や除去を提案する場合は、濡れている・カビ臭い・汚れているなどの明確な根拠がある場合に限定してください。',
+  ].join('\n');
+
+  const summary = anomaly.hasAnomaly
+    ? `${latest.level}。${anomaly.topTitle ?? '気になる変化があります'}`
+    : `${latest.level}。${trend.summary}`;
+
+  return {
+    status: 'available',
+    summary,
+    priority,
+    promptText,
+    generatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
+    version: 1,
+  };
+}
+
 async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
   const [env, readings] = await Promise.all([
     fetchBreedingEnvironment(uid),
@@ -637,6 +2154,32 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
 
   const evaluatedAt = new Date();
 
+  // AI相談用に、直近履歴から trend / anomaly / prompt context を生成
+  const recentHistory = await fetchRecentEnvironmentHistory(uid, 14);
+
+  const trend = buildTrendSummary({
+    latest: latestAssessment,
+    history: recentHistory,
+  });
+
+  const anomaly = buildLightweightAnomalySummary({
+    latest: latestAssessment,
+    history: recentHistory,
+  });
+
+  const sensorEvaluation = buildSensorEvaluationSummary({
+    latest: latestAssessment,
+    anomaly,
+  });
+
+  const aiAdvisorContext = buildAiAdvisorContext({
+    latest: latestAssessment,
+    trend,
+    anomaly,
+    sensorEvaluation,
+    evaluatedAt,
+  });
+
   await db
     .collection('users')
     .doc(uid)
@@ -645,6 +2188,10 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     .set(
       {
         ...latestAssessment,
+        trend,
+        anomaly,
+        sensorEvaluation,
+        aiAdvisorContext,
         evaluatedAt: admin.firestore.Timestamp.fromDate(evaluatedAt),
       },
       { merge: true },
@@ -668,34 +2215,14 @@ async function saveEnvironmentAssessmentLatest(uid: string): Promise<void> {
     latestLevel: latestAssessment.level,
     dailyLevel: dailyAssessment.level,
     sourceDocCount: readings.length,
+    trendDirection: trend.direction,
+    trendSummary: trend.summary,
+    hasAnomaly: anomaly.hasAnomaly,
+    anomalySeverity: anomaly.severity,
+    aiAdvisorContextStatus: aiAdvisorContext.status,
   });
 
-  // ===== 異常検知通知パイプライン =====
-  try {
-    const notificationResult = await executeAnomalyNotificationPipeline({
-      db,
-      messaging: admin.messaging(),
-      uid,
-      windowDays: 14,
-      now: evaluatedAt,
-    });
 
-    logger.info('executeAnomalyNotificationPipeline done', {
-      uid,
-      shouldNotify: notificationResult.decision.shouldNotify,
-      reason: notificationResult.decision.reason,
-      notificationKey: notificationResult.notificationKey,
-      tokenCount: notificationResult.tokenCount,
-      sentCount: notificationResult.sentCount,
-      failedCount: notificationResult.failedCount,
-      noTokens: notificationResult.noTokens,
-    });
-  } catch (e: any) {
-    logger.error('executeAnomalyNotificationPipeline error', {
-      uid,
-      error: String(e?.message ?? e),
-    });
-  }
 }
 
 async function saveEnvironmentAssessmentHistoryDaily(
@@ -740,6 +2267,17 @@ async function pollAllUsersOnce(): Promise<PollAllResult> {
   for (const doc of usersSnap.docs) {
     const uid = doc.id;
     try {
+            try {
+        await assertPaidFeatureAccess(uid);
+      } catch {
+        skipped++;
+        logger.info('pollAllUsersOnce skip', {
+          uid,
+          reason: 'not_paid',
+        });
+        continue;
+      }
+      
       const { token, secret, meterDeviceId } = await loadUserConfig(uid);
       if (!token || !secret || !meterDeviceId) {
         skipped++;
@@ -765,15 +2303,12 @@ async function pollAllUsersOnce(): Promise<PollAllResult> {
   return result;
 }
 
-/* =================================================================== */
-/*  連携解除: disableSwitchbotIntegration                              */
-/* =================================================================== */
-
 export const disableSwitchbotIntegration = onCall(
   { region: 'asia-northeast1' },
   async (req) => {
     const uid = req.auth?.uid;
     if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    await assertPaidFeatureAccess(uid);
 
     const deleteReadings = !!req.data?.deleteReadings;
 
@@ -790,6 +2325,7 @@ export const disableSwitchbotIntegration = onCall(
         meterDeviceName: admin.firestore.FieldValue.delete(),
         meterDeviceType: admin.firestore.FieldValue.delete(),
         enabled: false,
+        hasSecrets: false,
         disabledAt: now,
       },
       { merge: true },
@@ -798,6 +2334,7 @@ export const disableSwitchbotIntegration = onCall(
     batch.set(
       integCol.doc('switchbot_secrets'),
       {
+        v2_encrypted: admin.firestore.FieldValue.delete(),
         v1_plain: admin.firestore.FieldValue.delete(),
         v1: admin.firestore.FieldValue.delete(),
         disabledAt: now,
@@ -830,46 +2367,169 @@ export const disableSwitchbotIntegration = onCall(
   },
 );
 
-/** Debug: token/secret がちゃんと読めているか head/tail を返す */
-export const switchbotDebugEcho = onCall({ region: 'asia-northeast1' }, async (req) => {
-  if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-  const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
+export const deleteMyAccountAndData = onCall(
+  {
+    region: 'asia-northeast1',
+    timeoutSeconds: 540,
+    memory: '1GiB',
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
 
-  const headTail = (s?: string) => (!s ? null : { head: s.slice(0, 5), len: s.length, tail: s.slice(-5) });
-
-  return { ok: true, uid: req.auth.uid, meterDeviceId, token: headTail(token), secret: headTail(secret) };
-});
-
-export const pollMySwitchbotNow = onCall({ region: 'asia-northeast1' }, async (req) => {
-  if (!req.auth?.uid) return { ok: false, error: 'unauthenticated' };
-  try {
-    const { token, secret, meterDeviceId } = await loadUserConfig(req.auth.uid);
-    if (!token || !secret || !meterDeviceId) {
-      return { ok: false, uid: req.auth.uid, error: 'missing config (token/secret/deviceId)' };
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
     }
-    const status = await getMeterStatus(meterDeviceId, token, secret);
-    await saveReading(req.auth.uid, status);
-    await saveEnvironmentAssessmentLatest(req.auth.uid);
 
-    logger.info('pollMySwitchbotNow success', {
-      uid: req.auth.uid,
-      meterDeviceId,
+    const confirmText = String(req.data?.confirmText ?? '').trim();
+
+    if (confirmText !== 'DELETE_MY_ACCOUNT') {
+      throw new HttpsError(
+        'invalid-argument',
+        '削除確認文字列が一致しません。',
+      );
+    }
+
+    const deleteAuthUser = req.data?.deleteAuthUser !== false;
+
+    const stats = createDeepDeleteStats();
+
+    logger.warn('deleteMyAccountAndData started', {
+      uid,
+      deleteAuthUser,
     });
 
-    return { ok: true, uid: req.auth.uid, saved: 1, status };
-  } catch (e: any) {
-    logger.error('pollMine error', { uid: req.auth?.uid, error: String(e?.message ?? e) });
-    return { ok: false, uid: req.auth?.uid ?? null, error: String(e?.message ?? e) };
+    try {
+      // 1. users/{uid} 配下をサブコレクションごと削除
+      await deleteDocumentDeep(db.collection('users').doc(uid), stats);
+
+      // 2. switchbot_users/{uid} を削除
+      await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
+
+      // 3. Firebase Auth ユーザー本体を削除
+      if (deleteAuthUser) {
+        try {
+          await admin.auth().deleteUser(uid);
+        } catch (e: any) {
+          if (e?.code === 'auth/user-not-found') {
+            logger.warn('deleteMyAccountAndData auth user already missing', {
+              uid,
+            });
+          } else {
+            throw e;
+          }
+        }
+      }
+
+      const result = {
+        ok: true,
+        uid,
+        deleteAuthUser,
+        deletedDocuments: stats.deletedDocuments,
+        deletedBatches: stats.deletedBatches,
+        touchedCollections: Array.from(stats.touchedCollections).sort(),
+        deletedRootDocuments: stats.deletedRootDocuments,
+      };
+
+      logger.warn('deleteMyAccountAndData completed', result);
+
+      return result;
+    } catch (e: any) {
+      logger.error('deleteMyAccountAndData failed', {
+        uid,
+        error: String(e?.message ?? e),
+      });
+
+      throw new HttpsError(
+        'internal',
+        `アカウントデータ削除に失敗しました: ${String(e?.message ?? e)}`,
+      );
+    }
+  },
+);
+
+/** Debug: token/secret がちゃんと読めているか head/tail を返す */
+export const switchbotDebugEcho = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    }
+
+    await assertPaidFeatureAccess(uid);
+
+    const { token, secret, meterDeviceId } = await loadUserConfig(uid);
+
+    const headTail = (s?: string) =>
+      !s
+        ? null
+        : {
+            head: s.slice(0, 5),
+            len: s.length,
+            tail: s.slice(-5),
+          };
+
+    return {
+      ok: true,
+      uid,
+      meterDeviceId,
+      token: headTail(token),
+      secret: headTail(secret),
+    };
+  },
+);
+
+export const pollMySwitchbotNow = onCall(
+  { 
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (req) => {
+    const uid = req.auth?.uid;
+    if (!uid) return { ok: false, error: 'unauthenticated' };
+
+    try {
+      await assertPaidFeatureAccess(uid);
+
+      const { token, secret, meterDeviceId } = await loadUserConfig(uid);
+      if (!token || !secret || !meterDeviceId) {
+        return { ok: false, uid, error: 'missing config (token/secret/deviceId)' };
+      }
+
+      const status = await getMeterStatus(meterDeviceId, token, secret);
+      await saveReading(uid, status);
+      await saveEnvironmentAssessmentLatest(uid);
+
+      logger.info('pollMySwitchbotNow success', {
+        uid,
+        meterDeviceId,
+      });
+
+      return { ok: true, uid, saved: 1, status };
+    } catch (e: any) {
+      logger.error('pollMine error', { uid, error: String(e?.message ?? e) });
+      return { ok: false, uid, error: String(e?.message ?? e) };
+    }
   }
-});
+);
 
 /* =================================================================== */
 /*  Flutter から呼ぶ本命: listSwitchbotDevices                         */
 /* =================================================================== */
 
-export const listSwitchbotDevices = onCall({ region: 'asia-northeast1' }, async (req) => {
+export const listSwitchbotDevices = onCall(
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+  },
+  async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', '認証ユーザーのみが呼び出せます。');
+  await assertPaidFeatureAccess(uid);
 
   const { token, secret } = await loadUserConfig(uid);
   if (!token || !secret) {
@@ -902,6 +2562,7 @@ export const backfillMyEnvironmentAssessmentsHistory = onCall(
     if (!uid) {
       throw new HttpsError('unauthenticated', 'ログインが必要です。');
     }
+    await assertPaidFeatureAccess(uid);
 
     try {
       const [env, allReadings] = await Promise.all([
@@ -1012,16 +2673,56 @@ export const backfillMyEnvironmentAssessmentsHistory = onCall(
 
 /* ===== HTTP: 手動で叩きたいとき用 ===== */
 
-export const switchbotPollNow = onRequest({ region: 'asia-northeast1' }, async (_req, res) => {
-  const result = await pollAllUsersOnce();
-  res.json({ ok: true, ...result });
-});
+export const switchbotPollNow = onRequest(
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET, SWITCHBOT_MANUAL_POLL_SECRET],
+  },
+  async (req, res) => {
+    const expectedSecret = process.env.SWITCHBOT_MANUAL_POLL_SECRET;
+
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      typeof authHeader === 'string' && authHeader.startsWith('Bearer ')
+        ? authHeader.slice('Bearer '.length).trim()
+        : '';
+
+    if (!expectedSecret || bearerToken !== expectedSecret) {
+      logger.warn('switchbotPollNow forbidden', {
+        hasExpectedSecret: !!expectedSecret,
+      });
+
+      res.status(403).json({
+        ok: false,
+        error: 'forbidden',
+      });
+      return;
+    }
+
+    const result = await pollAllUsersOnce();
+    res.json({ ok: true, ...result });
+  },
+);
 
 /* ===== Scheduler ===== */
 
 export const switchbotPoller = onSchedule(
-  { region: 'asia-northeast1', schedule: 'every 60 minutes' },
+  {
+    region: 'asia-northeast1',
+    secrets: [ENVELOPE_KEY_SECRET],
+    schedule: 'every 60 minutes',
+  },
   async () => {
     await pollAllUsersOnce();
   },
 );
+
+
+export {
+  healthWeightRecordWritten,
+  healthDistanceRecordWritten,
+  healthDailyCheckinWritten,
+  healthEnvironmentHistoryWritten,
+  healthEnvironmentLatestWritten,
+  rebuildMyHealthArchitecture,
+} from './health/healthTriggers';

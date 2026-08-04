@@ -7,7 +7,7 @@ Retrieval-Augmented Generation（RAG）システムを採用している。
 RAGは以下の3レイヤで構成される。
 
 1. インデクシング（オフライン）
-2. 検索・生成API（オンライン）
+2. 検索・生成API（オンライン）  
 3. フロントエンド（Flutter）
 
 ---

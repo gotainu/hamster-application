@@ -3,8 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
+import '../models/hamster_avatar.dart';
 import '../models/pet_profile.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/pet_profile_repo.dart';
+import '../widgets/hamster_avatar_view.dart';
 import '../services/breeding_environment_repo.dart';
 import 'pet_profile_edit_screen.dart';
 import 'breeding_environment_edit_screen.dart';
@@ -135,6 +139,19 @@ class PetProfileScreen extends StatelessWidget {
                           '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
                     }
 
+                    final avatarAppearance =
+                        const HamsterAvatarAppearanceResolver().resolve(pet);
+                    final avatarPresentation =
+                        const HamsterAvatarAssetResolver().resolve(
+                      appearance: avatarAppearance,
+                      conditionResult: const HamsterAvatarConditionResult(
+                        condition: HamsterAvatarCondition.stable,
+                        cause: HamsterAvatarCause.none,
+                        message: 'Homeでは健康評価に応じて表情が変わります。',
+                        animateBreathing: true,
+                      ),
+                    );
+
                     return StreamBuilder<BreedingEnvironment?>(
                       stream: repoEnv.watchMainEnv(),
                       builder: (context, envSnap) {
@@ -148,39 +165,10 @@ class PetProfileScreen extends StatelessWidget {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  CircleAvatar(
-                                    radius: 56,
-                                    backgroundColor: Colors.transparent,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            AppTheme.accent.withValues(
-                                                alpha: isDark ? 0.7 : 0.23),
-                                            isDark
-                                                ? AppTheme.darkCard
-                                                : AppTheme.lightCard,
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                      ),
-                                      child: CircleAvatar(
-                                        radius: 52,
-                                        backgroundColor: isDark
-                                            ? Colors.grey[900]
-                                            : Colors.grey[200],
-                                        backgroundImage: pet.imageUrl != null
-                                            ? NetworkImage(pet.imageUrl!)
-                                            : null,
-                                        child: pet.imageUrl == null
-                                            ? const Icon(Icons.pets,
-                                                size: 48,
-                                                color: AppTheme.accent)
-                                            : null,
-                                      ),
-                                    ),
+                                  _ProfileIdentityVisual(
+                                    pet: pet,
+                                    avatarPresentation: avatarPresentation,
+                                    isDark: isDark,
                                   ),
                                   const SizedBox(height: 18),
                                   Text(pet.name.isEmpty ? '不明' : pet.name,
@@ -276,6 +264,101 @@ class PetProfileScreen extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileIdentityVisual extends StatelessWidget {
+  final PetProfile pet;
+  final HamsterAvatarPresentation avatarPresentation;
+  final bool isDark;
+
+  const _ProfileIdentityVisual({
+    required this.pet,
+    required this.avatarPresentation,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (pet.hasImage) {
+      return _ProfilePhoto(
+        imageUrl: pet.imageUrl!.trim(),
+        isDark: isDark,
+      );
+    }
+
+    if (pet.hasAvatarIdentity) {
+      return HamsterAvatarView(
+        presentation: avatarPresentation,
+        size: 132,
+        showDebugLabel: false,
+      );
+    }
+
+    return Container(
+      width: 124,
+      height: 124,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isDark ? Colors.grey[900] : Colors.grey[200],
+        border: Border.all(
+          color: AppTheme.accent.withValues(alpha: isDark ? 0.35 : 0.22),
+        ),
+      ),
+      child: Icon(
+        Icons.pets_rounded,
+        size: 50,
+        color: AppTheme.accent.withValues(alpha: 0.72),
+      ),
+    );
+  }
+}
+
+class _ProfilePhoto extends StatelessWidget {
+  final String imageUrl;
+  final bool isDark;
+
+  const _ProfilePhoto({
+    required this.imageUrl,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 132,
+      height: 132,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.accent.withValues(alpha: isDark ? 0.70 : 0.23),
+            isDark ? AppTheme.darkCard : AppTheme.lightCard,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: ClipOval(
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return ColoredBox(
+              color: isDark ? Colors.grey.shade900 : Colors.grey.shade200,
+              child: const Center(
+                child: Icon(
+                  Icons.pets_rounded,
+                  size: 48,
+                  color: AppTheme.accent,
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

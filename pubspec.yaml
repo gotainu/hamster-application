@@ -50,6 +50,9 @@ dependencies:
   convert: ^3.1.1
   flutter_secure_storage: ^9.2.4
   cloud_functions: ^6.0.0
+  smooth_page_indicator: ^1.2.1
+  url_launcher: ^6.3.1
+  package_info_plus: ^8.3.0
 
 dev_dependencies:
   flutter_test:
@@ -76,6 +79,20 @@ flutter:
   assets:
     - assets/images/roiroi.png
     - assets/images/roi.png
+    - assets/images/chat.png
+    - assets/images/switchbot_guide_01_prepare_hub_app.png
+    - assets/images/switchbot_guide_02_open_app.png
+    - assets/images/switchbot_guide_03_profile_settings.png
+    - assets/images/switchbot_guide_04_tap_version.png
+    - assets/images/switchbot_guide_05_token_secret.png
+    - assets/images/switchbot_guide_06_select_meter.png
+    - assets/images/theme/
+
+    - assets/avatars/
+    - assets/avatars/syrian/golden/
+    - assets/avatars/syrian/dalmatian/
+
+
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

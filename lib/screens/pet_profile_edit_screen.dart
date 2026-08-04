@@ -7,8 +7,12 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/user_image_picker.dart';
 
+import '../models/hamster_avatar.dart';
 import '../models/pet_profile.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/pet_profile_repo.dart';
+import '../widgets/hamster_avatar_view.dart';
 
 class PetProfileEditScreen extends StatefulWidget {
   const PetProfileEditScreen({super.key});
@@ -32,21 +36,8 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   String? _selectedColor;
   bool _isLoading = false;
 
-  final List<String> _speciesList = const [
-    'シリアン',
-    'ジャンガリアン',
-    'ロボロフスキー',
-    'チャイニーズ',
-    'キャンベル',
-  ];
-
-  final Map<String, List<String>> _colorOptionsMap = const {
-    'シリアン': ['キンクマ', 'ゴールデン', 'アルビノ'],
-    'ジャンガリアン': ['ノーマル', 'ブルーサファイア', 'パールホワイト', 'スノーホワイト', 'プディング', 'アルビノ'],
-    'ロボロフスキー': ['ノーマル', 'ホワイト', 'パイド', 'アルビノ'],
-    'チャイニーズ': ['ノーマル', 'ホワイト', 'パイド', 'アルビノ'],
-    'キャンベル': ['ノーマル', 'オパール', 'イエロー（アルビノイエロー）', '黒目イエロー', 'パイド', 'レッド'],
-  };
+  static const _avatarAppearanceResolver = HamsterAvatarAppearanceResolver();
+  static const _avatarAssetResolver = HamsterAvatarAssetResolver();
 
   // ---------- lifecycle ----------
   @override
@@ -74,7 +65,8 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
         _birthday = null;
         _birthdayController.clear();
         _selectedSpecies = 'シリアン';
-        _selectedColor = null;
+        _selectedColor =
+            _avatarAppearanceResolver.defaultColorForSpecies(_selectedSpecies);
         _existingImageUrl = null;
       });
       return;
@@ -90,8 +82,11 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       } else {
         _birthdayController.clear();
       }
-      _selectedSpecies = p.species;
-      _selectedColor = p.color;
+      _selectedSpecies = p.species.trim().isEmpty ? 'シリアン' : p.species;
+      _selectedColor = _avatarAppearanceResolver.normalizeColorForSelection(
+        species: _selectedSpecies,
+        color: p.color,
+      );
       _existingImageUrl = p.imageUrl;
     });
   }
@@ -160,6 +155,23 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
     }
   }
 
+  HamsterAvatarPresentation _avatarPreviewPresentation() {
+    final appearance = _avatarAppearanceResolver.resolveFromValues(
+      species: _selectedSpecies,
+      color: _selectedColor,
+    );
+
+    return _avatarAssetResolver.resolve(
+      appearance: appearance,
+      conditionResult: const HamsterAvatarConditionResult(
+        condition: HamsterAvatarCondition.stable,
+        cause: HamsterAvatarCause.none,
+        message: 'Homeでは、コンディションに応じて表情とポーズが変わります。',
+        animateBreathing: true,
+      ),
+    );
+  }
+
   Future<void> _submitForm() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -220,10 +232,13 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorList = _colorOptionsMap[_selectedSpecies]!;
-    if (_selectedColor == null || !colorList.contains(_selectedColor)) {
-      _selectedColor = null;
-    }
+    final speciesList =
+        _avatarAppearanceResolver.speciesOptionsForCurrent(_selectedSpecies);
+    final colorList =
+        _avatarAppearanceResolver.colorOptionsFor(_selectedSpecies);
+    final selectedColor =
+        colorList.contains(_selectedColor) ? _selectedColor : null;
+    final avatarPreview = _avatarPreviewPresentation();
     final bgGradient =
         isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
 
@@ -300,7 +315,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                           decoration:
                               const InputDecoration(labelText: 'ハムスターの種類'),
                           value: _selectedSpecies,
-                          items: _speciesList
+                          items: speciesList
                               .map((s) => DropdownMenuItem(
                                     value: s,
                                     child: Text(s,
@@ -312,14 +327,15 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                           onChanged: (v) {
                             setState(() {
                               _selectedSpecies = v!;
-                              _selectedColor = null;
+                              _selectedColor = _avatarAppearanceResolver
+                                  .defaultColorForSpecies(_selectedSpecies);
                             });
                           },
                         ),
                         const SizedBox(height: 18),
                         DropdownButtonFormField<String>(
                           decoration: const InputDecoration(labelText: '毛色'),
-                          value: _selectedColor,
+                          value: selectedColor,
                           items: colorList
                               .map((c) => DropdownMenuItem(
                                     value: c,
@@ -331,6 +347,30 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                               .toList(),
                           onChanged: (v) => setState(() => _selectedColor = v),
                           validator: (v) => v == null ? '毛色を選択してください' : null,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Homeアバタープレビュー',
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '種類と毛色をもとに外見を選び、健康評価に応じて表情とポーズが変化します。',
+                          textAlign: TextAlign.center,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.secondaryText(context),
+                                    height: 1.45,
+                                  ),
+                        ),
+                        const SizedBox(height: 12),
+                        HamsterAvatarView(
+                          presentation: avatarPreview,
+                          size: 150,
+                          showDebugLabel: false,
                         ),
                         const SizedBox(height: 22),
                         ElevatedButton(

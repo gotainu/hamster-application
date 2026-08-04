@@ -60,6 +60,7 @@ type NotificationDecisionReason =
   | 'belowSeverityThreshold'
   | 'alreadySentRecently'
   | 'inactive'
+  | 'userDisabled'
   | 'shouldNotify';
 
 type NotificationDecision = {
@@ -745,6 +746,54 @@ async function saveNotificationLog(params: {
   );
 }
 
+async function fetchPaidFeatureEntitlement(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+): Promise<{
+  isEntitled: boolean;
+  plan: string | null;
+  status: string | null;
+}> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('billing')
+    .doc('subscription')
+    .get();
+
+  const data = snap.data() ?? {};
+  const plan = typeof data.plan === 'string' ? data.plan : null;
+  const status = typeof data.status === 'string' ? data.status : null;
+
+  const isEntitled =
+    plan === 'paid' && (status === 'active' || status === 'trialing');
+
+  return {
+    isEntitled,
+    plan,
+    status,
+  };
+}
+
+async function fetchAnomalyNotificationsEnabled(
+  db: FirebaseFirestore.Firestore,
+  uid: string,
+): Promise<boolean> {
+  const snap = await db
+    .collection('users')
+    .doc(uid)
+    .collection('settings')
+    .doc('notifications')
+    .get();
+
+  if (!snap.exists) return true;
+
+  const data = snap.data() ?? {};
+  const value = data.anomalyNotificationsEnabled;
+
+  return typeof value === 'boolean' ? value : true;
+}
+
 async function fetchEnabledFcmTokens(
   db: FirebaseFirestore.Firestore,
   uid: string,
@@ -814,13 +863,50 @@ export async function executeAnomalyNotificationPipeline(params: {
   windowDays?: number;
   now?: Date;
 }): Promise<AnomalyNotificationExecutionResult> {
-  const {
+    const {
     db,
     messaging,
     uid,
     windowDays = HISTORY_WINDOW_DAYS,
     now = new Date(),
   } = params;
+
+  const paidEntitlement = await fetchPaidFeatureEntitlement(db, uid);
+
+  if (!paidEntitlement.isEntitled) {
+    const detectionResult: AnomalyDetectionResult = {
+      anomalies: [],
+      windowDays,
+      detectedAt: now,
+    };
+
+    const decision: NotificationDecision = {
+      shouldNotify: false,
+      reason: 'inactive',
+      anomaly: null,
+      notificationKey: null,
+      fingerprint: null,
+      message: '有料プランではないため、異常検知通知を送信しません。',
+    };
+
+    logger.info('anomaly notification skipped: not paid', {
+      uid,
+      plan: paidEntitlement.plan,
+      status: paidEntitlement.status,
+    });
+
+    return {
+      uid,
+      detectionResult,
+      decision,
+      message: null,
+      notificationKey: null,
+      tokenCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      noTokens: false,
+    };
+  }
 
   const history = await fetchRecentHistory(db, uid, windowDays);
   const detectionResult = detectAnomalies(history, windowDays, now);
@@ -856,7 +942,50 @@ export async function executeAnomalyNotificationPipeline(params: {
 
   const message = buildNotificationMessage(decision.anomaly);
 
-    if (!decision.shouldNotify) {
+  const anomalyNotificationsEnabled =
+    await fetchAnomalyNotificationsEnabled(db, uid);
+
+  if (!anomalyNotificationsEnabled) {
+    const disabledDecision: NotificationDecision = {
+      ...decision,
+      shouldNotify: false,
+      reason: 'userDisabled',
+      message: 'ユーザー設定で異常検知通知がOFFのため通知しません。',
+    };
+
+    await saveNotificationLog({
+      db,
+      uid,
+      decision: disabledDecision,
+      message,
+      now,
+      sentAt: null,
+      tokenCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      invalidTokenCount: 0,
+      noTokens: false,
+    });
+
+    logger.info('anomaly notification skipped: user disabled notifications', {
+      uid,
+      notificationKey: disabledDecision.notificationKey,
+    });
+
+    return {
+      uid,
+      detectionResult,
+      decision: disabledDecision,
+      message,
+      notificationKey: disabledDecision.notificationKey,
+      tokenCount: 0,
+      sentCount: 0,
+      failedCount: 0,
+      noTokens: false,
+    };
+  }
+
+  if (!decision.shouldNotify) {
     await saveNotificationLog({
       db,
       uid,
@@ -886,7 +1015,7 @@ export async function executeAnomalyNotificationPipeline(params: {
 
   const tokens = await fetchEnabledFcmTokens(db, uid);
 
-    if (tokens.length === 0) {
+  if (tokens.length === 0) {
     await saveNotificationLog({
       db,
       uid,

@@ -1,11 +1,14 @@
-import 'package:flutter/material.dart';
 import 'dart:math';
+
+import 'package:flutter/material.dart';
 
 class AnimatedShiningBorder extends StatefulWidget {
   final Widget child;
   final double borderRadius;
   final double borderWidth;
   final bool active;
+  final Duration duration;
+  final List<Color>? colors;
 
   const AnimatedShiningBorder({
     super.key,
@@ -13,6 +16,8 @@ class AnimatedShiningBorder extends StatefulWidget {
     this.borderRadius = 22,
     this.borderWidth = 2.5,
     this.active = true,
+    this.duration = const Duration(seconds: 2),
+    this.colors,
   });
 
   @override
@@ -21,28 +26,31 @@ class AnimatedShiningBorder extends StatefulWidget {
 
 class _AnimatedShiningBorderState extends State<AnimatedShiningBorder>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    );
-    if (widget.active) {
-      _controller.repeat();
-    }
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    _syncAnimation();
   }
 
   @override
   void didUpdateWidget(covariant AnimatedShiningBorder oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.active && !_controller.isAnimating) {
-      _controller.repeat();
-    } else if (!widget.active && _controller.isAnimating) {
-      _controller.reset();
-      _controller.stop();
+    if (oldWidget.duration != widget.duration) {
+      _controller.duration = widget.duration;
+    }
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.active) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller
+        ..stop()
+        ..value = 0;
     }
   }
 
@@ -54,14 +62,26 @@ class _AnimatedShiningBorderState extends State<AnimatedShiningBorder>
 
   @override
   Widget build(BuildContext context) {
+    final reduceMotion =
+        MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final animate = widget.active && !reduceMotion;
+
+    if (!animate) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        child: widget.child,
+      );
+    }
+
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
         return CustomPaint(
           painter: _ShiningBorderPainter(
-            progress: widget.active ? _controller.value : 0,
+            progress: _controller.value,
             borderRadius: widget.borderRadius,
             borderWidth: widget.borderWidth,
+            colors: widget.colors,
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -77,54 +97,59 @@ class _ShiningBorderPainter extends CustomPainter {
   final double progress;
   final double borderRadius;
   final double borderWidth;
+  final List<Color>? colors;
 
-  _ShiningBorderPainter({
+  const _ShiningBorderPainter({
     required this.progress,
     required this.borderRadius,
     required this.borderWidth,
+    this.colors,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     final rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
-    final Paint paint = Paint()
+
+    final borderColors = colors ??
+        const [
+          Color(0xFF5897F8),
+          Color(0xFFA66BFF),
+          Color(0xFF1DE9B6),
+          Color(0xFF5897F8),
+        ];
+
+    final borderPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = borderWidth;
+      ..strokeWidth = borderWidth
+      ..shader = SweepGradient(
+        colors: borderColors,
+        transform: GradientRotation(2 * pi * progress),
+      ).createShader(rect);
 
-    // Oura風ブルーグラデ
-    final colors = [
-      const Color(0xFF5897F8),
-      const Color(0xFFA66BFF),
-      const Color(0xFF1DE9B6),
-      const Color(0xFF5897F8),
-    ];
-    final sweepGradient = SweepGradient(
-      colors: colors,
-      startAngle: 0,
-      endAngle: 2 * pi,
-      transform: GradientRotation(2 * pi * progress),
-    );
-    paint.shader = sweepGradient.createShader(rect);
-
-    // シャイン用の白いフレア
     final shinePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth + 1
       ..shader = SweepGradient(
         colors: [
           Colors.transparent,
-          Colors.white.withOpacity(0.75),
+          Colors.white.withValues(alpha: 0.78),
           Colors.transparent,
         ],
-        stops: [progress, (progress + 0.12) % 1.0, (progress + 0.17) % 1.0],
+        stops: const [0.0, 0.08, 0.18],
         transform: GradientRotation(2 * pi * progress),
       ).createShader(rect);
 
-    canvas.drawRRect(rrect, paint);
-    canvas.drawRRect(rrect, shinePaint);
+    canvas
+      ..drawRRect(rrect, borderPaint)
+      ..drawRRect(rrect, shinePaint);
   }
 
   @override
-  bool shouldRepaint(_ShiningBorderPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _ShiningBorderPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.borderRadius != borderRadius ||
+        oldDelegate.borderWidth != borderWidth ||
+        oldDelegate.colors != colors;
+  }
 }

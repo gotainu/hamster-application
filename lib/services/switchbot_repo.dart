@@ -107,18 +107,22 @@ class SwitchbotRepo {
 
 class SwitchbotConfig {
   final bool enabled;
+  final bool hasSecrets;
   final String meterDeviceId;
   final String meterDeviceName;
   final String meterDeviceType;
 
   const SwitchbotConfig({
     required this.enabled,
+    required this.hasSecrets,
     required this.meterDeviceId,
     required this.meterDeviceName,
     required this.meterDeviceType,
   });
 
   bool get hasDevice => meterDeviceId.isNotEmpty;
+  bool get isLinked => enabled && hasSecrets;
+  bool get isReady => enabled && hasSecrets && hasDevice;
 }
 
 extension SwitchbotRepoConfig on SwitchbotRepo {
@@ -138,21 +142,26 @@ extension SwitchbotRepoConfig on SwitchbotRepo {
 
       final m = snap.data() ?? <String, dynamic>{};
 
-      final enabled = (m['enabled'] as bool?) ?? true; // 旧データ互換で default true
-      final id = (m['meterDeviceId'] ?? '') as String;
-      final name = (m['meterDeviceName'] ?? '') as String;
-      final type = (m['meterDeviceType'] ?? '') as String;
+      final enabled = (m['enabled'] as bool?) ?? false;
+      final hasSecrets = (m['hasSecrets'] as bool?) ?? false;
+      final id = (m['meterDeviceId'] as String?) ?? '';
+      final name = (m['meterDeviceName'] as String?) ?? '';
+      final type = (m['meterDeviceType'] as String?) ?? '';
 
       return SwitchbotConfig(
         enabled: enabled,
+        hasSecrets: hasSecrets,
         meterDeviceId: id,
         meterDeviceName: name,
         meterDeviceType: type,
       );
+    }).handleError((_) {
+      return null;
     });
   }
 
-  /// SwitchBot TOKEN/SECRET が保存されているか（=連携中か）
+  /// SwitchBot TOKEN/SECRET が保存されているか
+  /// 注意：秘密情報の中身は使わず、存在と形式だけを見る
   Stream<bool> watchHasSecrets() {
     final uid = _uid;
     if (uid == null) return const Stream<bool>.empty();
@@ -165,15 +174,57 @@ extension SwitchbotRepoConfig on SwitchbotRepo {
 
     return doc.snapshots().map((snap) {
       if (!snap.exists) return false;
-      final m = snap.data() ?? {};
-      final v1 = (m['v1_plain'] ?? m['v1']) as Map<String, dynamic>?;
-      if (v1 == null) return false;
-      final token = v1['token'];
-      final secret = v1['secret'];
-      return token is String &&
-          token.isNotEmpty &&
-          secret is String &&
-          secret.isNotEmpty;
+
+      final m = snap.data() ?? <String, dynamic>{};
+
+      // 新形式: v2_encrypted
+      final v2Raw = m['v2_encrypted'];
+      if (v2Raw is Map) {
+        final v2 = Map<String, dynamic>.from(v2Raw);
+        final token = v2['token'];
+        final secret = v2['secret'];
+
+        if (token is String &&
+            token.isNotEmpty &&
+            secret is String &&
+            secret.isNotEmpty) {
+          return true;
+        }
+      }
+
+      // 移行期間の旧形式: v1_plain
+      final v1PlainRaw = m['v1_plain'];
+      if (v1PlainRaw is Map) {
+        final v1Plain = Map<String, dynamic>.from(v1PlainRaw);
+        final token = v1Plain['token'];
+        final secret = v1Plain['secret'];
+
+        if (token is String &&
+            token.isNotEmpty &&
+            secret is String &&
+            secret.isNotEmpty) {
+          return true;
+        }
+      }
+
+      // さらに古い形式: v1
+      final v1Raw = m['v1'];
+      if (v1Raw is Map) {
+        final v1 = Map<String, dynamic>.from(v1Raw);
+        final token = v1['token'];
+        final secret = v1['secret'];
+
+        if (token is String &&
+            token.isNotEmpty &&
+            secret is String &&
+            secret.isNotEmpty) {
+          return true;
+        }
+      }
+
+      return false;
+    }).handleError((_) {
+      return false;
     });
   }
 }
