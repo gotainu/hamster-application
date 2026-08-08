@@ -1,0 +1,25 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwnMainPetImage(fileName) {
+      return signedIn()
+        && fileName == request.auth.uid + '-main_pet.jpg';
+    }
+
+    // 現行アプリ: hamster_images/{uid}-main_pet.jpg
+    match /hamster_images/{fileName} {
+      allow read: if isOwnMainPetImage(fileName);
+      allow create, update: if isOwnMainPetImage(fileName);
+      allow delete: if isOwnMainPetImage(fileName);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

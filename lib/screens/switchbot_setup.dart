@@ -149,8 +149,6 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
   String? _status;
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
-  Map<String, dynamic>? _secretEcho;
-
   FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
         app: Firebase.app(),
         region: 'asia-northeast1',
@@ -242,6 +240,7 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
     String? selectedDeviceId;
     String? selectedDeviceName;
     String? selectedDeviceType;
+    bool hasSecrets = false;
 
     final devDoc =
         await userRef.collection('integrations').doc('switchbot').get(options);
@@ -251,51 +250,7 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
       selectedDeviceId = m['meterDeviceId'] as String?;
       selectedDeviceName = m['meterDeviceName'] as String?;
       selectedDeviceType = m['meterDeviceType'] as String?;
-    }
-
-    final secDoc = await userRef
-        .collection('integrations')
-        .doc('switchbot_secrets')
-        .get(options);
-
-    final data = secDoc.data();
-
-    bool hasSecrets = false;
-
-    final v2 = data?['v2_encrypted'];
-    if (v2 is Map) {
-      hasSecrets =
-          (v2['token'] is String && (v2['token'] as String).isNotEmpty) &&
-              (v2['secret'] is String && (v2['secret'] as String).isNotEmpty);
-    }
-
-    if (!hasSecrets) {
-      final v1p = data?['v1_plain'];
-      if (v1p is Map) {
-        hasSecrets = (v1p['token'] is String &&
-                (v1p['token'] as String).isNotEmpty) &&
-            (v1p['secret'] is String && (v1p['secret'] as String).isNotEmpty);
-      }
-    }
-
-    if (!hasSecrets) {
-      final v1 = data?['v1'];
-      if (v1 is Map) {
-        hasSecrets =
-            (v1['token'] is String && (v1['token'] as String).isNotEmpty) &&
-                (v1['secret'] is String && (v1['secret'] as String).isNotEmpty);
-      }
-    }
-
-    Map<String, dynamic>? echo;
-    if (hasSecrets) {
-      try {
-        final callable = _fns.httpsCallable('switchbotDebugEcho');
-        final res = await callable.call();
-        echo = (res.data is Map)
-            ? Map<String, dynamic>.from(res.data as Map)
-            : null;
-      } catch (_) {}
+      hasSecrets = m['hasSecrets'] == true;
     }
 
     if (!mounted) return;
@@ -307,7 +262,6 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
 
       _hasSecrets = hasSecrets;
       _canPickDevices = hasSecrets;
-      _secretEcho = echo;
       _status = hasSecrets
           ? '資格情報は保存済みです。温湿度計を選択してください。'
           : 'まだ資格情報がありません。TOKEN/SECRET を保存してください。';
@@ -348,14 +302,15 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
         );
       }
 
-      final secRef = FirebaseFirestore.instance
+      final configRef = FirebaseFirestore.instance
           .collection('users')
           .doc(_uid)
           .collection('integrations')
-          .doc('switchbot_secrets');
+          .doc('switchbot');
 
-      final secSnap = await secRef.get(const GetOptions(source: Source.server));
-      final existsNow = secSnap.exists;
+      final configSnap =
+          await configRef.get(const GetOptions(source: Source.server));
+      final hasSecretsNow = configSnap.data()?['hasSecrets'] == true;
 
       if (!mounted) return;
 
@@ -366,9 +321,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
       });
 
       _showSnack(
-        existsNow
+        hasSecretsNow
             ? 'SwitchBot 認証OK：保存確認できました'
-            : 'Functionsは成功しましたが、Firestoreの保存確認ができませんでした',
+            : 'Functionsは成功しましたが、保存状態を確認できませんでした',
       );
 
       await _autoPickIfSingleMeter();
@@ -537,9 +492,6 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
         'meterDeviceId': id,
         'meterDeviceName': name,
         'meterDeviceType': type,
-        'enabled': true,
-        'hasSecrets': true,
-        'disabledAt': FieldValue.delete(),
         'updatedAt': FieldValue.serverTimestamp(),
       },
       SetOptions(merge: true),
@@ -609,8 +561,6 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
 
       setState(() {
         _hasSecrets = false;
-        _secretEcho = null;
-
         _canPickDevices = false;
         _selectedDeviceId = null;
         _selectedDeviceName = null;
@@ -1188,86 +1138,41 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
   }
 
   Widget _savedSecretsCard() {
-    String fmt(dynamic v) {
-      if (v is Map) {
-        final head = v['head']?.toString() ?? '';
-        final tail = v['tail']?.toString() ?? '';
-        final len = v['len']?.toString() ?? '?';
-
-        if (head.isEmpty || tail.isEmpty) {
-          return '保存済み';
-        }
-
-        return '$head…$tail（len:$len）';
-      }
-
-      return '保存済み';
-    }
-
-    final token = _secretEcho?['token'];
-    final secret = _secretEcho?['secret'];
-
     return _surfaceCard(
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                color: Color(0xFF00D6A3),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'TOKEN / SECRET は保存済みです',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _hasSelectedMeter ? '認証情報は保存されています。' : '次に温湿度計を選択してください。',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                            height: 1.45,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const Icon(
+            Icons.check_circle_rounded,
+            color: Color(0xFF00D6A3),
           ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.chipFill(
-                AppTheme.accent,
-                context,
-                opacity: 0.08,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'TOKEN: ${fmt(token)}',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
+                  'TOKEN / SECRET は保存済みです',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'SECRET: ${fmt(secret)}',
+                  _hasSelectedMeter
+                      ? '認証情報はサーバー側に安全に保存されています。'
+                      : '認証情報は保存済みです。次に温湿度計を選択してください。',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'セキュリティ保護のため、TOKEN / SECRET の内容はアプリへ読み出しません。',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
                       ),
                 ),
               ],
