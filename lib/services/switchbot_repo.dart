@@ -160,8 +160,9 @@ extension SwitchbotRepoConfig on SwitchbotRepo {
     });
   }
 
-  /// SwitchBot TOKEN/SECRET が保存されているか
-  /// 注意：秘密情報の中身は使わず、存在と形式だけを見る
+  /// SwitchBot TOKEN/SECRET がサーバー側に保存済みかを監視する。
+  /// 秘密情報本体はClientから一切読まず、
+  /// integrations/switchbot.hasSecrets のserver-owned markerだけを見る。
   Stream<bool> watchHasSecrets() {
     final uid = _uid;
     if (uid == null) return const Stream<bool>.empty();
@@ -170,59 +171,12 @@ extension SwitchbotRepoConfig on SwitchbotRepo {
         .collection('users')
         .doc(uid)
         .collection('integrations')
-        .doc('switchbot_secrets');
+        .doc('switchbot');
 
     return doc.snapshots().map((snap) {
       if (!snap.exists) return false;
-
       final m = snap.data() ?? <String, dynamic>{};
-
-      // 新形式: v2_encrypted
-      final v2Raw = m['v2_encrypted'];
-      if (v2Raw is Map) {
-        final v2 = Map<String, dynamic>.from(v2Raw);
-        final token = v2['token'];
-        final secret = v2['secret'];
-
-        if (token is String &&
-            token.isNotEmpty &&
-            secret is String &&
-            secret.isNotEmpty) {
-          return true;
-        }
-      }
-
-      // 移行期間の旧形式: v1_plain
-      final v1PlainRaw = m['v1_plain'];
-      if (v1PlainRaw is Map) {
-        final v1Plain = Map<String, dynamic>.from(v1PlainRaw);
-        final token = v1Plain['token'];
-        final secret = v1Plain['secret'];
-
-        if (token is String &&
-            token.isNotEmpty &&
-            secret is String &&
-            secret.isNotEmpty) {
-          return true;
-        }
-      }
-
-      // さらに古い形式: v1
-      final v1Raw = m['v1'];
-      if (v1Raw is Map) {
-        final v1 = Map<String, dynamic>.from(v1Raw);
-        final token = v1['token'];
-        final secret = v1['secret'];
-
-        if (token is String &&
-            token.isNotEmpty &&
-            secret is String &&
-            secret.isNotEmpty) {
-          return true;
-        }
-      }
-
-      return false;
+      return m['hasSecrets'] == true;
     }).handleError((_) {
       return false;
     });

@@ -1,29 +1,155 @@
-// firestore.rules
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+    function signedIn() {
+      return request.auth != null;
     }
 
-    match /users/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if false;
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
 
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+
+      // 現行Flutterが使うroot markerだけClient更新可。
+      allow create: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['has_subcollections'])
+        && request.resource.data.keys().hasAll(['has_subcollections'])
+        && request.resource.data.has_subcollections is bool;
+
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['has_subcollections'])
+        && request.resource.data.has_subcollections is bool;
+
+      allow delete: if false;
+
+      // Client-owned
+      match /pet_profiles/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if isOwner(uid) && docId == 'main_pet';
+      }
+
+      match /breeding_environments/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if isOwner(uid) && docId == 'main_env';
+      }
+
+      match /weight_records/{docId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /daily_checkins/{docId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /distance_records/{docId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /settings/notifications {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /app_state/onboarding {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /notification_tokens/{tokenId} {
+        allow read, create, update, delete: if isOwner(uid);
+      }
+
+      match /ai_chat_threads/{threadId} {
+        allow read, create, update, delete: if isOwner(uid);
+        match /messages/{messageId} {
+          allow read, create, update, delete: if isOwner(uid);
+        }
+      }
+
+      match /ai_chat_thread_archives/{archiveId} {
+        allow read, create, update, delete: if isOwner(uid);
+        match /messages/{messageId} {
+          allow read, create, update, delete: if isOwner(uid);
+        }
+      }
+
+      // SwitchBot secretsはFunctions(Admin SDK)だけ。
+      match /integrations/switchbot_secrets {
+        allow read, write: if false;
+      }
+
+      // Clientは表示用設定を読み、選択した温湿度計メタデータだけ更新可。
+      // hasSecrets / enabled / authVersion 等はServer-owned。
       match /integrations/switchbot {
-        allow read: if isOwner(userId);
-        allow write: if isOwner(userId); // meterDeviceId の更新
+        allow read: if isOwner(uid);
+        allow create: if false;
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'meterDeviceId',
+            'meterDeviceName',
+            'meterDeviceType',
+            'updatedAt'
+          ]);
+        allow delete: if false;
       }
 
-      match /integrations/switchbot_secrets/{docId} {
-        allow read, write: if false; // クライアント完全不可
+      // Server-owned / authoritative
+      match /switchbot_readings/{readingId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
 
-      match /switchbot_readings/{ts} {
-        allow read: if isOwner(userId);
-        allow write: if false; // Functions(Admin SDK)のみ
+      match /billing/subscription {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
+
+      match /daily_health_features/{dateKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /health_assessments/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /health_assessments_history/{dateKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /environment_assessments/{docId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /environment_assessments_history/{dateKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /anomaly_notification_logs/{notificationKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // 明示していないusers配下はdeny。
+      match /{document=**} {
+        allow read, write: if false;
+      }
+    }
+
+    // Functionsの定期処理用index。Client不可。
+    match /switchbot_users/{uid} {
+      allow read, write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
