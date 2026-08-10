@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -575,6 +576,12 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       throw Exception('認証トークンを取得できませんでした。もう一度ログインしてください。');
     }
 
+    final appCheckToken = await FirebaseAppCheck.instance.getToken();
+
+    if (appCheckToken == null || appCheckToken.isEmpty) {
+      throw Exception('アプリ認証トークンを取得できませんでした。もう一度お試しください。');
+    }
+
     const int maxHistory = 12;
     final historyToSend = List<Map<String, String>>.from(
       _conversationHistory.length > maxHistory
@@ -593,6 +600,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $idToken',
+        'X-Firebase-AppCheck': appCheckToken,
       },
       body: requestBody,
     );
