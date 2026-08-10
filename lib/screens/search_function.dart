@@ -576,10 +576,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       throw Exception('認証トークンを取得できませんでした。もう一度ログインしてください。');
     }
 
-    final appCheckToken = await FirebaseAppCheck.instance.getToken();
-
-    if (appCheckToken == null || appCheckToken.isEmpty) {
-      throw Exception('アプリ認証トークンを取得できませんでした。もう一度お試しください。');
+    String? appCheckToken;
+    try {
+      appCheckToken = await FirebaseAppCheck.instance.getToken();
+    } catch (error) {
+      debugPrint(
+        '[App Check] token unavailable; continuing in monitor-only mode '
+        '(${error.runtimeType})',
+      );
     }
 
     const int maxHistory = 12;
@@ -595,13 +599,17 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       'history': historyToSend,
     });
 
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $idToken',
+    };
+    if (appCheckToken != null && appCheckToken.isNotEmpty) {
+      headers['X-Firebase-AppCheck'] = appCheckToken;
+    }
+
     final res = await http.post(
       url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $idToken',
-        'X-Firebase-AppCheck': appCheckToken,
-      },
+      headers: headers,
       body: requestBody,
     );
 
