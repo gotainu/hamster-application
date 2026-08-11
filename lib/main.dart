@@ -94,8 +94,16 @@ Map<String, dynamic> _payloadToMap(String? payload) {
 Future<void> _initLocalNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
 
+  const darwinSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+
   const settings = InitializationSettings(
     android: androidSettings,
+    iOS: darwinSettings,
+    macOS: darwinSettings,
   );
 
   await flutterLocalNotificationsPlugin.initialize(
