@@ -199,7 +199,7 @@ class MyAppState extends State<MyApp> {
     }
 
     try {
-      final initialToken = await messaging.getToken();
+      final initialToken = await _getFcmTokenWhenReady(messaging);
       debugPrint('[FCM initial token] ${initialToken ?? 'null'}');
 
       if (initialToken != null) {
@@ -271,7 +271,7 @@ class MyAppState extends State<MyApp> {
       if (user == null) return;
 
       try {
-        final token = await messaging.getToken();
+        final token = await _getFcmTokenWhenReady(messaging);
         debugPrint('[FCM authState token] ${token ?? 'null'}');
 
         if (token != null) {
@@ -282,6 +282,24 @@ class MyAppState extends State<MyApp> {
         debugPrint('$st');
       }
     });
+  }
+
+  Future<String?> _getFcmTokenWhenReady(
+    FirebaseMessaging messaging,
+  ) async {
+    final isApplePlatform = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS);
+
+    if (isApplePlatform) {
+      final apnsToken = await messaging.getAPNSToken();
+      if (apnsToken == null) {
+        debugPrint("[FCM token skipped] APNs token is not available yet");
+        return null;
+      }
+    }
+
+    return messaging.getToken();
   }
 
   Future<void> _saveFcmToken(String token) async {
