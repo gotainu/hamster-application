@@ -59,10 +59,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCr1vZ4rlXetoKsdCMdVujZGgYGpB8BHao',
-    appId: '1:797691641198:ios:6c5f4f019aa168646b557f',
+    appId: '1:797691641198:ios:8742688c983e31766b557f',
     messagingSenderId: '797691641198',
     projectId: 'hamster-breeding-app',
     storageBucket: 'hamster-breeding-app.firebasestorage.app',
-    iosBundleId: 'com.example.hamsterProject',
+    iosBundleId: 'com.gotainu.hamster',
   );
 }

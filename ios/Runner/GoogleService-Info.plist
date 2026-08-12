@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.hamsterProject</string>
+	<string>com.gotainu.hamster</string>
 	<key>PROJECT_ID</key>
 	<string>hamster-breeding-app</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:797691641198:ios:6c5f4f019aa168646b557f</string>
+	<string>1:797691641198:ios:8742688c983e31766b557f</string>
 </dict>
 </plist>
