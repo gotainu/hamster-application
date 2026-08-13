@@ -2447,42 +2447,6 @@ export const deleteMyAccountAndData = onCall(
   },
 );
 
-/** Debug: token/secret がちゃんと読めているか head/tail を返す */
-export const switchbotDebugEcho = onCall(
-  {
-    region: 'asia-northeast1',
-    secrets: [ENVELOPE_KEY_SECRET],
-  },
-  async (req) => {
-    const uid = req.auth?.uid;
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'ログインが必要です。');
-    }
-
-    await assertPaidFeatureAccess(uid);
-
-    const { token, secret, meterDeviceId } = await loadUserConfig(uid);
-
-    const headTail = (s?: string) =>
-      !s
-        ? null
-        : {
-            head: s.slice(0, 5),
-            len: s.length,
-            tail: s.slice(-5),
-          };
-
-    return {
-      ok: true,
-      uid,
-      meterDeviceId,
-      token: headTail(token),
-      secret: headTail(secret),
-    };
-  },
-);
-
 export const pollMySwitchbotNow = onCall(
   { 
     region: 'asia-northeast1',

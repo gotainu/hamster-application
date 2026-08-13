@@ -29,7 +29,7 @@ class SwitchbotReading {
       if (dt != null) return dt.toLocal();
     }
 
-    // 3) ts が無い/壊れてる -> doc.id を ts として使う（func_b と同じ思想）
+    // 3) ts が無い/壊れてる -> doc.id を ts として使う
     if (fallbackId != null && fallbackId.isNotEmpty) {
       final dt = DateTime.tryParse(fallbackId);
       if (dt != null) return dt.toLocal();

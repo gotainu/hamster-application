@@ -48,7 +48,6 @@
 - settings.dart：テーマ/設定
 - pet_profile_screen.dart / pet_profile_edit_screen.dart：ペット
 - breeding_environment_edit_screen.dart：環境編集
-- func_b.dart：検証用 / デバッグ（扱い方を明記）
 
 ### 3.2 “SwitchBot連携しないユーザー” の体験
 - graph_function.dart は走行距離機能が中心
@@ -112,4 +111,3 @@
 - [ ] docs/firestore.md を作る（コレクション設計）
 - [ ] docs/functions.md を作る（Functions一覧）
 - [ ] docs/rag.md を作る（RAG仕様）
-- [ ] func_b.dart の位置づけを決める（debug専用なら明記 or 移動）
