@@ -8,6 +8,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing_status.dart';
+import '../services/app_analytics.dart';
 import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
 
@@ -35,6 +36,7 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     setState(() {
       _isOpeningCheckout = true;
     });
+    await AppAnalytics.logCheckoutStarted();
 
     try {
       final callable = _functions.httpsCallable('createStripeCheckoutSession');
@@ -57,7 +59,10 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
       if (!launched) {
         throw Exception('Stripe Checkout を開けませんでした。');
       }
+      await AppAnalytics.logCheckoutOpened();
     } on FirebaseFunctionsException catch (e) {
+      await AppAnalytics.logCheckoutFailed();
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -66,6 +71,8 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
         ),
       );
     } catch (e) {
+      await AppAnalytics.logCheckoutFailed();
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(

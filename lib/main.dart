@@ -17,6 +17,7 @@ import 'package:hamster_project/screens/onboarding_screen.dart';
 import 'package:hamster_project/screens/setup_checklist_screen.dart';
 import 'package:hamster_project/screens/splash.dart';
 import 'package:hamster_project/screens/tabs.dart';
+import 'package:hamster_project/services/app_analytics.dart';
 import 'package:hamster_project/services/notification_token_repo.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:hamster_project/theme/app_theme.dart';
@@ -51,10 +52,19 @@ bool _isAnomalyPayload(Map<String, dynamic> data) {
   return data['type'] == 'anomaly';
 }
 
-Future<void> _openAnomalyFromNotification(Map<String, dynamic> data) async {
+Future<void> _openAnomalyFromNotification(
+  Map<String, dynamic> data, {
+  required String source,
+}) async {
   debugPrint('[notification route] data=$data');
 
-  if (!_isAnomalyPayload(data)) return;
+  final isAnomaly = _isAnomalyPayload(data);
+  await AppAnalytics.logNotificationOpened(
+    source: source,
+    notificationType: isAnomaly ? 'anomaly' : 'other',
+  );
+
+  if (!isAnomaly) return;
 
   await Future<void>.delayed(const Duration(milliseconds: 350));
 
@@ -110,7 +120,12 @@ Future<void> _initLocalNotifications() async {
     settings,
     onDidReceiveNotificationResponse: (response) {
       final data = _payloadToMap(response.payload);
-      unawaited(_openAnomalyFromNotification(data));
+      unawaited(
+        _openAnomalyFromNotification(
+          data,
+          source: 'local_notification',
+        ),
+      );
     },
   );
 
@@ -249,7 +264,12 @@ class MyAppState extends State<MyApp> {
         'body=${message.notification?.body}, data=${message.data}',
       );
 
-      unawaited(_openAnomalyFromNotification(message.data));
+      unawaited(
+        _openAnomalyFromNotification(
+          message.data,
+          source: 'push_background',
+        ),
+      );
     });
 
     try {
@@ -260,7 +280,12 @@ class MyAppState extends State<MyApp> {
           'body=${initialMessage.notification?.body}, data=${initialMessage.data}',
         );
 
-        unawaited(_openAnomalyFromNotification(initialMessage.data));
+        unawaited(
+          _openAnomalyFromNotification(
+            initialMessage.data,
+            source: 'push_cold_start',
+          ),
+        );
       }
     } catch (e, st) {
       debugPrint('[FCM getInitialMessage error] $e');

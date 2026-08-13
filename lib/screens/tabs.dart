@@ -9,6 +9,7 @@ import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/screens/record_screen.dart';
 import 'package:hamster_project/services/daily_record_completion_service.dart';
+import 'package:hamster_project/services/app_analytics.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
 import 'package:hamster_project/widgets/paid_feature_gate.dart';
@@ -91,11 +92,7 @@ class TabsScreenState extends State<TabsScreen> {
       HomeScreen(
         key: _homeKey,
         recordCompletionListenable: _recordCompletionNotifier,
-        onTabSelected: (index) {
-          setState(() {
-            selectedIndex = index;
-          });
-        },
+        onTabSelected: _onTabSelected,
         onOpenAiWithDraft: openAiWithDraft,
         onOpenRecord: _openRecordScreen,
       ),
@@ -115,6 +112,11 @@ class TabsScreenState extends State<TabsScreen> {
         child: GraphFunctionScreen(embeddedInTab: true),
       ),
     ];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(AppAnalytics.logHomeView(source: 'app_start'));
+    });
   }
 
   Widget _buildRecordDestination() {
@@ -169,6 +171,10 @@ class TabsScreenState extends State<TabsScreen> {
     setState(() {
       selectedIndex = index;
     });
+
+    if (index == 0) {
+      unawaited(AppAnalytics.logHomeView(source: 'bottom_navigation'));
+    }
   }
 
   void _setScreen(String identifier) {

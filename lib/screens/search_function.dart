@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import '../models/hamster_avatar.dart';
 import '../models/pet_profile.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/app_analytics.dart';
 import '../services/hamster_avatar_appearance_resolver.dart';
 import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/pet_profile_repo.dart';
@@ -664,6 +665,12 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     final text = _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
 
+    final hasHistory =
+        _conversationHistory.any((message) => message['role'] == 'assistant');
+    unawaited(
+      AppAnalytics.logAiConsultationStarted(hasHistory: hasHistory),
+    );
+
     setState(() {
       _hasRestoredHistory = false;
       _messages.add(ChatMessage(content: text, isUser: true));
@@ -711,9 +718,16 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           chunks: result.chunks.map((e) => e.toJson()).toList(),
         ),
       );
+      unawaited(
+        AppAnalytics.logAiConsultationCompleted(
+          retrievedChunkCount: result.chunks.length,
+        ),
+      );
 
       _scrollToBottom();
     } catch (e) {
+      unawaited(AppAnalytics.logAiConsultationFailed());
+
       if (!mounted) return;
 
       setState(() {

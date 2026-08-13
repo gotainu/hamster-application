@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/daily_checkin_repo.dart';
+import '../services/app_analytics.dart';
 import '../theme/app_theme.dart';
 
 class DailyConditionInputCard extends StatefulWidget {
@@ -204,6 +205,12 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         _message = '今日の様子を保存しました';
         _isErrorMessage = false;
       });
+
+      await AppAnalytics.logDailyInputComplete(
+        condition: condition.name,
+        concernTagCount: _showConcernFields ? _selectedTags.length : 0,
+        hasMemo: _showConcernFields && _memoCtrl.text.trim().isNotEmpty,
+      );
 
       widget.onSaved?.call();
     } catch (e) {

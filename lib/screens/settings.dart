@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
+import '../services/app_analytics.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/billing_status_repo.dart';
 import '../services/notification_settings_service.dart';
@@ -256,6 +257,7 @@ class _SettingScreenState extends State<SettingScreen> {
     try {
       await _notificationSettingsService
           .setAnomalyNotificationsEnabled(enabled);
+      await AppAnalytics.logNotificationSettingChanged(enabled: enabled);
 
       if (!mounted) return;
 
