@@ -7,6 +7,10 @@ import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import { defineSecret } from 'firebase-functions/params';
+import {
+  isPaidStripeSubscription,
+  selectPreferredPaidSubscription,
+} from './stripeSubscriptionPriority';
 
 
 admin.initializeApp();
@@ -73,7 +77,7 @@ function isMissingStripeCustomerError(error: unknown): boolean {
 
   return (
     details.code === 'resource_missing' &&
-    details.param === 'customer'
+    (details.param === 'customer' || details.param === 'id')
   );
 }
 
@@ -410,18 +414,11 @@ export const createStripeCustomerPortalSession = onCall(
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: '2025-02-24.acacia',
     });
+    const stripeSubscriptionId = billingSnap.get(
+      'stripeSubscriptionId',
+    ) as string | undefined;
 
     try {
-      const resolvedCustomer = await resolveStripeCustomer({
-        stripe,
-        uid,
-        mode: 'require-existing',
-      });
-
-      const stripeSubscriptionId = billingSnap.get(
-        'stripeSubscriptionId',
-      ) as string | undefined;
-
       if (stripeSubscriptionId) {
         try {
           const subscription = await stripe.subscriptions.retrieve(
@@ -429,6 +426,7 @@ export const createStripeCustomerPortalSession = onCall(
           );
 
           await saveStripeSubscriptionToFirestore({
+            stripe,
             uid,
             subscription,
           });
@@ -459,6 +457,15 @@ export const createStripeCustomerPortalSession = onCall(
           );
         }
       }
+
+      // Refreshing the subscription above also repairs a stale customer ID in
+      // Firestore. This can happen when test-mode billing data remains after
+      // switching the Stripe secret to live mode.
+      const resolvedCustomer = await resolveStripeCustomer({
+        stripe,
+        uid,
+        mode: 'require-existing',
+      });
 
       const session = await stripe.billingPortal.sessions.create({
         customer: resolvedCustomer.customerId,
@@ -606,12 +613,57 @@ async function assertPaidFeatureAccess(uid: string): Promise<void> {
   }
 }
 
+async function findPreferredPaidSubscription(params: {
+  stripe: Stripe;
+  customerId: string;
+}): Promise<Stripe.Subscription | null> {
+  const { stripe, customerId } = params;
+  const subscriptions = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 100,
+  });
+
+  return selectPreferredPaidSubscription(subscriptions.data);
+}
+
 async function saveStripeSubscriptionToFirestore(params: {
+  stripe: Stripe;
   uid: string;
   subscription: Stripe.Subscription;
   checkoutSessionId?: string | null;
 }): Promise<void> {
-  const { uid, subscription, checkoutSessionId } = params;
+  const { stripe, uid, checkoutSessionId } = params;
+  let subscription = params.subscription;
+
+  const incomingCustomerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+
+  if (!isPaidStripeSubscription(subscription) && incomingCustomerId) {
+    const preferredSubscription = await findPreferredPaidSubscription({
+      stripe,
+      customerId: incomingCustomerId,
+    });
+
+    if (
+      preferredSubscription &&
+      preferredSubscription.id !== subscription.id
+    ) {
+      logger.info(
+        'Preserving paid subscription over non-paid Stripe event',
+        {
+          uid,
+          ignoredSubscriptionId: subscription.id,
+          ignoredStatus: subscription.status,
+          preferredSubscriptionId: preferredSubscription.id,
+          preferredStatus: preferredSubscription.status,
+        },
+      );
+      subscription = preferredSubscription;
+    }
+  }
 
   const customerId =
     typeof subscription.customer === 'string'
@@ -679,6 +731,7 @@ async function saveStripeSubscriptionToFirestore(params: {
 }
 
 async function markStripeSubscriptionCanceled(
+  stripe: Stripe,
   subscription: Stripe.Subscription,
 ): Promise<void> {
   const uid = await findUidByStripeSubscription(subscription);
@@ -692,6 +745,37 @@ async function markStripeSubscriptionCanceled(
           : subscription.customer?.id ?? null,
     });
     return;
+  }
+
+  const customerId =
+    typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id ?? null;
+
+  if (customerId) {
+    const preferredSubscription = await findPreferredPaidSubscription({
+      stripe,
+      customerId,
+    });
+
+    if (preferredSubscription) {
+      await saveStripeSubscriptionToFirestore({
+        stripe,
+        uid,
+        subscription: preferredSubscription,
+      });
+
+      logger.info(
+        'Preserved another paid subscription after cancellation event',
+        {
+          uid,
+          canceledSubscriptionId: subscription.id,
+          preferredSubscriptionId: preferredSubscription.id,
+          preferredStatus: preferredSubscription.status,
+        },
+      );
+      return;
+    }
   }
 
   const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
@@ -763,6 +847,7 @@ async function updateStripeSubscriptionFromInvoice(
   }
 
   await saveStripeSubscriptionToFirestore({
+    stripe,
     uid,
     subscription,
   });
@@ -867,6 +952,7 @@ export const stripeWebhook = onRequest(
           );
 
           await saveStripeSubscriptionToFirestore({
+            stripe,
             uid,
             subscription,
             checkoutSessionId: session.id,
@@ -889,6 +975,7 @@ export const stripeWebhook = onRequest(
           }
 
           await saveStripeSubscriptionToFirestore({
+            stripe,
             uid,
             subscription,
           });
@@ -898,7 +985,7 @@ export const stripeWebhook = onRequest(
 
         case 'customer.subscription.deleted': {
           const subscription = event.data.object as Stripe.Subscription;
-          await markStripeSubscriptionCanceled(subscription);
+          await markStripeSubscriptionCanceled(stripe, subscription);
           break;
         }
 
