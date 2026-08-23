@@ -1,4 +1,4 @@
-package com.example.hamster_project
+package com.gotainu.hamster
 
 import io.flutter.embedding.android.FlutterActivity
 

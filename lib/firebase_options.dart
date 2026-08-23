@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDgl2LnlcdvrqXpyH1MTCipCmd8bdffT78',
-    appId: '1:797691641198:android:d62cacb562d47c4e6b557f',
+    appId: '1:797691641198:android:05fc9e24e456282a6b557f',
     messagingSenderId: '797691641198',
     projectId: 'hamster-breeding-app',
     storageBucket: 'hamster-breeding-app.firebasestorage.app',
