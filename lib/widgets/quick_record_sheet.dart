@@ -81,7 +81,6 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
       760.0,
       math.max(360.0, availableHeight * 0.88),
     );
-    final maximumBodyHeight = math.max(240.0, maximumSheetHeight - 112);
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
@@ -139,10 +138,8 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
                         height: 1,
                         color: AppTheme.softBorder(context),
                       ),
-                      ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxHeight: maximumBodyHeight,
-                        ),
+                      Flexible(
+                        fit: FlexFit.loose,
                         child: PaidFeatureGate(
                           featureName: '記録',
                           lockedTitle: 'クイック記録は有料プランの機能です',
@@ -268,39 +265,39 @@ class _CategorySelection extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-        _QuickRecordCategoryTile(
-          icon: Icons.directions_run_rounded,
-          title: '走った記録',
-          subtitle: '昨晩〜今朝の回転数・走行距離',
-          accent: AppTheme.accent,
-          onTap: () => onSelect(_QuickRecordCategory.wheel),
-        ),
-        const SizedBox(height: 12),
-        _QuickRecordCategoryTile(
-          icon: Icons.favorite_border_rounded,
-          title: '今日の様子',
-          subtitle: '食欲・うんち・動き・気になること',
-          accent: AppTheme.envGood,
-          onTap: () => onSelect(_QuickRecordCategory.condition),
-        ),
-        const SizedBox(height: 12),
-        _QuickRecordCategoryTile(
-          icon: Icons.monitor_weight_outlined,
-          title: '体重',
-          subtitle: '定期的な体重と前回からの変化',
-          accent: AppTheme.envCaution,
-          onTap: () => onSelect(_QuickRecordCategory.weight),
-        ),
-        const SizedBox(height: 22),
-        OutlinedButton.icon(
-          onPressed: onOpenAllRecords,
-          icon: const Icon(Icons.edit_note_rounded),
-          label: const Text('すべての記録を開く'),
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(52),
-            shape: const StadiumBorder(),
+          _QuickRecordCategoryTile(
+            icon: Icons.directions_run_rounded,
+            title: '走った記録',
+            subtitle: '昨晩〜今朝の回転数・走行距離',
+            accent: AppTheme.accent,
+            onTap: () => onSelect(_QuickRecordCategory.wheel),
           ),
-        ),
+          const SizedBox(height: 12),
+          _QuickRecordCategoryTile(
+            icon: Icons.favorite_border_rounded,
+            title: '今日の様子',
+            subtitle: '食欲・うんち・動き・気になること',
+            accent: AppTheme.envGood,
+            onTap: () => onSelect(_QuickRecordCategory.condition),
+          ),
+          const SizedBox(height: 12),
+          _QuickRecordCategoryTile(
+            icon: Icons.monitor_weight_outlined,
+            title: '体重',
+            subtitle: '定期的な体重と前回からの変化',
+            accent: AppTheme.envCaution,
+            onTap: () => onSelect(_QuickRecordCategory.weight),
+          ),
+          const SizedBox(height: 22),
+          OutlinedButton.icon(
+            onPressed: onOpenAllRecords,
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('すべての記録を開く'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: const StadiumBorder(),
+            ),
+          ),
         ],
       ),
     );
