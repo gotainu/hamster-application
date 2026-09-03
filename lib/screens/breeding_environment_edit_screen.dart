@@ -136,7 +136,7 @@ class _BreedingEnvironmentEditScreenState
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
-                          color: AppTheme.accent.withOpacity(0.22),
+                          color: AppTheme.accent.withValues(alpha: 0.22),
                           blurRadius: 36,
                           offset: const Offset(0, 16),
                         ),
@@ -269,7 +269,7 @@ class _BreedingEnvironmentEditScreenState
             ),
             if (_isLoading)
               Container(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 child: const Center(child: CircularProgressIndicator()),
               ),
           ],

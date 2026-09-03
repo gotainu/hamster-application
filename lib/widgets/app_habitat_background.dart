@@ -26,18 +26,8 @@ class AppHabitatBackground extends StatelessWidget {
   //
   // 値を指定:
   //   デバッグビルド中だけ、その背景へ強制切替
-  static const HamsterAvatarCause? _debugBackgroundCause =
-      //null;
-      //HamsterAvatarCause.none;
-      //HamsterAvatarCause.heat;
-      //HamsterAvatarCause.cold;
-      //HamsterAvatarCause.humidityHigh;
-      //HamsterAvatarCause.humidityLow;
-      HamsterAvatarCause.activityHigh;
-  //HamsterAvatarCause.activityLow;
-  //HamsterAvatarCause.conditionConcern;
-  //HamsterAvatarCause.insufficientData;
-  //HamsterAvatarCause.overallAlert;
+  // 背景を確認するときだけ、nullを任意のHamsterAvatarCauseへ変更します。
+  static const HamsterAvatarCause? _debugBackgroundCause = null;
 
   const AppHabitatBackground({
     super.key,

@@ -50,7 +50,7 @@ class FuncMyPageScreen extends StatelessWidget {
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
-                    color: AppTheme.accent.withOpacity(0.19),
+                    color: AppTheme.accent.withValues(alpha: 0.19),
                     blurRadius: 36,
                     offset: const Offset(0, 16),
                   ),

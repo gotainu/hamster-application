@@ -187,8 +187,10 @@ class _UserImagePickerState extends State<UserImagePicker> {
             CircleAvatar(
               radius: radius,
               backgroundImage: provider,
-              backgroundColor:
-                  Theme.of(context).colorScheme.onSurface.withOpacity(0.12),
+              backgroundColor: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.12),
               child: provider == null
                   ? Icon(Icons.pets, size: radius * 0.75, color: Colors.white70)
                   : null,

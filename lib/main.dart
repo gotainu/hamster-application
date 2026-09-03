@@ -25,6 +25,8 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<TabsScreenState> tabsScreenKey = GlobalKey<TabsScreenState>();
 
 const AndroidNotificationChannel _highImportanceChannel =
@@ -73,10 +75,7 @@ Future<void> _openAnomalyFromNotification(
     return;
   }
 
-  final context = navigatorKey.currentContext;
-  if (context == null) return;
-
-  ScaffoldMessenger.of(context).showSnackBar(
+  scaffoldMessengerKey.currentState?.showSnackBar(
     const SnackBar(
       content: Text('通知を開きました。Homeで最近の気になる変化を確認できます。'),
     ),
@@ -369,7 +368,8 @@ class MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: 'Hamster Breeding',
+      scaffoldMessengerKey: scaffoldMessengerKey,
+      title: 'Hamster Care',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: _themeMode,

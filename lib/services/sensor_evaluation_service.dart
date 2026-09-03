@@ -261,8 +261,9 @@ class SensorEvaluationService {
 
     if (states.contains(MetricState.alert)) return MetricState.alert;
     if (states.contains(MetricState.caution)) return MetricState.caution;
-    if (states.every((s) => s == MetricState.unknown))
+    if (states.every((s) => s == MetricState.unknown)) {
       return MetricState.unknown;
+    }
     if (states.contains(MetricState.unknown)) return MetricState.caution;
     return MetricState.good;
   }

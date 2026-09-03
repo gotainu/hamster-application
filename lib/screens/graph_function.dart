@@ -1462,16 +1462,15 @@ class _TrendGlassCard extends StatelessWidget {
     required this.child,
     this.padding = const EdgeInsets.all(20),
     this.height,
-    this.radius = 28,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double? height;
-  final double radius;
 
   @override
   Widget build(BuildContext context) {
+    const radius = 28.0;
     final dark = AppTheme.isDark(context);
     final surface = dark
         ? const Color(0xFF171D28).withValues(alpha: 0.74)

@@ -90,26 +90,26 @@ class AnomalyNotificationMessageService {
         final days = anomaly.count ?? 0;
         final hum = anomaly.value?.round();
         return hum != null
-            ? '$period湿度が高めの状態が$days日連続です。最新の平均湿度は${hum}%です。状態をご確認ください。[$severityText]'
-            : '$period湿度が高めの状態が${days}日連続です。状態をご確認ください。[$severityText]';
+            ? '$period湿度が高めの状態が$days日連続です。最新の平均湿度は$hum%です。状態をご確認ください。[$severityText]'
+            : '$period湿度が高めの状態が$days日連続です。状態をご確認ください。[$severityText]';
 
       case AnomalyFlag.lowTemperatureStreak:
         final days = anomaly.count ?? 0;
         final temp = anomaly.value;
         return temp != null
             ? '$period温度が低めの状態が$days日連続です。最新の平均温度は${temp.toStringAsFixed(1)}℃です。[$severityText]'
-            : '$period温度が低めの状態が${days}日連続です。[$severityText]';
+            : '$period温度が低めの状態が$days日連続です。[$severityText]';
 
       case AnomalyFlag.highTemperatureStreak:
         final days = anomaly.count ?? 0;
         final temp = anomaly.value;
         return temp != null
             ? '$period温度が高めの状態が$days日連続です。最新の平均温度は${temp.toStringAsFixed(1)}℃です。[$severityText]'
-            : '$period温度が高めの状態が${days}日連続です。[$severityText]';
+            : '$period温度が高めの状態が$days日連続です。[$severityText]';
 
       case AnomalyFlag.dangerMinutesDetected:
         final minutes = anomaly.value?.round() ?? 0;
-        return '$period直近の評価で危険域への滞在が検出されました。最大${minutes}分です。早めの確認をおすすめします。[$severityText]';
+        return '$period直近の評価で危険域への滞在が検出されました。最大$minutes分です。早めの確認をおすすめします。[$severityText]';
 
       case AnomalyFlag.tempSpikeDetected:
         final count = anomaly.count ?? anomaly.value?.round() ?? 0;
@@ -135,7 +135,7 @@ class AnomalyNotificationMessageService {
 
       case AnomalyFlag.cautionLevelStreak:
         final days = anomaly.count ?? 0;
-        return '$period環境評価の「注意」が${days}日連続です。状況の固定化にご注意ください。[$severityText]';
+        return '$period環境評価の「注意」が$days日連続です。状況の固定化にご注意ください。[$severityText]';
 
       case AnomalyFlag.dangerLevelDetected:
         return '$period直近3日以内に環境評価「危険」が検出されました。至急状態をご確認ください。[$severityText]';

@@ -211,7 +211,8 @@ class DistanceRecordsRepo {
 
     if (series.isEmpty) return 0;
 
-    final total = series.fold<double>(0, (sum, e) => sum + e.distance);
+    final total =
+        series.fold<double>(0, (total, entry) => total + entry.distance);
     return total / days;
   }
 

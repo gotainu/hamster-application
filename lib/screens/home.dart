@@ -75,8 +75,6 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> focusAnomalyCard() async {
-    final messenger = ScaffoldMessenger.of(context);
-
     await Future<void>.delayed(const Duration(milliseconds: 300));
 
     if (!mounted) return;
@@ -87,8 +85,8 @@ class HomeScreenState extends State<HomeScreen> {
 
     final anomalyContext = _anomalyCardKey.currentContext;
 
-    if (anomalyContext == null) {
-      messenger.showSnackBar(
+    if (anomalyContext == null || !anomalyContext.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('現在、最近の気になる変化は表示されていません。'),
         ),
@@ -105,7 +103,7 @@ class HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
 
-    messenger.showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('最近の気になる変化を表示しました。'),
       ),

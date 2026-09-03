@@ -119,7 +119,7 @@ class EnvironmentTrendService {
     }
 
     final sign = diff > 0 ? '+' : '';
-    return '先週平均より 湿度 ${sign}${diff.round()}pt';
+    return '先週平均より 湿度 $sign${diff.round()}pt';
   }
 
   String _buildTemperatureDeltaText(double diff) {
@@ -128,7 +128,7 @@ class EnvironmentTrendService {
     }
 
     final sign = diff > 0 ? '+' : '';
-    return '先週平均より 温度 ${sign}${diff.toStringAsFixed(1)}℃';
+    return '先週平均より 温度 $sign${diff.toStringAsFixed(1)}℃';
   }
 
   String _buildHumiditySummaryText(EnvironmentAssessment a, double diff) {
