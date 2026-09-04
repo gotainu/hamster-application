@@ -207,7 +207,10 @@ class MyAppState extends State<MyApp> {
 
     try {
       final initialToken = await _getFcmTokenWhenReady(messaging);
-      debugPrint('[FCM initial token] ${initialToken ?? 'null'}');
+      debugPrint(
+        '[FCM initial token] '
+        '${initialToken == null ? 'unavailable' : 'available'}',
+      );
 
       if (initialToken != null) {
         await _saveFcmToken(initialToken);
@@ -218,7 +221,7 @@ class MyAppState extends State<MyApp> {
     }
 
     _tokenRefreshSub = messaging.onTokenRefresh.listen((token) async {
-      debugPrint('[FCM token refresh] $token');
+      debugPrint('[FCM token refresh] received');
       await _saveFcmToken(token);
     });
 
@@ -289,7 +292,10 @@ class MyAppState extends State<MyApp> {
 
       try {
         final token = await _getFcmTokenWhenReady(messaging);
-        debugPrint('[FCM authState token] ${token ?? 'null'}');
+        debugPrint(
+          '[FCM authState token] '
+          '${token == null ? 'unavailable' : 'available'}',
+        );
 
         if (token != null) {
           await _saveFcmToken(token);
@@ -331,7 +337,7 @@ class MyAppState extends State<MyApp> {
         token: token,
         platform: _platformName(),
       );
-      debugPrint('[FCM token saved] uid=${user.uid}');
+      debugPrint('[FCM token saved]');
     } catch (e, st) {
       debugPrint('[FCM save error] $e');
       debugPrint('$st');
