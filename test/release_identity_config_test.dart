@@ -30,5 +30,30 @@ void main() {
         contains('<key>CFBundleName</key>\n\t<string>Hamster Care</string>'),
       );
     });
+
+    test('iOS enables APNs and background notification delivery', () {
+      final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+      final entitlements =
+          File('ios/Runner/Runner.entitlements').readAsStringSync();
+      final project =
+          File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+
+      expect(
+        entitlements,
+        contains(
+          '<key>aps-environment</key>\n\t<string>development</string>',
+        ),
+      );
+      expect(
+        infoPlist,
+        contains(
+          '<key>UIBackgroundModes</key>\n\t<array>\n'
+          '\t\t<string>fetch</string>\n'
+          '\t\t<string>remote-notification</string>',
+        ),
+      );
+      expect(project, contains('com.apple.Push = {'));
+      expect(project, contains('com.apple.BackgroundModes = {'));
+    });
   });
 }
