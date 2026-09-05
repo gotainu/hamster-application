@@ -1,0 +1,5 @@
+support=https://hamster-breeding-app.web.app/support/
+privacy_policy=https://hamster-breeding-app.web.app/privacy/
+account_deletion=https://hamster-breeding-app.web.app/account-deletion/
+terms=https://hamster-breeding-app.web.app/terms/
+commercial_transactions=https://hamster-breeding-app.web.app/commercial-transactions/
