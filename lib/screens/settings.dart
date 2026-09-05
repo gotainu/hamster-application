@@ -81,6 +81,64 @@ class _SettingScreenState extends State<SettingScreen> {
       return;
     }
 
+    try {
+      final billing = await _billingStatusRepo.fetchBillingStatus();
+
+      if (billing.canUsePaidFeatures && !billing.isCancellationScheduled) {
+        if (!mounted) return;
+
+        final subscriptionChoice = await showDialog<String>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('月額プランを利用中です'),
+              content: const Text(
+                'アカウントを削除しても、Stripeの月額プランは自動では解約されません。継続請求を防ぐため、先に「プランを管理する」から解約してください。\n\n'
+                'アカウントは今すぐ削除することもできますが、その場合も月額プランの解約は別途必要です。',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  child: const Text('キャンセル'),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop('delete-now'),
+                  child: const Text('削除へ進む'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.of(dialogContext).pop('manage-plan'),
+                  child: const Text('プランを管理する'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (subscriptionChoice == 'manage-plan') {
+          if (!mounted) return;
+
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const SubscriptionPlanScreen(),
+            ),
+          );
+          return;
+        }
+
+        if (subscriptionChoice != 'delete-now') {
+          return;
+        }
+      }
+    } catch (error) {
+      debugPrint(
+        'Could not check subscription before account deletion: $error',
+      );
+    }
+
+    if (!mounted) return;
+
     final confirmText = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
@@ -1043,6 +1101,17 @@ const List<_PolicySectionData> _privacyPolicySections = [
         'AI相談では、質問内容に関係する場合に限り、ペット情報、飼育環境、センサー評価などを参照することがあります。',
   ),
   _PolicySectionData(
+    title: '外部サービスと情報の送信',
+    body:
+        '本アプリは、Google Firebase（認証・データ保存・通知・利用状況分析）、Stripe（決済・継続課金）、OpenAI（AI相談の回答生成）、Pinecone（飼育知識の検索）、SwitchBot（利用者が連携した機器情報と温湿度の取得）を利用します。\n\n'
+        'AI相談では、質問、直近の会話履歴、および回答に必要な範囲のペット・飼育環境・センサー評価情報が、運営者のサーバーを経由してAI処理基盤へ送信されることがあります。相談に不要な個人情報は入力しないでください。',
+  ),
+  _PolicySectionData(
+    title: '決済情報',
+    body: '有料プランのカード番号など支払手段の詳細はStripeが取り扱い、本アプリのデータベースには保存しません。\n\n'
+        '本アプリでは、契約状態を反映するため、Stripeの顧客・契約識別子、プラン、契約状態、契約期間を保存します。',
+  ),
+  _PolicySectionData(
     title: '通知トークン',
     body:
         '異常検知通知などを行うため、端末の通知トークンを保存することがあります。通知トークンは通知送信のために利用され、不要になった場合はアカウント削除などにより削除対象となります。',
@@ -1052,6 +1121,11 @@ const List<_PolicySectionData> _privacyPolicySections = [
     body:
         '設定画面のアカウント削除を実行すると、Firestore上のユーザーデータ、ペット情報、飼育記録、AI相談履歴、SwitchBot連携情報、通知関連データ、Firebase Authのアカウントを削除します。\n\n'
         '削除後の復元はできません。',
+  ),
+  _PolicySectionData(
+    title: 'お問い合わせ',
+    body:
+        '情報の確認、訂正、削除、その他のプライバシーに関するお問い合わせは、gotainu@gmail.com へご連絡ください。本人確認をお願いする場合があります。',
   ),
 ];
 
@@ -1071,6 +1145,12 @@ const List<_PolicySectionData> _termsSections = [
     title: '禁止事項',
     body:
         '本アプリを、不正アクセス、虚偽情報の登録、他者のアカウント利用、アプリやサーバーへの過度な負荷、その他不適切な目的で利用しないでください。',
+  ),
+  _PolicySectionData(
+    title: '有料プラン',
+    body:
+        '有料プランは月額500円（税込）の自動更新契約です。申込み時にStripeの決済画面で料金と請求内容を確認し、支払いを完了すると有料機能が利用可能になります。\n\n'
+        '解約は「利用プラン」からStripeの管理画面を開いて行えます。解約後も現在の請求期間の終了までは有料機能を利用でき、以後の自動更新は行われません。',
   ),
   _PolicySectionData(
     title: 'サービス内容の変更',

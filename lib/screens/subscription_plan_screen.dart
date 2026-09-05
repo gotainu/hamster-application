@@ -20,6 +20,13 @@ class SubscriptionPlanScreen extends StatefulWidget {
 }
 
 class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
+  static final Uri _privacyPolicyUrl = Uri.parse(
+    'https://hamster-breeding-app.web.app/privacy/',
+  );
+  static final Uri _termsOfUseUrl = Uri.parse(
+    'https://hamster-breeding-app.web.app/terms/',
+  );
+
   final BillingStatusRepo _repo = BillingStatusRepo();
 
   bool _isOpeningCheckout = false;
@@ -144,6 +151,25 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     }
   }
 
+  Future<void> _openLegalPage(Uri uri) async {
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) {
+        throw Exception('ページを開けませんでした。');
+      }
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ページを開けませんでした: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final repo = _repo;
@@ -188,6 +214,9 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
                       isOpeningPortal: _isOpeningPortal,
                       onStartCheckout: _startCheckout,
                       onOpenCustomerPortal: _openCustomerPortal,
+                      onOpenPrivacyPolicy: () =>
+                          _openLegalPage(_privacyPolicyUrl),
+                      onOpenTermsOfUse: () => _openLegalPage(_termsOfUseUrl),
                     ),
                     const SizedBox(height: 16),
                     const _PaidPlanFeatureCard(
@@ -239,6 +268,8 @@ class _BillingStatusHeroCard extends StatelessWidget {
     required this.isOpeningPortal,
     required this.onStartCheckout,
     required this.onOpenCustomerPortal,
+    required this.onOpenPrivacyPolicy,
+    required this.onOpenTermsOfUse,
   });
 
   final BillingStatus billing;
@@ -246,6 +277,8 @@ class _BillingStatusHeroCard extends StatelessWidget {
   final bool isOpeningPortal;
   final VoidCallback onStartCheckout;
   final VoidCallback onOpenCustomerPortal;
+  final VoidCallback onOpenPrivacyPolicy;
+  final VoidCallback onOpenTermsOfUse;
 
   @override
   Widget build(BuildContext context) {
@@ -341,6 +374,45 @@ class _BillingStatusHeroCard extends StatelessWidget {
             ),
           ] else ...[
             const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.chipFill(
+                  AppTheme.accent,
+                  context,
+                  opacity: 0.1,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hamster Care Premium Plan',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '月額500円（税込）',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '1か月ごとに自動更新されます。いつでも解約でき、解約後も現在の請求期間の終了までは利用できます。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.secondaryText(context),
+                          height: 1.45,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
@@ -364,6 +436,21 @@ class _BillingStatusHeroCard extends StatelessWidget {
                     color: AppTheme.secondaryText(context),
                     height: 1.45,
                   ),
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 4,
+              runSpacing: 0,
+              children: [
+                TextButton(
+                  onPressed: onOpenTermsOfUse,
+                  child: const Text('利用規約'),
+                ),
+                TextButton(
+                  onPressed: onOpenPrivacyPolicy,
+                  child: const Text('プライバシーポリシー'),
+                ),
+              ],
             ),
           ],
         ],
@@ -431,7 +518,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
           accentColor: Color(0xFF00D6A3),
           title: '有料プランを利用中です',
           description: '温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
-          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
         );
 
       case BillingStatusValue.pastDue:
@@ -459,7 +546,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
           accentColor: AppTheme.accent,
           title: '有料プランは未契約です',
           description: '有料プランはキャンセルされています。再度登録すると、有料機能を利用できます。',
-          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
         );
 
       case BillingStatusValue.incomplete:
@@ -477,7 +564,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
           accentColor: AppTheme.accent,
           title: '有料プランは未契約です',
           description: '有料プランに登録すると、温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
-          checkoutNote: 'Stripeの安全な決済ページで手続きします。テスト中は実際の請求は発生しません。',
+          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
         );
 
       case BillingStatusValue.unknown:

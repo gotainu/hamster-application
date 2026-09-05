@@ -1,6 +1,6 @@
 {
-    "name": "hamster_project",
-    "short_name": "hamster_project",
+    "name": "Hamster Care",
+    "short_name": "Hamster Care",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

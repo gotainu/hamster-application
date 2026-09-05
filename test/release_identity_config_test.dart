@@ -16,6 +16,29 @@ void main() {
           strings, contains('<string name="app_name">Hamster Care</string>'));
     });
 
+    test('Android release targets API 36 without broad media or ad IDs', () {
+      final buildConfig =
+          File('android/app/build.gradle.kts').readAsStringSync();
+      final manifest =
+          File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+
+      expect(buildConfig, contains('compileSdk = 36'));
+      expect(buildConfig, contains('targetSdk = 36'));
+      expect(buildConfig, contains('versionCode = flutter.versionCode'));
+      expect(buildConfig, contains('versionName = flutter.versionName'));
+      expect(manifest, isNot(contains('android.permission.CAMERA')));
+      expect(manifest, isNot(contains('android.permission.READ_MEDIA_IMAGES')));
+      expect(
+        manifest,
+        isNot(contains('android.permission.READ_EXTERNAL_STORAGE')),
+      );
+      expect(
+        manifest,
+        contains('com.google.android.gms.permission.AD_ID'),
+      );
+      expect(manifest, contains('tools:node="remove"'));
+    });
+
     test('iOS uses the Hamster Care display and bundle names', () {
       final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
 
@@ -54,6 +77,18 @@ void main() {
       );
       expect(project, contains('com.apple.Push = {'));
       expect(project, contains('com.apple.BackgroundModes = {'));
+    });
+
+    test('public review and account deletion pages are present', () {
+      for (final path in <String>[
+        'public/privacy/index.html',
+        'public/terms/index.html',
+        'public/commercial-transactions/index.html',
+        'public/support/index.html',
+        'public/account-deletion/index.html',
+      ]) {
+        expect(File(path).existsSync(), isTrue, reason: '$path is missing');
+      }
     });
   });
 }
