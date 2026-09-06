@@ -375,6 +375,7 @@ class MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: scaffoldMessengerKey,
+      debugShowCheckedModeBanner: false,
       title: 'Hamster Care',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

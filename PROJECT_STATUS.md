@@ -9,17 +9,16 @@
 - フェーズ: リリース準備（Release Hardening）
 - 最優先タスク: `REL-02` 日本限定・Stripe決済のまま両ストアへ初回提出
 - ブランチ: `main`
-- 基準コミット: `f972be0 feat: refresh hamster brand mark`
+- ブランド基準コミット: `f972be0 feat: refresh hamster brand mark`
 - 公開状況: 未公開
 
 ## 次に着手する作業
 
-1. Android/iOSのストア掲載用スクリーンショットを作成する。
-2. 審査用アカウントでログインと有料機能を再確認し、パスワードは各ストアの審査欄へ直接入力する。
-3. Google Play Consoleへ掲載情報・データセーフティ・AABを登録し、日本限定で審査提出する。
-4. Xcode 26以降とApple Distribution/App Store用プロファイルを準備し、iOS配布ビルドを作成する。
-5. App Store Connectへ掲載情報・App Privacy・配布ビルドを登録し、日本限定で審査提出する。
-6. 提出後は`REL-03`のE2E確認とクラッシュ監視、続いて`VAL-01`の有料ベータ検証へ進む。
+1. 審査用アカウントでログインと有料機能を再確認し、パスワードは各ストアの審査欄へ直接入力する。
+2. Google Play Consoleへ掲載情報・データセーフティ・AABを登録し、日本限定で審査提出する。
+3. Xcode 26以降とApple Distribution/App Store用プロファイルを準備し、iOS配布ビルドを作成する。
+4. App Store Connectへ掲載情報・App Privacy・配布ビルドを登録し、日本限定で審査提出する。
+5. 提出後は`REL-03`のE2E確認とクラッシュ監視、続いて`VAL-01`の有料ベータ検証へ進む。
 
 ## 検証済みの状態
 
@@ -29,6 +28,7 @@
 - 自動テスト: 7件成功
 - Android正式パッケージID: `com.gotainu.hamster`
 - iOS Bundle ID: `com.gotainu.hamster`
+- 初回iOS配布対象: iPhoneのみ
 - Android実機でPlay Integrityトークン取得を確認済み
 - iOS実機で明示的App IDによるRelease署名を確認済み
 - Stripeの月額500円プラン、Checkout、Customer Portal、Webhook、Firestore契約状態反映を確認済み
@@ -51,6 +51,8 @@
 - 最終ロゴ: 黒背景、生成り色の鉛筆線による下膨れのハムスター顔、開いた下部輪郭、頬と交差する左右3本のひげ、口なし、下部に心拍波形
 - iOS/Androidの全アプリアイコンへ反映済み
 - App Store 1024pxアイコン、Google Play 512pxアイコン、Google Playフィーチャー画像を作成済み
+- Google Play用Androidスマートフォン画像4枚（1080×1920、JPEG）を作成・検証済み
+- App Store用6.9インチiPhone画像4枚（1320×2868、JPEG）を作成・検証済み
 - ストア掲載文、審査メモ、プライバシー申告チェックリストを作成済み
 
 ## タスク一覧
@@ -62,7 +64,7 @@
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |
 | `OPS-05` | 完了 | Android正式IDとアップロード署名 | 鍵とパスワードの安全なバックアップを維持 |
 | `ANL-01` | 完了 | Firebase Analytics整備 | 公開後にイベントを確認 |
-| `REL-02` | 進行中 | 日本限定・Stripe決済のままストア初回提出 | スクリーンショット、審査情報、AAB/IPA登録 |
+| `REL-02` | 進行中 | 日本限定・Stripe決済のままストア初回提出 | 審査情報、AAB/IPA登録 |
 | `REL-03` | 未着手 | 提出候補版のE2E確認とクラッシュ監視 | `REL-02`の提出準備後 |
 | `VAL-01` | 未着手 | 有料ベータで継続利用を検証 | ストア配布経路の準備後 |
 | `AVT-06` | 進行中・非阻害 | 残りのアバター素材 | 初回公開後でも可 |
@@ -74,6 +76,7 @@
 ### 初回ストア提出
 
 - 初回公開地域は日本のみとする。
+- 初回iOS公開はiPhone専用とし、iPad対応はレスポンシブUI整備後に再検討する。
 - 現行のStripe Checkout / Stripe Customer Portalを維持して提出する。
 - AppleのApp内課金とGoogle Play Billingは、却下前には追加実装しない。
 - 決済方法を理由に却下された場合は、規約番号、審査文面、対象画面、日時を保存し、指摘内容に限定して対応を判断する。
@@ -109,7 +112,8 @@
 
 | 日付 | 内容 | 根拠 |
 |---|---|---|
+| 2026-09-06 | Androidと6.9インチiPhoneの掲載画像を各4枚作成 | ストア公式サイズ・非透過JPEGを確認 |
+| 2026-09-06 | 初回iOS公開をiPhone専用に決定 | 現行iPad表示はスマートフォン幅の中央配置となるため |
 | 2026-09-06 | 進捗管理の正本をExcelからMarkdownへ移行 | Gitで差分・履歴を管理する方針に変更 |
 | 2026-09-06 | 最終ブランドをアプリとストア素材へ反映 | `f972be0` |
 | 2026-09-06 | 最終アイコン入りAndroid AABを生成・検証 | SHA-256およびBundletool検証結果 |
-

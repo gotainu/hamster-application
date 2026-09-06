@@ -18,6 +18,7 @@
 - 詳しい説明: 4,000文字以内
 - アプリアイコン: `store_assets/icons/google_play_icon_512.png`
 - フィーチャーグラフィック: `store_assets/google_play_feature_graphic_1024x500.png`
+- スマートフォン画像: `store_assets/screenshots/android_phone/`（1080×1920、JPEG、4枚）
 - 初回リリースノート: `google_play/ja-JP/release_notes_1.0.0.txt`
 
 根拠: https://support.google.com/googleplay/android-developer/answer/9859152 / https://support.google.com/googleplay/android-developer/answer/9866151
@@ -30,6 +31,8 @@
 - 説明: 4,000文字以内
 - キーワード: UTF-8で100バイト以内
 - アプリアイコン: `store_assets/icons/app_store_icon_1024.png`
+- 6.9インチiPhone画像: `store_assets/screenshots/ios_iphone_6_9/`（1320×2868、JPEG、4枚）
+- 初回配布対象はiPhoneのみ。iPadはレスポンシブUI整備後に再検討する
 
 根拠: https://developer.apple.com/help/app-store-connect/reference/app-information/app-information / https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information
 

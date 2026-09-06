@@ -4,6 +4,57 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 
+({int width, int height}) _jpegDimensions(File file) {
+  final bytes = file.readAsBytesSync();
+  if (bytes.length < 4 || bytes[0] != 0xff || bytes[1] != 0xd8) {
+    throw FormatException('Not a JPEG file: ${file.path}');
+  }
+
+  var offset = 2;
+  while (offset + 8 < bytes.length) {
+    if (bytes[offset] != 0xff) {
+      offset += 1;
+      continue;
+    }
+
+    final marker = bytes[offset + 1];
+    if (marker == 0xd8 || marker == 0xd9) {
+      offset += 2;
+      continue;
+    }
+
+    final segmentLength = (bytes[offset + 2] << 8) | bytes[offset + 3];
+    if (segmentLength < 2 || offset + segmentLength + 2 > bytes.length) {
+      break;
+    }
+
+    const sizeMarkers = <int>{
+      0xc0,
+      0xc1,
+      0xc2,
+      0xc3,
+      0xc5,
+      0xc6,
+      0xc7,
+      0xc9,
+      0xca,
+      0xcb,
+      0xcd,
+      0xce,
+      0xcf,
+    };
+    if (sizeMarkers.contains(marker)) {
+      final height = (bytes[offset + 5] << 8) | bytes[offset + 6];
+      final width = (bytes[offset + 7] << 8) | bytes[offset + 8];
+      return (width: width, height: height);
+    }
+
+    offset += segmentLength + 2;
+  }
+
+  throw FormatException('JPEG dimensions not found: ${file.path}');
+}
+
 void main() {
   group('release app identity', () {
     test('Android uses the Hamster Care display name', () {
@@ -43,6 +94,8 @@ void main() {
 
     test('iOS uses the Hamster Care display and bundle names', () {
       final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
+      final project =
+          File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
 
       expect(
         infoPlist,
@@ -53,6 +106,11 @@ void main() {
       expect(
         infoPlist,
         contains('<key>CFBundleName</key>\n\t<string>Hamster Care</string>'),
+      );
+      expect(project, isNot(contains('TARGETED_DEVICE_FAMILY = "1,2";')));
+      expect(
+        RegExp(r'TARGETED_DEVICE_FAMILY = 1;').allMatches(project).length,
+        3,
       );
     });
 
@@ -138,6 +196,23 @@ void main() {
       expect(featureGraphic.lengthSync(), lessThanOrEqualTo(1024 * 1024));
       expect(dimensions.getUint32(0), 1024);
       expect(dimensions.getUint32(4), 500);
+
+      for (final name in <String>[
+        '01_today.jpg',
+        '02_record.jpg',
+        '03_changes.jpg',
+        '04_consultation.jpg',
+      ]) {
+        expect(
+          _jpegDimensions(File('store_assets/screenshots/android_phone/$name')),
+          (width: 1080, height: 1920),
+        );
+        expect(
+          _jpegDimensions(
+              File('store_assets/screenshots/ios_iphone_6_9/$name')),
+          (width: 1320, height: 2868),
+        );
+      }
     });
   });
 }
