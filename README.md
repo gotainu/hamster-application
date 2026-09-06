@@ -2,6 +2,10 @@
 
 A new Flutter project.
 
+## プロジェクト状況
+
+現在の進捗、最優先タスク、確定方針は[PROJECT_STATUS.md](PROJECT_STATUS.md)を参照してください。このファイルが進捗管理の正本です。
+
 ## 実機で実行する方法
 
 Android 実機を使って Flutter アプリを実行するには、以下の手順を順に実行していけば OK です！
@@ -114,7 +118,6 @@ final uri = Uri.parse(
 ⸻
 
 ## Getting Started
-
 
 
 
