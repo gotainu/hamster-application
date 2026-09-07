@@ -1,6 +1,6 @@
 # Hamster Care プライバシー申告チェックリスト
 
-更新日: 2026-09-05
+更新日: 2026-09-07
 
 この一覧はApp StoreのApp PrivacyとGoogle Playのデータ セーフティ入力用です。ストア画面の質問文は変更されることがあるため、提出時の最新表示に合わせて最終確認します。
 
@@ -29,27 +29,58 @@
 | 利用状況 | 画面利用や操作イベント | 品質改善、利用状況分析 | Firebase Analytics | 状況により関連 |
 | 診断情報 | エラーコード、サーバーログ | 障害調査、セキュリティ | Firebase / Google Cloud | 状況により関連 |
 
-## Apple App Privacy入力時の確認候補
+## Apple App Privacy入力候補（v1.0.0）
 
+- Location > Coarse Location: 収集する、Analytics
 - Contact Info > Email Address: 収集する、App Functionality
 - Identifiers > User ID: 収集する、App Functionality
+- Identifiers > Device ID: 収集する、App Functionality / Analytics
 - Purchases > Purchase History: 収集する、App Functionality
 - User Content > Photos or Videos: 収集する、App Functionality
 - User Content > Other User Content: 収集する、App Functionality
 - Usage Data > Product Interaction: 収集する、Analytics
-- Diagnostics: 実際に収集しているログの内容に合わせて選択
+- Diagnostics > Other Diagnostic Data: 収集する、App Functionality / Analytics
 - Tracking: いいえ
 
-## Google Play データ セーフティ入力時の確認候補
+## Google Play データ セーフティ入力候補（v1.0.0）
 
-- Personal info > Email address
-- App activity > App interactions / Other user-generated content
-- Photos and videos > Photos
-- Financial info > Purchase history
-- Device or other IDs
-- Health and fitnessは人の健康情報を対象とするため、ハムスターの飼育記録だけを理由に選択しない
-- Service providersへの処理委託がGoogleの「共有」の例外に該当するかは、提出画面の最新定義で確認
-- 「データ削除をリクエストできる」: はい
+### 全体回答
+
+- アプリがユーザーデータを収集または共有するか: **はい（収集する）**
+- データの共有: **いいえ**。Firebase、Stripe、OpenAI、Pinecone、SwitchBotは、契約上サービス提供のために処理する委託先として扱う前提。委託先が独自目的で利用する設定を追加した場合は再確認する
+- 転送中の暗号化: **はい**
+- データ削除をリクエストできるか: **はい**
+- 削除リクエストURL: https://hamster-breeding-app.web.app/account-deletion/
+- 独立したセキュリティ審査: 実施証明がないため **いいえ**
+
+### データ種別
+
+| Google Playの分類 | 収集 | 必須/任意 | 目的 | 主な根拠 |
+|---|---|---|---|---|
+| Location > Approximate location | はい | 必須 | Analytics | Firebase Analyticsがマスク済みIPアドレスからおおよその地域を導出 |
+| Personal info > Email address | はい | 必須 | App functionality / Account management | Firebase Authentication |
+| Personal info > User IDs | はい | 必須 | App functionality / Account management | Firebase UID、Stripe Customer ID |
+| Financial info > Purchase history | はい | 任意 | App functionality / Account management | Stripeのプラン・契約状態。カード番号等はアプリ側で取得・保存しない |
+| Messages > Other in-app messages | はい | 任意 | App functionality | AI相談の質問、直近会話、回答 |
+| Photos and videos > Photos | はい | 任意 | App functionality | 利用者が選択したペット画像 |
+| App activity > App interactions | はい | 必須 | Analytics | Firebase Analyticsの自動イベントと明示的な操作イベント |
+| App activity > Other user-generated content | はい | 任意 | App functionality | ペットプロフィール、飼育記録、メモ、自由記述 |
+| App info and performance > Diagnostics | はい | 必須 | App functionality / Analytics | API・Functionsの障害調査用ステータス、エラー、技術ログ |
+| Device or other IDs | はい | 必須 | App functionality / Analytics / Fraud prevention, security and compliance | Firebase app-instance ID、FCMトークン、App Check情報 |
+
+### 選択しないもの
+
+- Location > Precise location: 選択しない
+- Financial info > User payment info: カード番号等はStripeのWeb画面が直接処理し、アプリや運営者のデータベースへ保存しないため選択しない
+- Health and fitness: 人の健康・運動情報を対象とするため、ハムスターの飼育記録だけを理由に選択しない
+- Advertising or marketing目的: 広告機能を使用せず、Analyticsイベントを広告目的に利用しないため選択しない
+
+### 実装確認メモ
+
+- Androidマニフェストでは`AD_ID`とAdvertising Services関連権限を明示的に除外済み。ただしFirebase Analyticsのapp-instance IDは収集されるため、`Device or other IDs`は申告する
+- AI相談は認証付きRAG APIへ質問と直近12件までの会話を送信し、回答をFirestoreへ保存するため、`Other in-app messages`を申告する
+- Firebase Crashlytics / Performance Monitoring SDKは現在未導入。`Diagnostics`は主にAPI・Cloud Functions側の障害調査ログを根拠とする
+- SDK追加、広告連携、Google Signals、BigQuery連携、ログ仕様の変更時は再確認する
 
 ## 提出直前の実機確認
 
