@@ -18,6 +18,7 @@ import 'package:hamster_project/screens/splash.dart';
 import 'package:hamster_project/screens/tabs.dart';
 import 'package:hamster_project/services/app_analytics.dart';
 import 'package:hamster_project/services/notification_token_repo.dart';
+import 'package:hamster_project/services/notification_payload.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 
@@ -37,6 +38,22 @@ const AndroidNotificationChannel _highImportanceChannel =
   importance: Importance.max,
 );
 
+const AndroidNotificationChannel _healthCareChannel =
+    AndroidNotificationChannel(
+  healthCareNotificationChannelId,
+  'ケアの変化',
+  description: '温湿度、活動量、体重などの注意すべき変化をお知らせします。',
+  importance: Importance.defaultImportance,
+);
+
+const AndroidNotificationChannel _healthCriticalChannel =
+    AndroidNotificationChannel(
+  healthCriticalNotificationChannelId,
+  '早めの確認が必要な変化',
+  description: '早めの確認が必要な警戒状態をお知らせします。',
+  importance: Importance.max,
+);
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
@@ -49,35 +66,35 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   );
 }
 
-bool _isAnomalyPayload(Map<String, dynamic> data) {
-  return data['type'] == 'anomaly';
-}
-
-Future<void> _openAnomalyFromNotification(
+Future<void> _openHealthFromNotification(
   Map<String, dynamic> data, {
   required String source,
 }) async {
   debugPrint('[notification route] data=$data');
 
-  final isAnomaly = _isAnomalyPayload(data);
+  final isHealth = isHealthNotificationPayload(data);
   await AppAnalytics.logNotificationOpened(
     source: source,
-    notificationType: isAnomaly ? 'anomaly' : 'other',
+    notificationType: notificationTypeForAnalytics(data),
   );
 
-  if (!isAnomaly) return;
+  if (!isHealth) return;
 
-  await Future<void>.delayed(const Duration(milliseconds: 350));
+  for (var attempt = 0; attempt < 10; attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    final tabsState = tabsScreenKey.currentState;
+    if (tabsState == null) continue;
 
-  final tabsState = tabsScreenKey.currentState;
-  if (tabsState != null) {
-    await tabsState.openHomeAnomalyCard();
+    await tabsState.openHealthIncidentDetails(
+      incidentId: healthIncidentIdFromPayload(data),
+      domain: data['domain']?.toString(),
+    );
     return;
   }
 
   scaffoldMessengerKey.currentState?.showSnackBar(
     const SnackBar(
-      content: Text('通知を開きました。Homeで最近の気になる変化を確認できます。'),
+      content: Text('通知を開きました。「今日」で詳しい状態を確認できます。'),
     ),
   );
 }
@@ -119,7 +136,7 @@ Future<void> _initLocalNotifications() async {
     onDidReceiveNotificationResponse: (response) {
       final data = _payloadToMap(response.payload);
       unawaited(
-        _openAnomalyFromNotification(
+        _openHealthFromNotification(
           data,
           source: 'local_notification',
         ),
@@ -131,6 +148,14 @@ Future<void> _initLocalNotifications() async {
       .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(_highImportanceChannel);
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(_healthCareChannel);
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(_healthCriticalChannel);
 }
 
 Future<void> main() async {
@@ -234,19 +259,42 @@ class MyAppState extends State<MyApp> {
       final title = message.notification?.title ?? 'お知らせ';
       final body = message.notification?.body ?? '';
       final payload = jsonEncode(message.data);
+      final isHealth = isHealthNotificationPayload(message.data);
+      final isCritical = isCriticalHealthNotification(message.data);
+      final incidentId = healthIncidentIdFromPayload(message.data);
+      final channelId = isCritical
+          ? healthCriticalNotificationChannelId
+          : healthCareNotificationChannelId;
+      final channelName = isCritical ? '早めの確認が必要な変化' : 'ケアの変化';
 
       await flutterLocalNotificationsPlugin.show(
-        message.hashCode,
+        localNotificationIdForPayload(
+          message.data,
+          fallback: message.hashCode,
+        ),
         title,
         body,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
-            'high_importance_channel',
-            'High Importance Notifications',
-            channelDescription: 'Foreground 受信用の通知チャンネルです。',
-            importance: Importance.max,
-            priority: Priority.high,
+            isHealth ? channelId : 'high_importance_channel',
+            isHealth ? channelName : 'High Importance Notifications',
+            channelDescription: isHealth
+                ? '健康状態の意味のある変化をお知らせします。'
+                : 'Foreground 受信用の通知チャンネルです。',
+            importance: isCritical
+                ? Importance.max
+                : isHealth
+                    ? Importance.defaultImportance
+                    : Importance.max,
+            priority: isCritical
+                ? Priority.high
+                : isHealth
+                    ? Priority.defaultPriority
+                    : Priority.high,
             icon: '@mipmap/ic_launcher',
+            tag: incidentId,
+            groupKey: isHealth ? 'ham_care_health' : null,
+            onlyAlertOnce: isHealth,
           ),
         ),
         payload: payload,
@@ -260,7 +308,7 @@ class MyAppState extends State<MyApp> {
       );
 
       unawaited(
-        _openAnomalyFromNotification(
+        _openHealthFromNotification(
           message.data,
           source: 'push_background',
         ),
@@ -276,7 +324,7 @@ class MyAppState extends State<MyApp> {
         );
 
         unawaited(
-          _openAnomalyFromNotification(
+          _openHealthFromNotification(
             initialMessage.data,
             source: 'push_cold_start',
           ),
@@ -444,7 +492,7 @@ class _OnboardingGate extends StatelessWidget {
         if (!state.setupChecklistViewed) {
           return SetupChecklistScreen(
             onFinished: () {
-              // SetupChecklistScreen 側で markSetupChecklistViewed() 済み。
+              // SetupChecklistScreen 側で初回導線の完了状態を保存済み。
               // Stream更新後、このGateが自動でTabsScreenへ切り替える。
             },
           );

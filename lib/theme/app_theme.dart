@@ -104,6 +104,9 @@ class AppTheme {
   static const Color cardGradientStart = Color(0xFF232E47);
   static const Color cardGradientEnd = Color(0xFF202638);
   static const Color accent = Color.fromARGB(255, 73, 125, 246);
+  // 主操作は白文字と十分なコントラストを保つ、落ち着いたブルーに統一する。
+  // 淡いイエローは星・達成などの報酬表現にだけ使い、操作の優先度を分ける。
+  static const Color primaryAction = Color(0xFF315DAF);
 
   // ダークテーマの色
   static const Color darkBg = gradientEnd;
@@ -586,8 +589,28 @@ class AppTheme {
   static Color floatingRecordButtonSurface(BuildContext context) =>
       isDark(context) ? const Color(0xFF34383F) : const Color(0xFFFFFFFF);
 
-  static Color quickRecordSheetSurface(BuildContext context) =>
-      isDark(context) ? const Color(0xFF20242D) : const Color(0xFFF6F8FB);
+  static Color quickRecordSheetSurface(BuildContext context) => isDark(context)
+      ? const Color.fromARGB(214, 15, 21, 30)
+      : const Color.fromARGB(220, 247, 249, 250);
+
+  static Color quickRecordSheetBorder(BuildContext context) => isDark(context)
+      ? const Color(0xFFFFF1D1).withValues(alpha: 0.20)
+      : const Color(0xFF24425E).withValues(alpha: 0.16);
+
+  static Color quickRecordObjectSurface(BuildContext context) => isDark(context)
+      ? Colors.white.withValues(alpha: 0.065)
+      : Colors.white.withValues(alpha: 0.58);
+
+  static Color quickRecordChoiceSurface(BuildContext context) => isDark(context)
+      ? const Color(0xFF09111B).withValues(alpha: 0.42)
+      : const Color(0xFFF5F0E7).withValues(alpha: 0.62);
+
+  static Color quickRecordObjectBorder(BuildContext context) => isDark(context)
+      ? const Color(0xFFFFF1D1).withValues(alpha: 0.18)
+      : const Color(0xFF24425E).withValues(alpha: 0.14);
+
+  static Color quickRecordGlow(BuildContext context) =>
+      isDark(context) ? const Color(0xFF79E2DD) : const Color(0xFF167F82);
 
   static List<BoxShadow> floatingNavigationShadows(BuildContext context) => [
         BoxShadow(
@@ -673,7 +696,8 @@ class AppTheme {
     fontFamily: 'NotoSans',
     scaffoldBackgroundColor: darkBg,
     colorScheme: const ColorScheme.dark(
-      primary: Color.fromARGB(122, 73, 125, 246),
+      primary: primaryAction,
+      onPrimary: Colors.white,
       secondary: Colors.white,
       surface: darkCard,
     ),
@@ -719,7 +743,8 @@ class AppTheme {
     fontFamily: 'NotoSans',
     scaffoldBackgroundColor: lightBg,
     colorScheme: const ColorScheme.light(
-      primary: Color.fromARGB(139, 73, 125, 246),
+      primary: primaryAction,
+      onPrimary: Colors.white,
       secondary: Colors.black87,
       surface: lightCard,
     ),

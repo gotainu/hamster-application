@@ -5,14 +5,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../models/hamster_avatar.dart';
 import '../models/pet_profile.dart';
+import '../models/feature_trial_access.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/app_analytics.dart';
 import '../services/hamster_avatar_appearance_resolver.dart';
 import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/pet_profile_repo.dart';
+import '../services/feature_trial_repo.dart';
+import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
 import '../widgets/hamster_avatar_view.dart';
 import '../widgets/floating_bottom_navigation.dart';
@@ -107,7 +111,22 @@ class ChatMessage {
 }
 
 class FuncSearchScreen extends StatefulWidget {
-  const FuncSearchScreen({super.key});
+  final String? initialDraft;
+  final bool showCloseButton;
+  final bool showPaidGateBackground;
+  final Future<void> Function()? onConsultationCompleted;
+  final TrialFeature? trialFeature;
+  final bool showInputCoach;
+
+  const FuncSearchScreen({
+    super.key,
+    this.initialDraft,
+    this.showCloseButton = false,
+    this.showPaidGateBackground = false,
+    this.onConsultationCompleted,
+    this.trialFeature,
+    this.showInputCoach = false,
+  });
 
   @override
   FuncSearchScreenState createState() => FuncSearchScreenState();
@@ -117,6 +136,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final AiChatHistoryRepo _chatHistoryRepo = AiChatHistoryRepo();
   final PetProfileRepo _petProfileRepo = PetProfileRepo();
+  final FeatureTrialRepo _trialRepo = FeatureTrialRepo();
+  final BillingStatusRepo _billingRepo = BillingStatusRepo();
 
   static const HamsterAvatarAppearanceResolver _avatarAppearanceResolver =
       HamsterAvatarAppearanceResolver();
@@ -126,6 +147,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final GlobalKey _composerCoachKey = GlobalKey();
+  bool _inputCoachShown = false;
   final List<ChatMessage> _messages = [];
 
   String? _activeArchiveId;
@@ -153,6 +176,16 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     super.initState();
     _restoreChatHistory();
     _listenUserAvatar();
+
+    final initialDraft = widget.initialDraft?.trim();
+    if (initialDraft != null && initialDraft.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setDraftText(initialDraft);
+      });
+    }
+    if (widget.showInputCoach) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => showInputCoach());
+    }
 
     _focusNode.addListener(() {
       if (_focusNode.hasFocus && _showDescriptionCard) {
@@ -189,6 +222,33 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
 
     _scrollToBottom();
+  }
+
+  void showInputCoach() {
+    if (_inputCoachShown || !mounted) return;
+    _inputCoachShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      TutorialCoachMark(
+        targets: [
+          TargetFocus(
+            identify: 'ai-question-input',
+            keyTarget: _composerCoachKey,
+            shape: ShapeLightFocus.RRect,
+            radius: 24,
+            contents: [
+              TargetContent(
+                align: ContentAlign.top,
+                child: const _AiInputCoachContent(),
+              ),
+            ],
+          ),
+        ],
+        colorShadow: Colors.black,
+        opacityShadow: 0.78,
+        textSkip: 'あとで',
+      ).show(context: context);
+    });
   }
 
   void openChatHistory() {
@@ -671,6 +731,20 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       AppAnalytics.logAiConsultationStarted(hasHistory: hasHistory),
     );
 
+    if (widget.trialFeature == TrialFeature.ai) {
+      final billing = await _billingRepo.fetchBillingStatus();
+      if (!billing.canUsePaidFeatures) {
+        final trial = await _trialRepo.fetch();
+        if (!trial.allows(TrialFeature.ai)) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('AIの無料体験は3回までです。')),
+          );
+          return;
+        }
+      }
+    }
+
     setState(() {
       _hasRestoredHistory = false;
       _messages.add(ChatMessage(content: text, isUser: true));
@@ -723,6 +797,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           retrievedChunkCount: result.chunks.length,
         ),
       );
+      if (widget.trialFeature == TrialFeature.ai) {
+        final billing = await _billingRepo.fetchBillingStatus();
+        if (!billing.canUsePaidFeatures) await _trialRepo.consumeAiTrial();
+      }
+      final onConsultationCompleted = widget.onConsultationCompleted;
+      if (onConsultationCompleted != null) {
+        unawaited(onConsultationCompleted());
+      }
 
       _scrollToBottom();
     } catch (e) {
@@ -955,6 +1037,14 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Row(
         children: [
+          if (widget.showCloseButton) ...[
+            IconButton(
+              tooltip: '初回設定に戻る',
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close_rounded),
+            ),
+            const SizedBox(width: 4),
+          ],
           Expanded(
             child: Text(
               subtitle,
@@ -1197,7 +1287,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         lockedTitle: 'AI相談は有料プランの機能です',
         lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
         icon: Icons.smart_toy_rounded,
-        showBackground: false,
+        showBackground: widget.showPaidGateBackground,
+        trialFeature: widget.trialFeature,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1284,6 +1375,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
                 borderWidth: 2.2,
                 active: _focusNode.hasFocus && !_isViewingArchivedThread,
                 child: Container(
+                  key: _composerCoachKey,
                   decoration: BoxDecoration(
                     color: AppTheme.cardSurface(context),
                     borderRadius: BorderRadius.circular(24),
@@ -1354,4 +1446,18 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     _avatarSub = null;
     super.dispose();
   }
+}
+
+class _AiInputCoachContent extends StatelessWidget {
+  const _AiInputCoachContent();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 18),
+        child: Text(
+          'ここに、いま気になることを入力してみましょう。\n例：今日の飼育環境で確認しておくことを教えてください。',
+          style: TextStyle(
+              color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+      );
 }

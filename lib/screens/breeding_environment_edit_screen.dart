@@ -87,7 +87,7 @@ class _BreedingEnvironmentEditScreenState
       // 2秒後に戻る（mounted確認はここで）
       await Future.delayed(const Duration(seconds: 2));
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

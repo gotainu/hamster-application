@@ -24,6 +24,23 @@ export type EnvironmentTrendDirection =
   | 'worsening'
   | 'unknown';
 
+export interface HealthPersonalBaseline {
+  status: 'learning' | 'ready';
+  method: 'median_mad_ewma_v1';
+  recordCount: number;
+  requiredRecordCount: number;
+  spanDays: number;
+  requiredSpanDays: number;
+  firstDateKey: string | null;
+  lastDateKey: string | null;
+  median: number | null;
+  mad: number | null;
+  ewma: number | null;
+  ewmaAlpha: number;
+  deviationPct: number | null;
+  robustZScore: number | null;
+}
+
 export interface EnvironmentHealthFeatures {
   sourceKind: EnvironmentFeatureSourceKind;
   sourceDateKey: string | null;
@@ -66,6 +83,7 @@ export interface ActivityHealthFeatures {
   wheelDiameterCm: number | null;
   avg7DistanceMeters: number | null;
   deltaPct: number | null;
+  personalBaseline: HealthPersonalBaseline;
   windowDays: number;
   windowRecordCount: number;
   recordDate: Date | null;
@@ -80,6 +98,7 @@ export interface BodyHealthFeatures {
   previousChangeRate: number | null;
   windowDays: number;
   windowChangeRate: number | null;
+  personalBaseline: HealthPersonalBaseline;
   windowRecordCount: number;
   totalRecordCount: number;
 }
@@ -88,6 +107,7 @@ export interface ConditionHealthFeatures {
   recorded: boolean;
   condition: string | null;
   concernTags: string[];
+  observationLevels: Record<string, string>;
   memo: string;
   recordDate: Date | null;
 }
@@ -150,19 +170,28 @@ export interface HealthOverallAssessment {
   score: number | null;
   observedState: HealthAssessmentState;
   observedScore: number | null;
+  scoreRange: {
+    minimum: number;
+    maximum: number;
+  } | null;
+  scoreCoverage: number;
   confidence: HealthAssessmentConfidence;
   isProvisional: boolean;
   flags: string[];
   summary: string;
   recommendedActions: string[];
   primaryFactor: string | null;
+  primaryFactors: string[];
 }
 
 export interface HealthAssessmentDataQuality {
   completeness: number;
+  scoreCoverage: number;
   availableDomains: string[];
   missingDomains: string[];
   staleDomains: string[];
+  scoredDomains: string[];
+  unscoredDomains: string[];
 }
 
 export interface HealthAiAdvisorContext {
@@ -205,6 +234,7 @@ export interface DailyCheckinSource {
   dayKey: string;
   condition: string | null;
   concernTags: string[];
+  observationLevels: Record<string, string>;
   memo: string;
   date: Date | null;
 }

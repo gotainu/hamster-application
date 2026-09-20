@@ -1,18 +1,21 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 import '../models/breeding_environment.dart';
 import '../models/pet_profile.dart';
 import '../screens/breeding_environment_edit_screen.dart';
 import '../screens/pet_profile_edit_screen.dart';
-import '../screens/switchbot_setup.dart';
+import '../screens/owner_profile_edit_screen.dart';
 import '../services/breeding_environment_repo.dart';
 import '../services/onboarding_state_repo.dart';
 import '../services/pet_profile_repo.dart';
-import '../services/switchbot_repo.dart';
+import '../services/owner_profile_repo.dart';
 import '../theme/app_theme.dart';
 
+/// 新規ユーザーが、説明を読むだけでなくアプリの価値に到達するための導線です。
+///
+/// SwitchBot 等の追加設定はここでは扱わず、AI相談の精度に直結する三つの
+/// 操作（ペット、環境、最初の相談）だけに絞っています。
 class SetupChecklistScreen extends StatefulWidget {
   final VoidCallback? onFinished;
 
@@ -28,10 +31,14 @@ class SetupChecklistScreen extends StatefulWidget {
 class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
   final _petRepo = PetProfileRepo();
   final _envRepo = BreedingEnvironmentRepo();
-  final _switchbotRepo = SwitchbotRepo();
   final _onboardingRepo = OnboardingStateRepo();
+  final _ownerRepo = OwnerProfileRepo();
 
   late Future<_SetupChecklistStatus> _statusFuture;
+  final GlobalKey _petProfileStepKey = GlobalKey();
+  final GlobalKey _environmentStepKey = GlobalKey();
+  final GlobalKey _ownerStepKey = GlobalKey();
+  int? _scheduledCoachStep;
 
   @override
   void initState() {
@@ -40,109 +47,186 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(() {
-      _statusFuture = _loadStatus();
-    });
+    if (!mounted) return;
+    setState(() => _statusFuture = _loadStatus());
   }
 
   Future<_SetupChecklistStatus> _loadStatus() async {
-    final pet = await _petRepo.fetchMainPet();
-    final env = await _envRepo.fetchMainEnv();
+    final results = await Future.wait<Object?>([
+      _petRepo.fetchMainPet(),
+      _envRepo.fetchMainEnv(),
+      _ownerRepo.fetch(),
+      _onboardingRepo.fetchState(),
+    ]);
 
-    final hasSwitchbotSecrets = await _safeReadSwitchbotSecrets();
-    final switchbotConfig = await _safeReadSwitchbotConfig();
+    final pet = results[0] as PetProfile?;
+    final env = results[1] as BreedingEnvironment?;
+    final owner = results[2];
+    final onboarding = results[3] as OnboardingState;
 
     return _SetupChecklistStatus(
-      hasPetProfile: _hasPetProfile(pet),
-      hasBreedingEnvironment: _hasBreedingEnvironment(env),
-      hasSwitchbotSecrets: hasSwitchbotSecrets,
-      hasSwitchbotDevice: switchbotConfig?.hasDevice ?? false,
+      petName: pet?.name.trim() ?? '',
+      hasPetProfile:
+          pet != null || onboarding.completedSetupSteps.contains('pet'),
+      hasBreedingEnvironment:
+          env != null || onboarding.completedSetupSteps.contains('environment'),
+      hasOwnerProfile:
+          owner != null || onboarding.completedSetupSteps.contains('owner'),
+      setupCoachMarkStep: onboarding.setupCoachMarkStep,
     );
   }
 
-  Future<bool> _safeReadSwitchbotSecrets() async {
-    try {
-      return await _switchbotRepo.watchHasSecrets().first.timeout(
-            const Duration(seconds: 3),
-            onTimeout: () => false,
-          );
-    } catch (_) {
-      return false;
+  Future<void> _openPetProfileEdit({required bool isAlreadyRegistered}) async {
+    if (!isAlreadyRegistered) {
+      final shouldContinue = await _showValuePreview(
+        imagePath: 'assets/images/onboarding/personalized_care_portrait.png',
+        eyebrow: 'うちの子だけの見守りへ',
+        title: '名前を呼べる\n見守りを始めよう',
+        body: '種類・毛色・誕生日を登録すると、記録と相談がその子に合わせてまとまります。',
+        actionLabel: 'プロフィールを登録する',
+      );
+      if (!shouldContinue || !mounted) return;
     }
-  }
 
-  Future<SwitchbotConfig?> _safeReadSwitchbotConfig() async {
-    try {
-      return await _switchbotRepo.watchSwitchbotConfig().first.timeout(
-            const Duration(seconds: 3),
-            onTimeout: () => null,
-          );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  bool _hasPetProfile(PetProfile? pet) {
-    if (pet == null) return false;
-    return pet.name.trim().isNotEmpty &&
-        pet.species.trim().isNotEmpty &&
-        pet.color?.trim().isNotEmpty == true &&
-        pet.birthday != null;
-  }
-
-  bool _hasBreedingEnvironment(BreedingEnvironment? env) {
-    if (env == null) return false;
-
-    return (env.cageWidth ?? '').trim().isNotEmpty &&
-        (env.cageDepth ?? '').trim().isNotEmpty &&
-        (env.beddingThickness ?? '').trim().isNotEmpty &&
-        (env.wheelDiameter ?? '').trim().isNotEmpty &&
-        env.temperatureControl.trim().isNotEmpty;
-  }
-
-  Future<void> _openPetProfileEdit() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const PetProfileEditScreen(),
-      ),
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const PetProfileEditScreen()),
     );
-
-    if (!mounted) return;
+    if (saved == true) await _onboardingRepo.markSetupStepCompleted('pet');
     await _refresh();
   }
 
-  Future<void> _openBreedingEnvironmentEdit() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const BreedingEnvironmentEditScreen(),
-      ),
-    );
+  Future<void> _openBreedingEnvironmentEdit({
+    required bool isAlreadyRegistered,
+  }) async {
+    if (!isAlreadyRegistered) {
+      final shouldContinue = await _showValuePreview(
+        imagePath: 'assets/images/onboarding/detect_small_changes_portrait.png',
+        eyebrow: '環境を基準にする',
+        title: '気になる変化を\n見つけやすくしよう',
+        body: 'ケージ・床材・回し車・温度管理を登録すると、環境評価とAI相談が具体的になります。',
+        actionLabel: '飼育環境を登録する',
+      );
+      if (!shouldContinue || !mounted) return;
+    }
 
-    if (!mounted) return;
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const BreedingEnvironmentEditScreen()),
+    );
+    if (saved == true) {
+      await _onboardingRepo.markSetupStepCompleted('environment');
+    }
     await _refresh();
   }
 
-  Future<void> _openSwitchbotSetup() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SwitchbotSetupScreen(),
-      ),
+  Future<void> _openOwnerProfileEdit(
+      {required bool isAlreadyRegistered}) async {
+    if (!isAlreadyRegistered) {
+      final shouldContinue = await _showValuePreview(
+        imagePath: 'assets/images/onboarding/owner_context_portrait.png',
+        eyebrow: '見守りをあなた向けに',
+        title: '地域や経験を\nあとから活かせます',
+        body: '地域の天気や、あなたの飼育経験に合わせた振り返りに使えます。すべて後から変更できます。',
+        actionLabel: '飼い主プロフィールを登録する',
+      );
+      if (!shouldContinue || !mounted) return;
+    }
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const OwnerProfileEditScreen()),
     );
-
-    if (!mounted) return;
+    if (saved == true) await _onboardingRepo.markSetupStepCompleted('owner');
     await _refresh();
   }
 
   Future<void> _finishSetup() async {
-    await _onboardingRepo.markSetupChecklistViewed();
-
+    final status = await _statusFuture;
+    await _onboardingRepo.markJourneyCompleted(
+      startHomeAiOnboarding: status.isComplete,
+    );
     if (!mounted) return;
 
     widget.onFinished?.call();
-
     if (widget.onFinished == null) {
       Navigator.of(context).pop();
     }
+  }
+
+  Future<bool> _showValuePreview({
+    required String imagePath,
+    required String eyebrow,
+    required String title,
+    required String body,
+    required String actionLabel,
+  }) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _ValuePreviewSheet(
+        imagePath: imagePath,
+        eyebrow: eyebrow,
+        title: title,
+        body: body,
+        actionLabel: actionLabel,
+      ),
+    );
+    return result == true;
+  }
+
+  void _scheduleStartGuide(_SetupChecklistStatus status) {
+    final step = status.nextCoachStep;
+    if (step == null || _scheduledCoachStep == step) return;
+    _scheduledCoachStep = step;
+    final config = switch (step) {
+      1 => (
+          key: _petProfileStepKey,
+          title: 'まずは、うちの子を登録',
+          body: '登録すると、その子に合わせた見守りを始められます。'
+        ),
+      2 => (
+          key: _environmentStepKey,
+          title: '次は、飼育環境を登録',
+          body: '環境の変化に気づく基準を作りましょう。'
+        ),
+      _ => (
+          key: _ownerStepKey,
+          title: '最後に、飼い主プロフィール',
+          body: '地域や経験を、これからの見守りに活かせます。'
+        ),
+    };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      TutorialCoachMark(
+        targets: [
+          TargetFocus(
+            identify: 'setup-step-$step',
+            keyTarget: config.key,
+            shape: ShapeLightFocus.RRect,
+            radius: 24,
+            contents: [
+              TargetContent(
+                align: ContentAlign.bottom,
+                child: _CoachMarkContent(
+                  title: config.title,
+                  body: config.body,
+                ),
+              ),
+            ],
+          ),
+        ],
+        colorShadow: const Color(0xFF080D19),
+        opacityShadow: 0.76,
+        textSkip: 'あとで',
+        onSkip: () {
+          _onboardingRepo.markSetupCoachMarkStepSeen(step);
+          return true;
+        },
+        onFinish: () {
+          _onboardingRepo.markSetupCoachMarkStepSeen(step);
+        },
+      ).show(context: context);
+    });
   }
 
   @override
@@ -164,13 +248,17 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
               final loading = snap.connectionState == ConnectionState.waiting;
               final status = snap.data ?? _SetupChecklistStatus.empty();
 
+              if (!loading && status.nextCoachStep != null) {
+                _scheduleStartGuide(status);
+              }
+
               return ListView(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
                 children: [
                   Row(
                     children: [
                       Text(
-                        '初期設定',
+                        'はじめる準備',
                         style:
                             Theme.of(context).textTheme.headlineSmall?.copyWith(
                                   fontWeight: FontWeight.w900,
@@ -192,92 +280,72 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'まずは、このアプリの価値が出る設定を整えましょう。',
+                    '3つの登録で、見守りを始められます。',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.secondaryText(context),
-                          height: 1.5,
                         ),
                   ),
-                  const SizedBox(height: 20),
-                  _SetupProgressCard(
-                    completedCount: status.completedRequiredCount,
-                    totalCount: status.totalRequiredCount,
+                  const SizedBox(height: 22),
+                  _JourneyProgress(
+                    completedCount: status.completedCount,
+                    totalCount: status.totalCount,
                     loading: loading,
                   ),
                   const SizedBox(height: 22),
-                  _SectionTitle(
-                    title: '必須設定',
-                    subtitle: 'AI相談と評価の精度に直接関わります',
-                  ),
-                  const SizedBox(height: 12),
-                  _ChecklistTile(
+                  _JourneyStepTile(
+                    number: 1,
                     icon: Icons.pets_rounded,
-                    title: 'ペットプロフィールを登録',
-                    subtitle: '名前・種類・毛色・誕生日を登録します',
-                    requiredLabel: '必須',
+                    title: 'うちの子を登録',
+                    subtitle: '名前・種類・毛色・誕生日',
                     completed: status.hasPetProfile,
-                    onTap: _openPetProfileEdit,
+                    enabled: !loading,
                     actionLabel: status.hasPetProfile ? '編集' : '登録する',
+                    targetKey: _petProfileStepKey,
+                    onTap: () => _openPetProfileEdit(
+                      isAlreadyRegistered: status.hasPetProfile,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  _ChecklistTile(
+                  _JourneyStepTile(
+                    number: 2,
                     icon: Icons.home_work_rounded,
                     title: '飼育環境を登録',
-                    subtitle: 'ケージ・床材・回し車・温度管理を登録します',
-                    requiredLabel: '必須',
+                    subtitle: 'ケージ・床材・回し車・温度管理',
                     completed: status.hasBreedingEnvironment,
-                    onTap: _openBreedingEnvironmentEdit,
+                    enabled: !loading,
                     actionLabel: status.hasBreedingEnvironment ? '編集' : '登録する',
-                  ),
-                  const SizedBox(height: 24),
-                  _SectionTitle(
-                    title: 'おすすめ設定',
-                    subtitle: '毎日の見守りがさらに便利になります',
-                  ),
-                  const SizedBox(height: 12),
-                  _ChecklistTile(
-                    icon: Icons.thermostat_rounded,
-                    title: 'SwitchBotを連携',
-                    subtitle: status.hasSwitchbotSecrets
-                        ? status.hasSwitchbotDevice
-                            ? '温湿度計の選択まで完了しています'
-                            : '認証済みです。温湿度計を選択してください'
-                        : '温湿度を自動で記録できます',
-                    requiredLabel: '推奨',
-                    completed:
-                        status.hasSwitchbotSecrets && status.hasSwitchbotDevice,
-                    onTap: _openSwitchbotSetup,
-                    actionLabel: status.hasSwitchbotSecrets ? '設定を開く' : '連携する',
+                    targetKey: _environmentStepKey,
+                    onTap: () => _openBreedingEnvironmentEdit(
+                      isAlreadyRegistered: status.hasBreedingEnvironment,
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  _ChecklistTile(
-                    icon: Icons.directions_run_rounded,
-                    title: '昨日の走行記録を入れる',
-                    subtitle: '昨晩〜今朝の回転数を入力すると活動量評価に使えます',
-                    requiredLabel: '任意',
-                    completed: false,
-                    onTap: _finishSetup,
-                    actionLabel: 'Homeで入力',
-                  ),
-                  const SizedBox(height: 12),
-                  _ChecklistTile(
-                    icon: Icons.favorite_border_rounded,
-                    title: '今日の様子を残す',
-                    subtitle: '気になる様子がある時だけ記録できます',
-                    requiredLabel: '任意',
-                    completed: false,
-                    onTap: _finishSetup,
-                    actionLabel: 'Homeで入力',
+                  _JourneyStepTile(
+                    number: 3,
+                    icon: Icons.person_pin_circle_rounded,
+                    title: '飼い主プロフィールを登録',
+                    subtitle: '地域・年齢層・飼育経験',
+                    completed: status.hasOwnerProfile,
+                    enabled: !loading,
+                    actionLabel: status.hasOwnerProfile ? '編集' : '登録する',
+                    targetKey: _ownerStepKey,
+                    onTap: () => _openOwnerProfileEdit(
+                      isAlreadyRegistered: status.hasOwnerProfile,
+                    ),
                   ),
                   const SizedBox(height: 28),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: _finishSetup,
-                      icon: const Icon(Icons.check_circle_rounded),
-                      label: const Text(
-                        'Homeへ進む',
-                        style: TextStyle(fontWeight: FontWeight.w800),
+                      icon: Icon(
+                        status.isComplete
+                            ? Icons.check_circle_rounded
+                            : Icons.home_rounded,
+                      ),
+                      label: Text(
+                        status.isComplete ? '見守りを始める' : 'Homeへ進む',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
                       ),
                     ),
                   ),
@@ -292,43 +360,51 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
 }
 
 class _SetupChecklistStatus {
+  final String petName;
   final bool hasPetProfile;
   final bool hasBreedingEnvironment;
-  final bool hasSwitchbotSecrets;
-  final bool hasSwitchbotDevice;
+  final bool hasOwnerProfile;
+  final int setupCoachMarkStep;
 
   const _SetupChecklistStatus({
+    required this.petName,
     required this.hasPetProfile,
     required this.hasBreedingEnvironment,
-    required this.hasSwitchbotSecrets,
-    required this.hasSwitchbotDevice,
+    required this.hasOwnerProfile,
+    required this.setupCoachMarkStep,
   });
 
   factory _SetupChecklistStatus.empty() {
     return const _SetupChecklistStatus(
+      petName: '',
       hasPetProfile: false,
       hasBreedingEnvironment: false,
-      hasSwitchbotSecrets: false,
-      hasSwitchbotDevice: false,
+      hasOwnerProfile: false,
+      setupCoachMarkStep: 0,
     );
   }
 
-  int get completedRequiredCount {
-    return [
-      hasPetProfile,
-      hasBreedingEnvironment,
-    ].where((e) => e).length;
+  int get completedCount => [
+        hasPetProfile,
+        hasBreedingEnvironment,
+        hasOwnerProfile,
+      ].where((value) => value).length;
+  int get totalCount => 3;
+  bool get isComplete => completedCount == totalCount;
+  int? get nextCoachStep {
+    if (!hasPetProfile) return setupCoachMarkStep < 1 ? 1 : null;
+    if (!hasBreedingEnvironment) return setupCoachMarkStep < 2 ? 2 : null;
+    if (!hasOwnerProfile) return setupCoachMarkStep < 3 ? 3 : null;
+    return null;
   }
-
-  int get totalRequiredCount => 2;
 }
 
-class _SetupProgressCard extends StatelessWidget {
+class _JourneyProgress extends StatelessWidget {
   final int completedCount;
   final int totalCount;
   final bool loading;
 
-  const _SetupProgressCard({
+  const _JourneyProgress({
     required this.completedCount,
     required this.totalCount,
     required this.loading,
@@ -337,229 +413,325 @@ class _SetupProgressCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ratio = totalCount == 0 ? 0.0 : completedCount / totalCount;
-    final allDone = completedCount >= totalCount;
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: AppTheme.cardSurface(context),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 18,
-            offset: const Offset(0, 10),
-            color: AppTheme.softShadow(context),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppTheme.quickActionBorder(context)),
       ),
       child: Row(
         children: [
-          Container(
+          SizedBox(
             width: 54,
             height: 54,
-            decoration: BoxDecoration(
-              color: AppTheme.chipFill(
-                allDone ? AppTheme.envGood : AppTheme.accent,
-                context,
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(
-              allDone ? Icons.check_circle_rounded : Icons.checklist_rounded,
-              color: allDone ? AppTheme.envGood : AppTheme.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(
-                  loading
-                      ? '設定状況を確認中…'
-                      : allDone
-                          ? '必須設定は完了しています'
-                          : 'あと ${totalCount - completedCount} 件で準備完了',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                LinearProgressIndicator(
+                CircularProgressIndicator(
                   value: loading ? null : ratio,
-                  minHeight: 8,
-                  borderRadius: BorderRadius.circular(999),
+                  strokeWidth: 6,
+                  backgroundColor: AppTheme.quickActionFill(context),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '$completedCount / $totalCount 完了',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                        fontWeight: FontWeight.w700,
-                      ),
+                Center(
+                  child: Text(
+                    '$completedCount/$totalCount',
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              completedCount == totalCount
+                  ? '準備ができました'
+                  : 'あと${totalCount - completedCount}つ',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryText(context),
+                  ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _SectionTitle extends StatelessWidget {
+class _JourneyStepTile extends StatelessWidget {
+  final int number;
+  final IconData icon;
   final String title;
   final String subtitle;
+  final bool completed;
+  final bool enabled;
+  final String actionLabel;
+  final VoidCallback onTap;
+  final Key? targetKey;
 
-  const _SectionTitle({
+  const _JourneyStepTile({
+    required this.number,
+    required this.icon,
     required this.title,
     required this.subtitle,
+    required this.completed,
+    required this.enabled,
+    required this.actionLabel,
+    required this.onTap,
+    this.targetKey,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
+    final muted = !enabled && !completed;
+    final textColor =
+        muted ? AppTheme.weakText(context) : AppTheme.primaryText(context);
+
+    return Semantics(
+      button: enabled,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          borderRadius: BorderRadius.circular(24),
+          child: Ink(
+            key: targetKey,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.cardSurface(context),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: completed
+                    ? AppTheme.accent.withValues(alpha: 0.7)
+                    : AppTheme.quickActionBorder(context),
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: completed
+                        ? AppTheme.accent.withValues(alpha: 0.16)
+                        : AppTheme.quickActionFill(context),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    completed ? Icons.check_rounded : icon,
+                    color: completed
+                        ? AppTheme.accent
+                        : (muted
+                            ? AppTheme.weakText(context)
+                            : AppTheme.accent),
+                  ),
                 ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.secondaryText(context),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$number. $title',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              color: textColor,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: muted
+                                  ? AppTheme.weakText(context)
+                                  : AppTheme.secondaryText(context),
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  actionLabel,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: completed
+                            ? AppTheme.accent
+                            : (muted
+                                ? AppTheme.weakText(context)
+                                : AppTheme.accent),
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  completed
+                      ? Icons.check_circle_rounded
+                      : Icons.chevron_right_rounded,
+                  color: completed
+                      ? AppTheme.accent
+                      : (muted
+                          ? AppTheme.weakText(context)
+                          : AppTheme.secondaryText(context)),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ChecklistTile extends StatelessWidget {
-  final IconData icon;
+class _ValuePreviewSheet extends StatelessWidget {
+  final String imagePath;
+  final String eyebrow;
   final String title;
-  final String subtitle;
-  final String requiredLabel;
-  final bool completed;
-  final VoidCallback onTap;
+  final String body;
   final String actionLabel;
 
-  const _ChecklistTile({
-    required this.icon,
+  const _ValuePreviewSheet({
+    required this.imagePath,
+    required this.eyebrow,
     required this.title,
-    required this.subtitle,
-    required this.requiredLabel,
-    required this.completed,
-    required this.onTap,
+    required this.body,
     required this.actionLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = completed ? AppTheme.envGood : AppTheme.accent;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.cardSurface(context),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: completed
-                  ? AppTheme.envGood.withValues(alpha: 0.22)
-                  : AppTheme.quickActionBorder(context),
-            ),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 14,
-                offset: const Offset(0, 8),
-                color: AppTheme.softShadow(context),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppTheme.chipFill(color, context),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  completed ? Icons.check_circle_rounded : icon,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          title,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.chipFill(color, context),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            requiredLabel,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: color,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11,
-                                    ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                            height: 1.45,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: onTap,
-                child: Text(actionLabel),
-              ),
-            ],
-          ),
+    return SafeArea(
+      top: false,
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          border: Border.all(color: AppTheme.quickActionBorder(context)),
         ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: Image.asset(imagePath, fit: BoxFit.cover),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    stops: const [0, 0.26, 0.52, 1],
+                    colors: [
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.20),
+                      AppTheme.cardSurface(context).withValues(alpha: 0.84),
+                      AppTheme.cardSurface(context),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color:
+                            AppTheme.weakText(context).withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 156),
+                  Text(
+                    eyebrow,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: AppTheme.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 7),
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          height: 1.18,
+                          color: AppTheme.primaryText(context),
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    body,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.secondaryText(context),
+                          height: 1.55,
+                        ),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    icon: const Icon(Icons.arrow_forward_rounded),
+                    label: Text(
+                      actionLabel,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('あとで'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CoachMarkContent extends StatelessWidget {
+  final String title;
+  final String body;
+
+  const _CoachMarkContent({
+    required this.title,
+    required this.body,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 0),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.88),
+                  height: 1.45,
+                ),
+          ),
+        ],
       ),
     );
   }

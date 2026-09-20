@@ -169,7 +169,7 @@ class HamsterAvatarConditionResolver {
       );
     }
 
-    final score = assessment.overall.score ?? assessment.overall.observedScore;
+    final score = assessment.overall.score;
     if (score != null && score >= 90) {
       return HamsterAvatarConditionResult(
         condition: HamsterAvatarCondition.happy,
@@ -192,6 +192,7 @@ class HamsterAvatarConditionResolver {
       ...assessment.overall.flags,
       assessment.overall.summary,
       assessment.overall.primaryFactor ?? '',
+      ...assessment.overall.primaryFactors,
     ];
 
     for (final domain in [

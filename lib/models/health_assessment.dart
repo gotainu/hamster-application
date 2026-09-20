@@ -237,24 +237,30 @@ class HealthOverallAssessment {
   final int? score;
   final HealthAssessmentState observedState;
   final int? observedScore;
+  final HealthScoreRange? scoreRange;
+  final double scoreCoverage;
   final HealthAssessmentConfidence confidence;
   final bool isProvisional;
   final List<String> flags;
   final String summary;
   final List<String> recommendedActions;
   final String? primaryFactor;
+  final List<String> primaryFactors;
 
   const HealthOverallAssessment({
     required this.state,
     required this.score,
     required this.observedState,
     required this.observedScore,
+    required this.scoreRange,
+    required this.scoreCoverage,
     required this.confidence,
     required this.isProvisional,
     required this.flags,
     required this.summary,
     required this.recommendedActions,
     required this.primaryFactor,
+    required this.primaryFactors,
   });
 
   factory HealthOverallAssessment.fromMap(Json map) {
@@ -270,12 +276,22 @@ class HealthOverallAssessment {
       observedScore: map.containsKey('observedScore')
           ? _integer(map['observedScore'])
           : score,
+      scoreRange: map['scoreRange'] == null
+          ? null
+          : HealthScoreRange.fromMap(_json(map['scoreRange'])),
+      scoreCoverage: _double(map['scoreCoverage']) ?? (score == null ? 0 : 1),
       confidence: parseHealthAssessmentConfidence(map['confidence']),
       isProvisional: _boolean(map['isProvisional']) ?? false,
       flags: _stringList(map['flags']),
       summary: _string(map['summary']) ?? '',
       recommendedActions: _stringList(map['recommendedActions']),
       primaryFactor: _string(map['primaryFactor']),
+      primaryFactors: _stringList(map['primaryFactors']).isNotEmpty
+          ? _stringList(map['primaryFactors'])
+          : [
+              if ((_string(map['primaryFactor']) ?? '').isNotEmpty)
+                _string(map['primaryFactor'])!,
+            ],
     );
   }
 
@@ -287,44 +303,82 @@ class HealthOverallAssessment {
       'score': score,
       'observedState': observedState.name,
       'observedScore': observedScore,
+      if (scoreRange != null) 'scoreRange': scoreRange!.toMap(),
+      'scoreCoverage': scoreCoverage,
       'confidence': confidence.name,
       'isProvisional': isProvisional,
       'flags': flags,
       'summary': summary,
       'recommendedActions': recommendedActions,
       'primaryFactor': primaryFactor,
+      'primaryFactors': primaryFactors,
     };
   }
 }
 
+class HealthScoreRange {
+  final int minimum;
+  final int maximum;
+
+  const HealthScoreRange({
+    required this.minimum,
+    required this.maximum,
+  });
+
+  factory HealthScoreRange.fromMap(Json map) {
+    return HealthScoreRange(
+      minimum: _integer(map['minimum']) ?? 0,
+      maximum: _integer(map['maximum']) ?? 100,
+    );
+  }
+
+  Json toMap() => {
+        'minimum': minimum,
+        'maximum': maximum,
+      };
+}
+
 class HealthAssessmentDataQuality {
   final double completeness;
+  final double scoreCoverage;
   final List<String> availableDomains;
   final List<String> missingDomains;
   final List<String> staleDomains;
+  final List<String> scoredDomains;
+  final List<String> unscoredDomains;
 
   const HealthAssessmentDataQuality({
     required this.completeness,
+    required this.scoreCoverage,
     required this.availableDomains,
     required this.missingDomains,
     required this.staleDomains,
+    required this.scoredDomains,
+    required this.unscoredDomains,
   });
 
   factory HealthAssessmentDataQuality.fromMap(Json map) {
     return HealthAssessmentDataQuality(
       completeness: _double(map['completeness']) ?? 0,
+      scoreCoverage:
+          _double(map['scoreCoverage']) ?? (_double(map['completeness']) ?? 0),
       availableDomains: _stringList(map['availableDomains']),
       missingDomains: _stringList(map['missingDomains']),
       staleDomains: _stringList(map['staleDomains']),
+      scoredDomains: _stringList(map['scoredDomains']),
+      unscoredDomains: _stringList(map['unscoredDomains']),
     );
   }
 
   Json toMap() {
     return {
       'completeness': completeness,
+      'scoreCoverage': scoreCoverage,
       'availableDomains': availableDomains,
       'missingDomains': missingDomains,
       'staleDomains': staleDomains,
+      'scoredDomains': scoredDomains,
+      'unscoredDomains': unscoredDomains,
     };
   }
 }

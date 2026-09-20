@@ -5,7 +5,11 @@ import { buildDailyHealthFeatures } from './dailyHealthFeatures';
 import { fetchHealthSourceData } from './firestoreReaders';
 import { buildHealthAssessment } from './healthAssessment';
 import { formatDateKey, normalizeDateKey } from './dateKey';
-import { executeGoldHealthNotificationPipeline } from './goldHealthNotification';
+import {
+  executeGoldHealthNotificationPipeline,
+  executePendingResolvedHealthNotifications,
+} from './goldHealthNotification';
+import { syncHealthIncidentLifecycle } from './healthIncidentLifecycle';
 
 export interface HealthPipelineResult {
   uid: string;
@@ -17,7 +21,9 @@ export interface HealthPipelineResult {
   confidence: string;
   isProvisional: boolean;
   featureCompleteness: number;
+  scoreCoverage: number;
   primaryFactor: string | null;
+  primaryFactors: string[];
   updatedLatest: boolean;
 }
 
@@ -74,7 +80,7 @@ export async function rebuildHealthForDate(params: {
       featureRef,
       {
         ...featureResult.features,
-        source: 'health_pipeline_v4',
+        source: 'health_pipeline_v7',
         triggerReason: params.reason,
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
@@ -86,7 +92,7 @@ export async function rebuildHealthForDate(params: {
       historyRef,
       {
         ...assessment,
-        source: 'health_pipeline_v4',
+        source: 'health_pipeline_v7',
         triggerReason: params.reason,
         updatedAt:
           admin.firestore.FieldValue.serverTimestamp(),
@@ -99,7 +105,7 @@ export async function rebuildHealthForDate(params: {
         latestRef,
         {
           ...assessment,
-          source: 'health_pipeline_v4',
+          source: 'health_pipeline_v7',
           triggerReason: params.reason,
           updatedAt:
             admin.firestore.FieldValue.serverTimestamp(),
@@ -113,6 +119,15 @@ export async function rebuildHealthForDate(params: {
 
   if (updatedLatest && dateKey === formatDateKey(generatedAt)) {
     try {
+      if (params.reason !== 'manual_rebuild') {
+        await syncHealthIncidentLifecycle({
+          db,
+          uid: params.uid,
+          assessment,
+          now: generatedAt,
+        });
+      }
+
       const notificationResult =
         await executeGoldHealthNotificationPipeline({
           db,
@@ -134,6 +149,28 @@ export async function rebuildHealthForDate(params: {
         failedCount: notificationResult.failedCount,
         noTokens: notificationResult.noTokens,
       });
+
+      if (
+        params.reason !== 'manual_rebuild' &&
+        notificationResult.sentCount === 0
+      ) {
+        const resolvedResult =
+          await executePendingResolvedHealthNotifications({
+            db,
+            messaging: admin.messaging(),
+            uid: params.uid,
+            triggerReason: params.reason,
+            now: generatedAt,
+          });
+        logger.info('Resolved health notifications processed', {
+          uid: params.uid,
+          dateKey,
+          pendingCount: resolvedResult.pendingCount,
+          sentCount: resolvedResult.sentCount,
+          failedCount: resolvedResult.failedCount,
+          skippedCount: resolvedResult.skippedCount,
+        });
+      }
     } catch (error: unknown) {
       logger.error('Gold health notification pipeline failed', {
         uid: params.uid,
@@ -158,6 +195,8 @@ export async function rebuildHealthForDate(params: {
     confidence: assessment.overall.confidence,
     isProvisional: assessment.overall.isProvisional,
     primaryFactor: assessment.overall.primaryFactor,
+    primaryFactors: assessment.overall.primaryFactors,
+    scoreCoverage: assessment.overall.scoreCoverage,
     completeness:
       featureResult.features.dataQuality.completeness,
     updatedLatest,
@@ -174,7 +213,9 @@ export async function rebuildHealthForDate(params: {
     isProvisional: assessment.overall.isProvisional,
     featureCompleteness:
       featureResult.features.dataQuality.completeness,
+    scoreCoverage: assessment.overall.scoreCoverage,
     primaryFactor: assessment.overall.primaryFactor,
+    primaryFactors: assessment.overall.primaryFactors,
     updatedLatest,
   };
 }

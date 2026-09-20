@@ -140,7 +140,7 @@ class HealthScoreGauge extends StatelessWidget {
                   if (showProvisionalCaption && isProvisional) ...[
                     const SizedBox(height: 4),
                     Text(
-                      '暫定',
+                      score == null ? '記録を蓄積中' : '暫定',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: foregroundColor == null
                                 ? AppTheme.tertiaryText(context)

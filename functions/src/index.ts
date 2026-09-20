@@ -11,6 +11,7 @@ import {
   isPaidStripeSubscription,
   selectPreferredPaidSubscription,
 } from './stripeSubscriptionPriority';
+export {activateFeatureTrial, consumeAiTrial} from './featureTrials';
 
 
 admin.initializeApp();
@@ -2777,3 +2778,10 @@ export {
   healthEnvironmentLatestWritten,
   rebuildMyHealthArchitecture,
 } from './health/healthTriggers';
+
+export {
+  claimDailyOpenStar,
+  acknowledgeFiftyStarMilestone,
+  starDistanceRecordWritten,
+  starDailyCheckinWritten,
+} from './stars/starAwards';

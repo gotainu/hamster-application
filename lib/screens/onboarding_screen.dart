@@ -21,28 +21,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   static const _pages = <_OnboardingPageData>[
     _OnboardingPageData(
-      title: 'うちの子専属の\n飼育アドバイザー',
-      body: '温湿度・活動量・今日の様子をもとに、毎日の飼育をサポートします。',
-      imagePath: 'assets/images/roiroi.png',
-      icon: Icons.pets_rounded,
+      title: '小さな変化を\n見逃さない',
+      body: '毎日の様子と飼育環境をまとめて見て、いつもとの違いに気づけます。',
+      imagePath: 'assets/images/onboarding/detect_small_changes_portrait.png',
     ),
     _OnboardingPageData(
-      title: '感覚ではなく\nデータで見守る',
-      body: 'SwitchBotの温湿度、回し車の走行距離、毎日の様子をまとめて確認できます。',
-      imagePath: 'assets/images/chat.png',
-      icon: Icons.show_chart_rounded,
+      title: 'うちの子に合わせて\n見守る',
+      body: '種類・年齢・飼育環境をもとに、その子のための見守り基準を作れます。',
+      imagePath: 'assets/images/onboarding/personalized_care_portrait.png',
     ),
     _OnboardingPageData(
-      title: '小さな変化に\n早く気づく',
-      body: '高湿の継続、活動量の低下など、見逃しやすい変化を知らせます。',
-      imagePath: 'assets/images/roi.png',
-      icon: Icons.notifications_active_rounded,
-    ),
-    _OnboardingPageData(
-      title: '迷ったら\nそのまま相談',
-      body: '今の飼育環境や記録を踏まえて、AIに相談できます。',
-      imagePath: 'assets/images/chat.png',
-      icon: Icons.smart_toy_rounded,
+      title: '迷ったら\nすぐ相談できる',
+      body: '記録した情報を踏まえて、今確認したいことをAIと整理できます。',
+      imagePath: 'assets/images/onboarding/ai_consultation_portrait.png',
     ),
   ];
 
@@ -78,7 +69,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       backgroundColor: Colors.transparent,
       body: Container(
         decoration: BoxDecoration(
-          gradient: isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
+          gradient: isDark
+              ? const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF07080C),
+                    Color(0xFF11141C),
+                  ],
+                )
+              : AppTheme.lightBgGradient,
         ),
         child: SafeArea(
           child: Padding(
@@ -88,7 +88,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Row(
                   children: [
                     Text(
-                      'Hamster Well-being',
+                      'Ham Care',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.w900,
                             color: AppTheme.primaryText(context),
@@ -152,7 +152,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           : Icons.arrow_forward_rounded,
                     ),
                     label: Text(
-                      _isLastPage ? '初期設定をはじめる' : '次へ',
+                      _isLastPage ? '見守りを始める' : '次へ',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                       ),
@@ -191,197 +191,100 @@ class _OnboardingPage extends StatelessWidget {
         duration: const Duration(milliseconds: 360),
         curve: Curves.easeOutCubic,
         offset: active ? Offset.zero : const Offset(0.04, 0),
-        child: Column(
-          children: [
-            const Spacer(),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-              decoration: BoxDecoration(
-                color: AppTheme.cardSurface(context),
-                borderRadius: BorderRadius.circular(34),
-                boxShadow: [
-                  BoxShadow(
-                    color: accent.withValues(alpha: isDark ? 0.20 : 0.14),
-                    blurRadius: 34,
-                    offset: const Offset(0, 18),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Positioned(
-                    right: -42,
-                    top: -42,
-                    child: Container(
-                      width: 150,
-                      height: 150,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accent.withValues(alpha: isDark ? 0.08 : 0.07),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final cardHeight =
+                constraints.maxHeight < 486 ? constraints.maxHeight : 486.0;
+
+            return Column(
+              children: [
+                const Spacer(),
+                Container(
+                  width: double.infinity,
+                  height: cardHeight,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(34),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: isDark ? 0.20 : 0.14),
+                        blurRadius: 34,
+                        offset: const Offset(0, 18),
                       ),
-                    ),
+                    ],
                   ),
-                  Positioned(
-                    left: -36,
-                    bottom: -48,
-                    child: Container(
-                      width: 170,
-                      height: 170,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: accent.withValues(alpha: isDark ? 0.05 : 0.045),
-                      ),
-                    ),
-                  ),
-                  Column(
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      _OnboardingImageBadge(
-                        imagePath: data.imagePath,
-                        icon: data.icon,
-                      ),
-                      const SizedBox(height: 28),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          data.title,
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineMedium
-                              ?.copyWith(
-                                height: 1.08,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: -0.8,
-                                color: AppTheme.primaryText(context),
-                              ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          data.body,
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      Image.asset(data.imagePath, fit: BoxFit.cover),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Spacer(),
+                            Text(
+                              data.title,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(
+                                    height: 1.08,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: -0.8,
+                                    color: AppTheme.primaryText(context),
+                                  ),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              data.body,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
                                     height: 1.65,
                                     color: AppTheme.secondaryText(context),
                                     fontWeight: FontWeight.w600,
                                   ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: accent.withValues(
-                              alpha: isDark ? 0.12 : 0.10,
                             ),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: accent.withValues(
-                                alpha: isDark ? 0.20 : 0.16,
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: accent.withValues(
+                                  alpha: isDark ? 0.16 : 0.12,
+                                ),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: accent.withValues(
+                                    alpha: isDark ? 0.32 : 0.20,
+                                  ),
+                                ),
+                              ),
+                              child: Text(
+                                'Step ${pageIndex + 1} / 3',
+                                style: TextStyle(
+                                  color: accent,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
                               ),
                             ),
-                          ),
-                          child: Text(
-                            'Step ${pageIndex + 1} / 4',
-                            style: TextStyle(
-                              color: accent,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12,
-                            ),
-                          ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const Spacer(),
-          ],
+                ),
+                const Spacer(),
+              ],
+            );
+          },
         ),
       ),
-    );
-  }
-}
-
-class _OnboardingImageBadge extends StatelessWidget {
-  final String imagePath;
-  final IconData icon;
-
-  const _OnboardingImageBadge({
-    required this.imagePath,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = AppTheme.isDark(context);
-
-    return Stack(
-      alignment: Alignment.bottomRight,
-      children: [
-        Container(
-          width: 188,
-          height: 188,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: isDark
-                  ? const [
-                      Color(0xFF31456F),
-                      Color(0xFF1F2438),
-                    ]
-                  : const [
-                      Color(0xFFEAF1FF),
-                      Color(0xFFFFFFFF),
-                    ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.accent.withValues(alpha: isDark ? 0.22 : 0.14),
-                blurRadius: 30,
-                offset: const Offset(0, 16),
-              ),
-            ],
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              imagePath,
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppTheme.accent,
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.accent.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 28,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -390,12 +293,10 @@ class _OnboardingPageData {
   final String title;
   final String body;
   final String imagePath;
-  final IconData icon;
 
   const _OnboardingPageData({
     required this.title,
     required this.body,
     required this.imagePath,
-    required this.icon,
   });
 }

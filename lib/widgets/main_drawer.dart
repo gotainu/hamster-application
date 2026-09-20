@@ -7,16 +7,19 @@ import '../models/hamster_avatar.dart';
 import '../models/health_assessment.dart';
 import '../models/daily_record_completion.dart';
 import '../models/pet_profile.dart';
+import '../models/star_rewards_progress.dart';
 import '../services/hamster_avatar_appearance_resolver.dart';
 import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/hamster_avatar_condition_resolver.dart';
 import '../services/health_assessment_repo.dart';
 import '../services/pet_profile_repo.dart';
+import '../services/star_rewards_repo.dart';
 import '../theme/app_theme.dart';
 import 'hamster_avatar_view.dart';
 import 'shine_border.dart';
 
 class MainDrawer extends StatelessWidget {
+  static final StarRewardsRepo _starRewardsRepo = StarRewardsRepo();
   const MainDrawer({
     super.key,
     required this.onSelectScreen,
@@ -121,6 +124,28 @@ class MainDrawer extends StatelessWidget {
                                         ),
                                       ],
                                     ),
+                                  ),
+                                );
+                              },
+                            ),
+                            StreamBuilder<StarRewardsProgress?>(
+                              stream: _starRewardsRepo.watchProgress(),
+                              builder: (context, snapshot) {
+                                final progress = snapshot.data;
+                                if (progress == null) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: _DrawerGroup(
+                                    children: [
+                                      _DrawerItem(
+                                        icon: Icons.star_rounded,
+                                        title: '星の累計',
+                                        subtitle: '合計${progress.total}個',
+                                        onTap: () => onSelectScreen('stars'),
+                                      ),
+                                    ],
                                   ),
                                 );
                               },

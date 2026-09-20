@@ -39,10 +39,19 @@ async function main() {
       await setDoc(doc(db, 'users/alice'), { has_subcollections: true });
       await setDoc(doc(db, 'users/bob'), { has_subcollections: true });
       await setDoc(doc(db, 'users/alice/billing/subscription'), { plan: 'paid', status: 'active' });
+      await setDoc(doc(db, 'users/alice/rewards/stars'), { total: 50 });
+      await setDoc(doc(db, 'users/alice/star_awards/2026-09-15_open_app'), { kind: 'open_app' });
+      await setDoc(doc(db, 'users/alice/star_milestones/50'), { milestone: 50 });
       await setDoc(doc(db, 'users/alice/daily_health_features/2026-08-08'), { dateKey: '2026-08-08', source: 'health_pipeline_v4' });
       await setDoc(doc(db, 'users/alice/health_assessments/latest'), { dateKey: '2026-08-08', source: 'health_pipeline_v4' });
       await setDoc(doc(db, 'users/alice/environment_assessments/latest'), { status: 'ok', level: '良好' });
       await setDoc(doc(db, 'users/alice/anomaly_notification_logs/test-log'), { sentAt: null, lastDecisionReason: 'seed' });
+      await setDoc(doc(db, 'users/alice/health_incidents/environment__humidity_high'), {
+        incidentId: 'environment:humidity_high', status: 'active', currentSeverity: 'medium'
+      });
+      await setDoc(doc(db, 'users/alice/notification_delivery_counters/week_2026-09-07'), {
+        weekKey: 'week_2026-09-07', cautionClaimCount: 1
+      });
       await setDoc(doc(db, 'users/alice/integrations/switchbot'), {
         enabled: true,
         hasSecrets: true,
@@ -84,6 +93,20 @@ async function main() {
       assertSucceeds(getDoc(doc(adb, 'users/alice/billing/subscription'))));
     await check('本人でもbillingを改ざんできない', () =>
       assertFails(setDoc(doc(adb, 'users/alice/billing/subscription'), { plan: 'paid', status: 'active' }, { merge: true })));
+    await check('本人は星の累計を読める', () =>
+      assertSucceeds(getDoc(doc(adb, 'users/alice/rewards/stars'))));
+    await check('別ユーザーは星の累計を読めない', () =>
+      assertFails(getDoc(doc(bdb, 'users/alice/rewards/stars'))));
+    await check('本人でも星の累計を改ざんできない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/rewards/stars'), { total: 500 }, { merge: true })));
+    await check('本人は星の獲得履歴を読める', () =>
+      assertSucceeds(getDoc(doc(adb, 'users/alice/star_awards/2026-09-15_open_app'))));
+    await check('本人でも星の獲得履歴を書けない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/star_awards/2026-09-16_open_app'), { kind: 'open_app' })));
+    await check('本人は50個達成状態を読める', () =>
+      assertSucceeds(getDoc(doc(adb, 'users/alice/star_milestones/50'))));
+    await check('本人でも50個達成状態を書けない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/star_milestones/100'), { milestone: 100 })));
     await check('本人はSilverを読める', () =>
       assertSucceeds(getDoc(doc(adb, 'users/alice/daily_health_features/2026-08-08'))));
     await check('本人でもSilverを書けない', () =>
@@ -100,6 +123,31 @@ async function main() {
       assertSucceeds(getDoc(doc(adb, 'users/alice/anomaly_notification_logs/test-log'))));
     await check('本人でも通知ログを書けない', () =>
       assertFails(setDoc(doc(adb, 'users/alice/anomaly_notification_logs/test-log'), { sentAt: new Date() }, { merge: true })));
+    await check('本人は健康インシデントを読める', () =>
+      assertSucceeds(getDoc(doc(adb, 'users/alice/health_incidents/environment__humidity_high'))));
+    await check('本人でも健康インシデント本体を書けない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/health_incidents/environment__humidity_high'), { status: 'resolved' }, { merge: true })));
+    await check('本人は確認済み・スヌーズだけを書ける', () =>
+      assertSucceeds(setDoc(doc(adb, 'users/alice/health_incident_actions/environment__humidity_high'), {
+        incidentId: 'environment:humidity_high',
+        acknowledgedAt: new Date(),
+        snoozedUntil: new Date(Date.now() + 86400000),
+        updatedAt: new Date(),
+      })));
+    await check('本人でも通知制御以外の項目は書けない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/health_incident_actions/environment__humidity_high'), {
+        incidentId: 'environment:humidity_high',
+        status: 'resolved',
+        updatedAt: new Date(),
+      })));
+    await check('別ユーザーは健康インシデント操作を読めない', () =>
+      assertFails(getDoc(doc(bdb, 'users/alice/health_incident_actions/environment__humidity_high'))));
+    await check('本人でも週次配信カウンターを読めない', () =>
+      assertFails(getDoc(doc(adb, 'users/alice/notification_delivery_counters/week_2026-09-07'))));
+    await check('本人でも週次配信カウンターを書けない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/notification_delivery_counters/week_2026-09-07'), {
+        cautionClaimCount: 0,
+      }, { merge: true })));
 
     await check('本人でもSwitchBot secretsを読めない', () =>
       assertFails(getDoc(doc(adb, 'users/alice/integrations/switchbot_secrets'))));

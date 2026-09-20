@@ -46,7 +46,10 @@ export async function fetchHealthSourceData(params: {
       db: params.db,
       uid: params.uid,
       dateKey: activitySourceDateKey,
-      days: 7,
+      // Target day + 90 preceding calendar days. The feature builder keeps
+      // at most the latest 14 valid prior observations and never includes
+      // the target in its personal baseline.
+      days: 91,
     }),
     fetchWeightRecords({
       db: params.db,
@@ -124,38 +127,32 @@ export async function fetchDistanceWindow(params: {
   days: number;
 }): Promise<DistanceRecordSource[]> {
   const dateKey = normalizeDateKey(params.dateKey);
-  const days = Math.max(1, Math.min(31, params.days));
+  const days = Math.max(1, Math.min(91, params.days));
   const startDateKey = addDaysToDateKey(
     dateKey,
     -(days - 1),
   );
-
-  const dateKeys: string[] = [];
-  let current = startDateKey;
-
-  for (let index = 0; index < days; index += 1) {
-    dateKeys.push(current);
-    current = addDaysToDateKey(current, 1);
-  }
 
   const collection = params.db
     .collection('users')
     .doc(params.uid)
     .collection('distance_records');
 
-  const snapshots = await Promise.all(
-    dateKeys.map((key) => collection.doc(key).get()),
-  );
+  const snapshot = await collection
+    .orderBy(admin.firestore.FieldPath.documentId())
+    .startAt(startDateKey)
+    .endAt(dateKey)
+    .get();
 
-  return snapshots.map((snapshot, index) => {
-    const key = dateKeys[index];
-    const data = snapshot.exists
-      ? snapshot.data() as Json
-      : {};
+  return snapshot.docs.map((document) => {
+    const data = document.data() as Json;
+    const key = safeDateKey(
+      asString(data.dayKey) ?? document.id,
+    ) ?? document.id;
 
     return {
       dayKey: key,
-      exists: snapshot.exists,
+      exists: true,
       distanceMeters: asNumber(data.distance),
       rotations: asInteger(data.rotations),
       wheelDiameterCm: asNumber(data.wheelDiameterCm),
@@ -186,6 +183,9 @@ export async function fetchDailyCheckin(params: {
     dayKey: dateKey,
     condition: asString(data.condition),
     concernTags: asStringList(data.concernTags),
+    observationLevels: asStringRecord(
+      data.observationLevels,
+    ),
     memo: asString(data.memo) ?? '',
     date: asDate(data.date),
   };
@@ -723,6 +723,27 @@ function asStringList(value: unknown): string[] {
   return value
     .map((item) => String(item).trim())
     .filter((item) => item.length > 0);
+}
+
+function asStringRecord(
+  value: unknown,
+): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+
+  for (const [key, item] of Object.entries(value)) {
+    const normalizedKey = key.trim();
+    const normalizedValue = asString(item);
+
+    if (normalizedKey && normalizedValue) {
+      result[normalizedKey] = normalizedValue;
+    }
+  }
+
+  return result;
 }
 
 function asNumber(value: unknown): number | null {

@@ -15,12 +15,14 @@ class FloatingBottomNavigation extends StatelessWidget {
     required this.onTabSelected,
     required this.onQuickRecord,
     this.highlightQuickRecord = false,
+    this.consultationTargetKey,
   });
 
   final int currentIndex;
   final ValueChanged<int> onTabSelected;
   final VoidCallback onQuickRecord;
   final bool highlightQuickRecord;
+  final GlobalKey? consultationTargetKey;
 
   static const _items = <_FloatingNavigationItemData>[
     _FloatingNavigationItemData(
@@ -68,6 +70,7 @@ class FloatingBottomNavigation extends StatelessWidget {
                         data: _items[index],
                         selected: currentIndex == index,
                         onTap: () => _selectTab(index),
+                        targetKey: index == 1 ? consultationTargetKey : null,
                       ),
                     ),
                   ),
@@ -165,11 +168,13 @@ class _FloatingNavigationItem extends StatelessWidget {
     required this.data,
     required this.selected,
     required this.onTap,
+    this.targetKey,
   });
 
   final _FloatingNavigationItemData data;
   final bool selected;
   final VoidCallback onTap;
+  final GlobalKey? targetKey;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +191,7 @@ class _FloatingNavigationItem extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
+          key: targetKey,
           onTap: onTap,
           borderRadius: BorderRadius.circular(999),
           child: Container(

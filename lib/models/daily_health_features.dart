@@ -192,6 +192,7 @@ class ActivityHealthFeatures {
   final double? wheelDiameterCm;
   final double? avg7DistanceMeters;
   final double? deltaPct;
+  final HealthPersonalBaseline personalBaseline;
   final DateTime? recordDate;
 
   const ActivityHealthFeatures({
@@ -208,6 +209,7 @@ class ActivityHealthFeatures {
     required this.wheelDiameterCm,
     required this.avg7DistanceMeters,
     required this.deltaPct,
+    required this.personalBaseline,
     required this.recordDate,
   });
 
@@ -226,6 +228,9 @@ class ActivityHealthFeatures {
       wheelDiameterCm: _double(map['wheelDiameterCm']),
       avg7DistanceMeters: _double(map['avg7DistanceMeters']),
       deltaPct: _double(map['deltaPct']),
+      personalBaseline: HealthPersonalBaseline.fromMap(
+        _json(map['personalBaseline']),
+      ),
       recordDate: _dateTime(map['recordDate']),
     );
   }
@@ -247,6 +252,7 @@ class ActivityHealthFeatures {
       'wheelDiameterCm': wheelDiameterCm,
       'avg7DistanceMeters': avg7DistanceMeters,
       'deltaPct': deltaPct,
+      'personalBaseline': personalBaseline.toMap(),
       if (recordDate != null) 'recordDate': recordDate,
     };
   }
@@ -261,6 +267,7 @@ class BodyHealthFeatures {
   final double? previousChangeRate;
   final int windowDays;
   final double? windowChangeRate;
+  final HealthPersonalBaseline personalBaseline;
   final int windowRecordCount;
   final int totalRecordCount;
 
@@ -273,6 +280,7 @@ class BodyHealthFeatures {
     required this.previousChangeRate,
     required this.windowDays,
     required this.windowChangeRate,
+    required this.personalBaseline,
     required this.windowRecordCount,
     required this.totalRecordCount,
   });
@@ -287,6 +295,9 @@ class BodyHealthFeatures {
       previousChangeRate: _double(map['previousChangeRate']),
       windowDays: _integer(map['windowDays']) ?? 30,
       windowChangeRate: _double(map['windowChangeRate']),
+      personalBaseline: HealthPersonalBaseline.fromMap(
+        _json(map['personalBaseline']),
+      ),
       windowRecordCount: _integer(map['windowRecordCount']) ?? 0,
       totalRecordCount: _integer(map['totalRecordCount']) ?? 0,
     );
@@ -309,8 +320,83 @@ class BodyHealthFeatures {
       'previousChangeRate': previousChangeRate,
       'windowDays': windowDays,
       'windowChangeRate': windowChangeRate,
+      'personalBaseline': personalBaseline.toMap(),
       'windowRecordCount': windowRecordCount,
       'totalRecordCount': totalRecordCount,
+    };
+  }
+}
+
+class HealthPersonalBaseline {
+  final String status;
+  final String method;
+  final int recordCount;
+  final int requiredRecordCount;
+  final int spanDays;
+  final int requiredSpanDays;
+  final String? firstDateKey;
+  final String? lastDateKey;
+  final double? median;
+  final double? mad;
+  final double? ewma;
+  final double ewmaAlpha;
+  final double? deviationPct;
+  final double? robustZScore;
+
+  const HealthPersonalBaseline({
+    required this.status,
+    required this.method,
+    required this.recordCount,
+    required this.requiredRecordCount,
+    required this.spanDays,
+    required this.requiredSpanDays,
+    required this.firstDateKey,
+    required this.lastDateKey,
+    required this.median,
+    required this.mad,
+    required this.ewma,
+    required this.ewmaAlpha,
+    required this.deviationPct,
+    required this.robustZScore,
+  });
+
+  factory HealthPersonalBaseline.fromMap(Json map) {
+    return HealthPersonalBaseline(
+      status: _string(map['status']) ?? 'learning',
+      method: _string(map['method']) ?? 'median_mad_ewma_v1',
+      recordCount: _integer(map['recordCount']) ?? 0,
+      requiredRecordCount: _integer(map['requiredRecordCount']) ?? 7,
+      spanDays: _integer(map['spanDays']) ?? 0,
+      requiredSpanDays: _integer(map['requiredSpanDays']) ?? 14,
+      firstDateKey: _string(map['firstDateKey']),
+      lastDateKey: _string(map['lastDateKey']),
+      median: _double(map['median']),
+      mad: _double(map['mad']),
+      ewma: _double(map['ewma']),
+      ewmaAlpha: _double(map['ewmaAlpha']) ?? 0.3,
+      deviationPct: _double(map['deviationPct']),
+      robustZScore: _double(map['robustZScore']),
+    );
+  }
+
+  bool get isReady => status == 'ready';
+
+  Json toMap() {
+    return {
+      'status': status,
+      'method': method,
+      'recordCount': recordCount,
+      'requiredRecordCount': requiredRecordCount,
+      'spanDays': spanDays,
+      'requiredSpanDays': requiredSpanDays,
+      'firstDateKey': firstDateKey,
+      'lastDateKey': lastDateKey,
+      'median': median,
+      'mad': mad,
+      'ewma': ewma,
+      'ewmaAlpha': ewmaAlpha,
+      'deviationPct': deviationPct,
+      'robustZScore': robustZScore,
     };
   }
 }
@@ -319,6 +405,7 @@ class ConditionHealthFeatures {
   final bool recorded;
   final String? condition;
   final List<String> concernTags;
+  final Map<String, String> observationLevels;
   final String memo;
   final DateTime? recordDate;
 
@@ -326,6 +413,7 @@ class ConditionHealthFeatures {
     required this.recorded,
     required this.condition,
     required this.concernTags,
+    required this.observationLevels,
     required this.memo,
     required this.recordDate,
   });
@@ -335,6 +423,7 @@ class ConditionHealthFeatures {
       recorded: _boolean(map['recorded']) ?? false,
       condition: _string(map['condition']),
       concernTags: _stringList(map['concernTags']),
+      observationLevels: _stringMap(map['observationLevels']),
       memo: _string(map['memo']) ?? '',
       recordDate: _dateTime(map['recordDate']),
     );
@@ -345,6 +434,7 @@ class ConditionHealthFeatures {
       'recorded': recorded,
       'condition': condition,
       'concernTags': concernTags,
+      'observationLevels': observationLevels,
       'memo': memo,
       if (recordDate != null) 'recordDate': recordDate,
     };
@@ -474,4 +564,12 @@ List<String> _stringList(dynamic value) {
       .map((item) => item.toString().trim())
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
+}
+
+Map<String, String> _stringMap(dynamic value) {
+  if (value is! Map) return const {};
+
+  return value.map(
+    (key, item) => MapEntry(key.toString(), item.toString()),
+  );
 }

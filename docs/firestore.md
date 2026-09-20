@@ -30,6 +30,132 @@
 
 ---
 
+## 星の獲得と累計（ローカル実装・未デプロイ）
+
+- `users/{uid}/star_awards/{missionDateKey}_{kind}`: 星の獲得台帳。
+  `missionDateKey`, `kind` (`open_app` / `wheel` / `condition`),
+  `sourcePath`, `awardedAt` を持つ。同日・同種類は一意で、Functionsだけが作成する。
+- `users/{uid}/rewards/stars`: `total`, `updatedAt` を持つ累計ドキュメント。
+  Functionsが台帳と同じトランザクションで更新し、本人は読み取りのみ。
+- `users/{uid}/star_milestones/50`: 50個へ初めて到達した時の
+  `milestone`, `totalAtUnlock`, `unlockedAt` を保持する。祝福画面を閉じた後、
+  Functionsが`seenAt`を追記する。本人は読み取りのみ。
+
+星のミッション日は日本時間で判定する。走行は対象の走行記録日の翌日、
+今日の様子は記録当日。起動時のCallableは同日の既存の走行・様子記録も
+照合し、Functions導入前に保存された当日データや前日に保存された
+走行記録を取りこぼさない。過去の起動履歴は推測して付与しない。
+
+---
+
+## Health assessment v7
+
+### Daily caregiver check-in
+
+Path: `users/{uid}/daily_checkins/{dateKey}`
+
+- `condition`: `normal` / `slightlyConcerned` / `veryConcerned`。
+- `concernTags`: 食欲、飲水、排泄、呼吸、姿勢・動き、目・鼻、被毛・皮膚など、
+  画面で選択した変化箇所。
+- `observationLevels`: 各標準項目を `normal` / `changed` / `concerning` で
+  保持する構造化マップ。旧レコードでは省略可能。
+- `memo`: 任意の自由記述。
+- `schemaVersion: 2`。
+
+### Daily features
+
+Path: `users/{uid}/daily_health_features/{dateKey}`
+
+- `environment`, `activity`, `body`, `condition`, `nutrition` の日次特徴量を保持する。
+- 活動量と体重の `personalBaseline` に、個体自身の中央値、MAD、
+  EWMA（初期係数 `0.3`）、学習状態、記録数・期間、偏差を保存する。
+- 活動量は直前90日から最新14件までの有効な過去記録を使い、対象日自身を
+  含めない。7件以上かつ14日以上にまたがるまで `status: learning` とする。
+- `avg7DistanceMeters` は旧クライアント互換用に残すが、schema v5では
+  学習済み個体ベースラインの中央値を表す。
+- `source: health_pipeline_v7` と評価トリガーを保存する。
+- 今日の様子は `observationLevels` を日次特徴量へ引き継ぎ、呼吸の変化や
+  `concerning` を総合点とは独立した直接警戒トリガーとして扱う。
+
+### Assessment history and latest
+
+Paths:
+
+- `users/{uid}/health_assessments_history/{dateKey}`
+- `users/{uid}/health_assessments/latest`
+
+主なv7フィールド:
+
+- `overall.state`: 点数とは独立した総合状態。
+- `overall.score`: 全対象領域が揃い、信頼度が高い場合だけ入る参考点。
+- `overall.scoreCoverage`: 総合点の対象として評価できた重みの割合。
+- `overall.scoreRange.minimum/maximum`: 欠測領域が取り得る点を含む算出可能範囲。
+- `overall.primaryFactors`: 変化・注意・警戒の主因を重大度順で最大3件。
+- `dataQuality.scoredDomains/unscoredDomains`: 点数算出へ参加した領域と未算出領域。
+- `evaluatorVersion: 7`, `source: health_pipeline_v7`。
+
+旧ドキュメントとの互換性はFlutterモデル側で維持する。旧版に
+`scoreCoverage` がない場合は `completeness` を代替値として読み取る。
+
+---
+
+## Health notification incidents
+
+### Server-owned incident
+
+Path: `users/{uid}/health_incidents/{incidentKey}`
+
+- `incidentKey` は `environment__humidity_high` のように、日付を含まない正規化ID。
+- Functionsだけが作成・更新でき、本人のアプリは読み取り専用。
+- 主なフィールド: `incidentId`, `domain`, `conditionType`, `status`,
+  `currentSeverity`, `currentState`, `currentScore`, `firstDetectedAt`,
+  `lastDetectedAt`, `resolvedAt`, `reactivatedAt`, `occurrenceCount`,
+  `stateVersion`, `lastNotifiedAt`, `resolvedNotificationStatus`,
+  `resolvedNotificationClaimedAt`, `resolvedNotificationSentAt`。
+- `status` は `active` / `resolved`。解消後に再検出した場合は
+  `occurrenceCount` を増やして `reactivatedAt` を更新する。
+- 解消時、過去に通知済みのインシデントだけ
+  `resolvedNotificationStatus: pending` となる。解消通知は24時間以内に限り、
+  配信成功後は `sent`、設定OFFは `suppressed`、期限超過は `expired` になる。
+
+### Client-owned notification action
+
+Path: `users/{uid}/health_incident_actions/{incidentKey}`
+
+- 本人のアプリが「確認済み」「24時間休止」を保存するための領域。
+- 許可フィールドは `incidentId`, `acknowledgedAt`, `snoozedUntil`,
+  `updatedAt` のみ。健康判定本体や重大度は書き込めない。
+- Functionsの配信判定はこの操作を読み、同じ状態の継続通知を抑止する。
+- 重大度の上昇または解消後の再発は、過去の確認済み・休止より優先する。
+
+### Notification preferences
+
+Path: `users/{uid}/settings/notifications`
+
+- `goldHealthNotificationsEnabled` / `anomalyNotificationsEnabled`: 全体ON/OFF。
+- `criticalAlertsEnabled`: 警戒通知のON/OFF。
+- `cautionNotificationFrequency`: `state_changes_only` /
+  `every_three_days` / `off`。
+- `quietHoursEnabled`, `quietHoursStart`, `quietHoursEnd`, `timeZone`:
+  注意通知の夜間停止。初期値は日本時間21:00〜8:00。
+- `resolvedNotificationsEnabled`: 解消通知のON/OFF。初期値はON。
+- `notificationCategories`: `environment`, `activity`, `body`, `condition`,
+  `nutrition` のカテゴリ別ON/OFF。各カテゴリの初期値はON。
+
+### Server-owned weekly delivery counter
+
+Path: `users/{uid}/notification_delivery_counters/{weekKey}`
+
+- `weekKey` は利用者タイムゾーンの月曜日を起点にした
+  `week_YYYY-MM-DD`。
+- `cautionClaimCount` で注意・変化通知の週次予約数を管理し、初期上限は2件。
+- 警戒通知と解消通知はこの上限に含めない。
+- Functionsだけが読み書きでき、本人のアプリからも読み書き不可。
+- 配信が全面失敗した場合は予約数を戻す。古い予約を再試行する場合は
+  同じ予約を二重加算しない。
+
+---
+
 ## Breeding Environment
 
 ### Path

@@ -73,7 +73,7 @@ HealthScoreTrendSummary buildHealthScoreTrendSummary({
     final date = startDate.add(Duration(days: index));
     final assessment = byDateKey[_formatDateKey(date)];
     final publishedScore = assessment?.overall.score;
-    final score = publishedScore ?? assessment?.overall.observedScore;
+    final score = publishedScore;
 
     points.add(
       HealthScoreTrendPoint(

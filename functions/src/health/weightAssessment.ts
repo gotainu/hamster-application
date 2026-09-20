@@ -8,6 +8,10 @@ import {
   differenceInDateKeyDays,
   isDateKeyWithinWindow,
 } from './dateKey';
+import {
+  buildPersonalBaseline,
+  robustZScore,
+} from './personalBaseline';
 
 export interface WeightAssessmentConfig {
   changedRateThreshold: number;
@@ -99,6 +103,33 @@ export function evaluateWeightRecords(params: {
         windowFirst.weightGrams
       : null;
 
+  const baselineRecords = records.filter(
+    (record) =>
+      record.dayKey < latest.dayKey &&
+      isDateKeyWithinWindow({
+        targetDateKey: record.dayKey,
+        referenceDateKey: latest.dayKey,
+        windowDays: 90,
+      }),
+  );
+  const baseline = buildPersonalBaseline({
+    observations: baselineRecords.map((record) => ({
+      dateKey: record.dayKey,
+      value: record.weightGrams,
+    })),
+  });
+  const baselineDeviationRate =
+    baseline.status === 'ready' &&
+    baseline.median != null &&
+    baseline.median > 0
+      ? (latest.weightGrams - baseline.median) /
+        baseline.median
+      : null;
+  const weightRobustZScore = robustZScore({
+    value: latest.weightGrams,
+    baseline,
+  });
+
   const features: BodyHealthFeatures = {
     latestWeightGrams: latest.weightGrams,
     latestWeightDate:
@@ -109,6 +140,14 @@ export function evaluateWeightRecords(params: {
     previousChangeRate,
     windowDays: config.windowDays,
     windowChangeRate,
+    personalBaseline: {
+      ...baseline,
+      deviationPct:
+        baselineDeviationRate == null
+          ? null
+          : baselineDeviationRate * 100,
+      robustZScore: weightRobustZScore,
+    },
     windowRecordCount: windowRecords.length,
     totalRecordCount: records.length,
   };
@@ -152,19 +191,38 @@ export function evaluateWeightRecords(params: {
   const maximumRate = Math.max(
     absolutePreviousRate,
     absoluteWindowRate,
+    Math.abs(baselineDeviationRate ?? 0),
   );
 
-  if (maximumRate >= config.cautionRateThreshold) {
+  const robustDeviation = Math.abs(weightRobustZScore ?? 0);
+  const hasRobustLargeChange =
+    baselineDeviationRate != null &&
+    Math.abs(baselineDeviationRate) >= 0.05 &&
+    robustDeviation >= 4;
+  const hasRobustModerateChange =
+    baselineDeviationRate != null &&
+    Math.abs(baselineDeviationRate) >= 0.03 &&
+    robustDeviation >= 3;
+
+  if (
+    maximumRate >= config.cautionRateThreshold ||
+    hasRobustLargeChange
+  ) {
     return {
       features,
       assessment: {
         state: 'caution',
         score: 55,
-        flags: buildWeightChangeFlags({
-          previousChangeRate,
-          windowChangeRate,
-          level: 'large',
-        }),
+        flags: [
+          ...buildWeightChangeFlags({
+            previousChangeRate,
+            windowChangeRate,
+            level: 'large',
+          }),
+          ...(hasRobustLargeChange
+            ? ['weightPersonalBaselineLarge']
+            : []),
+        ],
         summary: '体重に大きめの変化があります',
         recommendedActions: [
           '測定条件をそろえて再確認してください。',
@@ -175,17 +233,25 @@ export function evaluateWeightRecords(params: {
     };
   }
 
-  if (maximumRate >= config.changedRateThreshold) {
+  if (
+    maximumRate >= config.changedRateThreshold ||
+    hasRobustModerateChange
+  ) {
     return {
       features,
       assessment: {
         state: 'changed',
         score: 80,
-        flags: buildWeightChangeFlags({
-          previousChangeRate,
-          windowChangeRate,
-          level: 'moderate',
-        }),
+        flags: [
+          ...buildWeightChangeFlags({
+            previousChangeRate,
+            windowChangeRate,
+            level: 'moderate',
+          }),
+          ...(hasRobustModerateChange
+            ? ['weightPersonalBaselineModerate']
+            : []),
+        ],
         summary: '体重に変化があります',
         recommendedActions: [
           'すぐに異常と判断せず、同じ条件で次回の記録と比較してください。',
@@ -247,6 +313,8 @@ function normalizeWeightRecords(
 function emptyBodyFeatures(
   windowDays: number,
 ): BodyHealthFeatures {
+  const baseline = buildPersonalBaseline({observations: []});
+
   return {
     latestWeightGrams: null,
     latestWeightDate: null,
@@ -256,6 +324,11 @@ function emptyBodyFeatures(
     previousChangeRate: null,
     windowDays,
     windowChangeRate: null,
+    personalBaseline: {
+      ...baseline,
+      deviationPct: null,
+      robustZScore: null,
+    },
     windowRecordCount: 0,
     totalRecordCount: 0,
   };

@@ -11,6 +11,21 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function validHealthIncidentAction(data) {
+      return data.keys().hasOnly([
+          'incidentId',
+          'acknowledgedAt',
+          'snoozedUntil',
+          'updatedAt'
+        ])
+        && data.keys().hasAll(['incidentId', 'updatedAt'])
+        && data.incidentId is string
+        && data.incidentId.size() > 0
+        && data.updatedAt is timestamp
+        && (!('acknowledgedAt' in data) || data.acknowledgedAt is timestamp)
+        && (!('snoozedUntil' in data) || data.snoozedUntil is timestamp);
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid);
 
@@ -36,6 +51,11 @@ service cloud.firestore {
       match /breeding_environments/{docId} {
         allow read: if isOwner(uid);
         allow create, update, delete: if isOwner(uid) && docId == 'main_env';
+      }
+
+      match /owner_profiles/{docId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if isOwner(uid) && docId == 'main';
       }
 
       match /weight_records/{docId} {
@@ -107,6 +127,28 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // 無料体験の開始日・残回数はFunctionsだけが更新する。
+      match /feature_access/trial {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // 星の獲得・累計・達成イベントはFunctionsだけが作成・更新する。
+      match /star_awards/{awardId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /rewards/stars {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /star_milestones/{milestoneId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
       match /daily_health_features/{dateKey} {
         allow read: if isOwner(uid);
         allow write: if false;
@@ -135,6 +177,23 @@ service cloud.firestore {
       match /anomaly_notification_logs/{notificationKey} {
         allow read: if isOwner(uid);
         allow write: if false;
+      }
+
+      match /health_incidents/{incidentKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /health_incident_actions/{incidentKey} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && validHealthIncidentAction(request.resource.data);
+        allow delete: if false;
+      }
+
+      // 週次配信上限の原子的カウンター。Functionsだけが操作する。
+      match /notification_delivery_counters/{weekKey} {
+        allow read, write: if false;
       }
 
       // 明示していないusers配下はdeny。

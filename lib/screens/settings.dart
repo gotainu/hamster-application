@@ -341,6 +341,83 @@ class _SettingScreenState extends State<SettingScreen> {
     }
   }
 
+  Future<void> _setCriticalAlertsEnabled(bool enabled) async {
+    await _updateNotificationPreference(
+      () => _notificationSettingsService.setCriticalAlertsEnabled(enabled),
+      enabled ? '警戒通知をONにしました。' : '警戒通知をOFFにしました。',
+    );
+  }
+
+  Future<void> _setCautionNotificationFrequency(
+    CautionNotificationFrequency frequency,
+  ) async {
+    await _updateNotificationPreference(
+      () => _notificationSettingsService
+          .setCautionNotificationFrequency(frequency),
+      '注意通知の頻度を「${frequency.label}」に変更しました。',
+    );
+  }
+
+  Future<void> _setQuietHoursEnabled(bool enabled) async {
+    await _updateNotificationPreference(
+      () => _notificationSettingsService.setQuietHoursEnabled(enabled),
+      enabled ? '21時〜8時の注意通知を停止します。' : '夜間も注意通知を受け取ります。',
+    );
+  }
+
+  Future<void> _setResolvedNotificationsEnabled(bool enabled) async {
+    await _updateNotificationPreference(
+      () =>
+          _notificationSettingsService.setResolvedNotificationsEnabled(enabled),
+      enabled ? '状態が落ち着いたときも通知します。' : '解消通知をOFFにしました。',
+    );
+  }
+
+  Future<void> _setNotificationCategoryEnabled(
+    NotificationSettings settings,
+    String category,
+    String label,
+    bool enabled,
+  ) async {
+    await _updateNotificationPreference(
+      () => _notificationSettingsService.setNotificationCategories({
+        ...settings.notificationCategories,
+        category: enabled,
+      }),
+      enabled ? '$labelの通知をONにしました。' : '$labelの通知をOFFにしました。',
+    );
+  }
+
+  Future<void> _updateNotificationPreference(
+    Future<void> Function() update,
+    String successMessage,
+  ) async {
+    if (_isUpdatingNotificationSetting) return;
+
+    setState(() {
+      _isUpdatingNotificationSetting = true;
+    });
+
+    try {
+      await update();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('通知設定の更新に失敗しました: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingNotificationSetting = false;
+        });
+      }
+    }
+  }
+
   Future<void> _openContactEmail() async {
     if (_isOpeningContact) return;
 
@@ -714,10 +791,8 @@ class _SettingScreenState extends State<SettingScreen> {
                 StreamBuilder<NotificationSettings>(
                   stream: _notificationSettingsService.watchSettings(),
                   builder: (context, snapshot) {
-                    final settings = snapshot.data ??
-                        const NotificationSettings(
-                          anomalyNotificationsEnabled: true,
-                        );
+                    final settings =
+                        snapshot.data ?? NotificationSettings.defaults;
 
                     final enabled = settings.anomalyNotificationsEnabled;
 
@@ -732,36 +807,147 @@ class _SettingScreenState extends State<SettingScreen> {
                           color: AppTheme.quickActionBorder(context),
                         ),
                       ),
-                      child: SwitchListTile(
-                        secondary: Icon(
-                          enabled
-                              ? Icons.notifications_active_rounded
-                              : Icons.notifications_off_rounded,
-                          color: enabled
-                              ? AppTheme.accent
-                              : AppTheme.secondaryText(context),
-                        ),
-                        title: Text(
-                          '異常検知通知',
-                          style:
-                              Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                        ),
-                        subtitle: Text(
-                          enabled
-                              ? '高温・高湿・危険評価などを検知したときに通知します'
-                              : '異常を検知しても通知は送信されません',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            secondary: Icon(
+                              enabled
+                                  ? Icons.notifications_active_rounded
+                                  : Icons.notifications_off_rounded,
+                              color: enabled
+                                  ? AppTheme.accent
+                                  : AppTheme.secondaryText(context),
+                            ),
+                            title: Text(
+                              '健康状態の通知',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
+                            subtitle: Text(
+                              enabled ? '重要度に応じて通知します' : '健康状態の通知はすべて停止中です',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppTheme.secondaryText(context),
                                   ),
-                        ),
-                        value: enabled,
-                        activeColor: AppTheme.accent,
-                        onChanged: _isUpdatingNotificationSetting
-                            ? null
-                            : _setAnomalyNotificationsEnabled,
+                            ),
+                            value: enabled,
+                            activeColor: AppTheme.accent,
+                            onChanged: _isUpdatingNotificationSetting
+                                ? null
+                                : _setAnomalyNotificationsEnabled,
+                          ),
+                          const Divider(height: 1),
+                          SwitchListTile(
+                            secondary: const Icon(
+                              Icons.warning_amber_rounded,
+                              color: AppTheme.accent,
+                            ),
+                            title: const Text('警戒通知'),
+                            subtitle: const Text('強い異常や悪化はすぐに通知'),
+                            value: settings.criticalAlertsEnabled,
+                            activeColor: AppTheme.accent,
+                            onChanged:
+                                !enabled || _isUpdatingNotificationSetting
+                                    ? null
+                                    : _setCriticalAlertsEnabled,
+                          ),
+                          ListTile(
+                            enabled: enabled,
+                            leading: const Icon(
+                              Icons.notifications_none_rounded,
+                              color: AppTheme.accent,
+                            ),
+                            title: const Text('注意通知の頻度'),
+                            subtitle: Text(
+                              settings.cautionNotificationFrequency.label,
+                            ),
+                            trailing:
+                                PopupMenuButton<CautionNotificationFrequency>(
+                              enabled:
+                                  enabled && !_isUpdatingNotificationSetting,
+                              tooltip: '注意通知の頻度を変更',
+                              onSelected: _setCautionNotificationFrequency,
+                              itemBuilder: (context) =>
+                                  CautionNotificationFrequency.values
+                                      .map(
+                                        (frequency) => PopupMenuItem(
+                                          value: frequency,
+                                          child: Text(frequency.label),
+                                        ),
+                                      )
+                                      .toList(),
+                              child: const Icon(Icons.expand_more_rounded),
+                            ),
+                          ),
+                          SwitchListTile(
+                            secondary: const Icon(
+                              Icons.bedtime_outlined,
+                              color: AppTheme.accent,
+                            ),
+                            title: const Text('夜間は注意通知を停止'),
+                            subtitle: const Text('21:00〜8:00（警戒通知は除く）'),
+                            value: settings.quietHoursEnabled,
+                            activeColor: AppTheme.accent,
+                            onChanged:
+                                !enabled || _isUpdatingNotificationSetting
+                                    ? null
+                                    : _setQuietHoursEnabled,
+                          ),
+                          SwitchListTile(
+                            secondary: const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: AppTheme.accent,
+                            ),
+                            title: const Text('解消したときも通知'),
+                            subtitle: const Text('気になっていた状態が落ち着いたらお知らせ'),
+                            value: settings.resolvedNotificationsEnabled,
+                            activeColor: AppTheme.accent,
+                            onChanged:
+                                !enabled || _isUpdatingNotificationSetting
+                                    ? null
+                                    : _setResolvedNotificationsEnabled,
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            enabled: enabled,
+                            leading: const Icon(
+                              Icons.tune_rounded,
+                              color: AppTheme.accent,
+                            ),
+                            title: const Text('通知する項目'),
+                            subtitle: const Text('必要なカテゴリだけ選べます'),
+                          ),
+                          ...const <String, String>{
+                            'environment': '環境',
+                            'activity': '活動量',
+                            'body': '体重',
+                            'condition': '今日の様子',
+                            'nutrition': '給餌',
+                          }.entries.map(
+                                (entry) => SwitchListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.only(
+                                      left: 56, right: 16),
+                                  title: Text(entry.value),
+                                  value: settings.isCategoryEnabled(entry.key),
+                                  activeColor: AppTheme.accent,
+                                  onChanged:
+                                      !enabled || _isUpdatingNotificationSetting
+                                          ? null
+                                          : (value) =>
+                                              _setNotificationCategoryEnabled(
+                                                settings,
+                                                entry.key,
+                                                entry.value,
+                                                value,
+                                              ),
+                                ),
+                              ),
+                        ],
                       ),
                     );
                   },

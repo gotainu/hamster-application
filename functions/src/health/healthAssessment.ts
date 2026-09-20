@@ -35,7 +35,6 @@ export function buildHealthAssessment(params: {
 
   const overall = buildOverallAssessment({
     domains,
-    completeness: params.features.dataQuality.completeness,
     staleDomains: params.features.dataQuality.staleDomains,
   });
 
@@ -53,15 +52,18 @@ export function buildHealthAssessment(params: {
     overall,
     dataQuality: {
       completeness: params.features.dataQuality.completeness,
+      scoreCoverage: overall.scoreCoverage,
       availableDomains:
         params.features.dataQuality.availableDomains,
       missingDomains:
         params.features.dataQuality.missingDomains,
       staleDomains:
         params.features.dataQuality.staleDomains,
+      scoredDomains: scoredDomainKeys(domains),
+      unscoredDomains: unscoredDomainKeys(domains),
     },
     aiAdvisorContext,
-    evaluatorVersion: 4,
+    evaluatorVersion: 7,
     evaluatedAt,
   };
 }
@@ -585,24 +587,39 @@ function buildActivityAssessment(
   }
 
   const deltaPct = activity.deltaPct;
+  const robustZ = activity.personalBaseline.robustZScore;
 
   if (deltaPct == null) {
     return {
       state: 'insufficientData',
       score: null,
-      flags: ['activityComparisonMissing'],
-      summary: '前日分の活動量を記録しました。比較データを蓄積中です。',
+      flags: [
+        'activityComparisonMissing',
+        'activityBaselineLearning',
+      ],
+      summary: `前日分の活動量を記録しました。個体ベースラインを学習中です（${activity.personalBaseline.recordCount}/${activity.personalBaseline.requiredRecordCount}件、${activity.personalBaseline.spanDays}/${activity.personalBaseline.requiredSpanDays}日）。`,
       recommendedActions: [],
       sourceUpdatedAt: activity.recordDate,
     };
   }
 
-  if (deltaPct <= -40) {
+  if (
+    deltaPct <= -50 ||
+    (
+      robustZ != null &&
+      robustZ <= -3 &&
+      deltaPct <= -30
+    )
+  ) {
     return {
       state: 'alert',
       score: 40,
-      flags: ['activityLow', 'activityDrop'],
-      summary: '前日の活動量が直近7日平均を大きく下回っています。',
+      flags: [
+        'activityLow',
+        'activityDrop',
+        ...(robustZ != null ? ['activityPersonalBaseline'] : []),
+      ],
+      summary: '前日の活動量が個体ベースラインを大きく下回っています。',
       recommendedActions: [
         '食欲・排泄・動きなど、ほかの変化も確認してください。',
       ],
@@ -610,12 +627,19 @@ function buildActivityAssessment(
     };
   }
 
-  if (deltaPct <= -15) {
+  if (
+    deltaPct <= -25 ||
+    (
+      robustZ != null &&
+      robustZ <= -2 &&
+      deltaPct <= -15
+    )
+  ) {
     return {
       state: 'caution',
       score: 70,
       flags: ['activityLow', 'activityDrop'],
-      summary: '前日の活動量が直近7日平均より少なめです。',
+      summary: '前日の活動量が個体ベースラインより少なめです。',
       recommendedActions: [
         '一時的な変化か、ほかの体調変化がないか確認してください。',
       ],
@@ -623,12 +647,19 @@ function buildActivityAssessment(
     };
   }
 
-  if (deltaPct >= 60) {
+  if (
+    deltaPct >= 100 ||
+    (
+      robustZ != null &&
+      robustZ >= 3 &&
+      deltaPct >= 60
+    )
+  ) {
     return {
       state: 'alert',
       score: 75,
       flags: ['activityHigh'],
-      summary: '前日の活動量が直近7日平均を大きく上回っています。',
+      summary: '前日の活動量が個体ベースラインを大きく上回っています。',
       recommendedActions: [
         '落ち着きのなさや環境変化がないか確認してください。',
       ],
@@ -636,12 +667,19 @@ function buildActivityAssessment(
     };
   }
 
-  if (deltaPct >= 20) {
+  if (
+    deltaPct >= 50 ||
+    (
+      robustZ != null &&
+      robustZ >= 2 &&
+      deltaPct >= 25
+    )
+  ) {
     return {
       state: 'caution',
       score: 88,
       flags: ['activityHigh'],
-      summary: '前日の活動量が直近7日平均より多めです。',
+      summary: '前日の活動量が個体ベースラインより多めです。',
       recommendedActions: [],
       sourceUpdatedAt: activity.recordDate,
     };
@@ -651,7 +689,7 @@ function buildActivityAssessment(
     state: 'good',
     score: 100,
     flags: [],
-    summary: '前日の活動量は直近7日平均に対して概ね安定しています。',
+    summary: '前日の活動量は個体ベースラインに対して概ね安定しています。',
     recommendedActions: [],
     sourceUpdatedAt: activity.recordDate,
   };
@@ -673,51 +711,127 @@ function buildConditionAssessment(
     };
   }
 
-  const flags = condition.concernTags.map(
-    (tag) => `condition_${tag}`,
+  const structuredChanges = Object.entries(
+    condition.observationLevels ?? {},
+  ).filter(([, level]) =>
+    level === 'changed' || level === 'concerning',
   );
+  const changedTags = Array.from(new Set([
+    ...condition.concernTags,
+    ...structuredChanges.map(([tag]) => tag),
+  ]));
+  const flags = changedTags.map((tag) => `condition_${tag}`);
+  const concerningTags = structuredChanges
+    .filter(([, level]) => level === 'concerning')
+    .map(([tag]) => tag);
+  const hasBreathingChange = changedTags.includes('breathing');
+  const isDirectAlert =
+    condition.condition === 'veryConcerned' ||
+    concerningTags.length > 0 ||
+    hasBreathingChange;
+  const isCaution =
+    condition.condition === 'slightlyConcerned' ||
+    structuredChanges.length > 0;
+  const changeLabels = changedTags
+    .map(conditionObservationLabel)
+    .join('・');
 
-  switch (condition.condition) {
-    case 'veryConcerned':
-      return {
-        state: 'alert',
-        score: 40,
-        flags: ['conditionVeryConcerned', ...flags],
-        summary: '飼い主が「かなり心配」と記録しています。',
-        recommendedActions: [
-          '症状が強い、または緊急性が疑われる場合は動物病院への相談を検討してください。',
-        ],
-        sourceUpdatedAt: condition.recordDate,
-      };
-    case 'slightlyConcerned':
-      return {
-        state: 'caution',
-        score: 70,
-        flags: ['conditionSlightlyConcerned', ...flags],
-        summary: '飼い主が「少し気になる」と記録しています。',
-        recommendedActions: [
-          '気になる項目をほかの記録とあわせて観察してください。',
-        ],
-        sourceUpdatedAt: condition.recordDate,
-      };
-    case 'normal':
-      return {
-        state: 'good',
-        score: 100,
-        flags: [],
-        summary: '今日の様子は「いつも通り」です。',
-        recommendedActions: [],
-        sourceUpdatedAt: condition.recordDate,
-      };
+  if (isDirectAlert) {
+    const alertFlags = [
+      condition.condition === 'veryConcerned'
+        ? 'conditionVeryConcerned'
+        : 'conditionStructuredAlert',
+      ifValue(hasBreathingChange, 'conditionBreathingChanged'),
+      ...flags,
+    ].filter((flag): flag is string => flag != null);
+
+    return {
+      state: 'alert',
+      score: 40,
+      flags: Array.from(new Set(alertFlags)),
+      summary: hasBreathingChange
+        ? '今日の観察で呼吸の変化が記録されています。'
+        : `今日の観察で心配な変化${
+          changeLabels ? `（${changeLabels}）` : ''
+        }が記録されています。`,
+      recommendedActions: [
+        hasBreathingChange
+          ? '呼吸が苦しそう、音がする、ぐったりしている場合は、記録の継続より動物病院への相談を優先してください。'
+          : '症状が強い、または緊急性が疑われる場合は動物病院への相談を検討してください。',
+      ],
+      sourceUpdatedAt: condition.recordDate,
+    };
+  }
+
+  if (isCaution) {
+    return {
+      state: 'caution',
+      score: 70,
+      flags: Array.from(new Set([
+        'conditionSlightlyConcerned',
+        ...flags,
+      ])),
+      summary: `今日の観察で少し気になる変化${
+        changeLabels ? `（${changeLabels}）` : ''
+      }が記録されています。`,
+      recommendedActions: [
+        '気になる項目をほかの記録とあわせて観察してください。',
+      ],
+      sourceUpdatedAt: condition.recordDate,
+    };
+  }
+
+  if (condition.condition === 'normal') {
+    return {
+      state: 'good',
+      score: 100,
+      flags: [],
+      summary: '今日の様子は「いつも通り」です。',
+      recommendedActions: [],
+      sourceUpdatedAt: condition.recordDate,
+    };
+  }
+
+  return {
+    state: 'unknown',
+    score: null,
+    flags: ['conditionUnknown'],
+    summary: '様子チェックの状態を判定できませんでした。',
+    recommendedActions: [],
+    sourceUpdatedAt: condition.recordDate,
+  };
+}
+
+function ifValue(
+  condition: boolean,
+  value: string,
+): string | null {
+  return condition ? value : null;
+}
+
+function conditionObservationLabel(tag: string): string {
+  switch (tag) {
+    case 'appetite':
+      return '食欲';
+    case 'water':
+      return '飲水';
+    case 'elimination':
+    case 'poop':
+      return '排泄';
+    case 'breathing':
+      return '呼吸';
+    case 'movement':
+      return '姿勢・動き';
+    case 'eyesNose':
+      return '目・鼻';
+    case 'coatSkin':
+      return '被毛・皮膚';
+    case 'chewing':
+      return 'かじり方';
+    case 'other':
+      return 'その他';
     default:
-      return {
-        state: 'unknown',
-        score: null,
-        flags: ['conditionUnknown'],
-        summary: '様子チェックの状態を判定できませんでした。',
-        recommendedActions: [],
-        sourceUpdatedAt: condition.recordDate,
-      };
+      return tag;
   }
 }
 
@@ -756,7 +870,6 @@ function buildOverallAssessment(params: {
     condition: HealthDomainAssessment;
     nutrition: HealthDomainAssessment;
   };
-  completeness: number;
   staleDomains: string[];
 }): HealthOverallAssessment {
   const weightedDomains = [
@@ -795,14 +908,19 @@ function buildOverallAssessment(params: {
     0,
   );
 
-  const rawObservedScore = scoreWeight > 0
-    ? Math.round(
-        scored.reduce(
-          (sum, item) =>
-            sum + (item.domain.score ?? 0) * item.weight,
-          0,
-        ) / scoreWeight,
-      )
+  const earnedPoints = scored.reduce(
+    (sum, item) =>
+      sum + (item.domain.score ?? 0) * item.weight,
+    0,
+  );
+
+  const rawScoreRange = scoreWeight > 0
+    ? {
+        minimum: Math.round(earnedPoints),
+        maximum: Math.round(
+          earnedPoints + (1 - scoreWeight) * 100,
+        ),
+      }
     : null;
 
   const considered = weightedDomains.filter(
@@ -821,13 +939,23 @@ function buildOverallAssessment(params: {
               severityRank(b) - severityRank(a),
           )[0];
 
-  const observedScore = applyStateScoreCap(
-    rawObservedScore,
-    observedState,
-  );
+  const scoreRange = rawScoreRange == null
+    ? null
+    : {
+        minimum:
+          applyStateScoreCap(
+            rawScoreRange.minimum,
+            observedState,
+          ) ?? rawScoreRange.minimum,
+        maximum:
+          applyStateScoreCap(
+            rawScoreRange.maximum,
+            observedState,
+          ) ?? rawScoreRange.maximum,
+      };
 
   const confidence = resolveConfidence({
-    completeness: params.completeness,
+    scoreCoverage: scoreWeight,
     hasStaleDomains: params.staleDomains.length > 0,
   });
 
@@ -844,10 +972,18 @@ function buildOverallAssessment(params: {
         ? 'insufficientData'
         : observedState;
 
-  const score =
-    confidence === 'insufficient'
-      ? null
-      : observedScore;
+  // A partial score is not normalized to 100. Publishing such a point value
+  // would make missing domains look healthy. State and red flags remain
+  // available independently of the reference score.
+  const hasCompleteFreshEvidence =
+    scoreWeight >= 0.999 && confidence === 'high';
+  const observedScore = hasCompleteFreshEvidence
+    ? applyStateScoreCap(
+        Math.round(earnedPoints),
+        observedState,
+      )
+    : null;
+  const score = observedScore;
 
   const flags = [
     ...new Set(
@@ -857,7 +993,13 @@ function buildOverallAssessment(params: {
     ),
   ];
 
-  const topDomain = considered
+  const concerningDomains = considered
+    .filter(
+      (item) =>
+        item.domain.state === 'changed' ||
+        item.domain.state === 'caution' ||
+        item.domain.state === 'alert',
+    )
     .slice()
     .sort((a, b) => {
       const severityDelta =
@@ -870,15 +1012,21 @@ function buildOverallAssessment(params: {
         (a.domain.score ?? 101) -
         (b.domain.score ?? 101)
       );
-    })[0];
+    });
 
-  const baseSummary = topDomain
-    ? topDomain.domain.summary
+  const topDomain = concerningDomains[0];
+  const summaryDomain = topDomain ?? considered[0];
+
+  const baseSummary = summaryDomain
+    ? summaryDomain.domain.summary
     : '評価に必要なデータが不足しています。';
 
-  const primaryFactor = topDomain
-    ? `${topDomain.label}: ${topDomain.domain.summary}`
-    : null;
+  const primaryFactors = concerningDomains
+    .map(
+      (item) => `${item.label}: ${item.domain.summary}`,
+    )
+    .slice(0, 3);
+  const primaryFactor = primaryFactors[0] ?? null;
 
   const summary = buildOverallSummary({
     baseSummary,
@@ -899,13 +1047,46 @@ function buildOverallAssessment(params: {
     score,
     observedState,
     observedScore,
+    scoreRange,
+    scoreCoverage: scoreWeight,
     confidence,
-    isProvisional: confidence !== 'high',
+    isProvisional: score == null,
     flags,
     summary,
     recommendedActions,
     primaryFactor,
+    primaryFactors,
   };
+}
+
+function scoredDomainKeys(domains: {
+  environment: HealthDomainAssessment;
+  activity: HealthDomainAssessment;
+  body: HealthDomainAssessment;
+  condition: HealthDomainAssessment;
+  nutrition: HealthDomainAssessment;
+}): string[] {
+  return Object.entries(domains)
+    .filter(([key, domain]) =>
+      key !== 'nutrition' && domain.score != null,
+    )
+    .map(([key]) => key);
+}
+
+function unscoredDomainKeys(domains: {
+  environment: HealthDomainAssessment;
+  activity: HealthDomainAssessment;
+  body: HealthDomainAssessment;
+  condition: HealthDomainAssessment;
+  nutrition: HealthDomainAssessment;
+}): string[] {
+  return ['environment', 'activity', 'body', 'condition']
+    .filter((key) => {
+      const domain = domains[
+        key as keyof typeof domains
+      ];
+      return domain.score == null;
+    });
 }
 
 function applyStateScoreCap(
@@ -958,17 +1139,17 @@ function buildOverallSummary(params: {
 }
 
 function resolveConfidence(params: {
-  completeness: number;
+  scoreCoverage: number;
   hasStaleDomains: boolean;
 }): HealthAssessmentConfidence {
-  const completeness = clamp01(params.completeness);
+  const scoreCoverage = clamp01(params.scoreCoverage);
 
   let confidence: HealthAssessmentConfidence;
-  if (completeness < 0.5) {
+  if (scoreCoverage < 0.5) {
     confidence = 'insufficient';
-  } else if (completeness < 0.75) {
+  } else if (scoreCoverage < 0.75) {
     confidence = 'low';
-  } else if (completeness < 1) {
+  } else if (scoreCoverage < 0.999) {
     confidence = 'medium';
   } else {
     confidence = 'high';
@@ -1001,10 +1182,9 @@ function buildAiAdvisorContext(params: {
   overall: HealthOverallAssessment;
   generatedAt: Date;
 }) {
-  const status =
-    params.overall.confidence === 'insufficient'
-      ? 'insufficient_data' as const
-      : 'available' as const;
+  const status = params.overall.score == null
+    ? 'insufficient_data' as const
+    : 'available' as const;
 
   const priority =
     params.overall.observedState === 'alert'
@@ -1016,18 +1196,18 @@ function buildAiAdvisorContext(params: {
         ? 'caution' as const
         : 'normal' as const;
 
-  const scoreLines =
-    params.overall.confidence === 'insufficient'
-      ? [
-          `取得できた範囲の状態: ${params.overall.observedState}`,
-          `観測スコア: ${params.overall.observedScore ?? '未算出'}`,
-        ]
-      : [
-          `総合状態: ${params.overall.state}`,
-          `総合スコア: ${params.overall.score ?? '未算出'}${
-            params.overall.isProvisional ? '（暫定）' : ''
-          }`,
-        ];
+  const scoreLines = [
+    `総合状態: ${params.overall.state}`,
+    `総合スコア: ${params.overall.score ?? 'データ充足後に表示'}`,
+    `スコア算出範囲: ${
+      params.overall.scoreRange == null
+        ? '未算出'
+        : `${params.overall.scoreRange.minimum}〜${params.overall.scoreRange.maximum}`
+    }`,
+    `スコア対象充足率: ${Math.round(
+      params.overall.scoreCoverage * 100,
+    )}%`,
+  ];
 
   const lines = [
     '【統合コンディション評価】',
@@ -1040,7 +1220,11 @@ function buildAiAdvisorContext(params: {
       params.overall.isProvisional ? 'はい' : 'いいえ'
     }`,
     `要約: ${params.overall.summary}`,
-    `主な要因: ${params.overall.primaryFactor ?? '特定なし'}`,
+    `主な要因: ${
+      params.overall.primaryFactors.length > 0
+        ? params.overall.primaryFactors.join(' / ')
+        : '特定なし'
+    }`,
     '',
     '【環境】',
     params.domains.environment.summary,
@@ -1091,7 +1275,7 @@ function buildAiAdvisorContext(params: {
     priority,
     summary: params.overall.summary,
     promptText: lines.join('\n'),
-    version: 4,
+    version: 7,
     generatedAt: params.generatedAt,
   };
 }

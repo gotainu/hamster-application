@@ -1,11 +1,15 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
+import '../models/daily_record_completion.dart';
 import '../theme/app_theme.dart';
 import 'daily_condition_input_card.dart';
 import 'paid_feature_gate.dart';
+import 'quick_record_reward.dart';
 import 'weight_input_card.dart';
 import 'wheel_rotation_input_card.dart';
 
@@ -20,7 +24,9 @@ enum _QuickRecordCategory {
 }
 
 class QuickRecordSheet extends StatefulWidget {
-  const QuickRecordSheet({super.key});
+  final ValueListenable<DailyRecordCompletion?>? completionListenable;
+
+  const QuickRecordSheet({super.key, this.completionListenable});
 
   @override
   State<QuickRecordSheet> createState() => _QuickRecordSheetState();
@@ -28,8 +34,10 @@ class QuickRecordSheet extends StatefulWidget {
 
 class _QuickRecordSheetState extends State<QuickRecordSheet> {
   _QuickRecordCategory? _selectedCategory;
+  QuickRecordRewardData? _reward;
 
   String get _title {
+    if (_reward != null) return '記録できました';
     switch (_selectedCategory) {
       case _QuickRecordCategory.wheel:
         return '走った記録';
@@ -42,19 +50,6 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
     }
   }
 
-  String get _subtitle {
-    switch (_selectedCategory) {
-      case _QuickRecordCategory.wheel:
-        return '昨晩から今朝までの回転数を記録します';
-      case _QuickRecordCategory.condition:
-        return '食欲や動きなど、今日の様子を残します';
-      case _QuickRecordCategory.weight:
-        return '測定した体重とメモを記録します';
-      case null:
-        return '記録したい項目を選んでください';
-    }
-  }
-
   void _selectCategory(_QuickRecordCategory category) {
     HapticFeedback.selectionClick();
     setState(() => _selectedCategory = category);
@@ -62,15 +57,19 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
 
   void _backToCategories() {
     FocusScope.of(context).unfocus();
-    setState(() => _selectedCategory = null);
+    setState(() {
+      _reward = null;
+      _selectedCategory = null;
+    });
   }
 
   void _openAllRecords() {
     Navigator.of(context).pop(QuickRecordSheetResult.openAllRecords);
   }
 
-  void _savedFeedback() {
+  void _savedFeedback(QuickRecordRewardData reward) {
     HapticFeedback.mediumImpact();
+    setState(() => _reward = reward);
   }
 
   @override
@@ -98,74 +97,94 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
               alignment: Alignment.bottomCenter,
-              child: Container(
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: AppTheme.quickRecordSheetSurface(context),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(32),
-                  ),
-                  border: Border(
-                    top: BorderSide(
-                      color: AppTheme.softBorder(context),
-                    ),
-                  ),
-                  boxShadow: AppTheme.floatingNavigationShadows(context),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(32),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 10),
-                      Container(
-                        width: 42,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: AppTheme.tertiaryText(context),
-                          borderRadius: BorderRadius.circular(999),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppTheme.quickRecordSheetSurface(context),
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(32),
+                      ),
+                      border: Border(
+                        top: BorderSide(
+                          color: AppTheme.quickRecordSheetBorder(context),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      _SheetHeader(
-                        title: _title,
-                        subtitle: _subtitle,
-                        showBack: _selectedCategory != null,
-                        onBack: _backToCategories,
-                        onClose: () => Navigator.of(context).pop(),
-                      ),
-                      Divider(
-                        height: 1,
-                        color: AppTheme.softBorder(context),
-                      ),
-                      Flexible(
-                        fit: FlexFit.loose,
-                        child: PaidFeatureGate(
-                          featureName: '記録',
-                          lockedTitle: 'クイック記録は有料プランの機能です',
-                          lockedMessage:
-                              '走った記録、今日の様子、体重をすばやく入力する機能は、有料プランで利用できます。',
-                          icon: Icons.add_circle_outline_rounded,
-                          showBackground: false,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            child: _selectedCategory == null
-                                ? _CategorySelection(
-                                    key: const ValueKey('categories'),
-                                    onSelect: _selectCategory,
-                                    onOpenAllRecords: _openAllRecords,
-                                  )
-                                : _SelectedRecordForm(
-                                    key: ValueKey(_selectedCategory),
-                                    category: _selectedCategory!,
-                                    onSaved: _savedFeedback,
-                                  ),
+                      boxShadow: AppTheme.floatingNavigationShadows(context),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(height: 10),
+                          Container(
+                            width: 42,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: AppTheme.tertiaryText(context),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                           ),
-                        ),
+                          const SizedBox(height: 8),
+                          _SheetHeader(
+                            title: _title,
+                            showBack:
+                                _selectedCategory != null && _reward == null,
+                            onBack: _backToCategories,
+                            onClose: () => Navigator.of(context).pop(),
+                          ),
+                          Divider(
+                            height: 1,
+                            color: AppTheme.quickRecordObjectBorder(context),
+                          ),
+                          Flexible(
+                            fit: FlexFit.loose,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 260),
+                              switchInCurve: Curves.easeOutCubic,
+                              switchOutCurve: Curves.easeInCubic,
+                              child: _reward != null
+                                  ? QuickRecordRewardView(
+                                      key: ValueKey(_reward),
+                                      reward: _reward!,
+                                      completionListenable:
+                                          widget.completionListenable,
+                                      onContinue: _backToCategories,
+                                      onClose: () =>
+                                          Navigator.of(context).pop(),
+                                    )
+                                  : PaidFeatureGate(
+                                      key: const ValueKey('record-form'),
+                                      featureName: '記録',
+                                      lockedTitle: 'クイック記録は有料プランの機能です',
+                                      lockedMessage:
+                                          '走った記録、今日の様子、体重をすばやく入力する機能は、有料プランで利用できます。',
+                                      icon: Icons.add_circle_outline_rounded,
+                                      showBackground: false,
+                                      child: _selectedCategory == null
+                                          ? _CategorySelection(
+                                              key: const ValueKey('categories'),
+                                              onSelect: _selectCategory,
+                                              onOpenAllRecords: _openAllRecords,
+                                            )
+                                          : _SelectedRecordForm(
+                                              key: ValueKey(
+                                                _selectedCategory,
+                                              ),
+                                              category: _selectedCategory!,
+                                              onSaved: _savedFeedback,
+                                            ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -180,14 +199,12 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
 class _SheetHeader extends StatelessWidget {
   const _SheetHeader({
     required this.title,
-    required this.subtitle,
     required this.showBack,
     required this.onBack,
     required this.onClose,
   });
 
   final String title;
-  final String subtitle;
   final bool showBack;
   final VoidCallback onBack;
   final VoidCallback onClose;
@@ -195,9 +212,9 @@ class _SheetHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 2, 10, 14),
+      padding: const EdgeInsets.fromLTRB(10, 2, 10, 10),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
             width: 48,
@@ -210,28 +227,12 @@ class _SheetHeader extends StatelessWidget {
                 : null,
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Column(
-                children: [
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.secondaryText(context),
-                          height: 1.35,
-                        ),
-                  ),
-                ],
-              ),
             ),
           ),
           SizedBox(
@@ -268,23 +269,21 @@ class _CategorySelection extends StatelessWidget {
           _QuickRecordCategoryTile(
             icon: Icons.directions_run_rounded,
             title: '走った記録',
-            subtitle: '昨晩〜今朝の回転数・走行距離',
             accent: AppTheme.accent,
             onTap: () => onSelect(_QuickRecordCategory.wheel),
           ),
           const SizedBox(height: 12),
           _QuickRecordCategoryTile(
-            icon: Icons.favorite_border_rounded,
+            icon: Icons.pets_rounded,
             title: '今日の様子',
-            subtitle: '食欲・うんち・動き・気になること',
             accent: AppTheme.envGood,
+            useBrandMark: true,
             onTap: () => onSelect(_QuickRecordCategory.condition),
           ),
           const SizedBox(height: 12),
           _QuickRecordCategoryTile(
             icon: Icons.monitor_weight_outlined,
             title: '体重',
-            subtitle: '定期的な体重と前回からの変化',
             accent: AppTheme.envCaution,
             onTap: () => onSelect(_QuickRecordCategory.weight),
           ),
@@ -308,31 +307,32 @@ class _QuickRecordCategoryTile extends StatelessWidget {
   const _QuickRecordCategoryTile({
     required this.icon,
     required this.title,
-    required this.subtitle,
     required this.accent,
     required this.onTap,
+    this.useBrandMark = false,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
   final Color accent;
   final VoidCallback onTap;
+  final bool useBrandMark;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppTheme.cardSurface(context),
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
+            color: AppTheme.quickRecordObjectSurface(context),
             borderRadius: BorderRadius.circular(24),
             border: Border.all(
-              color: accent.withValues(alpha: 0.22),
+              color: AppTheme.quickRecordObjectBorder(context),
             ),
           ),
           child: Row(
@@ -341,39 +341,31 @@ class _QuickRecordCategoryTile extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AppTheme.chipFill(
-                    accent,
-                    context,
-                    opacity: AppTheme.isDark(context) ? 0.15 : 0.11,
-                  ),
+                  color: useBrandMark
+                      ? Colors.black
+                      : accent.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: useBrandMark
+                        ? const Color(0xFFFFF1D1).withValues(alpha: 0.28)
+                        : accent.withValues(alpha: 0.25),
+                  ),
                 ),
-                child: Icon(
-                  icon,
-                  color: accent,
-                  size: 28,
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: useBrandMark
+                    ? Image.asset(
+                        'store_assets/icons/google_play_icon_512.png',
+                        fit: BoxFit.cover,
+                      )
+                    : Icon(icon, color: accent, size: 26),
               ),
               const SizedBox(width: 15),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.secondaryText(context),
-                            height: 1.35,
-                          ),
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
               ),
               Icon(
@@ -396,7 +388,7 @@ class _SelectedRecordForm extends StatelessWidget {
   });
 
   final _QuickRecordCategory category;
-  final VoidCallback onSaved;
+  final ValueChanged<QuickRecordRewardData> onSaved;
 
   @override
   Widget build(BuildContext context) {
@@ -413,14 +405,21 @@ class _SelectedRecordForm extends StatelessWidget {
               required int rotations,
               double? distanceMeters,
             }) {
-              onSaved();
+              onSaved(
+                QuickRecordRewardData.activity(
+                  rotations: rotations,
+                  distanceMeters: distanceMeters,
+                ),
+              );
             },
           ),
         _QuickRecordCategory.condition => DailyConditionInputCard(
-            onSaved: onSaved,
+            onSaved: () => onSaved(QuickRecordRewardData.condition()),
           ),
         _QuickRecordCategory.weight => WeightInputCard(
-            onSaved: (_) => onSaved(),
+            onSaved: (record) => onSaved(
+              QuickRecordRewardData.weight(record.weightGrams),
+            ),
           ),
       },
     );

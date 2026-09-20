@@ -23,6 +23,7 @@ import '../services/daily_status_summary_service.dart';
 import '../services/weight_records_repo.dart';
 import '../services/weight_trend_evaluation_service.dart';
 import '../services/health_assessment_repo.dart';
+import '../services/health_incident_service.dart';
 import '../widgets/semantic_trend_chart.dart';
 import '../widgets/status_card.dart';
 import '../widgets/health_score_gauge.dart';
@@ -31,7 +32,14 @@ import '../widgets/app_habitat_background.dart';
 import '../theme/app_theme.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
-  const DailyStatusDetailScreen({super.key});
+  const DailyStatusDetailScreen({
+    super.key,
+    this.incidentId,
+    this.incidentDomain,
+  });
+
+  final String? incidentId;
+  final String? incidentDomain;
 
   @override
   State<DailyStatusDetailScreen> createState() =>
@@ -182,6 +190,13 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                       )
                     else
                       _OverallSummaryCard(assessment: a!),
+                    if (widget.incidentId != null) ...[
+                      const SizedBox(height: 18),
+                      _HealthIncidentActionCard(
+                        incidentId: widget.incidentId!,
+                        fallbackDomain: widget.incidentDomain,
+                      ),
+                    ],
                     if (hasHealth) ...[
                       const SizedBox(height: 18),
                       _HealthAssessmentBreakdownCard(
@@ -480,6 +495,199 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
   }
 }
 
+class _HealthIncidentActionCard extends StatefulWidget {
+  const _HealthIncidentActionCard({
+    required this.incidentId,
+    this.fallbackDomain,
+  });
+
+  final String incidentId;
+  final String? fallbackDomain;
+
+  @override
+  State<_HealthIncidentActionCard> createState() =>
+      _HealthIncidentActionCardState();
+}
+
+class _HealthIncidentActionCardState extends State<_HealthIncidentActionCard> {
+  final _service = HealthIncidentService();
+  bool _isUpdating = false;
+
+  Future<void> _runAction(
+    Future<void> Function() action,
+    String successMessage,
+  ) async {
+    if (_isUpdating) return;
+    setState(() => _isUpdating = true);
+    try {
+      await action();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(successMessage)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('操作を保存できませんでした: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
+  String _conditionLabel(HealthIncident? incident) {
+    final condition = incident?.conditionType ?? widget.incidentId;
+    switch (condition) {
+      case 'humidity_high':
+        return '湿度が高めの状態';
+      case 'humidity_low':
+        return '湿度が低めの状態';
+      case 'temperature_high':
+        return '温度が高めの状態';
+      case 'temperature_low':
+        return '温度が低めの状態';
+      case 'activity_drop':
+        return '活動量が少なめの状態';
+      case 'weight_drop':
+        return '体重の減少傾向';
+      case 'concerning_checkin':
+        return '今日の様子の気になる記録';
+      default:
+        return widget.fallbackDomain == 'environment'
+            ? '飼育環境の気になる変化'
+            : '健康状態の気になる変化';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<HealthIncident?>(
+      stream: _service.watchIncident(widget.incidentId),
+      builder: (context, incidentSnapshot) {
+        final incident = incidentSnapshot.data;
+        return StreamBuilder<HealthIncidentAction>(
+          stream: _service.watchAction(widget.incidentId),
+          initialData: const HealthIncidentAction(),
+          builder: (context, actionSnapshot) {
+            final action = actionSnapshot.data ?? const HealthIncidentAction();
+            final resolved = incident?.isResolved == true;
+            final statusColor = resolved
+                ? Colors.green
+                : incident?.severity == 'high'
+                    ? Colors.redAccent
+                    : Colors.orangeAccent;
+            final statusLabel = resolved
+                ? '解消済み'
+                : incident?.severity == 'high'
+                    ? '警戒'
+                    : '注意';
+
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppTheme.isDark(context)
+                    ? AppTheme.cardInnerDark
+                    : AppTheme.cardInnerLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppTheme.quickActionBorder(context)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        resolved
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.notifications_active_outlined,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _conditionLabel(incident),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    resolved
+                        ? '最新の評価では、この状態は解消しています。'
+                        : action.isAcknowledged
+                            ? '確認済みです。状態が悪化または再発した場合は改めて通知します。'
+                            : action.isSnoozed
+                                ? '注意通知を24時間休止しています。警戒レベルへの悪化は通知します。'
+                                : '内容を確認したら、同じ状態の通知を止めるか、一時的に休止できます。',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.secondaryText(context),
+                          height: 1.45,
+                        ),
+                  ),
+                  if (!resolved) ...[
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _isUpdating || action.isAcknowledged
+                              ? null
+                              : () => _runAction(
+                                    () =>
+                                        _service.acknowledge(widget.incidentId),
+                                    'この状態を確認済みにしました。',
+                                  ),
+                          icon: const Icon(Icons.done_rounded),
+                          label: Text(
+                            action.isAcknowledged ? '確認済み' : '確認済みにする',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: _isUpdating || action.isSnoozed
+                              ? null
+                              : () => _runAction(
+                                    () => _service
+                                        .snoozeFor24Hours(widget.incidentId),
+                                    '注意通知を24時間休止しました。',
+                                  ),
+                          icon: const Icon(Icons.snooze_rounded),
+                          label: const Text('24時間休止'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
 class _DetailBundle {
   final HealthAssessment? healthAssessment;
   final List<HealthAssessment> healthHistory;
@@ -769,14 +977,18 @@ class _HealthOverallSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final completeness =
-        (assessment.dataQuality.completeness * 100).clamp(0, 100).round();
+    final scoreCoverage =
+        (assessment.dataQuality.scoreCoverage * 100).clamp(0, 100).round();
     final trend = buildHealthScoreTrendSummary(
       history: history,
       latest: assessment,
       days: 7,
     );
-    final primaryFactor = assessment.overall.primaryFactor?.trim();
+    final primaryFactors = assessment.overall.primaryFactors
+        .map((factor) => factor.trim())
+        .where((factor) => factor.isNotEmpty)
+        .take(3)
+        .toList(growable: false);
 
     final level = _level();
     final accent = healthAssessmentAccent(
@@ -803,8 +1015,7 @@ class _HealthOverallSummaryCard extends StatelessWidget {
             const SizedBox(height: 2),
             Center(
               child: HealthScoreGauge(
-                score: assessment.overall.score ??
-                    assessment.overall.observedScore,
+                score: assessment.overall.score,
                 state: assessment.overall.state,
                 isProvisional: assessment.overall.isProvisional,
                 width: 280,
@@ -823,7 +1034,7 @@ class _HealthOverallSummaryCard extends StatelessWidget {
                     height: 1.45,
                   ),
             ),
-            if (primaryFactor != null && primaryFactor.isNotEmpty) ...[
+            if (primaryFactors.isNotEmpty) ...[
               const SizedBox(height: 13),
               Container(
                 width: double.infinity,
@@ -847,12 +1058,34 @@ class _HealthOverallSummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        '主な要因：$primaryFactor',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.4,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '主な要因',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                          const SizedBox(height: 4),
+                          for (final factor in primaryFactors)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 3),
+                              child: Text(
+                                '・$factor',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.4,
+                                    ),
+                              ),
                             ),
+                        ],
                       ),
                     ),
                   ],
@@ -897,7 +1130,7 @@ class _HealthOverallSummaryCard extends StatelessWidget {
                 _DetailChip(
                   text: '評価信頼度 ${_confidenceLabel()}',
                 ),
-                _DetailChip(text: 'データ充足率 $completeness%'),
+                _DetailChip(text: 'スコア対象 $scoreCoverage%'),
                 if (assessment.overall.isProvisional)
                   const _DetailChip(text: '暫定評価'),
                 _DetailChip(text: '評価日 ${assessment.dateKey}'),

@@ -6,18 +6,18 @@ import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
 import 'package:hamster_project/models/anomaly_detection.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
+import 'package:hamster_project/models/daily_star_progress.dart';
 import 'package:hamster_project/models/health_assessment.dart';
 import 'package:hamster_project/models/pet_profile.dart';
 import 'package:hamster_project/services/anomaly_detection_service.dart';
 import 'package:hamster_project/services/environment_status_service.dart';
 import 'package:hamster_project/services/environment_assessment_repo.dart';
 import 'package:hamster_project/services/environment_trend_service.dart';
-import 'package:hamster_project/services/paid_feature_guard_service.dart';
 import 'package:hamster_project/services/health_assessment_repo.dart';
 import 'package:hamster_project/services/pet_profile_repo.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
-import 'package:hamster_project/screens/record_screen.dart';
+import 'package:hamster_project/screens/daily_stars.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_trend_chart.dart';
 import 'package:hamster_project/widgets/status_card.dart';
@@ -25,19 +25,20 @@ import 'package:hamster_project/widgets/health_score_gauge.dart';
 import 'package:hamster_project/widgets/health_score_trend_chart.dart';
 import 'package:hamster_project/widgets/hamster_avatar_hero.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
+import 'package:hamster_project/services/paid_feature_guard_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueListenable<DailyRecordCompletion?> recordCompletionListenable;
   final void Function(int) onTabSelected;
   final Future<void> Function(String draftText)? onOpenAiWithDraft;
-  final Future<void> Function()? onOpenRecord;
+  final Future<void> Function()? onOpenQuickRecord;
 
   const HomeScreen({
     super.key,
     required this.recordCompletionListenable,
     required this.onTabSelected,
     this.onOpenAiWithDraft,
-    this.onOpenRecord,
+    this.onOpenQuickRecord,
   });
 
   @override
@@ -51,8 +52,8 @@ class HomeScreenState extends State<HomeScreen> {
   final _assessmentRepo = EnvironmentAssessmentRepo();
   final _healthAssessmentRepo = HealthAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
-  final _paidFeatureGuard = PaidFeatureGuardService();
   final _petProfileRepo = PetProfileRepo();
+  final _paidFeatureGuard = PaidFeatureGuardService();
 
   String _homeSubtitle({
     required String? petName,
@@ -111,9 +112,6 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openAiWithDraft(String draftText) async {
-    final allowed = await _ensurePaidFeature(featureName: 'AI相談');
-    if (!allowed) return;
-
     final handler = widget.onOpenAiWithDraft;
 
     if (handler != null) {
@@ -124,31 +122,9 @@ class HomeScreenState extends State<HomeScreen> {
     widget.onTabSelected(1);
   }
 
-  Future<void> _openRecord() async {
-    final allowed = await _ensurePaidFeature(featureName: '記録');
-    if (!allowed || !mounted) return;
-
-    final handler = widget.onOpenRecord;
-    if (handler != null) {
-      await handler();
-      return;
-    }
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const RecordScreen(),
-      ),
-    );
-  }
-
-  Future<bool> _ensurePaidFeature({
-    required String featureName,
-  }) {
-    return _paidFeatureGuard.ensureCanUsePaidFeature(
-      context,
-      featureName: featureName,
-    );
-  }
+  Future<bool> _ensurePaidFeature({required String featureName}) =>
+      _paidFeatureGuard.ensureCanUsePaidFeature(context,
+          featureName: featureName);
 
   @override
   void dispose() {
@@ -214,7 +190,7 @@ class HomeScreenState extends State<HomeScreen> {
                                   assessment?.hasData == true,
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
                           if (isLoading)
                             _EnvironmentAssessmentHero.loading()
                           else if (hasGoldAssessment)
@@ -281,6 +257,36 @@ class HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
+                          const SizedBox(height: 20),
+                          ValueListenableBuilder<DailyRecordCompletion?>(
+                            valueListenable: widget.recordCompletionListenable,
+                            builder: (context, completion, _) {
+                              if (completion == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Column(
+                                children: [
+                                  const _HomeContentTitle(title: '今日の記録'),
+                                  const SizedBox(height: 8),
+                                  DailyStarsStrip(
+                                    progress: DailyStarProgress.fromCompletion(
+                                      completion,
+                                    ),
+                                    prominent: true,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => DailyStarsScreen(
+                                          completionListenable:
+                                              widget.recordCompletionListenable,
+                                          onRecord: widget.onOpenQuickRecord,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                           if (!isLoading && anomalyDetection.hasAnomaly) ...[
                             const SizedBox(height: 14),
                             Container(
@@ -307,26 +313,6 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ],
-                          const SizedBox(height: 14),
-                          ValueListenableBuilder<DailyRecordCompletion?>(
-                            valueListenable: widget.recordCompletionListenable,
-                            builder: (context, completion, _) {
-                              if (completion == null ||
-                                  !completion.shouldShowPrompt) {
-                                return const SizedBox.shrink();
-                              }
-
-                              return Padding(
-                                padding: const EdgeInsets.only(
-                                  bottom: 18,
-                                ),
-                                child: _HomeRecordPromptCard(
-                                  completion: completion,
-                                  onOpenRecord: _openRecord,
-                                ),
-                              );
-                            },
-                          ),
                           Center(
                             child: Text(
                               '© 2025 Go / hamster well-being',
@@ -364,6 +350,30 @@ class _HomeHeader extends StatelessWidget {
               color: AppTheme.overallConditionSecondary(context),
               fontWeight: FontWeight.w800,
               height: 1.4,
+              shadows: AppTheme.overallConditionForegroundShadows(context),
+            ),
+      ),
+    );
+  }
+}
+
+class _HomeContentTitle extends StatelessWidget {
+  final String title;
+
+  const _HomeContentTitle({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Text(
+        title,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppTheme.overallConditionForeground(context),
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0.2,
               shadows: AppTheme.overallConditionForegroundShadows(context),
             ),
       ),
@@ -424,26 +434,11 @@ class _HealthAssessmentHero extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: double.infinity,
-              child: Text(
-                '総合コンディション',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: AppTheme.overallConditionForeground(context),
-                      fontSize: 21,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.2,
-                      shadows:
-                          AppTheme.overallConditionForegroundShadows(context),
-                    ),
-              ),
-            ),
+            const _HomeContentTitle(title: '総合コンディション'),
             const SizedBox(height: 4),
             Center(
               child: HealthScoreGauge(
-                score: assessment.overall.score ??
-                    assessment.overall.observedScore,
+                score: assessment.overall.score,
                 state: assessment.overall.state,
                 isProvisional: assessment.overall.isProvisional,
                 width: 248,
@@ -459,6 +454,16 @@ class _HealthAssessmentHero extends StatelessWidget {
                     AppTheme.overallConditionForegroundShadows(context),
               ),
             ),
+            if (assessment.overall.score == null)
+              Center(
+                child: Text(
+                  '参考スコアは記録が揃うと表示されます',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.overallConditionMuted(context),
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
             const SizedBox(height: 6),
             Center(
               child: HamsterAvatarHero(
@@ -1249,126 +1254,6 @@ class _HomeAnomalyCard extends StatelessWidget {
               label: const Text('この変化をAIに相談'),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _HomeRecordPromptCard extends StatelessWidget {
-  final DailyRecordCompletion completion;
-  final VoidCallback onOpenRecord;
-
-  const _HomeRecordPromptCard({
-    required this.completion,
-    required this.onOpenRecord,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final dailyItems = completion.incompleteDailyLabels;
-    final showWeight = completion.weightDue;
-
-    final title = dailyItems.isNotEmpty
-        ? completion.remainingDailyCount == 1
-            ? '今日の記録があと1件あります'
-            : '今日の記録が残っています'
-        : 'そろそろ体重を記録しませんか？';
-
-    return StatusCard(
-      level: StatusCardLevel.neutral,
-      radius: 24,
-      padding: const EdgeInsets.all(18),
-      onTap: onOpenRecord,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppTheme.tertiaryText(context),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (dailyItems.isNotEmpty)
-            ...dailyItems.map(
-              (label) => _PromptRow(
-                icon: label.contains('走った')
-                    ? Icons.directions_run_rounded
-                    : Icons.favorite_border_rounded,
-                label: label,
-                trailing: '未入力',
-              ),
-            ),
-          if (showWeight)
-            _PromptRow(
-              icon: Icons.monitor_weight_outlined,
-              label: completion.weightPromptLabel,
-              trailing: '任意',
-            ),
-          const SizedBox(height: 10),
-          Text(
-            dailyItems.isNotEmpty
-                ? '入力が完了すると、このカードは自動で消えます。'
-                : '体重は毎日の必須記録ではありません。',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PromptRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String trailing;
-
-  const _PromptRow({
-    required this.icon,
-    required this.label,
-    required this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        children: [
-          Icon(
-            icon,
-            size: 20,
-            color: AppTheme.accent,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-            ),
-          ),
-          Text(
-            trailing,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
         ],
       ),
     );

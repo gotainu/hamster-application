@@ -218,7 +218,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('ペット情報を変更しました！')));
-      Navigator.pop(context);
+      Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

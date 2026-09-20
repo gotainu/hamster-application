@@ -13,6 +13,8 @@
     "deploy:one": "npm run build && firebase deploy --only functions:pollMySwitchbotNow",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions",
+    "dry-run:notifications": "node scripts/notification_dry_run.cjs",
+    "dry-run:health-score": "node scripts/health_score_dry_run.cjs",
     "logs": "firebase functions:log"
   },
   "dependencies": {

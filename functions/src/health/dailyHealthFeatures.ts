@@ -5,6 +5,10 @@ import {
 } from './healthTypes';
 import { normalizeDateKey } from './dateKey';
 import { evaluateWeightRecords } from './weightAssessment';
+import {
+  buildPersonalBaseline,
+  robustZScore,
+} from './personalBaseline';
 
 export interface DailyHealthFeaturesBuildResult {
   features: DailyHealthFeatures;
@@ -67,24 +71,28 @@ export function buildDailyHealthFeatures(params: {
     (record) =>
       record.dayKey === activitySourceDateKey,
   );
-  const windowStartDateKey =
-    params.source.distanceWindow[0]?.dayKey ??
-    activitySourceDateKey;
-  const windowEndDateKey =
-    params.source.distanceWindow[
-      params.source.distanceWindow.length - 1
-    ]?.dayKey ?? activitySourceDateKey;
-
-  const distanceTotal = params.source.distanceWindow.reduce(
-    (sum, record) =>
-      sum + Math.max(0, record.distanceMeters ?? 0),
-    0,
+  const comparisonWindow = params.source.distanceWindow.filter(
+    (record) =>
+      record.dayKey < activitySourceDateKey &&
+      record.exists &&
+      record.distanceMeters != null &&
+      record.distanceMeters >= 0,
   );
+  const baseline = buildPersonalBaseline({
+    observations: comparisonWindow.map((record) => ({
+      dateKey: record.dayKey,
+      value: record.distanceMeters ?? 0,
+    })),
+  });
+  const windowStartDateKey =
+    baseline.firstDateKey ?? activitySourceDateKey;
+  const windowEndDateKey =
+    baseline.lastDateKey ?? activitySourceDateKey;
 
+  // Kept as a compatibility alias for older clients. In schema v4 this is
+  // the robust personal-baseline median, not a target-inclusive mean.
   const avg7DistanceMeters =
-    params.source.distanceWindow.length > 0
-      ? distanceTotal / params.source.distanceWindow.length
-      : null;
+    baseline.status === 'ready' ? baseline.median : null;
 
   const distanceMeters =
     targetDistance?.distanceMeters ?? null;
@@ -100,6 +108,11 @@ export function buildDailyHealthFeatures(params: {
         ) * 100
       : null;
 
+  const activityRobustZScore =
+    targetDistance?.exists && distanceMeters != null
+      ? robustZScore({value: distanceMeters, baseline})
+      : null;
+
   const activity = {
     assessmentDateKey: dateKey,
     sourceDateKey: activitySourceDateKey,
@@ -113,11 +126,13 @@ export function buildDailyHealthFeatures(params: {
       targetDistance?.wheelDiameterCm ?? null,
     avg7DistanceMeters,
     deltaPct,
-    windowDays: params.source.distanceWindow.length,
-    windowRecordCount:
-      params.source.distanceWindow.filter(
-        (record) => record.exists,
-      ).length,
+    personalBaseline: {
+      ...baseline,
+      deviationPct: deltaPct,
+      robustZScore: activityRobustZScore,
+    },
+    windowDays: 90,
+    windowRecordCount: baseline.recordCount,
     recordDate: targetDistance?.date ?? null,
   };
 
@@ -125,6 +140,8 @@ export function buildDailyHealthFeatures(params: {
     recorded: params.source.dailyCheckin.exists,
     condition: params.source.dailyCheckin.condition,
     concernTags: params.source.dailyCheckin.concernTags,
+    observationLevels:
+      params.source.dailyCheckin.observationLevels,
     memo: params.source.dailyCheckin.memo,
     recordDate: params.source.dailyCheckin.date,
   };
@@ -192,7 +209,7 @@ export function buildDailyHealthFeatures(params: {
       staleDomains,
       completeness,
     },
-    schemaVersion: 3,
+    schemaVersion: 5,
     generatedAt: params.generatedAt ?? new Date(),
   };
 
