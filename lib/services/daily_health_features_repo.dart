@@ -11,11 +11,9 @@ class DailyHealthFeaturesRepo {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
 
-  DailyHealthFeaturesRepo({
-    FirebaseFirestore? db,
-    FirebaseAuth? auth,
-  })  : _db = db ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+  DailyHealthFeaturesRepo({FirebaseFirestore? db, FirebaseAuth? auth})
+    : _db = db ?? FirebaseFirestore.instance,
+      _auth = auth ?? FirebaseAuth.instance;
 
   String? get _uid => _auth.currentUser?.uid;
 
@@ -38,9 +36,7 @@ class DailyHealthFeaturesRepo {
     return fetchByDateKey(dateKeyLocal(date));
   }
 
-  Future<DailyHealthFeatures?> fetchByDateKey(
-    String dateKey,
-  ) async {
+  Future<DailyHealthFeatures?> fetchByDateKey(String dateKey) async {
     final collection = _collection();
     if (collection == null) return null;
 
@@ -49,18 +45,17 @@ class DailyHealthFeaturesRepo {
 
     if (!snapshot.exists || data == null) return null;
 
-    return DailyHealthFeatures.fromMap(
-      data,
-      fallbackDateKey: snapshot.id,
-    );
+    return DailyHealthFeatures.fromMap(data, fallbackDateKey: snapshot.id);
   }
 
   Future<DailyHealthFeatures?> fetchLatest() async {
     final collection = _collection();
     if (collection == null) return null;
 
-    final snapshot =
-        await collection.orderBy('dateKey', descending: true).limit(1).get();
+    final snapshot = await collection
+        .orderBy('dateKey', descending: true)
+        .limit(1)
+        .get();
 
     if (snapshot.docs.isEmpty) return null;
 
@@ -71,9 +66,7 @@ class DailyHealthFeaturesRepo {
     );
   }
 
-  Future<List<DailyHealthFeatures>> fetchRecent({
-    int limit = 30,
-  }) async {
+  Future<List<DailyHealthFeatures>> fetchRecent({int limit = 30}) async {
     final collection = _collection();
     if (collection == null) return const [];
 
@@ -93,9 +86,7 @@ class DailyHealthFeaturesRepo {
         .toList(growable: false);
   }
 
-  Stream<DailyHealthFeatures?> watchByDateKey(
-    String dateKey,
-  ) {
+  Stream<DailyHealthFeatures?> watchByDateKey(String dateKey) {
     final collection = _collection();
     if (collection == null) {
       return Stream<DailyHealthFeatures?>.value(null);
@@ -105,10 +96,7 @@ class DailyHealthFeaturesRepo {
       final data = snapshot.data();
       if (!snapshot.exists || data == null) return null;
 
-      return DailyHealthFeatures.fromMap(
-        data,
-        fallbackDateKey: snapshot.id,
-      );
+      return DailyHealthFeatures.fromMap(data, fallbackDateKey: snapshot.id);
     });
   }
 
@@ -123,13 +111,36 @@ class DailyHealthFeaturesRepo {
         .limit(1)
         .snapshots()
         .map((snapshot) {
-      if (snapshot.docs.isEmpty) return null;
+          if (snapshot.docs.isEmpty) return null;
 
-      final document = snapshot.docs.first;
-      return DailyHealthFeatures.fromMap(
-        document.data(),
-        fallbackDateKey: document.id,
-      );
-    });
+          final document = snapshot.docs.first;
+          return DailyHealthFeatures.fromMap(
+            document.data(),
+            fallbackDateKey: document.id,
+          );
+        });
+  }
+
+  Stream<List<DailyHealthFeatures>> watchSince(DateTime startDate) {
+    final collection = _collection();
+    if (collection == null) {
+      return Stream<List<DailyHealthFeatures>>.value(const []);
+    }
+    final startKey = dateKeyLocal(startDate);
+    return collection
+        .where('dateKey', isGreaterThanOrEqualTo: startKey)
+        .orderBy('dateKey')
+        .limit(14)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (document) => DailyHealthFeatures.fromMap(
+                  document.data(),
+                  fallbackDateKey: document.id,
+                ),
+              )
+              .toList(growable: false),
+        );
   }
 }

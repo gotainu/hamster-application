@@ -4,13 +4,15 @@ import 'package:intl/intl.dart';
 
 import '../screens/breeding_environment_edit_screen.dart';
 import '../services/distance_records_repo.dart';
+import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
 
-typedef WheelRotationSavedCallback = void Function({
-  required DateTime date,
-  required int rotations,
-  double? distanceMeters,
-});
+typedef WheelRotationSavedCallback =
+    void Function({
+      required DateTime date,
+      required int rotations,
+      double? distanceMeters,
+    });
 
 class WheelRotationInputCard extends StatefulWidget {
   final DistanceRecordsRepo? distanceRepo;
@@ -181,9 +183,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
 
   Future<void> _openEnvironmentSettings() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const BreedingEnvironmentEditScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const BreedingEnvironmentEditScreen()),
     );
 
     if (!mounted) return;
@@ -214,6 +214,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
         rotations: rotations,
         date: _selectedRecordDate,
       );
+      await OnboardingStateRepo().recordFirstMonitoringData('wheel');
 
       final savedDistance =
           _distance ?? await _repo.previewDistanceFromRotations(rotations);
@@ -300,16 +301,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               opacity: AppTheme.isDark(context) ? 0.12 : 0.08,
             ),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: AppTheme.accent.withValues(alpha: 0.22),
-            ),
+            border: Border.all(color: AppTheme.accent.withValues(alpha: 0.22)),
           ),
           child: Row(
             children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                color: AppTheme.accent,
-              ),
+              const Icon(Icons.check_circle_rounded, color: AppTheme.accent),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -320,8 +316,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                           ? '昨日の記録済み'
                           : '${DateFormat('M/d').format(record.date)}の記録済み',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -330,9 +326,9 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                         _formatDistance(record.distance),
                       ].join(' / '),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: secondary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: secondary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ],
                 ),
@@ -355,11 +351,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
           Text(
             _message!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _isErrorMessage
-                      ? Theme.of(context).colorScheme.error
-                      : AppTheme.accent,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: _isErrorMessage
+                  ? Theme.of(context).colorScheme.error
+                  : AppTheme.accent,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ],
@@ -416,15 +412,15 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                     Text(
                       widget.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       widget.subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: secondary,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: secondary),
                     ),
                   ],
                 ),
@@ -442,8 +438,10 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 width: double.infinity,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 13,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.chipFill(
                     AppTheme.accent,
@@ -463,8 +461,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                       child: Text(
                         dateLabel,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const Icon(Icons.expand_more_rounded),
@@ -478,9 +476,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               enabled: !_loadingWheel && _wheelReady,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-              ],
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 labelText: '回し車の回転数',
                 hintText: '例：1200',
@@ -488,8 +484,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                 helperText: _loadingWheel
                     ? '車輪設定を確認中…'
                     : _wheelReady
-                        ? '入力すると距離を自動計算します'
-                        : null,
+                    ? '入力すると距離を自動計算します'
+                    : null,
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -507,24 +503,20 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.straighten_rounded,
-                    size: 20,
-                    color: secondary,
-                  ),
+                  Icon(Icons.straighten_rounded, size: 20, color: secondary),
                   const SizedBox(width: 10),
                   Text(
                     '推定走行距離',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: secondary,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: secondary),
                   ),
                   const Spacer(),
                   Text(
                     _formatDistance(_distance),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ),
@@ -533,9 +525,9 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               const SizedBox(height: 12),
               Text(
                 '車輪の直径が未設定です。回転数から距離を計算するために、先に飼育環境を設定してください。',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: secondary,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: secondary),
               ),
               const SizedBox(height: 10),
               OutlinedButton.icon(
@@ -549,11 +541,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
               Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _isErrorMessage
-                          ? Theme.of(context).colorScheme.error
-                          : AppTheme.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: _isErrorMessage
+                      ? Theme.of(context).colorScheme.error
+                      : AppTheme.accent,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
             const SizedBox(height: 14),

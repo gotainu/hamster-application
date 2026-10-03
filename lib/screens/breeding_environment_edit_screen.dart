@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../models/breeding_environment.dart';
 import '../services/breeding_environment_repo.dart';
+import '../services/onboarding_state_repo.dart';
 
 class BreedingEnvironmentEditScreen extends StatefulWidget {
   const BreedingEnvironmentEditScreen({super.key});
@@ -74,6 +75,7 @@ class _BreedingEnvironmentEditScreenState
 
     try {
       await _repo.saveMainEnv(env);
+      await OnboardingStateRepo().markProfileCompleted('environment');
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -90,9 +92,9 @@ class _BreedingEnvironmentEditScreenState
       Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('保存に失敗しました…')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('保存に失敗しました…')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -101,8 +103,9 @@ class _BreedingEnvironmentEditScreenState
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bgGradient =
-        isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient;
+    final bgGradient = isDark
+        ? AppTheme.darkBgGradient
+        : AppTheme.lightBgGradient;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -128,7 +131,9 @@ class _BreedingEnvironmentEditScreenState
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 480),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 36),
+                      horizontal: 28,
+                      vertical: 36,
+                    ),
                     decoration: BoxDecoration(
                       color: isDark
                           ? AppTheme.cardInnerDark
@@ -146,14 +151,15 @@ class _BreedingEnvironmentEditScreenState
                       key: _formKey,
                       child: Column(
                         children: [
-                          const Icon(Icons.eco,
-                              color: AppTheme.accent, size: 38),
+                          const Icon(
+                            Icons.eco,
+                            color: AppTheme.accent,
+                            size: 38,
+                          ),
                           const SizedBox(height: 14),
                           Text(
                             '飼育環境フォーム',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
+                            style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 24),
@@ -165,8 +171,8 @@ class _BreedingEnvironmentEditScreenState
                             keyboardType: TextInputType.number,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                    ? '横幅を入力してください'
-                                    : null,
+                                ? '横幅を入力してください'
+                                : null,
                             onSaved: (value) => _cageWidth = value,
                           ),
                           const SizedBox(height: 16),
@@ -178,8 +184,8 @@ class _BreedingEnvironmentEditScreenState
                             keyboardType: TextInputType.number,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                    ? '奥行きを入力してください'
-                                    : null,
+                                ? '奥行きを入力してください'
+                                : null,
                             onSaved: (value) => _cageDepth = value,
                           ),
                           const SizedBox(height: 16),
@@ -191,8 +197,8 @@ class _BreedingEnvironmentEditScreenState
                             keyboardType: TextInputType.number,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                    ? '床材の嵩を入力してください'
-                                    : null,
+                                ? '床材の嵩を入力してください'
+                                : null,
                             onSaved: (value) => _beddingThickness = value,
                           ),
                           const SizedBox(height: 16),
@@ -204,8 +210,8 @@ class _BreedingEnvironmentEditScreenState
                             keyboardType: TextInputType.number,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                    ? '車輪の直径を入力してください'
-                                    : null,
+                                ? '車輪の直径を入力してください'
+                                : null,
                             onSaved: (value) => _wheelDiameter = value,
                           ),
                           const SizedBox(height: 16),
@@ -244,8 +250,9 @@ class _BreedingEnvironmentEditScreenState
                               icon: const Icon(Icons.save, color: Colors.white),
                               label: const Text('設定を保存'),
                               style: ElevatedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 18),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 18,
+                                ),
                                 textStyle: Theme.of(context)
                                     .textTheme
                                     .titleMedium

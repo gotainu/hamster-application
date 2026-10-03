@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/weight_record.dart';
 import '../services/weight_records_repo.dart';
+import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
 
 typedef WeightSavedCallback = void Function(WeightRecord record);
@@ -13,12 +14,7 @@ class WeightInputCard extends StatefulWidget {
   final DateTime? initialDate;
   final WeightSavedCallback? onSaved;
 
-  const WeightInputCard({
-    super.key,
-    this.repo,
-    this.initialDate,
-    this.onSaved,
-  });
+  const WeightInputCard({super.key, this.repo, this.initialDate, this.onSaved});
 
   @override
   State<WeightInputCard> createState() => _WeightInputCardState();
@@ -95,8 +91,9 @@ class _WeightInputCardState extends State<WeightInputCard> {
         _previousRecord = previous;
         _editing = saved == null;
 
-        _weightController.text =
-            saved == null ? '' : _formatWeight(saved.weightGrams);
+        _weightController.text = saved == null
+            ? ''
+            : _formatWeight(saved.weightGrams);
         _memoController.text = saved?.memo ?? '';
       });
     } catch (error) {
@@ -154,6 +151,7 @@ class _WeightInputCardState extends State<WeightInputCard> {
         weightGrams: weight,
         memo: _memoController.text,
       );
+      await OnboardingStateRepo().recordFirstMonitoringData('weight');
 
       final record = WeightRecord(
         dayKey: DateFormat('yyyy-MM-dd').format(_selectedDate),
@@ -209,9 +207,7 @@ class _WeightInputCardState extends State<WeightInputCard> {
       decoration: BoxDecoration(
         color: AppTheme.accent.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: AppTheme.accent.withValues(alpha: 0.24),
-        ),
+        border: Border.all(color: AppTheme.accent.withValues(alpha: 0.24)),
       ),
       child: Row(
         children: [
@@ -222,24 +218,24 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 Text(
                   '${_formatWeight(record.weightGrams)}g',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   DateFormat('yyyy/M/d').format(record.date),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                      ),
+                    color: AppTheme.secondaryText(context),
+                  ),
                 ),
                 if (comparison != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     comparison,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.accent,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      color: AppTheme.accent,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ],
               ],
@@ -297,15 +293,15 @@ class _WeightInputCardState extends State<WeightInputCard> {
                     Text(
                       '体重',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     Text(
                       '毎日ではなく、週1回程度を目安に記録します。',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: secondary,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: secondary),
                     ),
                   ],
                 ),
@@ -329,8 +325,9 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 Expanded(
                   child: TextField(
                     controller: _weightController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
                         RegExp(r'^\d{0,4}([.,]\d{0,1})?$'),
@@ -350,8 +347,8 @@ class _WeightInputCardState extends State<WeightInputCard> {
                   child: Text(
                     DateFormat('M/d').format(_selectedDate),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
               ],
@@ -372,11 +369,11 @@ class _WeightInputCardState extends State<WeightInputCard> {
               Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: _error
-                          ? Theme.of(context).colorScheme.error
-                          : AppTheme.accent,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  color: _error
+                      ? Theme.of(context).colorScheme.error
+                      : AppTheme.accent,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
             const SizedBox(height: 14),

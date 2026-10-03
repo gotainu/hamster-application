@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/billing_status.dart';
 import '../screens/subscription_plan_screen.dart';
 import 'billing_status_repo.dart';
+import 'onboarding_state_repo.dart';
 
 class PaidFeatureGuardService {
-  PaidFeatureGuardService({
-    BillingStatusRepo? billingStatusRepo,
-  }) : _billingStatusRepo = billingStatusRepo ?? BillingStatusRepo();
+  PaidFeatureGuardService({BillingStatusRepo? billingStatusRepo})
+    : _billingStatusRepo = billingStatusRepo ?? BillingStatusRepo();
 
   final BillingStatusRepo _billingStatusRepo;
 
@@ -15,11 +15,17 @@ class PaidFeatureGuardService {
     BuildContext context, {
     required String featureName,
     String? description,
+    bool allowDuringOnboarding = false,
   }) async {
     final billing = await _billingStatusRepo.fetchBillingStatus();
 
     if (billing.canUsePaidFeatures) {
       return true;
+    }
+
+    if (allowDuringOnboarding) {
+      final onboarding = await OnboardingStateRepo().fetchState();
+      if (onboarding.hasActiveOnboardingEntitlement()) return true;
     }
 
     if (!context.mounted) {
@@ -38,11 +44,9 @@ class PaidFeatureGuardService {
     );
 
     if (shouldOpenPlan == true && context.mounted) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => const SubscriptionPlanScreen(),
-        ),
-      );
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const SubscriptionPlanScreen()));
     }
 
     return false;
@@ -66,7 +70,8 @@ class _PaidFeatureDialog extends StatelessWidget {
         ? 'お支払いの確認が必要です'
         : '$featureNameは有料プランの機能です';
 
-    final body = description ??
+    final body =
+        description ??
         (billing.needsPaymentAttention
             ? '現在のお支払い状態では、この機能を利用できません。利用プラン画面で状態を確認してください。'
             : 'ハムスターの環境管理を継続的に支援するため、この機能は有料プランで利用できます。');

@@ -43,6 +43,16 @@ final class AppAnalytics {
     return _log('ai_consultation_failed');
   }
 
+  static Future<void> logOnboardingEvent(
+    String event, {
+    String? method,
+  }) {
+    return _log(event, {
+      'flow_version': 2,
+      if (method != null) 'method': method,
+    });
+  }
+
   static Future<void> logNotificationOpened({
     required String source,
     required String notificationType,
