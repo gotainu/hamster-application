@@ -5,6 +5,7 @@ import '../models/feature_trial_access.dart';
 import '../screens/subscription_plan_screen.dart';
 import '../services/billing_status_repo.dart';
 import '../services/feature_trial_repo.dart';
+import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
 
 class PaidFeatureGate extends StatelessWidget {
@@ -17,6 +18,7 @@ class PaidFeatureGate extends StatelessWidget {
     this.icon = Icons.workspace_premium_rounded,
     this.showBackground = true,
     this.trialFeature,
+    this.allowDuringOnboarding = false,
   });
 
   final Widget child;
@@ -26,6 +28,7 @@ class PaidFeatureGate extends StatelessWidget {
   final IconData icon;
   final bool showBackground;
   final TrialFeature? trialFeature;
+  final bool allowDuringOnboarding;
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +61,27 @@ class PaidFeatureGate extends StatelessWidget {
 
         if (billing.canUsePaidFeatures) {
           return child;
+        }
+
+        if (allowDuringOnboarding) {
+          return StreamBuilder<OnboardingState>(
+            stream: OnboardingStateRepo().watchState(),
+            builder: (context, onboardingSnapshot) {
+              final onboarding =
+                  onboardingSnapshot.data ?? OnboardingState.initial();
+              if (onboarding.hasActiveOnboardingEntitlement()) {
+                return child;
+              }
+              return _PaidFeatureLockedView(
+                featureName: featureName,
+                title: lockedTitle ?? '$featureNameは有料プランの機能です',
+                message:
+                    lockedMessage ?? '無料オンボーディング期間は終了しました。続けるには有料プランをご利用ください。',
+                icon: icon,
+                showBackground: showBackground,
+              );
+            },
+          );
         }
 
         return _PaidFeatureLockedView(

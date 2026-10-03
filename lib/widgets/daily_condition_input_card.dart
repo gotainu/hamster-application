@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../services/app_analytics.dart';
 import '../services/daily_checkin_repo.dart';
+import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
 
 class DailyConditionInputCard extends StatefulWidget {
@@ -222,6 +223,11 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         );
         _isEditing = false;
       });
+
+      // 進捗記録が失敗しても、ユーザーの大切な日次記録は失敗扱いにしない。
+      try {
+        await OnboardingStateRepo().recordFirstMonitoringData('daily_checkin');
+      } catch (_) {}
 
       await AppAnalytics.logDailyInputComplete(
         condition: condition.name,

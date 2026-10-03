@@ -116,6 +116,7 @@ class FuncSearchScreen extends StatefulWidget {
   final bool showPaidGateBackground;
   final Future<void> Function()? onConsultationCompleted;
   final TrialFeature? trialFeature;
+  final bool allowDuringOnboarding;
   final bool showInputCoach;
 
   const FuncSearchScreen({
@@ -125,6 +126,7 @@ class FuncSearchScreen extends StatefulWidget {
     this.showPaidGateBackground = false,
     this.onConsultationCompleted,
     this.trialFeature,
+    this.allowDuringOnboarding = false,
     this.showInputCoach = false,
   });
 
@@ -1289,6 +1291,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         icon: Icons.smart_toy_rounded,
         showBackground: widget.showPaidGateBackground,
         trialFeature: widget.trialFeature,
+        allowDuringOnboarding: widget.allowDuringOnboarding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

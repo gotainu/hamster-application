@@ -26,6 +26,8 @@ import 'package:hamster_project/widgets/health_score_trend_chart.dart';
 import 'package:hamster_project/widgets/hamster_avatar_hero.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
 import 'package:hamster_project/services/paid_feature_guard_service.dart';
+import 'package:hamster_project/services/onboarding_state_repo.dart';
+import 'package:hamster_project/widgets/analysis_progress_card.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueListenable<DailyRecordCompletion?> recordCompletionListenable;
@@ -122,9 +124,34 @@ class HomeScreenState extends State<HomeScreen> {
     widget.onTabSelected(1);
   }
 
-  Future<bool> _ensurePaidFeature({required String featureName}) =>
-      _paidFeatureGuard.ensureCanUsePaidFeature(context,
-          featureName: featureName);
+  Future<bool> _ensurePaidFeature({
+    required String featureName,
+    bool allowDuringOnboarding = false,
+  }) =>
+      _paidFeatureGuard.ensureCanUsePaidFeature(
+        context,
+        featureName: featureName,
+        allowDuringOnboarding: allowDuringOnboarding,
+      );
+
+  Future<void> _openSwitchbot() async {
+    final allowed = await _ensurePaidFeature(
+      featureName: 'SwitchBot連携',
+      allowDuringOnboarding: true,
+    );
+    if (!allowed || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const SwitchbotSetupScreen()),
+    );
+  }
+
+  Future<void> _openFirstPersonalizedAnalysis() async {
+    await OnboardingStateRepo().markFirstPersonalizedAnalysisViewed();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const DailyStatusDetailScreen()),
+    );
+  }
 
   @override
   void dispose() {
@@ -191,6 +218,21 @@ class HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(height: 14),
+                          StreamBuilder<OnboardingState>(
+                            stream: OnboardingStateRepo().watchState(),
+                            builder: (context, onboardingSnapshot) {
+                              return AnalysisProgressCard(
+                                state: onboardingSnapshot.data ??
+                                    OnboardingState.initial(),
+                                onOpenRecord: () =>
+                                    widget.onOpenQuickRecord?.call(),
+                                onOpenSwitchbot: () => _openSwitchbot(),
+                                onViewAnalysis: () =>
+                                    _openFirstPersonalizedAnalysis(),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 14),
                           if (isLoading)
                             _EnvironmentAssessmentHero.loading()
                           else if (hasGoldAssessment)
@@ -223,21 +265,7 @@ class HomeScreenState extends State<HomeScreen> {
                             )
                           else if (assessment == null || !assessment.hasData)
                             _EnvironmentAssessmentHero.empty(
-                              onOpenSetup: () async {
-                                final allowed = await _ensurePaidFeature(
-                                  featureName: 'SwitchBot連携',
-                                );
-                                if (!allowed) return;
-
-                                if (!context.mounted) return;
-
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        const SwitchbotSetupScreen(),
-                                  ),
-                                );
-                              },
+                              onOpenSetup: _openSwitchbot,
                             )
                           else
                             _EnvironmentAssessmentHero(

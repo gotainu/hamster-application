@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'app_analytics.dart';
+
 typedef Json = Map<String, dynamic>;
 
 class OnboardingState {
@@ -10,6 +12,13 @@ class OnboardingState {
   final int setupCoachMarkStep;
   final bool homeAiOnboardingPending;
   final Set<String> completedSetupSteps;
+  final DateTime? firstMonitoringDataRecordedAt;
+  final String? firstMonitoringDataSource;
+  final DateTime? monitoringIntroductionViewedAt;
+  final String? monitoringMethod;
+  final DateTime? monitoringMethodSelectedAt;
+  final DateTime? personalizedAnalysisAvailableAt;
+  final DateTime? firstPersonalizedAnalysisViewedAt;
   final DateTime? updatedAt;
 
   const OnboardingState({
@@ -19,12 +28,28 @@ class OnboardingState {
     required this.setupCoachMarkStep,
     required this.homeAiOnboardingPending,
     required this.completedSetupSteps,
+    this.firstMonitoringDataRecordedAt,
+    this.firstMonitoringDataSource,
+    this.monitoringIntroductionViewedAt,
+    this.monitoringMethod,
+    this.monitoringMethodSelectedAt,
+    this.personalizedAnalysisAvailableAt,
+    this.firstPersonalizedAnalysisViewedAt,
     this.updatedAt,
   });
 
   bool get shouldShowIntro => !introCompleted;
   // 旧テスト・保存形式との後方互換用。新しい導線は step を使います。
   bool get setupCoachMarkSeen => setupCoachMarkStep > 0;
+  bool get hasStartedMonitoring => firstMonitoringDataRecordedAt != null;
+
+  /// 最初の実データ保存後から7日間、見守り開始に必要な機能を使えます。
+  bool hasActiveOnboardingEntitlement([DateTime? now]) {
+    final startedAt = firstMonitoringDataRecordedAt;
+    if (startedAt == null) return true;
+    return (now ?? DateTime.now()).difference(startedAt) <
+        const Duration(days: 7);
+  }
 
   factory OnboardingState.initial() {
     return const OnboardingState(
@@ -38,7 +63,10 @@ class OnboardingState {
   }
 
   factory OnboardingState.fromJson(Json json) {
-    final updatedAtRaw = json['updatedAt'];
+    DateTime? date(String key) {
+      final value = json[key];
+      return value is Timestamp ? value.toDate().toLocal() : null;
+    }
 
     return OnboardingState(
       introCompleted: json['introCompleted'] == true,
@@ -53,8 +81,15 @@ class OnboardingState {
           ((json['completedSetupSteps'] as List<dynamic>?) ?? const [])
               .whereType<String>()
               .toSet(),
-      updatedAt:
-          updatedAtRaw is Timestamp ? updatedAtRaw.toDate().toLocal() : null,
+      firstMonitoringDataRecordedAt: date('firstMonitoringDataRecordedAt'),
+      firstMonitoringDataSource: json['firstMonitoringDataSource'] as String?,
+      monitoringIntroductionViewedAt: date('monitoringIntroductionViewedAt'),
+      monitoringMethod: json['monitoringMethod'] as String?,
+      monitoringMethodSelectedAt: date('monitoringMethodSelectedAt'),
+      personalizedAnalysisAvailableAt: date('personalizedAnalysisAvailableAt'),
+      firstPersonalizedAnalysisViewedAt:
+          date('firstPersonalizedAnalysisViewedAt'),
+      updatedAt: date('updatedAt'),
     );
   }
 }
@@ -143,6 +178,44 @@ class OnboardingStateRepo {
     }, SetOptions(merge: true));
   }
 
+  /// 既存のプロフィール保存処理から呼ぶ互換エントリポイントです。
+  Future<void> markProfileCompleted(String profile) =>
+      markSetupStepCompleted(profile);
+
+  Future<void> markMonitoringIntroductionViewed() => _mark({
+        'monitoringIntroductionViewedAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> selectMonitoringMethod(String method) => _mark({
+        'monitoringMethod': method,
+        'monitoringMethodSelectedAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> recordFirstMonitoringData(String source) async {
+    final doc = _doc();
+    if (doc == null) return;
+
+    final current = await doc.get();
+    if (current.data()?['firstMonitoringDataRecordedAt'] != null) return;
+
+    await _mark({
+      'firstMonitoringDataRecordedAt': FieldValue.serverTimestamp(),
+      'firstMonitoringDataSource': source,
+    });
+    await AppAnalytics.logOnboardingEvent(
+      'first_monitoring_data_recorded',
+      method: source,
+    );
+  }
+
+  Future<void> markPersonalizedAnalysisAvailable() => _mark({
+        'personalizedAnalysisAvailableAt': FieldValue.serverTimestamp(),
+      });
+
+  Future<void> markFirstPersonalizedAnalysisViewed() => _mark({
+        'firstPersonalizedAnalysisViewedAt': FieldValue.serverTimestamp(),
+      });
+
   Future<void> markSetupCoachMarkStepSeen(int step) async {
     final doc = _doc();
     if (doc == null) return;
@@ -187,6 +260,15 @@ class OnboardingStateRepo {
       'introCompleted': true,
       'setupChecklistViewed': true,
       'homeAiOnboardingPending': startHomeAiOnboarding,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _mark(Json values) async {
+    final doc = _doc();
+    if (doc == null) return;
+    await doc.set({
+      ...values,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }

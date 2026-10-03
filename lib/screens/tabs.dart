@@ -23,6 +23,7 @@ import 'package:hamster_project/widgets/app_habitat_background.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/models/feature_trial_access.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
+import 'package:hamster_project/screens/monitoring_introduction_screen.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class TabsScreen extends StatefulWidget {
@@ -225,6 +226,17 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
     _searchKey.currentState?.showInputCoach();
   }
 
+  Future<void> _handleFirstAiConsultation() async {
+    final state = await _onboardingRepo.fetchState();
+    final isFirstAnswer = !state.firstAiConsultationCompleted;
+    await _onboardingRepo.markFirstAiConsultationCompleted();
+    if (!isFirstAnswer || !mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const MonitoringIntroductionScreen()),
+    );
+  }
+
   Future<void> _showHomeAiCoach() async {
     if (!mounted) return;
     TutorialCoachMark(
@@ -278,9 +290,8 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       ),
       FuncSearchScreen(
         key: _searchKey,
-        trialFeature: TrialFeature.ai,
-        onConsultationCompleted: () =>
-            _onboardingRepo.markFirstAiConsultationCompleted(),
+        allowDuringOnboarding: true,
+        onConsultationCompleted: _handleFirstAiConsultation,
       ),
       const PaidFeatureGate(
         featureName: '変化',
@@ -324,6 +335,7 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
         lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
         icon: Icons.edit_note_rounded,
         showBackground: false,
+        allowDuringOnboarding: true,
         child: RecordScreen(),
       ),
     );

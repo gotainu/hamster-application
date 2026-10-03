@@ -21,4 +21,26 @@ void main() {
 
     expect(state.firstAiConsultationCompleted, isTrue);
   });
+
+  test('onboarding entitlement expires seven days after the first record', () {
+    final now = DateTime(2026, 10, 3, 12);
+    final state = OnboardingState(
+      introCompleted: true,
+      setupChecklistViewed: true,
+      firstAiConsultationCompleted: true,
+      setupCoachMarkStep: 0,
+      homeAiOnboardingPending: false,
+      completedSetupSteps: const <String>{},
+      firstMonitoringDataRecordedAt: now.subtract(const Duration(days: 7)),
+    );
+
+    expect(state.hasActiveOnboardingEntitlement(now), isFalse);
+  });
+
+  test('onboarding entitlement remains active before first monitoring data',
+      () {
+    final state = OnboardingState.initial();
+
+    expect(state.hasActiveOnboardingEntitlement(), isTrue);
+  });
 }
