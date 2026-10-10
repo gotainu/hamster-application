@@ -10,6 +10,7 @@ import '../services/app_analytics.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/billing_status_repo.dart';
 import '../services/notification_settings_service.dart';
+import '../widgets/hamster_feedback_popup.dart';
 import 'switchbot_setup.dart';
 import 'subscription_plan_screen.dart';
 import 'pet_profile_edit_screen.dart';
@@ -58,9 +59,7 @@ class _SettingScreenState extends State<SettingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ログアウトに失敗しました: $e')),
-      );
+      HamsterFeedbackPopup.show(context, message: 'ログアウトに失敗しました。');
     } finally {
       if (mounted) {
         setState(() {
@@ -75,9 +74,7 @@ class _SettingScreenState extends State<SettingScreen> {
     final uid = user?.uid;
 
     if (uid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ログインユーザーが見つかりません。')),
-      );
+      HamsterFeedbackPopup.show(context, message: 'ログインユーザーが見つかりません。');
       return;
     }
 
@@ -198,9 +195,7 @@ class _SettingScreenState extends State<SettingScreen> {
     if (confirmText != 'DELETE_MY_ACCOUNT') {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('削除確認文字列が一致しませんでした。')),
-      );
+      HamsterFeedbackPopup.show(context, message: '削除確認文字列が一致しませんでした。');
       return;
     }
 
@@ -228,9 +223,7 @@ class _SettingScreenState extends State<SettingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('削除に失敗しました: $e')),
-      );
+      HamsterFeedbackPopup.show(context, message: '削除に失敗しました。');
     } finally {
       if (mounted) {
         setState(() {
@@ -283,19 +276,14 @@ class _SettingScreenState extends State<SettingScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            deletedCount > 0 ? 'AI相談履歴を削除しました。' : '削除対象のAI相談履歴はありませんでした。',
-          ),
-        ),
+      HamsterFeedbackPopup.show(
+        context,
+        message: deletedCount > 0 ? 'AI相談履歴を削除しました。' : '削除対象のAI相談履歴はありませんでした。',
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('AI相談履歴の削除に失敗しました: $e')),
-      );
+      HamsterFeedbackPopup.show(context, message: 'AI相談履歴の削除に失敗しました。');
     } finally {
       if (mounted) {
         setState(() {
@@ -313,25 +301,32 @@ class _SettingScreenState extends State<SettingScreen> {
     });
 
     try {
+      if (enabled) {
+        final granted =
+            await MyApp.of(context).requestCareNotificationPermission();
+        if (!granted) {
+          if (!mounted) return;
+          HamsterFeedbackPopup.show(
+            context,
+            message: '見守り通知を受け取るには、端末の通知を許可してください。',
+          );
+          return;
+        }
+      }
       await _notificationSettingsService
           .setAnomalyNotificationsEnabled(enabled);
       await AppAnalytics.logNotificationSettingChanged(enabled: enabled);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            enabled ? '異常検知通知をONにしました。' : '異常検知通知をOFFにしました。',
-          ),
-        ),
+      HamsterFeedbackPopup.show(
+        context,
+        message: enabled ? '異常検知通知をONにしました。' : '異常検知通知をOFFにしました。',
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('通知設定の更新に失敗しました: $e')),
-      );
+      HamsterFeedbackPopup.show(context, message: '通知設定の更新に失敗しました。');
     } finally {
       if (mounted) {
         setState(() {
@@ -401,14 +396,10 @@ class _SettingScreenState extends State<SettingScreen> {
     try {
       await update();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(successMessage)),
-      );
+      HamsterFeedbackPopup.show(context, message: successMessage);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('通知設定の更新に失敗しました: $e')),
-      );
+      HamsterFeedbackPopup.show(context, message: '通知設定の更新に失敗しました。');
     } finally {
       if (mounted) {
         setState(() {
@@ -460,11 +451,7 @@ class _SettingScreenState extends State<SettingScreen> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('メールアプリを開けませんでした: $e'),
-        ),
-      );
+      HamsterFeedbackPopup.show(context, message: 'メールアプリを開けませんでした。');
     } finally {
       if (mounted) {
         setState(() {

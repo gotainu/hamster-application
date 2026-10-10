@@ -2,6 +2,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 
 void main() {
+  test('monitoring CTA defaults to false for initial and legacy state', () {
+    expect(OnboardingState.initial().monitoringIntroCtaPending, isFalse);
+    expect(OnboardingState.fromJson({}).monitoringIntroCtaPending, isFalse);
+  });
+
+  test('monitoring CTA pending is restored from persisted state', () {
+    final state = OnboardingState.fromJson({
+      'firstAiConsultationCompleted': true,
+      'homeAiOnboardingPending': false,
+      'monitoringIntroCtaPending': true,
+    });
+
+    expect(state.monitoringIntroCtaPending, isTrue);
+    expect(state.firstAiConsultationCompleted, isTrue);
+    expect(state.homeAiOnboardingPending, isFalse);
+  });
+
   test('legacy onboarding state keeps the AI consultation step incomplete', () {
     final state = OnboardingState.fromJson({
       'introCompleted': true,

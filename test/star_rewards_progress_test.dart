@@ -18,27 +18,67 @@ void main() {
     expect(progress.lifetimeEarned, 50);
   });
 
-  testWidgets('50-star message is gated by milestone state', (tester) async {
+  testWidgets('light mode seed milestone is gated by milestone state',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: StarCollectionScreen(
-          progressStream: Stream.value(const StarRewardsProgress(total: 50)),
+          progressStream: Stream.value(const StarRewardsProgress(total: 1)),
           milestoneStream: Stream.value(false),
         ),
       ),
     );
     await tester.pump();
-    expect(find.text('星が合計50個貯まりました！'), findsNothing);
+    await tester.pump();
+    expect(find.text('ひまわりの種が合計50粒貯まりました！'), findsNothing);
 
     await tester.pumpWidget(
       MaterialApp(
         home: StarCollectionScreen(
-          progressStream: Stream.value(const StarRewardsProgress(total: 50)),
+          progressStream: Stream.value(const StarRewardsProgress(total: 1)),
           milestoneStream: Stream.value(true),
         ),
       ),
     );
     await tester.pump();
+    await tester.pump();
+    expect(find.text('ひまわりの種が合計50粒貯まりました！'), findsOneWidget);
+  });
+
+  testWidgets('dark mode keeps the star collection language', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: StarCollectionScreen(
+          progressStream: Stream.value(const StarRewardsProgress(total: 1)),
+          milestoneStream: Stream.value(true),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('星の累計'), findsOneWidget);
     expect(find.text('星が合計50個貯まりました！'), findsOneWidget);
+  });
+
+  testWidgets('shows every collected object and the day background',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StarCollectionScreen(
+          progressStream: Stream.value(const StarRewardsProgress(total: 2)),
+          milestoneStream: Stream.value(false),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('collection-background-day')),
+        findsOneWidget);
+    expect(find.byKey(const ValueKey('collected-item-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('collected-item-1')), findsOneWidget);
+    expect(find.text('2粒'), findsOneWidget);
   });
 }

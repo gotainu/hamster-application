@@ -102,6 +102,10 @@ export const healthDistanceRecordWritten = onDocumentWritten(
       maxDays: 7,
     });
 
+    if (!affectedDateKeys.includes(todayDateKey)) {
+      affectedDateKeys.push(todayDateKey);
+    }
+
     await rebuildDates({
       uid,
       dateKeys: affectedDateKeys,

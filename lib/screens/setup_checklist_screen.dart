@@ -11,6 +11,7 @@ import '../services/onboarding_state_repo.dart';
 import '../services/pet_profile_repo.dart';
 import '../services/owner_profile_repo.dart';
 import '../theme/app_theme.dart';
+import '../widgets/hamster_feedback_popup.dart';
 
 /// 新規ユーザーが、説明を読むだけでなくアプリの価値に到達するための導線です。
 ///
@@ -48,7 +49,9 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
 
   Future<void> _refresh() async {
     if (!mounted) return;
-    setState(() => _statusFuture = _loadStatus());
+    setState(() {
+      _statusFuture = _loadStatus();
+    });
   }
 
   Future<_SetupChecklistStatus> _loadStatus() async {
@@ -131,9 +134,16 @@ class _SetupChecklistScreenState extends State<SetupChecklistScreen> {
       if (!shouldContinue || !mounted) return;
     }
     final saved = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => const OwnerProfileEditScreen()),
+      MaterialPageRoute(
+        builder: (_) => const OwnerProfileEditScreen(closeOnSave: true),
+      ),
     );
-    if (saved == true) await _onboardingRepo.markSetupStepCompleted('owner');
+    if (saved == true) {
+      await _onboardingRepo.markSetupStepCompleted('owner');
+      if (mounted) {
+        HamsterFeedbackPopup.show(context, message: '飼い主のプロフィールを保存しました。');
+      }
+    }
     await _refresh();
   }
 

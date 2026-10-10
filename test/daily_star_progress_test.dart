@@ -4,6 +4,7 @@ import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/daily_star_progress.dart';
 import 'package:hamster_project/models/weight_record.dart';
 import 'package:hamster_project/screens/daily_stars.dart';
+import 'package:hamster_project/widgets/collectible_glyph.dart';
 
 void main() {
   final today = DateTime(2026, 9, 15);
@@ -58,7 +59,7 @@ void main() {
     expect(saved.filledCount, 1);
   });
 
-  testWidgets('home strip shows only tappable stars', (tester) async {
+  testWidgets('light mode home strip shows sunflower seeds', (tester) async {
     var tapped = false;
     final progress = DailyStarProgress.fromCompletion(completion());
     await tester.pumpWidget(
@@ -72,11 +73,24 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(2));
+    expect(find.byType(CollectibleGlyph), findsNWidgets(3));
+    expect(find.byIcon(Icons.star_rounded), findsNothing);
     expect(find.text('昨日の走った記録'), findsNothing);
     await tester.tap(find.byType(DailyStarsStrip));
     expect(tapped, isTrue);
+  });
+
+  testWidgets('dark mode home strip keeps stars', (tester) async {
+    final progress = DailyStarProgress.fromCompletion(completion());
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: Scaffold(body: DailyStarsStrip(progress: progress)),
+      ),
+    );
+
+    expect(find.byIcon(Icons.star_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(2));
   });
 
   testWidgets('detail screen names the three missions', (tester) async {

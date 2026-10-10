@@ -1,0 +1,180 @@
+{
+  "access": {
+    "mode": "read_only",
+    "requiresSubscription": false
+  },
+  "analysisSpecVersion": "personality_v1",
+  "cutoffDateKey": "2026-10-09",
+  "evaluationDateKey": "2026-10-10",
+  "featureSnapshotSource": "fresh_bronze_cutoff_rebuild",
+  "generatedAt": "2026-10-10T00:00:00Z",
+  "inputFingerprint": "af9f64e69af874540ba2b44f6a297d3812f6c64323e1e844e0dbdd0fd9bcb85e",
+  "latestValidDates": {
+    "activity": "2026-10-09",
+    "body": "2026-10-08"
+  },
+  "limitations": [
+    "観察記録に基づく特徴の説明です。肥満・健康・病気の診断ではありません。",
+    "日別の活動記録から、夜型や深夜に活発かどうかは判断できません。",
+    "平滑化した値だけで、長期的な増減は断定できません。",
+    "MADが0でも、すべての記録が同じ値だったことを意味しません。",
+    "2016年の英国の一次診療施設を受診したハムスターの記録であり、健康な個体だけの標準体重や日本の全個体を代表するものではありません。",
+    "論文は各個体の3か月超の体重記録の平均を集計しています。比較する個体のベースライン中央値とは測定のまとめ方が異なります。",
+    "表の種別総個体数は成人体重を解析した標本数ではありません。成人体重の種別解析数は公開表からは確認できません。",
+    "中央値と四分位点だけでは正確なパーセンタイルは計算できず、中央50%の範囲を健康・異常の判定に使うことはできません。"
+  ],
+  "metrics": {
+    "activity": {
+      "baseline": {
+        "deviationPct": 0,
+        "ewma": 628.3185307179587,
+        "ewmaAlpha": 0.3,
+        "firstDateKey": "2026-09-23",
+        "lastDateKey": "2026-10-06",
+        "mad": 0,
+        "median": 628.3185307179587,
+        "method": "median_mad_ewma_v1",
+        "recordCount": 8,
+        "requiredRecordCount": 7,
+        "requiredSpanDays": 14,
+        "robustZScore": null,
+        "spanDays": 14,
+        "status": "ready"
+      },
+      "difference": {
+        "absolute": 0,
+        "percent": 0
+      },
+      "interpretations": [
+        {
+          "code": "individual_activity",
+          "text": "この子の普段の1日の走行距離は、観察記録では約628.3mです。"
+        },
+        {
+          "code": "latest_matches_baseline",
+          "text": "最近の記録は、この子の普段の基準と同じ値でした。"
+        },
+        {
+          "code": "observation_window",
+          "text": "2026-09-23から2026-10-06まで、14日間に記録した8日分をもとにしています。"
+        },
+        {
+          "code": "no_activity_cohort",
+          "text": "同種の走行距離に比較できる研究統計がないため、この子自身の記録と比べています。"
+        }
+      ],
+      "latestDateKey": "2026-10-09",
+      "latestValue": 628.3185307179587,
+      "populationComparison": null,
+      "unit": "m"
+    },
+    "body": {
+      "baseline": {
+        "deviationPct": 0,
+        "ewma": 100,
+        "ewmaAlpha": 0.3,
+        "firstDateKey": "2026-09-22",
+        "lastDateKey": "2026-10-05",
+        "mad": 0,
+        "median": 100,
+        "method": "median_mad_ewma_v1",
+        "recordCount": 8,
+        "requiredRecordCount": 7,
+        "requiredSpanDays": 14,
+        "robustZScore": null,
+        "spanDays": 14,
+        "status": "ready"
+      },
+      "difference": {
+        "absolute": 0,
+        "percent": 0
+      },
+      "interpretations": [
+        {
+          "code": "individual_weight",
+          "text": "この子の普段の体重は、観察記録では約100gです。"
+        },
+        {
+          "code": "latest_matches_baseline",
+          "text": "最近の記録は、この子の普段の基準と同じ値でした。"
+        },
+        {
+          "code": "observation_window",
+          "text": "2026-09-22から2026-10-05まで、14日間に記録した8日分をもとにしています。"
+        }
+      ],
+      "latestDateKey": "2026-10-08",
+      "latestValue": 100,
+      "populationComparison": {
+        "ageBand": "adult_over_3_months",
+        "applicability": "not_applicable",
+        "cohort": null,
+        "expressionJa": "適用できる種別・成人期の比較データがないため公開研究との比較を適用しません。",
+        "limitations": [
+          "2016年の英国の一次診療施設を受診したハムスターの記録であり、健康な個体だけの標準体重や日本の全個体を代表するものではありません。",
+          "論文は各個体の3か月超の体重記録の平均を集計しています。比較する個体のベースライン中央値とは測定のまとめ方が異なります。",
+          "表の種別総個体数は成人体重を解析した標本数ではありません。成人体重の種別解析数は公開表からは確認できません。",
+          "中央値と四分位点だけでは正確なパーセンタイルは計算できず、中央50%の範囲を健康・異常の判定に使うことはできません。"
+        ],
+        "position": null,
+        "reason": "reference_unavailable",
+        "species": "syrian"
+      },
+      "unit": "g"
+    }
+  },
+  "petId": "main_pet",
+  "petSnapshot": {
+    "ageAtBaselineStartMonths": 8,
+    "ageMonths": 9,
+    "birthdayDateKey": "2026-01-01",
+    "species": "シリアン",
+    "speciesCode": "syrian"
+  },
+  "readinessSnapshot": {
+    "activity": {
+      "deviationPct": 0,
+      "ewma": 628.3185307179587,
+      "ewmaAlpha": 0.3,
+      "firstDateKey": "2026-09-23",
+      "lastDateKey": "2026-10-06",
+      "mad": 0,
+      "median": 628.3185307179587,
+      "method": "median_mad_ewma_v1",
+      "recordCount": 8,
+      "requiredRecordCount": 7,
+      "requiredSpanDays": 14,
+      "robustZScore": null,
+      "spanDays": 14,
+      "status": "ready"
+    },
+    "body": {
+      "deviationPct": 0,
+      "ewma": 100,
+      "ewmaAlpha": 0.3,
+      "firstDateKey": "2026-09-22",
+      "lastDateKey": "2026-10-05",
+      "mad": 0,
+      "median": 100,
+      "method": "median_mad_ewma_v1",
+      "recordCount": 8,
+      "requiredRecordCount": 7,
+      "requiredSpanDays": 14,
+      "robustZScore": null,
+      "spanDays": 14,
+      "status": "ready"
+    }
+  },
+  "readyMetrics": [
+    "body",
+    "activity"
+  ],
+  "reportId": "daily_2026-10-10",
+  "reportKind": "daily",
+  "reportType": "both",
+  "schemaVersion": 1,
+  "silverDateKey": "2026-10-10",
+  "silverGeneratedAt": "2026-10-10T00:00:00Z",
+  "silverSchemaVersion": 5,
+  "silverUpdatedAt": "2026-10-10T02:02:55.714Z"
+}

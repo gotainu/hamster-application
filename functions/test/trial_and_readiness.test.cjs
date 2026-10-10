@@ -1,0 +1,21 @@
+'use strict';
+const assert = require('assert');
+const { calculateInitialTrialEndsAt, classifyLegacyTrialMigration, isInitialTrialActive, initialTrialPolicy } = require('../lib/trialPolicy.js');
+const { readinessFromBaseline } = require('../lib/health/analysisReadiness.js');
+const { buildInitialTrialMigrationDryRun } = require('../lib/trialMigration.js');
+
+const baseline = (recordCount, spanDays, status = 'learning') => ({ status, method: 'median_mad_ewma_v1', recordCount, requiredRecordCount: 7, spanDays, requiredSpanDays: 14, firstDateKey: '2026-01-01', lastDateKey: '2026-01-15', median: null, mad: null, ewma: null, ewmaAlpha: .3, deviationPct: null, robustZScore: null });
+const start = new Date('2026-01-01T00:00:00Z');
+assert.equal(calculateInitialTrialEndsAt({startedAt: start}).toISOString(), '2026-01-22T00:00:00.000Z');
+assert.equal(initialTrialPolicy.aiRequestLimit, 20, 'one tutorial plus nineteen later consultations are allowed');
+assert.equal(initialTrialPolicy.aiReservationCostMicros, 50000);
+assert.equal(initialTrialPolicy.aiCostMicrosLimit, 1000000);
+assert.equal(isInitialTrialActive({status: 'active', endsAt: new Date('2026-01-22T00:00:00Z'), now: new Date('2026-01-21T23:59:59Z')}), true);
+assert.equal(isInitialTrialActive({status: 'active', endsAt: new Date('2026-01-22T00:00:00Z'), now: new Date('2026-01-22T00:00:00Z')}), false);
+assert.equal(isInitialTrialActive({status: 'active', endsAt: new Date('2026-01-22T00:00:00Z'), now: new Date('2026-01-22T00:00:01Z')}), false);
+assert.equal(readinessFromBaseline({metric: 'body', baseline: baseline(7, 13), analysisSpecVersion: 'v'}).status, 'learning');
+assert.equal(readinessFromBaseline({metric: 'activity', baseline: baseline(6, 14), analysisSpecVersion: 'v'}).status, 'learning');
+assert.equal(readinessFromBaseline({metric: 'body', baseline: baseline(7, 14, 'ready'), analysisSpecVersion: 'v'}).status, 'ready');
+assert.equal(classifyLegacyTrialMigration({isPaid: true, legacyEndsAt: null, now: start}), 'paid_no_trial');
+assert.equal(buildInitialTrialMigrationDryRun({uid: 'x', isPaid: false, legacyEndsAt: null, now: start}).proposedAction, 'offer_once');
+console.log('trial_and_readiness: passed');

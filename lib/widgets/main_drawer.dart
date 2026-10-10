@@ -16,6 +16,7 @@ import '../services/pet_profile_repo.dart';
 import '../services/star_rewards_repo.dart';
 import '../theme/app_theme.dart';
 import 'hamster_avatar_view.dart';
+import 'collectible_glyph.dart';
 import 'shine_border.dart';
 
 class MainDrawer extends StatelessWidget {
@@ -132,6 +133,7 @@ class MainDrawer extends StatelessWidget {
                               stream: _starRewardsRepo.watchProgress(),
                               builder: (context, snapshot) {
                                 final progress = snapshot.data;
+                                final collectible = CollectibleCopy.of(context);
                                 if (progress == null) {
                                   return const SizedBox.shrink();
                                 }
@@ -141,8 +143,13 @@ class MainDrawer extends StatelessWidget {
                                     children: [
                                       _DrawerItem(
                                         icon: Icons.star_rounded,
-                                        title: '星の累計',
-                                        subtitle: '合計${progress.total}個',
+                                        customIcon: const CollectibleGlyph(
+                                          filled: true,
+                                          size: 23,
+                                        ),
+                                        title: collectible.collectionTitle,
+                                        subtitle:
+                                            '合計${progress.total}${collectible.countUnit}',
                                         onTap: () => onSelectScreen('stars'),
                                       ),
                                     ],
@@ -150,6 +157,15 @@ class MainDrawer extends StatelessWidget {
                                 );
                               },
                             ),
+                            const SizedBox(height: 12),
+                            _DrawerGroup(children: [
+                              _DrawerItem(
+                                icon: Icons.auto_stories_outlined,
+                                title: 'レポート履歴',
+                                subtitle: '個性と初回コンディションを振り返る',
+                                onTap: () => onSelectScreen('report_history'),
+                              ),
+                            ]),
                             const SizedBox(height: 26),
                             const _SectionLabel(label: 'プロフィール・設定'),
                             const SizedBox(height: 10),
@@ -160,6 +176,12 @@ class MainDrawer extends StatelessWidget {
                                   title: 'ペットのプロフィール',
                                   subtitle: '名前や基本情報を編集',
                                   onTap: () => onSelectScreen('pets_profile'),
+                                ),
+                                _DrawerItem(
+                                  icon: Icons.location_on_outlined,
+                                  title: '飼い主プロフィール',
+                                  subtitle: '地域や飼育経験を編集',
+                                  onTap: () => onSelectScreen('owner_profile'),
                                 ),
                                 _DrawerItem(
                                   icon: Icons.settings_outlined,
@@ -573,12 +595,14 @@ class _DrawerItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.customIcon,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -608,10 +632,13 @@ class _DrawerItem extends StatelessWidget {
                         color: AppTheme.drawerItemIconBorder(context),
                       ),
                     ),
-                    child: Icon(
-                      icon,
-                      color: AppTheme.drawerIconForeground(context),
-                      size: 23,
+                    child: Center(
+                      child: customIcon ??
+                          Icon(
+                            icon,
+                            color: AppTheme.drawerIconForeground(context),
+                            size: 23,
+                          ),
                     ),
                   ),
                   const SizedBox(width: 14),

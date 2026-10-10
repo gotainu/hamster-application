@@ -39,6 +39,7 @@ async function main() {
       await setDoc(doc(db, 'users/alice'), { has_subcollections: true });
       await setDoc(doc(db, 'users/bob'), { has_subcollections: true });
       await setDoc(doc(db, 'users/alice/billing/subscription'), { plan: 'paid', status: 'active' });
+      await setDoc(doc(db, 'users/bob/feature_access/initial_trial_v2'), { status: 'active', endsAt: new Date(Date.now() + 86400000) });
       await setDoc(doc(db, 'users/alice/rewards/stars'), { total: 50 });
       await setDoc(doc(db, 'users/alice/star_awards/2026-09-15_open_app'), { kind: 'open_app' });
       await setDoc(doc(db, 'users/alice/star_milestones/50'), { milestone: 50 });
@@ -71,9 +72,11 @@ async function main() {
 
     const alice = testEnv.authenticatedContext('alice');
     const bob = testEnv.authenticatedContext('bob');
+    const charlie = testEnv.authenticatedContext('charlie');
     const guest = testEnv.unauthenticatedContext();
     const adb = alice.firestore();
     const bdb = bob.firestore();
+    const cdb = charlie.firestore();
     const gdb = guest.firestore();
 
     await check('未認証はpet profileを読めない', () =>
@@ -86,6 +89,10 @@ async function main() {
       assertSucceeds(updateDoc(doc(adb, 'users/alice'), { has_subcollections: true })));
     await check('本人はdaily_checkinsを書ける', () =>
       assertSucceeds(setDoc(doc(adb, 'users/alice/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
+    await check('有効な21日体験中は新規記録を書ける', () =>
+      assertSucceeds(setDoc(doc(bdb, 'users/bob/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
+    await check('未契約・期限なし体験は新規記録を書けない', () =>
+      assertFails(setDoc(doc(cdb, 'users/charlie/weight_records/x'), { weight: 30 })));
     await check('本人はAI chatを書ける', () =>
       assertSucceeds(setDoc(doc(adb, 'users/alice/ai_chat_threads/main/messages/m1'), { role: 'user', content: 'test' })));
 
@@ -93,6 +100,14 @@ async function main() {
       assertSucceeds(getDoc(doc(adb, 'users/alice/billing/subscription'))));
     await check('本人でもbillingを改ざんできない', () =>
       assertFails(setDoc(doc(adb, 'users/alice/billing/subscription'), { plan: 'paid', status: 'active' }, { merge: true })));
+    await check('本人でも初回無料体験を作れない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/feature_access/initial_trial_v2'), { status: 'active' })));
+    await check('本人でもAI利用枠を直接作れない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/feature_access/initial_trial_v2/ai_usage/chat_1234567890'), { status: 'succeeded' })));
+    await check('本人でも分析イベントを直接作れない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/analysis_events/first_accepted_weight'), { eventName: 'first_accepted_data_saved' })));
+    await check('本人でも体験開始イベントを直接作れない', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/journey_events/initial_trial_started'), { eventName: 'initial_trial_started' })));
     await check('本人は星の累計を読める', () =>
       assertSucceeds(getDoc(doc(adb, 'users/alice/rewards/stars'))));
     await check('別ユーザーは星の累計を読めない', () =>

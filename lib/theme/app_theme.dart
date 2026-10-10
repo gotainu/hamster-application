@@ -689,6 +689,142 @@ class AppTheme {
         ],
       );
 
+  // Reusable data presentation tokens; existing ThemeData is unchanged.
+  static const dataPagePadding = EdgeInsets.fromLTRB(18, 12, 18, 20);
+  static const dataCardPadding = EdgeInsets.all(18);
+  static const dataDetailsPadding =
+      EdgeInsets.symmetric(horizontal: 18, vertical: 6);
+  static const dataDetailsContentPadding = EdgeInsets.fromLTRB(18, 0, 18, 18);
+  static const double dataCardRadius = 22;
+  static const double dataSectionGap = 14;
+  static const double dataContentGap = 10;
+  static const double dataSmallGap = 6;
+  static const double dataValueGap = 4;
+  static const double comparisonTrackHeight = 8;
+  static const double comparisonTrackRadius = 4;
+  static const double comparisonInset = 12;
+  static const double comparisonCompactPlotHeight = 42;
+  static const double comparisonCompactBandHeight = 18;
+  static const double comparisonCompactMarkerSize = 18;
+  static const double comparisonCompactLineWidth = 1.5;
+  static const double comparisonCompactLabelGap = 4;
+  static const double comparisonCompactLabelMaxWidth = 104;
+  static const dataDifferencePadding =
+      EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+  static const double dataDifferenceRadius = 20;
+  static const double dataDifferenceBorderWidth = 1;
+  static const double dataDetailLabelWidth = 96;
+  static const double dataDetailRowGap = 4;
+
+  static TextStyle dataValueStyle(BuildContext context) => TextStyle(
+        fontFamily: Theme.of(context).textTheme.displayLarge?.fontFamily,
+        fontSize: 52,
+        fontWeight: FontWeight.w600,
+        letterSpacing: -1.5,
+        height: 1.06,
+        color: primaryText(context),
+      );
+  static TextStyle dataTitleStyle(BuildContext context) =>
+      Theme.of(context).textTheme.titleMedium!.copyWith(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: primaryText(context),
+            height: 1.3,
+          );
+  static TextStyle dataDiscoveryStyle(BuildContext context) =>
+      Theme.of(context).textTheme.titleLarge!.copyWith(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: secondaryText(context),
+            height: 1.4,
+          );
+  static TextStyle dataBodyStyle(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium!.copyWith(
+            fontSize: 16,
+            height: 1.4,
+            color: primaryText(context),
+          );
+  static TextStyle dataCaptionStyle(BuildContext context) =>
+      Theme.of(context).textTheme.bodySmall!.copyWith(
+            fontSize: 13,
+            height: 1.4,
+            color: secondaryText(context),
+          );
+
+  /// Quiet data surfaces opt in; global ThemeData and health cards retain their
+  /// existing decoration. Reuse the established navy/neutral palette.
+  static BoxDecoration dataPageDecoration(BuildContext context) =>
+      BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark(context)
+              ? [
+                  Color.alphaBlend(
+                      quickRecordGlow(context).withValues(alpha: 0.025),
+                      Color.alphaBlend(
+                          quickRecordChoiceSurface(context), darkBg)),
+                  Color.alphaBlend(quickRecordChoiceSurface(context), darkBg),
+                ]
+              : [lightBg, Colors.white],
+        ),
+      );
+  static BoxDecoration dataSurfaceDecoration(BuildContext context,
+      {required double radius}) {
+    final dark = isDark(context);
+    final base = dark
+        ? Color.alphaBlend(quickRecordChoiceSurface(context), cardGradientEnd)
+        : Colors.white;
+    final highlight = quickRecordObjectBorder(context);
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color.alphaBlend(
+              highlight.withValues(alpha: dark ? 0.028 : 0.006), base),
+          base,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(radius),
+      border:
+          Border.all(color: highlight.withValues(alpha: dark ? 0.09 : 0.08)),
+      boxShadow: [
+        BoxShadow(
+            color: softShadow(context),
+            blurRadius: 18,
+            offset: const Offset(0, 6))
+      ],
+    );
+  }
+
+  static TextStyle dataDifferenceValueStyle(BuildContext context) =>
+      dataBodyStyle(context).copyWith(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: isDark(context) ? quickRecordGlow(context) : accent,
+      );
+  static BoxDecoration dataDifferenceDecoration(BuildContext context) =>
+      BoxDecoration(
+        color: accent.withValues(alpha: isDark(context) ? 0.12 : 0.055),
+        borderRadius: BorderRadius.circular(dataDifferenceRadius),
+        border: Border.all(
+            width: dataDifferenceBorderWidth,
+            color: accent.withValues(alpha: isDark(context) ? 0.20 : 0.15)),
+      );
+  static Gradient comparisonCompactRangeGradient(BuildContext context) =>
+      LinearGradient(
+        colors: [
+          quickRecordGlow(context).withValues(alpha: 0.72),
+          accent.withValues(alpha: 0.56),
+          comparisonReferenceColor(context).withValues(alpha: 0.25)
+        ],
+      );
+  static Color comparisonValueColor(BuildContext context) => accent;
+  static Color comparisonReferenceColor(BuildContext context) =>
+      primaryText(context).withValues(alpha: 0.70);
+  static Color comparisonTrackColor(BuildContext context) => chartGrid(context);
+
   // ダークテーマ
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,

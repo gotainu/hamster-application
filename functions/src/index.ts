@@ -11,7 +11,19 @@ import {
   isPaidStripeSubscription,
   selectPreferredPaidSubscription,
 } from './stripeSubscriptionPriority';
-export {activateFeatureTrial, consumeAiTrial} from './featureTrials';
+import { getFeatureAccess } from './featureTrials';
+export {activateFeatureTrial, consumeAiTrial, startInitialTrial, consumeInitialTrialAi} from './featureTrials';
+export {
+  analyticsWeightRecordCreated,
+  analyticsActivityRecordCreated,
+  analyticsDailyCheckinCreated,
+  analyticsSwitchbotReadingCreated,
+} from './analyticsRecordEvents';
+export {
+  ingestJourneyEventToBigQuery,
+  ingestAnalysisEventToBigQuery,
+  ingestAiProviderUsageToBigQuery,
+} from './bigqueryServerEvents';
 
 
 admin.initializeApp();
@@ -585,31 +597,16 @@ async function findUidByStripeSubscription(
 }
 
 async function assertPaidFeatureAccess(uid: string): Promise<void> {
-  const snap = await db
-    .collection('users')
-    .doc(uid)
-    .collection('billing')
-    .doc('subscription')
-    .get();
-
-  const data = snap.data() ?? {};
-  const plan = data.plan;
-  const status = data.status;
-
-  const isEntitled =
-    plan === 'paid' &&
-    (status === 'active' || status === 'trialing');
-
-  if (!isEntitled) {
+  const access = await getFeatureAccess(uid);
+  if (!access.allowed) {
     logger.warn('Paid feature access denied', {
       uid,
-      plan,
-      status,
+      source: access.source,
     });
 
     throw new HttpsError(
       'permission-denied',
-      'この機能は有料プランで利用できます。',
+      '無料体験または有料プランで利用できます。',
     );
   }
 }
@@ -2785,3 +2782,7 @@ export {
   starDistanceRecordWritten,
   starDailyCheckinWritten,
 } from './stars/starAwards';
+
+export {personalityHealthFeaturesWritten, personalityDistanceRecordWritten} from './health/personalityTriggers';
+
+export {personalityDailyReports} from './health/personalityDaily';

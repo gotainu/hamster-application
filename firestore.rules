@@ -11,6 +11,31 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function validPersonalityReportId(reportId) {
+      return reportId is string && (
+        reportId.matches('^personality_v1_(body|activity|body_activity)$')
+        || reportId.matches('^daily_[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+      );
+    }
+
+    function hasPaidAccess(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)/billing/subscription)
+        && get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data.plan == 'paid'
+        && (get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data.status == 'active' || get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data.status == 'trialing')
+        && (!('currentPeriodEnd' in get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data) || get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data.currentPeriodEnd == null || request.time < get(/databases/$(database)/documents/users/$(uid)/billing/subscription).data.currentPeriodEnd);
+    }
+
+    function hasInitialTrialAccess(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)/feature_access/initial_trial_v2)
+        && get(/databases/$(database)/documents/users/$(uid)/feature_access/initial_trial_v2).data.status == 'active'
+        && ('endsAt' in get(/databases/$(database)/documents/users/$(uid)/feature_access/initial_trial_v2).data)
+        && request.time < get(/databases/$(database)/documents/users/$(uid)/feature_access/initial_trial_v2).data.endsAt;
+    }
+
+    function canCreateRecord(uid) {
+      return hasPaidAccess(uid) || hasInitialTrialAccess(uid);
+    }
+
     function validHealthIncidentAction(data) {
       return data.keys().hasOnly([
           'incidentId',
@@ -59,15 +84,18 @@ service cloud.firestore {
       }
 
       match /weight_records/{docId} {
-        allow read, create, update, delete: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && canCreateRecord(uid);
       }
 
       match /daily_checkins/{docId} {
-        allow read, create, update, delete: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && canCreateRecord(uid);
       }
 
       match /distance_records/{docId} {
-        allow read, create, update, delete: if isOwner(uid);
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && canCreateRecord(uid);
       }
 
       match /settings/notifications {
@@ -94,6 +122,11 @@ service cloud.firestore {
         match /messages/{messageId} {
           allow read, create, update, delete: if isOwner(uid);
         }
+      }
+
+      // AI回答への評価。本人以外は読めない。
+      match /ai_answer_feedback/{feedbackId} {
+        allow read, create, update, delete: if isOwner(uid);
       }
 
       // SwitchBot secretsはFunctions(Admin SDK)だけ。
@@ -129,6 +162,67 @@ service cloud.firestore {
 
       // 無料体験の開始日・残回数はFunctionsだけが更新する。
       match /feature_access/trial {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /feature_access/initial_trial_v2 {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /ai_usage/{usageId} { allow read, write: if false; }
+      }
+
+
+      match /analysis_readiness/{metric} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /personalized_reports/{reportId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Server-generated snapshots remain readable by their owner after expiry.
+      match /personality_reports/{reportId} {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false;
+      }
+
+      match /report_pointers/personality {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false;
+      }
+
+      // Daily publications never replace the pointer consumed by v1 clients.
+      match /report_pointers/personality_daily {
+        allow read: if isOwner(uid);
+        allow create, update, delete: if false;
+      }
+
+      // Each successful rendering creates one immutable marker. Reading an old
+      // report never changes the read state of the latest report.
+      match /report_view_states/{reportId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && validPersonalityReportId(reportId)
+          && request.resource.data.keys().hasOnly(['reportId', 'viewedAt'])
+          && request.resource.data.keys().hasAll(['reportId', 'viewedAt'])
+          && request.resource.data.reportId is string
+          && request.resource.data.reportId == reportId
+          && request.resource.data.viewedAt is timestamp
+          && request.resource.data.viewedAt == request.time
+          && exists(/databases/$(database)/documents/users/$(uid)/personality_reports/$(reportId))
+          && get(/databases/$(database)/documents/users/$(uid)/personality_reports/$(reportId)).data.reportId == reportId;
+        allow update, delete: if false;
+      }
+
+      match /analysis_events/{eventId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /journey_events/{eventId} {
         allow read: if isOwner(uid);
         allow write: if false;
       }
@@ -205,6 +299,19 @@ service cloud.firestore {
     // Functionsの定期処理用index。Client不可。
     match /switchbot_users/{uid} {
       allow read, write: if false;
+    }
+
+    // Eligible daily-report users are managed only by trusted server code.
+    match /personality_report_queue/{uid} {
+      allow read, write: if false;
+    }
+
+    // Reference cohort management is server-only; clients use report snapshots.
+    match /reference_cohorts/{cohortId} {
+      allow read, write: if false;
+      match /versions/{versionId} {
+        allow read, write: if false;
+      }
     }
 
     match /{document=**} {

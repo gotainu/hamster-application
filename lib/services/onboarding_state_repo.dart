@@ -11,6 +11,7 @@ class OnboardingState {
   final bool firstAiConsultationCompleted;
   final int setupCoachMarkStep;
   final bool homeAiOnboardingPending;
+  final bool monitoringIntroCtaPending;
   final Set<String> completedSetupSteps;
   final DateTime? firstMonitoringDataRecordedAt;
   final String? firstMonitoringDataSource;
@@ -27,6 +28,7 @@ class OnboardingState {
     required this.firstAiConsultationCompleted,
     required this.setupCoachMarkStep,
     required this.homeAiOnboardingPending,
+    this.monitoringIntroCtaPending = false,
     required this.completedSetupSteps,
     this.firstMonitoringDataRecordedAt,
     this.firstMonitoringDataSource,
@@ -77,6 +79,7 @@ class OnboardingState {
       setupCoachMarkStep: (json['setupCoachMarkStep'] as num?)?.toInt() ??
           (json['setupCoachMarkSeen'] == true ? 1 : 0),
       homeAiOnboardingPending: json['homeAiOnboardingPending'] == true,
+      monitoringIntroCtaPending: json['monitoringIntroCtaPending'] == true,
       completedSetupSteps:
           ((json['completedSetupSteps'] as List<dynamic>?) ?? const [])
               .whereType<String>()
@@ -166,16 +169,30 @@ class OnboardingStateRepo {
     }, SetOptions(merge: true));
   }
 
-  /// AI が回答を返した時だけ呼び出し、初回体験の最後の操作を記録します。
+  /// AI成功だけを記録します。モニタリングへの移動はユーザー操作で行います。
   Future<void> markFirstAiConsultationCompleted() async {
     final doc = _doc();
     if (doc == null) return;
 
-    await doc.set({
-      'firstAiConsultationCompleted': true,
-      'homeAiOnboardingPending': false,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(doc);
+      final data = snapshot.data() ?? <String, dynamic>{};
+      if (data['firstAiConsultationCompleted'] == true) return;
+      final wasHomeAiOnboardingPending =
+          data['homeAiOnboardingPending'] == true;
+      transaction.set(
+        doc,
+        {
+          'firstAiConsultationCompleted': true,
+          'homeAiOnboardingPending': false,
+          'monitoringIntroCtaPending':
+              data['monitoringIntroCtaPending'] == true ||
+                  wasHomeAiOnboardingPending,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    });
   }
 
   /// 既存のプロフィール保存処理から呼ぶ互換エントリポイントです。
@@ -184,6 +201,7 @@ class OnboardingStateRepo {
 
   Future<void> markMonitoringIntroductionViewed() => _mark({
         'monitoringIntroductionViewedAt': FieldValue.serverTimestamp(),
+        'monitoringIntroCtaPending': false,
       });
 
   Future<void> selectMonitoringMethod(String method) => _mark({
@@ -281,6 +299,7 @@ class OnboardingStateRepo {
       'introCompleted': false,
       'setupChecklistViewed': false,
       'firstAiConsultationCompleted': false,
+      'monitoringIntroCtaPending': false,
       'setupCoachMarkStep': 0,
       'homeAiOnboardingPending': false,
       'completedSetupSteps': <String>[],

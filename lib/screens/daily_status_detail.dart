@@ -30,6 +30,7 @@ import '../widgets/health_score_gauge.dart';
 import '../widgets/health_score_trend_chart.dart';
 import '../widgets/app_habitat_background.dart';
 import '../theme/app_theme.dart';
+import '../widgets/hamster_feedback_popup.dart';
 
 class DailyStatusDetailScreen extends StatefulWidget {
   const DailyStatusDetailScreen({
@@ -522,14 +523,10 @@ class _HealthIncidentActionCardState extends State<_HealthIncidentActionCard> {
     try {
       await action();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(successMessage)),
-      );
+      HamsterFeedbackPopup.show(context, message: successMessage);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('操作を保存できませんでした: $error')),
-      );
+      HamsterFeedbackPopup.show(context, message: '操作を保存できませんでした。');
     } finally {
       if (mounted) setState(() => _isUpdating = false);
     }

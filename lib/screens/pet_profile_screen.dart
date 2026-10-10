@@ -420,6 +420,8 @@ class _EnvironmentCard extends StatelessWidget {
             style: style,
           ),
           const SizedBox(height: 3),
+          Text('ケージの高さ: ${env.cageHeight ?? '不明'} cm', style: style),
+          const SizedBox(height: 3),
           Text('床材の嵩: ${env.beddingThickness ?? '不明'} cm', style: style),
           const SizedBox(height: 3),
           Text('車輪の直径: ${env.wheelDiameter ?? '不明'} cm', style: style),

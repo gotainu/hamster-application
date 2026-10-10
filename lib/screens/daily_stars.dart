@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../models/daily_record_completion.dart';
 import '../models/daily_star_progress.dart';
 import '../theme/app_theme.dart';
+import '../widgets/collectible_glyph.dart';
 
 class DailyStarsScreen extends StatelessWidget {
   final ValueListenable<DailyRecordCompletion?> completionListenable;
@@ -19,38 +20,72 @@ class DailyStarsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final collectible = CollectibleCopy.of(context);
+    final isSeed = collectible.isSeed;
+    final foreground = isSeed ? const Color(0xFF27323B) : Colors.white;
+    final backgroundAsset = isSeed
+        ? 'assets/images/theme/bg_default_day.webp'
+        : 'assets/images/theme/bg_default_night.webp';
     return Scaffold(
-      appBar: AppBar(title: const Text('今日の星')),
-      body: ValueListenableBuilder<DailyRecordCompletion?>(
-        valueListenable: completionListenable,
-        builder: (context, completion, _) {
-          if (completion == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final progress = DailyStarProgress.fromCompletion(completion);
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(22, 30, 22, 32),
-            children: [
-              Center(
-                child: DailyStarsStrip(progress: progress),
-              ),
-              const SizedBox(height: 32),
-              ...progress.slots.map((slot) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _StarTaskTile(
-                      slot: slot,
-                      onTap: slot.kind == DailyStarSlotKind.openApp ||
-                              onRecord == null
-                          ? null
-                          : () async {
-                              Navigator.of(context).pop();
-                              await onRecord!();
-                            },
-                    ),
-                  )),
-            ],
-          );
-        },
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Text(collectible.dailyTitle),
+        backgroundColor: Colors.transparent,
+        foregroundColor: foreground,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            backgroundAsset,
+            key: ValueKey(
+                'daily-collectible-background-${isSeed ? 'day' : 'night'}'),
+            fit: BoxFit.cover,
+          ),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: isSeed
+                  ? Colors.white.withValues(alpha: .26)
+                  : const Color(0xFF070B14).withValues(alpha: .38),
+            ),
+          ),
+          ValueListenableBuilder<DailyRecordCompletion?>(
+            valueListenable: completionListenable,
+            builder: (context, completion, _) {
+              if (completion == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final progress = DailyStarProgress.fromCompletion(completion);
+              return ListView(
+                padding: EdgeInsets.fromLTRB(
+                  22,
+                  MediaQuery.paddingOf(context).top + kToolbarHeight + 30,
+                  22,
+                  32,
+                ),
+                children: [
+                  Center(child: DailyStarsStrip(progress: progress)),
+                  const SizedBox(height: 32),
+                  ...progress.slots.map((slot) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _StarTaskTile(
+                          slot: slot,
+                          onTap: slot.kind == DailyStarSlotKind.openApp ||
+                                  onRecord == null
+                              ? null
+                              : () async {
+                                  Navigator.of(context).pop();
+                                  await onRecord!();
+                                },
+                        ),
+                      )),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -70,6 +105,7 @@ class DailyStarsStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final collectible = CollectibleCopy.of(context);
     final stars = prominent
         ? _ProminentStarsRow(progress: progress)
         : Row(
@@ -85,7 +121,8 @@ class DailyStarsStrip extends StatelessWidget {
 
     return Semantics(
       button: onTap != null,
-      label: '今日の星 ${progress.filledCount} / ${progress.slots.length}。詳しく見る',
+      label:
+          '${collectible.dailyTitle} ${progress.filledCount} / ${progress.slots.length}。詳しく見る',
       child: onTap == null
           ? stars
           : Material(
@@ -110,7 +147,8 @@ class _ProminentStarsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final warmGold = const Color(0xFFFFD782);
+    final collectible = CollectibleCopy.of(context);
+    final warmGold = collectible.highlight(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
@@ -135,7 +173,8 @@ class _ProminentStarsRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          for (final slot in progress.slots) _AnimatedStar(slot: slot, size: 80),
+          for (final slot in progress.slots)
+            _AnimatedStar(slot: slot, size: 80),
         ],
       ),
     );
@@ -172,8 +211,9 @@ class _StarGlyph extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final collectible = CollectibleCopy.of(context);
     final color = filled
-        ? const Color(0xFFFFD782)
+        ? collectible.accent(context)
         : AppTheme.secondaryText(context).withValues(alpha: 0.5);
     return Container(
       width: size,
@@ -188,10 +228,11 @@ class _StarGlyph extends StatelessWidget {
             ? [BoxShadow(color: color.withValues(alpha: 0.22), blurRadius: 20)]
             : null,
       ),
-      child: Icon(
-        filled ? Icons.star_rounded : Icons.star_border_rounded,
-        size: size * 0.62,
-        color: color,
+      child: Center(
+        child: CollectibleGlyph(
+          filled: filled,
+          size: size * .62,
+        ),
       ),
     );
   }
@@ -223,11 +264,9 @@ class _StarTaskTile extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(
-                    slot.filled
-                        ? Icons.star_rounded
-                        : Icons.star_border_rounded,
-                    color: const Color(0xFFFFD782),
+                  CollectibleGlyph(
+                    filled: slot.filled,
+                    size: 25,
                   ),
                   const SizedBox(width: 14),
                   Expanded(

@@ -1,6 +1,7 @@
 // lib/screens/home.dart
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
@@ -17,6 +18,10 @@ import 'package:hamster_project/services/health_assessment_repo.dart';
 import 'package:hamster_project/services/pet_profile_repo.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
+import 'package:hamster_project/screens/personality_report_screen.dart';
+import 'package:hamster_project/services/personality_report_view_service.dart';
+import 'package:hamster_project/models/personality_report.dart';
+import 'package:hamster_project/widgets/personality_report_entry.dart';
 import 'package:hamster_project/screens/daily_stars.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_trend_chart.dart';
@@ -25,9 +30,8 @@ import 'package:hamster_project/widgets/health_score_gauge.dart';
 import 'package:hamster_project/widgets/health_score_trend_chart.dart';
 import 'package:hamster_project/widgets/hamster_avatar_hero.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
-import 'package:hamster_project/services/paid_feature_guard_service.dart';
-import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:hamster_project/widgets/analysis_progress_card.dart';
+import 'package:hamster_project/widgets/hamster_feedback_popup.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueListenable<DailyRecordCompletion?> recordCompletionListenable;
@@ -55,7 +59,6 @@ class HomeScreenState extends State<HomeScreen> {
   final _healthAssessmentRepo = HealthAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _petProfileRepo = PetProfileRepo();
-  final _paidFeatureGuard = PaidFeatureGuardService();
 
   String _homeSubtitle({
     required String? petName,
@@ -89,10 +92,9 @@ class HomeScreenState extends State<HomeScreen> {
     final anomalyContext = _anomalyCardKey.currentContext;
 
     if (anomalyContext == null || !anomalyContext.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('現在、最近の気になる変化は表示されていません。'),
-        ),
+      HamsterFeedbackPopup.show(
+        context,
+        message: '現在、最近の気になる変化は表示されていません。',
       );
       return;
     }
@@ -106,11 +108,7 @@ class HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('最近の気になる変化を表示しました。'),
-      ),
-    );
+    HamsterFeedbackPopup.show(context, message: '最近の気になる変化を表示しました。');
   }
 
   Future<void> _openAiWithDraft(String draftText) async {
@@ -124,32 +122,37 @@ class HomeScreenState extends State<HomeScreen> {
     widget.onTabSelected(1);
   }
 
-  Future<bool> _ensurePaidFeature({
-    required String featureName,
-    bool allowDuringOnboarding = false,
-  }) =>
-      _paidFeatureGuard.ensureCanUsePaidFeature(
-        context,
-        featureName: featureName,
-        allowDuringOnboarding: allowDuringOnboarding,
-      );
-
   Future<void> _openSwitchbot() async {
-    final allowed = await _ensurePaidFeature(
-      featureName: 'SwitchBot連携',
-      allowDuringOnboarding: true,
-    );
-    if (!allowed || !mounted) return;
+    // SwitchbotSetupScreen owns the same server-backed trial gate as record save.
+    if (!mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SwitchbotSetupScreen()),
     );
   }
 
-  Future<void> _openFirstPersonalizedAnalysis() async {
-    await OnboardingStateRepo().markFirstPersonalizedAnalysisViewed();
+  Future<void> _openPersonalityReport(PersonalityReport selectedReport) async {
     if (!mounted) return;
+    final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    final presentationId =
+        'personality_${DateTime.now().microsecondsSinceEpoch}';
+    final views = PersonalityReportViewService.production();
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const DailyStatusDetailScreen()),
+      MaterialPageRoute(
+        builder: (_) => PersonalityReportScreen(
+          reportId: selectedReport.reportId,
+          expectedOwnerUid: ownerUid,
+          onReportViewed: (report) async {
+            if (ownerUid == null) return;
+            await views.recordView(
+              ownerUid: ownerUid,
+              reportId: report.reportId,
+              petId: report.petId,
+              schemaVersion: report.schemaVersion,
+              presentationId: presentationId,
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -216,21 +219,6 @@ class HomeScreenState extends State<HomeScreen> {
                               hasAssessmentData: hasGoldAssessment ||
                                   assessment?.hasData == true,
                             ),
-                          ),
-                          const SizedBox(height: 14),
-                          StreamBuilder<OnboardingState>(
-                            stream: OnboardingStateRepo().watchState(),
-                            builder: (context, onboardingSnapshot) {
-                              return AnalysisProgressCard(
-                                state: onboardingSnapshot.data ??
-                                    OnboardingState.initial(),
-                                onOpenRecord: () =>
-                                    widget.onOpenQuickRecord?.call(),
-                                onOpenSwitchbot: () => _openSwitchbot(),
-                                onViewAnalysis: () =>
-                                    _openFirstPersonalizedAnalysis(),
-                              );
-                            },
                           ),
                           const SizedBox(height: 14),
                           if (isLoading)
@@ -341,6 +329,15 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ],
+                          PersonalityReportEntry(
+                              onOpen: _openPersonalityReport),
+                          const SizedBox(height: 14),
+                          AnalysisProgressCard(
+                            onOpenRecord: () =>
+                                widget.onOpenQuickRecord?.call(),
+                            onOpenSwitchbot: _openSwitchbot,
+                          ),
+                          const SizedBox(height: 14),
                           Center(
                             child: Text(
                               '© 2025 Go / hamster well-being',
@@ -442,9 +439,12 @@ class _HealthAssessmentHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final action = assessment.overall.recommendedActions.isEmpty
-        ? null
-        : assessment.overall.recommendedActions.first;
+    final isAlert =
+        assessment.overall.observedState == HealthAssessmentState.alert;
+    final stateColor = isAlert
+        ? AppTheme.envDanger
+        : AppTheme.overallConditionForeground(context);
+    final action = _homeAdvice();
     final trend = buildHealthScoreTrendSummary(
       history: history,
       latest: assessment,
@@ -457,8 +457,7 @@ class _HealthAssessmentHero extends StatelessWidget {
       child: StatusCard(
         level: _level(),
         transparentBackground: true,
-        emphasize:
-            assessment.overall.observedState == HealthAssessmentState.alert,
+        emphasize: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -474,8 +473,8 @@ class _HealthAssessmentHero extends StatelessWidget {
                 strokeWidth: 16,
                 scoreFontSize: 50,
                 stateFontSize: 16,
-                accentColor: AppTheme.overallConditionForeground(context),
-                foregroundColor: AppTheme.overallConditionForeground(context),
+                accentColor: stateColor,
+                foregroundColor: stateColor,
                 trackColor: AppTheme.overallConditionGaugeTrack(context),
                 endpointFillColor: AppTheme.overallConditionPointFill(context),
                 textShadows:
@@ -534,6 +533,7 @@ class _HealthAssessmentHero extends StatelessWidget {
               summary: trend,
               height: 94,
               compact: true,
+              adaptiveScale: true,
               showThresholdLabels: false,
               monochrome: true,
               foregroundColor: AppTheme.overallConditionForeground(context),
@@ -542,32 +542,29 @@ class _HealthAssessmentHero extends StatelessWidget {
               pointFillColor: AppTheme.overallConditionPointFill(context),
               labelShadows: AppTheme.overallConditionForegroundShadows(context),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.task_alt_rounded,
-                    size: 22,
-                    color: AppTheme.overallConditionForeground(context),
+            const SizedBox(height: 14),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.task_alt_rounded, size: 23, color: stateColor),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    action,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: AppTheme.overallConditionForeground(context),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          height: 1.35,
+                          shadows: AppTheme.overallConditionForegroundShadows(
+                              context),
+                        ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      action,
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: AppTheme.overallConditionForeground(context),
-                            fontWeight: FontWeight.w800,
-                            height: 1.5,
-                            shadows: AppTheme.overallConditionForegroundShadows(
-                                context),
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
             if (onAskAi != null) ...[
               const SizedBox(height: 12),
               Align(
@@ -590,6 +587,23 @@ class _HealthAssessmentHero extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _homeAdvice() {
+    switch (assessment.overall.observedState) {
+      case HealthAssessmentState.alert:
+        return '気になる変化があります。詳細を確認してください。';
+      case HealthAssessmentState.caution:
+        return '気になる点があります。詳細を確認しましょう。';
+      case HealthAssessmentState.changed:
+        return 'いつもとの違いを、詳細で確認しましょう。';
+      case HealthAssessmentState.good:
+      case HealthAssessmentState.stable:
+        return '今日も穏やかに過ごせています。';
+      case HealthAssessmentState.insufficientData:
+      case HealthAssessmentState.unknown:
+        return '記録がそろうと、状態を確認できます。';
+    }
   }
 }
 

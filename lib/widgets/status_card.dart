@@ -21,6 +21,9 @@ class StatusCard extends StatelessWidget {
   final VoidCallback? onTap;
   final bool emphasize;
   final bool transparentBackground;
+
+  /// Calm data presentation without changing existing status-card semantics.
+  final bool dataSurface;
   final double radius;
   final EdgeInsetsGeometry padding;
   final double? strength;
@@ -32,6 +35,7 @@ class StatusCard extends StatelessWidget {
     this.onTap,
     this.emphasize = false,
     this.transparentBackground = false,
+    this.dataSurface = false,
     this.radius = 26,
     this.padding = const EdgeInsets.all(20),
     this.strength,
@@ -78,12 +82,14 @@ class StatusCard extends StatelessWidget {
               context,
               radius: radius,
             )
-          : AppTheme.statusCardDecoration(
-              context,
-              accent: accent,
-              strength: strength ?? _defaultStrength,
-              radius: radius,
-            ),
+          : dataSurface
+              ? AppTheme.dataSurfaceDecoration(context, radius: radius)
+              : AppTheme.statusCardDecoration(
+                  context,
+                  accent: accent,
+                  strength: strength ?? _defaultStrength,
+                  radius: radius,
+                ),
       child: child,
     );
 

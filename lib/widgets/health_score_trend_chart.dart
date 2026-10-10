@@ -120,6 +120,7 @@ class HealthScoreTrendChart extends StatelessWidget {
   final bool compact;
   final bool showThresholdLabels;
   final bool monochrome;
+  final bool adaptiveScale;
   final Color? foregroundColor;
   final Color? mutedForegroundColor;
   final Color? gridColor;
@@ -133,6 +134,7 @@ class HealthScoreTrendChart extends StatelessWidget {
     this.compact = false,
     this.showThresholdLabels = true,
     this.monochrome = false,
+    this.adaptiveScale = false,
     this.foregroundColor,
     this.mutedForegroundColor,
     this.gridColor,
@@ -195,6 +197,7 @@ class HealthScoreTrendChart extends StatelessWidget {
                 alertColor:
                     monochrome ? resolvedForeground : AppTheme.envDanger,
                 showThresholdLabels: showThresholdLabels && !compact,
+                adaptiveScale: adaptiveScale,
               ),
             ),
           ),
@@ -265,6 +268,7 @@ class _HealthScoreTrendPainter extends CustomPainter {
   final Color cautionColor;
   final Color alertColor;
   final bool showThresholdLabels;
+  final bool adaptiveScale;
 
   const _HealthScoreTrendPainter({
     required this.points,
@@ -275,6 +279,7 @@ class _HealthScoreTrendPainter extends CustomPainter {
     required this.cautionColor,
     required this.alertColor,
     required this.showThresholdLabels,
+    required this.adaptiveScale,
   });
 
   @override
@@ -289,53 +294,84 @@ class _HealthScoreTrendPainter extends CustomPainter {
       math.max(1.0, size.height - 10).toDouble(),
     );
 
-    double yForScore(double score) {
-      return plotRect.top + (1 - score.clamp(0, 100) / 100) * plotRect.height;
+    final scores = points
+        .map((point) => point.score)
+        .whereType<int>()
+        .map((score) => score.toDouble())
+        .toList(growable: false);
+    var lowerBound = 0.0;
+    var upperBound = 100.0;
+    if (adaptiveScale && scores.isNotEmpty) {
+      final minScore = scores.reduce(math.min);
+      final maxScore = scores.reduce(math.max);
+      if (minScore == maxScore) {
+        lowerBound = math.max(0, minScore - 5).toDouble();
+        upperBound = math.min(100, maxScore + 5).toDouble();
+      } else {
+        final padding = math.max(2.0, (maxScore - minScore) * .25);
+        lowerBound = math.max(0, minScore - padding).toDouble();
+        upperBound = math.min(100, maxScore + padding).toDouble();
+      }
     }
-
-    final y90 = yForScore(90);
-    final y70 = yForScore(70);
-
-    canvas.drawRect(
-      Rect.fromLTRB(plotRect.left, plotRect.top, plotRect.right, y90),
-      Paint()..color = goodColor.withValues(alpha: 0.055),
-    );
-    canvas.drawRect(
-      Rect.fromLTRB(plotRect.left, y90, plotRect.right, y70),
-      Paint()..color = cautionColor.withValues(alpha: 0.055),
-    );
-    canvas.drawRect(
-      Rect.fromLTRB(plotRect.left, y70, plotRect.right, plotRect.bottom),
-      Paint()..color = alertColor.withValues(alpha: 0.04),
-    );
+    final scoreRange = math.max(1.0, upperBound - lowerBound);
+    double yForScore(double score) {
+      return plotRect.top +
+          (1 - ((score - lowerBound) / scoreRange).clamp(0.0, 1.0)) *
+              plotRect.height;
+    }
 
     final gridPaint = Paint()
       ..color = gridColor
       ..strokeWidth = 1;
-    canvas.drawLine(
-      Offset(plotRect.left, y90),
-      Offset(plotRect.right, y90),
-      gridPaint,
-    );
-    canvas.drawLine(
-      Offset(plotRect.left, y70),
-      Offset(plotRect.right, y70),
-      gridPaint,
-    );
+    if (adaptiveScale) {
+      for (final fraction in const [.0, .5, 1.0]) {
+        final y = plotRect.top + plotRect.height * fraction;
+        canvas.drawLine(
+          Offset(plotRect.left, y),
+          Offset(plotRect.right, y),
+          gridPaint,
+        );
+      }
+    } else {
+      final y90 = yForScore(90);
+      final y70 = yForScore(70);
+      canvas.drawRect(
+        Rect.fromLTRB(plotRect.left, plotRect.top, plotRect.right, y90),
+        Paint()..color = goodColor.withValues(alpha: 0.055),
+      );
+      canvas.drawRect(
+        Rect.fromLTRB(plotRect.left, y90, plotRect.right, y70),
+        Paint()..color = cautionColor.withValues(alpha: 0.055),
+      );
+      canvas.drawRect(
+        Rect.fromLTRB(plotRect.left, y70, plotRect.right, plotRect.bottom),
+        Paint()..color = alertColor.withValues(alpha: 0.04),
+      );
+      canvas.drawLine(
+        Offset(plotRect.left, y90),
+        Offset(plotRect.right, y90),
+        gridPaint,
+      );
+      canvas.drawLine(
+        Offset(plotRect.left, y70),
+        Offset(plotRect.right, y70),
+        gridPaint,
+      );
 
-    if (showThresholdLabels) {
-      _drawText(
-        canvas,
-        '90',
-        Offset(plotRect.right + 6, y90 - 7),
-        goodColor,
-      );
-      _drawText(
-        canvas,
-        '70',
-        Offset(plotRect.right + 6, y70 - 7),
-        cautionColor,
-      );
+      if (showThresholdLabels) {
+        _drawText(
+          canvas,
+          '90',
+          Offset(plotRect.right + 6, y90 - 7),
+          goodColor,
+        );
+        _drawText(
+          canvas,
+          '70',
+          Offset(plotRect.right + 6, y70 - 7),
+          cautionColor,
+        );
+      }
     }
 
     final lastIndex = points.length - 1;
@@ -467,7 +503,8 @@ class _HealthScoreTrendPainter extends CustomPainter {
         oldDelegate.goodColor != goodColor ||
         oldDelegate.cautionColor != cautionColor ||
         oldDelegate.alertColor != alertColor ||
-        oldDelegate.showThresholdLabels != showThresholdLabels;
+        oldDelegate.showThresholdLabels != showThresholdLabels ||
+        oldDelegate.adaptiveScale != adaptiveScale;
   }
 }
 

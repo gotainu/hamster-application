@@ -21,6 +21,7 @@ import 'package:hamster_project/services/notification_token_repo.dart';
 import 'package:hamster_project/services/notification_payload.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:hamster_project/theme/app_theme.dart';
+import 'package:hamster_project/widgets/hamster_feedback_popup.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -29,6 +30,13 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> scaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<TabsScreenState> tabsScreenKey = GlobalKey<TabsScreenState>();
+
+void _showAppFeedback(String message) {
+  final context = navigatorKey.currentContext;
+  if (context != null) {
+    HamsterFeedbackPopup.show(context, message: message);
+  }
+}
 
 const AndroidNotificationChannel _highImportanceChannel =
     AndroidNotificationChannel(
@@ -92,11 +100,7 @@ Future<void> _openHealthFromNotification(
     return;
   }
 
-  scaffoldMessengerKey.currentState?.showSnackBar(
-    const SnackBar(
-      content: Text('通知を開きました。「今日」で詳しい状態を確認できます。'),
-    ),
-  );
+  _showAppFeedback('通知を開きました。「今日」で詳しい状態を確認できます。');
 }
 
 Map<String, dynamic> _payloadToMap(String? payload) {
@@ -205,7 +209,55 @@ class MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+    // Bind Analytics identity before any asynchronous FCM permission/token work
+    // so restored sessions cannot emit an early screen event under a stale ID.
+    _listenAuth(FirebaseMessaging.instance);
     unawaited(_initFcm());
+  }
+
+  void _listenAuth(FirebaseMessaging messaging) {
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
+      if (user == null) {
+        await AppAnalytics.clearUserId();
+        return;
+      }
+
+      try {
+        // Firebase Auth's verified UID is deliberately the Analytics User-ID.
+        // Do not use it for server authorization; that always re-verifies tokens.
+        if (FirebaseAuth.instance.currentUser?.uid == user.uid) {
+          await AppAnalytics.setUserId(user.uid);
+        }
+      } catch (e) {
+        debugPrint('[Analytics user ID binding skipped] $e');
+      }
+
+      try {
+        final token = await _getFcmTokenWhenReady(messaging);
+        debugPrint(
+          '[FCM authState token] '
+          '${token == null ? 'unavailable' : 'available'}',
+        );
+
+        if (token != null) {
+          await _saveFcmToken(token);
+        }
+      } catch (e, st) {
+        debugPrint('[FCM authState getToken error] $e');
+        debugPrint('$st');
+      }
+    });
+  }
+
+  Future<bool> requestCareNotificationPermission() async {
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+    return settings.authorizationStatus == AuthorizationStatus.authorized ||
+        settings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   Future<void> _initFcm() async {
@@ -213,22 +265,6 @@ class MyAppState extends State<MyApp> {
     _fcmInitialized = true;
 
     final messaging = FirebaseMessaging.instance;
-
-    try {
-      final settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
-
-      debugPrint(
-        '[FCM permission] authorizationStatus=${settings.authorizationStatus}',
-      );
-    } catch (e, st) {
-      debugPrint('[FCM permission error] $e');
-      debugPrint('$st');
-    }
 
     try {
       final initialToken = await _getFcmTokenWhenReady(messaging);
@@ -334,25 +370,6 @@ class MyAppState extends State<MyApp> {
       debugPrint('[FCM getInitialMessage error] $e');
       debugPrint('$st');
     }
-
-    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (user == null) return;
-
-      try {
-        final token = await _getFcmTokenWhenReady(messaging);
-        debugPrint(
-          '[FCM authState token] '
-          '${token == null ? 'unavailable' : 'available'}',
-        );
-
-        if (token != null) {
-          await _saveFcmToken(token);
-        }
-      } catch (e, st) {
-        debugPrint('[FCM authState getToken error] $e');
-        debugPrint('$st');
-      }
-    });
   }
 
   Future<String?> _getFcmTokenWhenReady(

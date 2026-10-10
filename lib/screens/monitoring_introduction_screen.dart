@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/onboarding_state_repo.dart';
@@ -63,7 +65,7 @@ class MonitoringIntroductionScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  '目安として7日ほど記録が集まると、利用できるデータの範囲で初回の個体別分析を確認できます。',
+                  '体重・活動量は、それぞれ有効な記録7件と14日以上の観察期間がそろうと、準備が整った指標から個体別分析に使えます。',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppTheme.secondaryText(context),
                         height: 1.55,
@@ -87,14 +89,43 @@ class MonitoringIntroductionScreen extends StatelessWidget {
   }
 }
 
-class MonitoringMethodSelectionScreen extends StatelessWidget {
+class MonitoringMethodSelectionScreen extends StatefulWidget {
   const MonitoringMethodSelectionScreen({super.key});
+
+  @override
+  State<MonitoringMethodSelectionScreen> createState() =>
+      _MonitoringMethodSelectionScreenState();
+}
+
+class _MonitoringMethodSelectionScreenState
+    extends State<MonitoringMethodSelectionScreen> {
+  late final String _presentationId;
+
+  @override
+  void initState() {
+    super.initState();
+    _presentationId = 'method_${DateTime.now().microsecondsSinceEpoch}';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(
+        AppAnalytics.logMonitoringMethodPresented(
+          presentationId: _presentationId,
+        ),
+      );
+    });
+  }
 
   Future<void> _open(BuildContext context, String method) async {
     await OnboardingStateRepo().selectMonitoringMethod(method);
-    await AppAnalytics.logOnboardingEvent(
-      'monitoring_method_selected',
+    const positions = {
+      'switchbot': 1,
+      'daily_checkin': 2,
+      'weight': 3,
+      'wheel': 4
+    };
+    await AppAnalytics.logMonitoringMethodSelected(
       method: method,
+      position: positions[method] ?? 0,
+      presentationId: _presentationId,
     );
     if (!context.mounted) return;
     final Widget next = switch (method) {

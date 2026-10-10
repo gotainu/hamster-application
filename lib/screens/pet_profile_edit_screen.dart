@@ -13,6 +13,7 @@ import '../services/hamster_avatar_appearance_resolver.dart';
 import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/pet_profile_repo.dart';
 import '../widgets/hamster_avatar_view.dart';
+import '../widgets/hamster_feedback_popup.dart';
 
 class PetProfileEditScreen extends StatefulWidget {
   const PetProfileEditScreen({super.key});
@@ -43,7 +44,12 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   @override
   void initState() {
     super.initState();
+    _nameController.addListener(_refreshPreview);
     _fetchExistingData();
+  }
+
+  void _refreshPreview() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -146,12 +152,10 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('画像を削除しました')));
+      HamsterFeedbackPopup.show(context, message: '画像を削除しました');
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('画像の削除に失敗しました…')));
+      HamsterFeedbackPopup.show(context, message: '画像の削除に失敗しました…');
     }
   }
 
@@ -194,9 +198,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
         imageUrl = await ref.getDownloadURL();
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('画像のアップロードに失敗しました')),
-          );
+          HamsterFeedbackPopup.show(context, message: '画像のアップロードに失敗しました');
           setState(() => _isLoading = false);
         }
         return;
@@ -216,13 +218,11 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('ペット情報を変更しました！')));
+      HamsterFeedbackPopup.show(context, message: 'ペット情報を変更しました！');
       Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('保存に失敗しました…')));
+      HamsterFeedbackPopup.show(context, message: '保存に失敗しました…');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -349,28 +349,12 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                           validator: (v) => v == null ? '毛色を選択してください' : null,
                         ),
                         const SizedBox(height: 24),
-                        Text(
-                          'Homeアバタープレビュー',
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          '種類と毛色をもとに外見を選び、健康評価に応じて表情とポーズが変化します。',
-                          textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.secondaryText(context),
-                                    height: 1.45,
-                                  ),
-                        ),
-                        const SizedBox(height: 12),
-                        HamsterAvatarView(
+                        _PetIdentityPreview(
+                          name: _nameController.text.trim(),
+                          birthday: _birthday,
+                          species: _selectedSpecies,
+                          color: selectedColor ?? '未選択',
                           presentation: avatarPreview,
-                          size: 150,
-                          showDebugLabel: false,
                         ),
                         const SizedBox(height: 22),
                         ElevatedButton(
@@ -410,4 +394,149 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       ),
     );
   }
+}
+
+class _PetIdentityPreview extends StatelessWidget {
+  const _PetIdentityPreview({
+    required this.name,
+    required this.birthday,
+    required this.species,
+    required this.color,
+    required this.presentation,
+  });
+
+  final String name;
+  final DateTime? birthday;
+  final String species;
+  final String color;
+  final HamsterAvatarPresentation presentation;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = AppTheme.isDark(context);
+    final displayName = name.isEmpty ? 'これから名前をつける子' : name;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDark
+              ? const [Color(0xFF23385A), Color(0xFF18243A)]
+              : const [Color(0xFFDCEEFF), Color(0xFFF6FAFF)],
+        ),
+        border: Border.all(
+          color: AppTheme.accent.withValues(alpha: isDark ? .38 : .20),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.accent.withValues(alpha: isDark ? .14 : .08),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Homeでの姿',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.primaryText(context),
+                  ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: 154,
+            height: 154,
+            child: HamsterAvatarView(
+              presentation: presentation,
+              size: 142,
+              showDebugLabel: false,
+              showBackdrop: false,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            displayName,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primaryText(context),
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${_ageLabel(birthday)} ・ コンディションにあわせて表情も変わります',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.secondaryText(context),
+                  height: 1.4,
+                ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _PreviewMetric(label: '種類', value: species)),
+              const SizedBox(width: 8),
+              Expanded(child: _PreviewMetric(label: '毛色', value: color)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _ageLabel(DateTime? birthday) {
+    if (birthday == null) return '誕生日を選ぶと年齢が表示されます';
+    final now = DateTime.now();
+    var months = (now.year - birthday.year) * 12 + now.month - birthday.month;
+    if (now.day < birthday.day) months--;
+    if (months < 12) return '${months.clamp(0, 11)}か月';
+    return '${months ~/ 12}歳${months % 12}か月';
+  }
+}
+
+class _PreviewMetric extends StatelessWidget {
+  const _PreviewMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(
+            alpha: AppTheme.isDark(context) ? .08 : .56,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: AppTheme.secondaryText(context),
+                  ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primaryText(context),
+                  ),
+            ),
+          ],
+        ),
+      );
 }

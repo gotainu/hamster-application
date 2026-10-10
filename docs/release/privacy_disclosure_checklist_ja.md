@@ -20,6 +20,22 @@
 |---|---|---|---|---|
 | 連絡先情報 | メールアドレス | 認証、連絡、アカウント管理 | Firebase Authentication | あり |
 | ユーザーID | Firebase UID、Stripe Customer ID | アカウント、契約状態の管理 | Firebase、Stripe | あり |
+
+> 公開前の改訂要否（未反映）: 現在のアプリ実装ではFirebase Authentication
+> UIDをFirebase Analyticsの標準User-IDとしても設定します。これは完全匿名の
+> 解析ではなく、契約・分析の結合に使う識別子です。メールアドレス、氏名、
+> ペット名、質問・回答本文、市区町村、認証トークンはAnalyticsへ送信しません。
+> 公開中のプライバシーポリシーに「UIDをAnalyticsへ送信しない」等の記載が
+> ある場合は、次の文案へ差し替える承認が必要です。
+>
+> 「ログイン中は、Firebase Authenticationのユーザー識別子をFirebase
+> Analyticsの標準User-IDとして設定し、利用導線・無料体験・レポート表示の
+> 集計に用います。質問本文、自由記述、氏名、メールアドレス、ペット名、
+> 市区町村および認証情報はAnalyticsへ送信しません。」
+>
+> 実装・BigQuery取り込み時のデータ最小化とストア申告の見直し案は
+> [`../analytics/server_event_ingestion_and_privacy_ja.md`](../analytics/server_event_ingestion_and_privacy_ja.md)
+> に整理しています。これは公開ポリシーの変更そのものではありません。
 | ユーザーコンテンツ | ハムスターの名前、種類、毛色、誕生日、写真、飼育環境、メモ | アプリ機能の提供 | Firestore、Firebase Storage | あり |
 | 飼育記録 | 今日の様子、体重、走行距離、温湿度 | 記録、グラフ、評価、通知 | Firestore | あり |
 | 購入情報 | プラン、契約状態、更新・解約予定日、決済結果 | 有料機能の提供 | Stripe、Firestore | あり |

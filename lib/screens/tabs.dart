@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hamster_project/screens/pet_profile_screen.dart';
+import 'package:hamster_project/screens/owner_profile_edit_screen.dart';
 import 'package:hamster_project/screens/search_function.dart';
 import 'package:hamster_project/screens/graph_function.dart';
 import 'package:hamster_project/screens/home.dart';
@@ -10,11 +11,13 @@ import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/screens/record_screen.dart';
 import 'package:hamster_project/screens/star_collection.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
+import 'package:hamster_project/screens/personality_report_history_screen.dart';
 import 'package:hamster_project/services/daily_record_completion_service.dart';
 import 'package:hamster_project/services/star_rewards_repo.dart';
 import 'package:hamster_project/services/app_analytics.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
+import 'package:hamster_project/widgets/collectible_glyph.dart';
 import 'package:hamster_project/widgets/paid_feature_gate.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
 import 'package:hamster_project/widgets/quick_record_sheet.dart';
@@ -23,7 +26,6 @@ import 'package:hamster_project/widgets/app_habitat_background.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/models/feature_trial_access.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
-import 'package:hamster_project/screens/monitoring_introduction_screen.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class TabsScreen extends StatefulWidget {
@@ -103,41 +105,40 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
     if (!mounted) return;
     await showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.6, end: 1),
-              duration: const Duration(milliseconds: 620),
-              curve: Curves.easeOutBack,
-              builder: (context, scale, child) => Transform.scale(
-                scale: scale,
-                child: child,
+      builder: (dialogContext) {
+        final collectible = CollectibleCopy.of(dialogContext);
+        return AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.6, end: 1),
+                duration: const Duration(milliseconds: 620),
+                curve: Curves.easeOutBack,
+                builder: (context, scale, child) => Transform.scale(
+                  scale: scale,
+                  child: child,
+                ),
+                child: CollectibleGlyph(filled: true, size: 84),
               ),
-              child: const Icon(
-                Icons.star_rounded,
-                size: 84,
-                color: Color(0xFFFFD782),
+              const SizedBox(height: 16),
+              Text(
+                collectible.milestoneLabel(50),
+                textAlign: TextAlign.center,
+                style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              '星が合計50個貯まりました！',
-              textAlign: TextAlign.center,
-              style: Theme.of(dialogContext).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('やった！'),
             ),
           ],
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('やった！'),
-          ),
-        ],
-      ),
+        );
+      },
     );
     if (!mounted) return;
     try {
@@ -227,14 +228,7 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleFirstAiConsultation() async {
-    final state = await _onboardingRepo.fetchState();
-    final isFirstAnswer = !state.firstAiConsultationCompleted;
     await _onboardingRepo.markFirstAiConsultationCompleted();
-    if (!isFirstAnswer || !mounted) return;
-
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const MonitoringIntroductionScreen()),
-    );
   }
 
   Future<void> _showHomeAiCoach() async {
@@ -290,7 +284,8 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       ),
       FuncSearchScreen(
         key: _searchKey,
-        allowDuringOnboarding: true,
+        useInitialTrial: true,
+        canStartInitialTrial: true,
         onConsultationCompleted: _handleFirstAiConsultation,
       ),
       const PaidFeatureGate(
@@ -335,7 +330,7 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
         lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
         icon: Icons.edit_note_rounded,
         showBackground: false,
-        allowDuringOnboarding: true,
+        useInitialTrial: true,
         child: RecordScreen(),
       ),
     );
@@ -393,6 +388,9 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       case 'record':
         screen = _buildRecordDestination();
         break;
+      case 'report_history':
+        screen = const PersonalityReportHistoryScreen();
+        break;
       case 'settings':
         screen = const SettingScreen();
         break;
@@ -401,6 +399,9 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
         break;
       case 'pets_profile':
         screen = const PetProfileScreen();
+        break;
+      case 'owner_profile':
+        screen = const OwnerProfileEditScreen();
         break;
       default:
         return;

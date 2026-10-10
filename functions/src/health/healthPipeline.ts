@@ -10,6 +10,7 @@ import {
   executePendingResolvedHealthNotifications,
 } from './goldHealthNotification';
 import { syncHealthIncidentLifecycle } from './healthIncidentLifecycle';
+import { syncPersonalizedAnalysis } from './firstPersonalizedReport';
 
 export interface HealthPipelineResult {
   uid: string;
@@ -116,6 +117,19 @@ export async function rebuildHealthForDate(params: {
       updatedLatest = true;
     }
   });
+
+  try {
+    await syncPersonalizedAnalysis({
+      db,
+      uid: params.uid,
+      dateKey,
+      features: featureResult.features,
+      now: generatedAt,
+    });
+  } catch (error: unknown) {
+    // Readiness/report persistence is retried by the next idempotent pipeline run.
+    logger.error('Personalized analysis state sync failed', {uid: params.uid, dateKey, error: error instanceof Error ? error.message : String(error)});
+  }
 
   if (updatedLatest && dateKey === formatDateKey(generatedAt)) {
     try {

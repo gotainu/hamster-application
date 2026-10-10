@@ -166,7 +166,7 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
                                           '走った記録、今日の様子、体重をすばやく入力する機能は、有料プランで利用できます。',
                                       icon: Icons.add_circle_outline_rounded,
                                       showBackground: false,
-                                      allowDuringOnboarding: true,
+                                      useInitialTrial: true,
                                       child: _selectedCategory == null
                                           ? _CategorySelection(
                                               key: const ValueKey('categories'),

@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/daily_condition_input_card.dart';
 import '../widgets/wheel_rotation_input_card.dart';
 import '../widgets/weight_input_card.dart';
+import '../widgets/hamster_feedback_popup.dart';
 
 class RecordScreen extends StatefulWidget {
   const RecordScreen({super.key});
@@ -59,11 +60,7 @@ class _RecordScreenState extends State<RecordScreen> {
             const SizedBox(height: 14),
             DailyConditionInputCard(
               onSaved: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('今日の様子を保存しました。'),
-                  ),
-                );
+                HamsterFeedbackPopup.show(context, message: '今日の様子を保存しました。');
               },
             ),
             const SizedBox(height: 24),
@@ -79,11 +76,7 @@ class _RecordScreenState extends State<RecordScreen> {
             const SizedBox(height: 10),
             WeightInputCard(
               onSaved: (_) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('体重を保存しました。'),
-                  ),
-                );
+                HamsterFeedbackPopup.show(context, message: '体重を保存しました。');
               },
             ),
           ],

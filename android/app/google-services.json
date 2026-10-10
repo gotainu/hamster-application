@@ -12,7 +12,12 @@
           "package_name": "com.example.hamster_project"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "797691641198-1l3hom8ej5tm83sls7b0aqds40qtrkq7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDgl2LnlcdvrqXpyH1MTCipCmd8bdffT78"
@@ -20,7 +25,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "797691641198-1l3hom8ej5tm83sls7b0aqds40qtrkq7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "797691641198-7sfv0t5cej2o9nermpklnaiehprp2n7i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hamsterProject"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +48,28 @@
           "package_name": "com.gotainu.hamster"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "797691641198-7mehf7c0et5rq89tsl2u607hs5t92s8s.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gotainu.hamster",
+            "certificate_hash": "d1f7bdf1efd65206b7fe3f86d2d6557568fdf054"
+          }
+        },
+        {
+          "client_id": "797691641198-i2b60p8m15k50nefmud8o7gd2uopa001.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gotainu.hamster",
+            "certificate_hash": "77e80aa04047339ca075c38190491cd4f6a0011a"
+          }
+        },
+        {
+          "client_id": "797691641198-1l3hom8ej5tm83sls7b0aqds40qtrkq7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDgl2LnlcdvrqXpyH1MTCipCmd8bdffT78"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "797691641198-1l3hom8ej5tm83sls7b0aqds40qtrkq7.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "797691641198-7sfv0t5cej2o9nermpklnaiehprp2n7i.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.hamsterProject"
+              }
+            }
+          ]
         }
       }
     }

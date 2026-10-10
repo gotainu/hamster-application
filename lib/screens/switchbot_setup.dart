@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/paid_feature_gate.dart';
+import 'package:hamster_project/widgets/hamster_feedback_popup.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 
 class _SwitchbotGuideStep {
@@ -57,9 +58,8 @@ class SwitchbotSetupScreen extends StatelessWidget {
           width: double.infinity,
           height: double.infinity,
           decoration: BoxDecoration(
-            gradient: isDark
-                ? AppTheme.darkBgGradient
-                : AppTheme.lightBgGradient,
+            gradient:
+                isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
           ),
           child: const SafeArea(
             top: false,
@@ -70,7 +70,7 @@ class SwitchbotSetupScreen extends StatelessWidget {
                   '温湿度の自動記録、環境評価、異常検知通知に使うSwitchBot連携は、有料プランで利用できます。',
               icon: Icons.thermostat_rounded,
               showBackground: false,
-              allowDuringOnboarding: true,
+              useInitialTrial: true,
               child: _SwitchbotSetupContent(),
             ),
           ),
@@ -153,9 +153,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
 
   FirebaseFunctions get _fns => FirebaseFunctions.instanceFor(
-    app: Firebase.app(),
-    region: 'asia-northeast1',
-  );
+        app: Firebase.app(),
+        region: 'asia-northeast1',
+      );
 
   @override
   void initState() {
@@ -172,7 +172,7 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
 
   void _showSnack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    HamsterFeedbackPopup.show(context, message: msg);
   }
 
   bool get _hasSelectedMeter =>
@@ -245,10 +245,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
     String? selectedDeviceType;
     bool hasSecrets = false;
 
-    final devDoc = await userRef
-        .collection('integrations')
-        .doc('switchbot')
-        .get(options);
+    final devDoc =
+        await userRef.collection('integrations').doc('switchbot').get(options);
 
     if (devDoc.exists) {
       final m = devDoc.data()!;
@@ -360,9 +358,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
     final List devices = (normalized?['devices'] is List)
         ? List.from(normalized!['devices'] as List)
         : (normalized?['body'] is Map &&
-              (normalized!['body'] as Map)['deviceList'] is List)
-        ? List.from((normalized['body'] as Map)['deviceList'] as List)
-        : const [];
+                (normalized!['body'] as Map)['deviceList'] is List)
+            ? List.from((normalized['body'] as Map)['deviceList'] as List)
+            : const [];
 
     if (devices.isEmpty) {
       throw Exception('デバイスが見つかりませんでした');
@@ -490,11 +488,11 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
         .collection('integrations')
         .doc('switchbot')
         .set({
-          'meterDeviceId': id,
-          'meterDeviceName': name,
-          'meterDeviceType': type,
-          'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      'meterDeviceId': id,
+      'meterDeviceName': name,
+      'meterDeviceType': type,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     if (!mounted) return;
 
@@ -639,8 +637,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.secondaryText(context),
-            ),
+                  color: AppTheme.secondaryText(context),
+                ),
           ),
         ],
       ),
@@ -699,8 +697,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
           Text(
             '温湿度計のデータを自動で記録し、環境評価やAI相談に活用します。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.secondaryText(context),
-            ),
+                  color: AppTheme.secondaryText(context),
+                ),
           ),
         ],
       ),
@@ -741,9 +739,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                 Text(
                   _connectionStateDescription,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                    height: 1.45,
-                  ),
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                      ),
                 ),
                 const SizedBox(height: 12),
                 ClipRRect(
@@ -763,9 +761,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                 Text(
                   '$completed / 2 完了',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.tertiaryText(context),
-                    fontWeight: FontWeight.w700,
-                  ),
+                        color: AppTheme.tertiaryText(context),
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ],
             ),
@@ -808,15 +806,15 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                   Text(
                     '連携の流れを見る',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'SwitchBotアプリの準備からTOKEN/SECRET取得、温湿度計の選択まで確認できます。',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.secondaryText(context),
-                    ),
+                          color: AppTheme.secondaryText(context),
+                        ),
                   ),
                 ],
               ),
@@ -1009,10 +1007,10 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
               Text(
                 step.stepLabel,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppTheme.accent,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0.6,
-                ),
+                      color: AppTheme.accent,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                    ),
               ),
               const SizedBox(height: 10),
               Text(
@@ -1025,9 +1023,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
               Text(
                 step.description,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                  height: 1.5,
-                ),
+                      color: AppTheme.secondaryText(context),
+                      height: 1.5,
+                    ),
               ),
               const SizedBox(height: 18),
               ClipRRect(
@@ -1058,7 +1056,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                             const SizedBox(height: 12),
                             Text(
                               '画像を準備中です',
-                              style: Theme.of(context).textTheme.bodyMedium
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
                                   ?.copyWith(
                                     color: AppTheme.secondaryText(context),
                                   ),
@@ -1071,7 +1071,9 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                               child: Text(
                                 step.imageAssetPath,
                                 textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodySmall
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
                                     ?.copyWith(
                                       color: AppTheme.weakText(context),
                                     ),
@@ -1161,17 +1163,17 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                       ? '認証情報はサーバー側に安全に保存されています。'
                       : '認証情報は保存済みです。次に温湿度計を選択してください。',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                    height: 1.45,
-                  ),
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                      ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'セキュリティ保護のため、TOKEN / SECRET の内容はアプリへ読み出しません。',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                    height: 1.45,
-                  ),
+                        color: AppTheme.secondaryText(context),
+                        height: 1.45,
+                      ),
                 ),
               ],
             ),
@@ -1216,17 +1218,16 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
           Text(
             deviceSummary,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.secondaryText(context),
-              height: 1.45,
-            ),
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: (_canPickDevices && !_polling)
-                  ? _pickDeviceFromCloud
-                  : null,
+              onPressed:
+                  (_canPickDevices && !_polling) ? _pickDeviceFromCloud : null,
               icon: _polling
                   ? const SizedBox(
                       width: 18,
@@ -1242,8 +1243,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
                 _polling
                     ? '取得中...'
                     : _hasSelectedMeter
-                    ? '別の温湿度計を選ぶ'
-                    : 'デバイス一覧から選ぶ',
+                        ? '別の温湿度計を選ぶ'
+                        : 'デバイス一覧から選ぶ',
               ),
             ),
           ),
@@ -1278,8 +1279,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
             child: Text(
               _status!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.secondaryText(context),
-              ),
+                    color: AppTheme.secondaryText(context),
+                  ),
             ),
           ),
         ],
@@ -1297,17 +1298,17 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
           Text(
             '連携を解除',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.redAccent,
-              fontWeight: FontWeight.w800,
-            ),
+                  color: Colors.redAccent,
+                  fontWeight: FontWeight.w800,
+                ),
           ),
           const SizedBox(height: 6),
           Text(
             'TOKEN/SECRETと選択中の温湿度計を解除します。過去の温湿度記録は通常残します。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.secondaryText(context),
-              height: 1.45,
-            ),
+                  color: AppTheme.secondaryText(context),
+                  height: 1.45,
+                ),
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -1368,8 +1369,8 @@ class _SwitchbotSetupContentState extends State<_SwitchbotSetupContent> {
         Text(
           '※ TOKEN/SECRET はCloud Functions経由で保存されます。安全のため、アプリでは全文を表示しません。',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: AppTheme.tertiaryText(context),
-          ),
+                color: AppTheme.tertiaryText(context),
+              ),
         ),
       ],
     );

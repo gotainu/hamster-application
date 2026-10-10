@@ -52,6 +52,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>プロフィール写真の撮影に使用します。</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>AI相談で音声を文字に変換するために使用します。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>プロフィール写真の選択に使用します。</string>
 </dict>

@@ -1,5 +1,7 @@
 // lib/screens/subscription_plan_screen.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -8,12 +10,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing_status.dart';
+import '../models/entitlement_snapshot.dart';
 import '../services/app_analytics.dart';
 import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
+import '../widgets/hamster_feedback_popup.dart';
 
 class SubscriptionPlanScreen extends StatefulWidget {
-  const SubscriptionPlanScreen({super.key});
+  const SubscriptionPlanScreen({super.key, this.billingRepo});
+
+  final BillingStatusRepo? billingRepo;
 
   @override
   State<SubscriptionPlanScreen> createState() => _SubscriptionPlanScreenState();
@@ -27,7 +33,54 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     'https://hamster-breeding-app.web.app/terms/',
   );
 
-  final BillingStatusRepo _repo = BillingStatusRepo();
+  late BillingStatusRepo _repo;
+  late Stream<EntitlementSnapshot<BillingStatus>> _billingStream;
+  StreamSubscription<String?>? _authSubscription;
+  String? _streamUid;
+  int _readVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _bindRepo();
+  }
+
+  void _bindRepo() {
+    final repo = _repo = widget.billingRepo ?? BillingStatusRepo();
+    _streamUid = repo.currentUserId;
+    _billingStream = repo.watchBillingStatus();
+    _authSubscription = repo.watchUserId().listen((uid) {
+      if (!mounted || !identical(repo, _repo) || uid == _streamUid) return;
+      setState(() {
+        _streamUid = uid;
+        _readVersion++;
+        _billingStream = repo.watchBillingStatus();
+      });
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant SubscriptionPlanScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.billingRepo != widget.billingRepo) {
+      unawaited(_authSubscription?.cancel());
+      _readVersion++;
+      _bindRepo();
+    }
+  }
+
+  void _retryBillingRead() {
+    setState(() {
+      _readVersion++;
+      _billingStream = _repo.watchBillingStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
 
   bool _isOpeningCheckout = false;
   bool _isOpeningPortal = false;
@@ -67,26 +120,21 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
         throw Exception('Stripe Checkout を開けませんでした。');
       }
       await AppAnalytics.logCheckoutOpened();
-    } on FirebaseFunctionsException catch (e) {
+    } on FirebaseFunctionsException catch (_) {
       await AppAnalytics.logCheckoutFailed();
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('購入ページの作成に失敗しました: ${e.message ?? e.code}'),
-        ),
+      HamsterFeedbackPopup.show(
+        context,
+        message: '購入ページの作成に失敗しました。時間をおいてお試しください。',
       );
     } catch (e) {
       await AppAnalytics.logCheckoutFailed();
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('購入ページを開けませんでした: $e'),
-        ),
-      );
+      HamsterFeedbackPopup.show(context, message: '購入ページを開けませんでした。');
     } finally {
       if (mounted) {
         setState(() {
@@ -126,22 +174,17 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
       if (!launched) {
         throw Exception('Stripe Customer Portal を開けませんでした。');
       }
-    } on FirebaseFunctionsException catch (e) {
+    } on FirebaseFunctionsException catch (_) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('利用プラン管理画面の作成に失敗しました: ${e.message ?? e.code}'),
-        ),
+      HamsterFeedbackPopup.show(
+        context,
+        message: '利用プラン管理画面を開けませんでした。時間をおいてお試しください。',
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('利用プラン管理画面を開けませんでした: $e'),
-        ),
-      );
+      HamsterFeedbackPopup.show(context, message: '利用プラン管理画面を開けませんでした。');
     } finally {
       if (mounted) {
         setState(() {
@@ -164,15 +207,12 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     } catch (error) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ページを開けませんでした: $error')),
-      );
+      HamsterFeedbackPopup.show(context, message: 'ページを開けませんでした。');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final repo = _repo;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -200,24 +240,35 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
                 isDark ? AppTheme.darkBgGradient : AppTheme.lightBgGradient,
           ),
           child: SafeArea(
-            child: StreamBuilder<BillingStatus>(
-              stream: repo.watchBillingStatus(),
+            child: StreamBuilder<EntitlementSnapshot<BillingStatus>>(
+              key: ValueKey((_streamUid, _readVersion)),
+              stream: _billingStream,
               builder: (context, snapshot) {
-                final billing = snapshot.data ?? BillingStatus.empty();
+                final read = snapshot.data;
+                final sameUser = _streamUid == _repo.currentUserId;
+                final confirmed = sameUser &&
+                    read?.isServerConfirmed == true &&
+                    read?.uid == _repo.currentUserId;
 
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                   children: [
-                    _BillingStatusHeroCard(
-                      billing: billing,
-                      isOpeningCheckout: _isOpeningCheckout,
-                      isOpeningPortal: _isOpeningPortal,
-                      onStartCheckout: _startCheckout,
-                      onOpenCustomerPortal: _openCustomerPortal,
-                      onOpenPrivacyPolicy: () =>
-                          _openLegalPage(_privacyPolicyUrl),
-                      onOpenTermsOfUse: () => _openLegalPage(_termsOfUseUrl),
-                    ),
+                    if (!confirmed || snapshot.hasError)
+                      _BillingReadStatusCard(
+                        unavailable: sameUser && snapshot.hasError,
+                        onRetry: _retryBillingRead,
+                      )
+                    else
+                      _BillingStatusHeroCard(
+                        billing: read!.data!,
+                        isOpeningCheckout: _isOpeningCheckout,
+                        isOpeningPortal: _isOpeningPortal,
+                        onStartCheckout: _startCheckout,
+                        onOpenCustomerPortal: _openCustomerPortal,
+                        onOpenPrivacyPolicy: () =>
+                            _openLegalPage(_privacyPolicyUrl),
+                        onOpenTermsOfUse: () => _openLegalPage(_termsOfUseUrl),
+                      ),
                     const SizedBox(height: 16),
                     const _PaidPlanFeatureCard(
                       icon: Icons.thermostat_rounded,
@@ -259,6 +310,44 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
       ),
     );
   }
+}
+
+class _BillingReadStatusCard extends StatelessWidget {
+  const _BillingReadStatusCard(
+      {required this.unavailable, required this.onRetry});
+
+  final bool unavailable;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(22),
+        decoration: AppTheme.cardGradient(
+          Theme.of(context).brightness == Brightness.dark,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (!unavailable) ...[
+              const CircularProgressIndicator(),
+              const SizedBox(height: 18),
+            ],
+            Text(
+              unavailable ? '利用状態を確認できませんでした' : '利用状態を確認しています',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            if (unavailable) ...[
+              const SizedBox(height: 18),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('もう一度確認'),
+              ),
+            ],
+          ],
+        ),
+      );
 }
 
 class _BillingStatusHeroCard extends StatelessWidget {
