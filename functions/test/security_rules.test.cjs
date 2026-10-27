@@ -2,12 +2,16 @@
 
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
 const { initializeTestEnvironment, assertFails, assertSucceeds } = require('@firebase/rules-unit-testing');
 const { doc, getDoc, setDoc, updateDoc } = require('firebase/firestore');
 const { ref, uploadBytes, getMetadata, deleteObject } = require('firebase/storage');
 
 const ROOT = path.resolve(__dirname, '../..');
-const PROJECT_ID = 'hamster-rules-test';
+assert.match(process.env.FIRESTORE_EMULATOR_HOST ?? '', /^127\.0\.0\.1:\d+$/, 'Dedicated Firestore emulator required');
+assert.match(process.env.FIREBASE_STORAGE_EMULATOR_HOST ?? '', /^127\.0\.0\.1:\d+$/, 'Dedicated Storage emulator required');
+assert.notEqual(process.env.FIRESTORE_EMULATOR_HOST, '127.0.0.1:8080');
+const PROJECT_ID = 'demo-hamcare-core-rules';
 let passed = 0;
 let failed = 0;
 
@@ -83,14 +87,14 @@ async function main() {
       assertFails(getDoc(doc(gdb, 'users/alice/pet_profiles/main_pet'))));
     await check('別ユーザーはpet profileを読めない', () =>
       assertFails(getDoc(doc(bdb, 'users/alice/pet_profiles/main_pet'))));
-    await check('本人はpet profileを書ける', () =>
-      assertSucceeds(setDoc(doc(adb, 'users/alice/pet_profiles/main_pet'), { name: 'Ibuki' }, { merge: true })));
+    await check('本人もpet profileのID付与・編集はcallableを経由する', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/pet_profiles/main_pet'), { name: 'Ibuki' }, { merge: true })));
     await check('本人はusers root markerを更新できる', () =>
       assertSucceeds(updateDoc(doc(adb, 'users/alice'), { has_subcollections: true })));
-    await check('本人はdaily_checkinsを書ける', () =>
-      assertSucceeds(setDoc(doc(adb, 'users/alice/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
-    await check('有効な21日体験中は新規記録を書ける', () =>
-      assertSucceeds(setDoc(doc(bdb, 'users/bob/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
+    await check('本人もdaily_checkinsの保存は履歴callableを経由する', () =>
+      assertFails(setDoc(doc(adb, 'users/alice/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
+    await check('有効な21日体験でもdaily_checkins履歴は直接迂回できない', () =>
+      assertFails(setDoc(doc(bdb, 'users/bob/daily_checkins/2026-08-08'), { dayKey: '2026-08-08', condition: 'normal' })));
     await check('未契約・期限なし体験は新規記録を書けない', () =>
       assertFails(setDoc(doc(cdb, 'users/charlie/weight_records/x'), { weight: 30 })));
     await check('本人はAI chatを書ける', () =>

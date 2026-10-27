@@ -13,6 +13,7 @@ import '../services/feature_trial_repo.dart';
 import '../services/onboarding_state_repo.dart';
 import '../services/initial_trial_repo.dart';
 import '../services/app_analytics.dart';
+import '../services/ai_access_failure.dart';
 import '../theme/app_theme.dart';
 import 'hamster_feedback_popup.dart';
 
@@ -30,6 +31,7 @@ class PaidFeatureGate extends StatefulWidget {
     this.useInitialTrial = false,
     this.canStartInitialTrial = false,
     this.billingRepo,
+    this.now,
   });
 
   final Widget child;
@@ -44,12 +46,15 @@ class PaidFeatureGate extends StatefulWidget {
   final bool canStartInitialTrial;
 
   final BillingStatusRepo? billingRepo;
+  final DateTime Function()? now;
 
   @override
   State<PaidFeatureGate> createState() => _PaidFeatureGateState();
 }
 
 class _PaidFeatureGateState extends State<PaidFeatureGate> {
+  DateTime _now() => (widget.now ?? DateTime.now)();
+  final _expiry = _EntitlementExpiryTimer();
   late BillingStatusRepo _repo;
   late Stream<EntitlementSnapshot<BillingStatus>> _billingStream;
   StreamSubscription<String?>? _authSubscription;
@@ -95,6 +100,7 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
 
   @override
   void dispose() {
+    _expiry.dispose();
     _authSubscription?.cancel();
     super.dispose();
   }
@@ -123,7 +129,11 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
             return _readStatus();
           }
           final billing = read.data!;
-          if (billing.canUsePaidFeatures) return widget.child;
+          _expiry.schedule(
+              billing.isPaid ? billing.currentPeriodEnd : null, _now(), () {
+            if (mounted) setState(() {});
+          });
+          if (billing.canUsePaidFeaturesAt(_now())) return widget.child;
 
           if (widget.trialFeature != null) {
             return _TrialAwareFeatureGate(
@@ -151,6 +161,7 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
               icon: widget.icon,
               showBackground: widget.showBackground,
               canStart: widget.canStartInitialTrial,
+              now: _now,
               child: widget.child,
             );
           }
@@ -200,6 +211,7 @@ class _InitialTrialFeatureGate extends StatefulWidget {
       required this.icon,
       required this.showBackground,
       required this.canStart,
+      required this.now,
       required this.child});
   final BillingStatusRepo billingRepo;
   final BillingStatus billing;
@@ -210,6 +222,7 @@ class _InitialTrialFeatureGate extends StatefulWidget {
   final IconData icon;
   final bool showBackground;
   final bool canStart;
+  final DateTime Function() now;
   final Widget child;
   @override
   State<_InitialTrialFeatureGate> createState() =>
@@ -217,6 +230,7 @@ class _InitialTrialFeatureGate extends StatefulWidget {
 }
 
 class _InitialTrialFeatureGateState extends State<_InitialTrialFeatureGate> {
+  final _expiry = _EntitlementExpiryTimer();
   InitialTrialRepo? _trialRepo;
   bool _starting = false;
   late final Stream<EntitlementSnapshot<InitialTrialAccess>> _trialStream;
@@ -227,19 +241,27 @@ class _InitialTrialFeatureGateState extends State<_InitialTrialFeatureGate> {
     _trialStream = widget.billingRepo.watchInitialTrialAccess();
   }
 
+  @override
+  void dispose() {
+    _expiry.dispose();
+    super.dispose();
+  }
+
   Future<void> _start() async {
     setState(() => _starting = true);
     try {
       await (_trialRepo ??= InitialTrialRepo()).start();
       unawaited(AppAnalytics.logEntitlementEvent('initial_trial_start_attempt',
           flowVersion: 'initial_trial_v2', outcome: 'success'));
-    } catch (_) {
+    } catch (error) {
+      final failure = AiAccessFailure.fromTrialStart(error);
+      debugPrint('[InitialTrial] start failed code=${failure.code}');
       unawaited(AppAnalytics.logEntitlementEvent('initial_trial_start_attempt',
           flowVersion: 'initial_trial_v2', outcome: 'failed'));
       if (mounted) {
         HamsterFeedbackPopup.show(
           context,
-          message: '無料体験は利用上限の設定後に開始できます。',
+          message: failure.message,
           tone: HamsterFeedbackTone.warning,
         );
       }
@@ -255,14 +277,23 @@ class _InitialTrialFeatureGateState extends State<_InitialTrialFeatureGate> {
         builder: (context, trialSnapshot) {
           final read = trialSnapshot.data;
           final trial = read?.data;
+          _expiry.schedule(
+              read?.isServerConfirmed == true &&
+                      read?.uid == widget.billingRepo.currentUserId &&
+                      trial?.status == 'active'
+                  ? trial?.endsAt
+                  : null,
+              widget.now(), () {
+            if (mounted) setState(() {});
+          });
           final phase = resolveInitialTrialGateState(
             billingHasData: true,
             billingHasError: false,
             trialHasData: read?.isServerConfirmed == true &&
                 read?.uid == widget.billingRepo.currentUserId,
             trialHasError: trialSnapshot.hasError,
-            hasPaidAccess: widget.billing.canUsePaidFeatures,
-            hasActiveTrial: trial?.isActive ?? false,
+            hasPaidAccess: widget.billing.canUsePaidFeaturesAt(widget.now()),
+            hasActiveTrial: trial?.isActiveAt(widget.now()) ?? false,
             trialStatus: trial?.status,
             canStart: widget.canStart,
           );
@@ -306,6 +337,26 @@ class _InitialTrialFeatureGateState extends State<_InitialTrialFeatureGate> {
           }
         },
       );
+}
+
+/// Rechecks an open gate when a known entitlement expires, even if Firestore
+/// does not send another document snapshot at the deadline.
+class _EntitlementExpiryTimer {
+  Timer? _timer;
+  DateTime? _deadline;
+
+  void schedule(DateTime? deadline, DateTime now, VoidCallback onExpiry) {
+    if (_deadline == deadline) return;
+    _timer?.cancel();
+    _deadline = deadline;
+    if (deadline == null || !now.isBefore(deadline)) return;
+    _timer = Timer(deadline.difference(now), () {
+      _deadline = null;
+      onExpiry();
+    });
+  }
+
+  void dispose() => _timer?.cancel();
 }
 
 class _InitialTrialStatusView extends StatelessWidget {

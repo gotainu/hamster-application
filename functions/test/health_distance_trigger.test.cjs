@@ -63,6 +63,7 @@ function loadSourceModules(rebuildHealthForDate) {
         return { info() {}, error() {} };
       }
       if (name === 'firebase-admin') return admin;
+      if (name === 'node:crypto') return require('node:crypto');
       if (filename === triggerEntry && name === './healthPipeline') {
         return { rebuildHealthForDate };
       }

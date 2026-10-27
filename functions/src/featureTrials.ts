@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import * as logger from 'firebase-functions/logger';
 import {
   calculateInitialTrialEndsAt,
   initialTrialPolicy,
@@ -98,13 +99,8 @@ export const consumeAiTrial = onCall({region}, async (req) => {
 export const startInitialTrial = onCall({region}, async (req) => {
   const uid = req.auth?.uid;
   if (!uid) throw new HttpsError('unauthenticated', 'ログインが必要です。');
-  const validationUids = (process.env.TRIAL_TEST_UIDS ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (validationUids.length > 0 && !validationUids.includes(uid)) {
-    throw new HttpsError('permission-denied', '現在は許可されたテストアカウントのみ無料体験を開始できます。');
-  }
+  // Validation identity is an analytics label, not a free-trial entitlement.
+  // Every authenticated user follows the same immutable, finite policy below.
   const ref = initialAccessRef(uid);
   const testOnly = isValidationUid(uid);
   return admin.firestore().runTransaction(async (transaction) => {
@@ -125,9 +121,16 @@ export const startInitialTrial = onCall({region}, async (req) => {
       initialTrialPolicy.aiRequestLimit <= 0 ||
       initialTrialPolicy.aiCostMicrosLimit <= 0
     ) {
+      logger.error('initial_trial_start_denied', {
+        reason: 'policy_unconfigured',
+        policyVersion: initialTrialPolicy.policyVersion,
+        aiRequestLimit: initialTrialPolicy.aiRequestLimit,
+        aiCostMicrosLimit: initialTrialPolicy.aiCostMicrosLimit,
+      });
       throw new HttpsError(
         'failed-precondition',
-        '無料体験は利用上限の設定完了後に開始できます。',
+        '現在、無料体験を開始できません。運営側で設定を確認しています。',
+        {reason: 'policy_unconfigured'},
       );
     }
     const startedAt = admin.firestore.Timestamp.fromDate(now);

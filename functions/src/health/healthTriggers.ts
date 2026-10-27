@@ -13,6 +13,8 @@ import {
   rebuildHealthForDate,
 } from './healthPipeline';
 
+import {affectedCheckinEvaluationDates} from './checkinInsights';
+
 const REGION = 'asia-northeast1';
 
 export const healthWeightRecordWritten = onDocumentWritten(
@@ -123,11 +125,9 @@ export const healthDailyCheckinWritten = onDocumentWritten(
     memory: '256MiB',
   },
   async (event) => {
-    await rebuildHealthForDate({
+    await rebuildDates({
       uid: event.params.uid,
-      dateKey: normalizeDateKey(
-        event.params.sourceDateKey,
-      ),
+      dateKeys: affectedCheckinEvaluationDates(event.params.sourceDateKey, formatDateKey(new Date())),
       reason: 'daily_checkin_written',
     });
   },

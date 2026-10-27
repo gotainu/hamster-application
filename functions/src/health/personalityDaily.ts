@@ -8,6 +8,9 @@ import {robustZScore} from './personalBaseline';
 import {baselineSnapshot, isReady, metricSnapshot, dateKey, monthsAt, PERSONALITY_SPEC_VERSION} from './personalityReport';
 import {buildPopulationWeightContext, normalizeReferenceSpecies, parseReferenceCohort} from './referenceCohorts';
 import {isValidationUid} from '../validationIdentity';
+import {buildReportInsightSnapshot} from './weightInsights';
+import {buildCheckinInsights, type CheckinInsightEvidence} from './checkinInsights';
+import {checkinPublicationCandidate, hasNewCheckinPublication, mergeCheckinPublicationState, readCheckinPublicationState} from './checkinPublication';
 
 type Data = Record<string, any>;
 type Metric = 'body' | 'activity';
@@ -50,28 +53,29 @@ function featureFrontiers(features: Data): Frontiers {
 function advanced(current: Frontiers, old: Frontiers): boolean {
   return METRICS.some(metric => current[metric] != null && (old[metric] == null || current[metric]! > old[metric]!));
 }
-function dueDate(now: Date, frontiers: Frontiers): string {
+function dueDate(now: Date, frontiers: Frontiers, observationDateKey?: string | null): string {
   const today = formatDateKey(now);
   let day = now < jstReportMorning(today) ? today : addDaysToDateKey(today, 1);
-  for (const key of Object.values(frontiers)) {
+  for (const key of [...Object.values(frontiers), ...(observationDateKey ? [observationDateKey] : [])]) {
     const afterObservation = addDaysToDateKey(key, 1);
     if (afterObservation > day) day = afterObservation;
   }
   return day;
 }
 
-/** The current Silver trigger queues through this entry point; today's distance
- * trigger uses the queue-only source preview below. Numeric/time-only changes
- * and historical backfill without a newer valid observation day do not enqueue
- * another report. Queue writes are server-only and contain no text. */
+
+/** Current Silver queues numeric observation frontiers and new observation
+ * meanings. Full Evidence/date/count changes alone are not publication events.
+ * Today's distance trigger retains its separate numeric-only preview. */
 export async function enqueueDailyPersonalityReport(params: {
   db: FirebaseFirestore.Firestore; uid: string; sourceDateKey: string; now: Date;
 }): Promise<{status: string; dueDateKey?: string}> {
   const today = formatDateKey(params.now);
   if (normalizeDateKey(params.sourceDateKey) !== today) return {status: 'historical_skipped'};
-  const silver = (await params.db.collection('users').doc(params.uid).collection('daily_health_features').doc(today).get()).data() ?? {};
+  const silverDoc = await params.db.collection('users').doc(params.uid).collection('daily_health_features').doc(today).get();
+  const silver = silverDoc.data() ?? {};
   if (silver.dateKey !== today || silver.schemaVersion !== 5) return {status: 'silver_unavailable'};
-  return enqueueFeatures({...params, features: silver});
+  return enqueueFeatures({...params, features: silver, sourceSilver: silverDoc});
 }
 
 // Distance recorded for today is not consumed by the existing health pipeline
@@ -85,11 +89,22 @@ export async function enqueueDailyPersonalityRecord(params: {
   const tomorrow = addDaysToDateKey(today, 1);
   const source = await fetchHealthSourceData({db: params.db, uid: params.uid, dateKey: tomorrow});
   const features = buildDailyHealthFeatures({dateKey: tomorrow, source: {...source, weightRecords: source.weightRecords.filter(record => record.dayKey <= today)}, generatedAt: params.now}).features;
-  return enqueueFeatures({db: params.db, uid: params.uid, sourceDateKey: today, now: params.now, features});
+  return enqueueFeatures({db: params.db, uid: params.uid, sourceDateKey: today, now: params.now, features, numericOnly: true});
+}
+
+/** Silver was fingerprinted with Date values, then Firestore stores them as
+ * Timestamps. Restore only the typed Evidence timestamp before validating its
+ * existing hash; do not change the shared calculation or persist new Evidence. */
+function storedCheckinEvidence(value: Data): CheckinInsightEvidence {
+  return {...value, records: Array.isArray(value.records) ? value.records.map(record => ({...record,
+    sourceUpdatedAt: record.sourceUpdatedAt instanceof Date ? record.sourceUpdatedAt
+      : typeof record.sourceUpdatedAt?.toDate === 'function' ? record.sourceUpdatedAt.toDate() : record.sourceUpdatedAt,
+  })) : value.records} as CheckinInsightEvidence;
 }
 
 async function enqueueFeatures(params: {
   db: FirebaseFirestore.Firestore; uid: string; sourceDateKey: string; now: Date; features: Data;
+  sourceSilver?: FirebaseFirestore.DocumentSnapshot; numericOnly?: boolean;
 }): Promise<{status: string; dueDateKey?: string}> {
   const today = formatDateKey(params.now);
   const user = params.db.collection('users').doc(params.uid);
@@ -97,7 +112,11 @@ async function enqueueFeatures(params: {
   const pointerRef = user.collection('report_pointers').doc('personality_daily');
   const legacyPointerRef = user.collection('report_pointers').doc('personality');
   return params.db.runTransaction(async tx => {
-    const [dailyPointerDoc, legacyPointerDoc, queueDoc] = await Promise.all([tx.get(pointerRef), tx.get(legacyPointerRef), tx.get(queueRef)]);
+    const [dailyPointerDoc, legacyPointerDoc, queueDoc, currentSilver] = await Promise.all([tx.get(pointerRef), tx.get(legacyPointerRef), tx.get(queueRef),
+      params.sourceSilver ? tx.get(params.sourceSilver.ref) : Promise.resolve(null)]);
+    // A delayed trigger may not replace the candidate queued by newer Silver.
+    if (params.sourceSilver && (!currentSilver?.exists || !currentSilver.updateTime || !params.sourceSilver.updateTime ||
+      !currentSilver.updateTime.isEqual(params.sourceSilver.updateTime))) return {status: 'stale_source'};
     // The first daily report inherits v1's observation watermark; later daily
     // publications use their own pointer and never change the legacy entry.
     const pointerDoc = dailyPointerDoc.exists ? dailyPointerDoc : legacyPointerDoc;
@@ -107,15 +126,24 @@ async function enqueueFeatures(params: {
     const queue = queueDoc.data() ?? {};
     const current = featureFrontiers(silver);
     const known = mergeFrontiers(reportFrontiers(latest), queue.latestValidDates ?? {});
-    if (!advanced(current, known)) return {status: 'unchanged'};
+    const published = readCheckinPublicationState(pointer.checkinPublicationState);
+    const checkins = !params.numericOnly && silver.checkinInsightEvidence
+      ? buildCheckinInsights({evidence: storedCheckinEvidence(silver.checkinInsightEvidence), generatedAt: params.now}) : null;
+    const candidate = checkinPublicationCandidate(checkins);
+    const queuedSignature = queue.checkinPublicationCandidate?.semanticSignature ?? null;
+    const newObservation = hasNewCheckinPublication(candidate, published);
+    const observationChanged = !params.numericOnly && (newObservation ? candidate.semanticSignature !== queuedSignature : queuedSignature != null);
+    if (!advanced(current, known) && !observationChanged) return {status: 'unchanged'};
     const frontiers = mergeFrontiers(queue.latestValidDates ?? {}, current);
-    const due = dueDate(params.now, frontiers);
+    const due = dueDate(params.now, frontiers, newObservation ? candidate.windowEndDateKey : null);
     // A pending earlier morning is preserved; later data is retained by the
     // publisher and moved to the next cutoff after its first queued run.
     const queuedDay = typeof queue.dueDateKey === 'string' && queue.dueDateKey < due ? queue.dueDateKey : due;
     tx.set(queueRef, {schemaVersion: 1, uid: params.uid, dueDateKey: queuedDay,
       dueAt: admin.firestore.Timestamp.fromDate(jstReportMorning(queuedDay)),
       latestValidDates: frontiers, sourceDateKey: today,
+      ...(params.numericOnly ? (queue.checkinPublicationCandidate ? {checkinPublicationCandidate: queue.checkinPublicationCandidate} : {})
+        : {checkinPublicationCandidate: newObservation ? candidate : null}),
       queuedAt: admin.firestore.Timestamp.fromDate(params.now)});
     return {status: 'queued', dueDateKey: queuedDay};
   });
@@ -140,7 +168,7 @@ async function cutoffFeatures(params: {db: FirebaseFirestore.Firestore; uid: str
     silver = await silverRef.get();
   }
   const filtered = {...source, weightRecords: source.weightRecords.filter(record => record.dayKey <= cutoff)};
-  const features = buildDailyHealthFeatures({dateKey: params.day, source: filtered, generatedAt: params.now}).features;
+  const features = buildDailyHealthFeatures({dateKey: params.day, source: filtered, generatedAt: params.now, checkinWindowEndDateKey: cutoff}).features;
   // A missing D-1 target does not erase the newest valid observation. This
   // supplements Gold's latest point only; the builder's baseline is untouched.
   if (!features.activity.hasRecord || features.activity.distanceMeters == null || features.activity.distanceMeters < 0) {
@@ -157,6 +185,7 @@ async function cutoffFeatures(params: {db: FirebaseFirestore.Firestore; uid: str
   const inputs = {
     body: filtered.weightRecords.filter(record => record.dayKey >= first).map(record => [record.dayKey, record.weightGrams]),
     activity: filtered.distanceWindow.filter(record => record.dayKey <= cutoff && record.exists && Number.isFinite(record.distanceMeters) && record.distanceMeters! >= 0).map(record => [record.dayKey, record.distanceMeters]),
+    checkinEvidenceHash: features.checkinInsightEvidence?.evidenceHash ?? null,
   };
   const inputFingerprint = createHash('sha256').update(JSON.stringify(inputs)).digest('hex');
   return {features, silver: silver.data() ?? {}, silverStatus, cutoff, inputFingerprint};
@@ -190,8 +219,14 @@ export async function publishDailyPersonalityReport(params: {
     const frontiers = featureFrontiers(prepared.features);
     const baselines = Object.fromEntries(METRICS.map(metric => [metric, baselineSnapshot(prepared.features[metric].personalBaseline)])) as Record<Metric, Data>;
     const ready = METRICS.filter(metric => isReady(baselines[metric]));
+    const insightSnapshot = buildReportInsightSnapshot({features: prepared.features, generatedAt: params.now});
+    const candidate = checkinPublicationCandidate(insightSnapshot?.checkinInsights);
+    const publicationState = readCheckinPublicationState(pointer.checkinPublicationState);
+    const newObservation = hasNewCheckinPublication(candidate, publicationState);
     const queueAdvancedDuringRead = !!queueDoc.updateTime && !!initialQueue.updateTime && !queueDoc.updateTime.isEqual(initialQueue.updateTime);
-    const remaining = METRICS.some(metric => queue.latestValidDates?.[metric] &&
+    const remainingObservation = queue.checkinPublicationCandidate?.semanticSignature != null &&
+      (queueAdvancedDuringRead || queue.checkinPublicationCandidate.windowEndDateKey > prepared.cutoff);
+    const remaining = remainingObservation || METRICS.some(metric => queue.latestValidDates?.[metric] &&
       (queue.latestValidDates[metric] > prepared.cutoff || (queueAdvancedDuringRead && (!frontiers[metric] || queue.latestValidDates[metric] > frontiers[metric]!))));
     const acknowledge = () => {
       if (params.dryRun) return;
@@ -200,10 +235,23 @@ export async function publishDailyPersonalityReport(params: {
         tx.set(queueRef, {...queue, dueDateKey: due, dueAt: admin.firestore.Timestamp.fromDate(jstReportMorning(due))});
       } else tx.delete(queueRef);
     };
+    const initialObservationSignature = initialQueue.data()?.checkinPublicationCandidate?.semanticSignature ?? null;
+    const latestObservationSignature = queue.checkinPublicationCandidate?.semanticSignature ?? null;
+    if (queueAdvancedDuringRead && initialObservationSignature !== latestObservationSignature) {
+      // A corrected/deleted observation may have cancelled this work, or a new
+      // meaning may have replaced it. Do not publish the old prepared snapshot
+      // or acknowledge away the newer candidate. Numeric-only races keep their
+      // existing frontier behavior; observation races retry from fresh inputs.
+      if (!params.dryRun) {
+        const due = addDaysToDateKey(day, 1);
+        tx.set(queueRef, {...queue, dueDateKey: due, dueAt: admin.firestore.Timestamp.fromDate(jstReportMorning(due))});
+      }
+      return {status: 'deferred_newer_observation'};
+    }
     if (typeof pointer.evaluationDateKey === 'string' && pointer.evaluationDateKey > day) {acknowledge(); return {status: 'stale_evaluation'};}
     if (existingDoc.exists) {acknowledge(); return {status: 'existing', reportId, readyMetrics: existingDoc.data()?.readyMetrics ?? []};}
-    if (!ready.length) {acknowledge(); return {status: 'learning'};}
-    if (!advanced(frontiers, reportFrontiers(previous))) {acknowledge(); return {status: 'no_new_data'};}
+    if (!ready.length && !candidate.materialityKeys.length) {acknowledge(); return {status: 'learning'};}
+    if (!advanced(frontiers, reportFrontiers(previous)) && !newObservation) {acknowledge(); return {status: 'no_new_data'};}
     const profile = profileDoc.data() ?? {};
     const speciesRaw = typeof profile.species === 'string' ? profile.species : null;
     const species = normalizeReferenceSpecies(speciesRaw);
@@ -226,14 +274,15 @@ export async function publishDailyPersonalityReport(params: {
     if (ready.some(metric => baselines[metric].mad === 0)) limitations.push('MADが0でも、すべての記録が同じ値だったことを意味しません。');
     if (metrics.body) limitations.push(...metrics.body.populationComparison.limitations);
     const report = {
+      ...(insightSnapshot ? {insightSnapshot} : {}),
       schemaVersion: 1, analysisSpecVersion: PERSONALITY_SPEC_VERSION, reportId, reportKind: 'daily', petId: 'main_pet',
-      reportType: ready.length === 2 ? 'both' : ready[0] === 'body' ? 'weight_only' : 'activity_only',
+      reportType: ready.length === 2 ? 'both' : ready[0] === 'body' ? 'weight_only' : ready[0] === 'activity' ? 'activity_only' : 'observation_only',
       evaluationDateKey: day, cutoffDateKey: prepared.cutoff, silverDateKey: day, generatedAt, readyMetrics: ready,
-      latestValidDates: frontiers, inputFingerprint: prepared.inputFingerprint,
+      latestValidDates: mergeFrontiers(reportFrontiers(previous), frontiers), inputFingerprint: prepared.inputFingerprint,
       featureSnapshotSource: 'fresh_bronze_cutoff_rebuild',
       silverSchemaVersion: prepared.features.schemaVersion, silverGeneratedAt: prepared.silver.generatedAt ?? null, silverUpdatedAt: prepared.silver.updatedAt ?? null,
       petSnapshot: {species: speciesRaw, speciesCode: species, birthdayDateKey: birthday, ageMonths: monthsAt(birthday, day), ageAtBaselineStartMonths: monthsAt(birthday, baselines.body.firstDateKey)},
-      metrics, readinessSnapshot: baselines, limitations: [...new Set(limitations)], access: {mode: 'read_only', requiresSubscription: false},
+      metrics, readinessSnapshot: baselines, checkinPublication: candidate, limitations: [...new Set(limitations)], access: {mode: 'read_only', requiresSubscription: false},
     };
     if (params.dryRun) return {status: 'would_create', reportId, readyMetrics: ready};
     tx.create(reportRef, report);
@@ -247,7 +296,8 @@ export async function publishDailyPersonalityReport(params: {
     });
     tx.set(pointerRef, {reportId, reportKind: 'daily', petId: 'main_pet', readyMetrics: ready,
       publishedReadyMetrics: Array.from(new Set([...(pointer.publishedReadyMetrics ?? pointer.readyMetrics ?? []), ...ready])).filter(metric => METRICS.includes(metric)),
-      analysisSpecVersion: PERSONALITY_SPEC_VERSION, evaluationDateKey: day, silverDateKey: day, updatedAt: generatedAt});
+      analysisSpecVersion: PERSONALITY_SPEC_VERSION, evaluationDateKey: day, silverDateKey: day, updatedAt: generatedAt,
+      checkinPublicationState: mergeCheckinPublicationState(publicationState, candidate)});
     acknowledge();
     return {status: 'created', reportId, readyMetrics: ready};
   });

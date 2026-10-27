@@ -5,16 +5,19 @@ import '../models/personality_report.dart';
 import '../services/personality_report_view_service.dart';
 import '../services/personality_reports_repo.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/personality_report_view_model.dart';
 import '../widgets/status_card.dart';
 import 'personality_report_screen.dart';
-import 'personalized_report_screen.dart';
+import '../services/legacy_first_reports_repo.dart';
+import '../models/legacy_first_report.dart';
 
 /// Owner-read-only immutable snapshots. Only actual detail drawing marks a view.
 class PersonalityReportHistoryScreen extends StatefulWidget {
   const PersonalityReportHistoryScreen(
-      {super.key, this.repo, this.viewService});
+      {super.key, this.repo, this.viewService, this.legacySource});
   final PersonalityReportsHistorySource? repo;
   final PersonalityReportViewService? viewService;
+  final LegacyFirstReportSource? legacySource;
   @override
   State<PersonalityReportHistoryScreen> createState() =>
       _PersonalityReportHistoryScreenState();
@@ -25,6 +28,9 @@ class _PersonalityReportHistoryScreenState
   late PersonalityReportsHistorySource _repo;
   late PersonalityReportViewService _views;
   StreamSubscription<String?>? _ownerSubscription;
+  StreamSubscription<LegacyFirstReportState>? _legacySubscription;
+  LegacyFirstReportSource? _legacySource;
+  LegacyFirstReportState? _legacy;
   String? _owner;
   bool _bound = false;
   int _version = 0;
@@ -42,6 +48,14 @@ class _PersonalityReportHistoryScreenState
   void _bind() {
     _repo = widget.repo ?? PersonalityReportsRepo();
     _views = widget.viewService ?? PersonalityReportViewService.production();
+    _legacySource = widget.legacySource ??
+        (widget.repo == null ? LegacyFirstReportsRepo() : null);
+    _legacySubscription = _legacySource?.watchFirstReport().listen((state) {
+      if (!mounted) return;
+      setState(() => _legacy = state);
+    }, onError: (Object error, StackTrace stack) {
+      if (mounted) setState(() => _legacy = null);
+    });
     _ownerSubscription = _repo.watchOwnerUid().listen(_bindOwner,
         onError: (Object error, StackTrace stack) {
       if (!mounted) return;
@@ -76,7 +90,8 @@ class _PersonalityReportHistoryScreenState
   void didUpdateWidget(covariant PersonalityReportHistoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.repo != widget.repo ||
-        oldWidget.viewService != widget.viewService) {
+        oldWidget.viewService != widget.viewService ||
+        oldWidget.legacySource != widget.legacySource) {
       _version++;
       _bound = false;
       _owner = null;
@@ -85,6 +100,8 @@ class _PersonalityReportHistoryScreenState
       _loading = true;
       _error = false;
       unawaited(_ownerSubscription?.cancel());
+      unawaited(_legacySubscription?.cancel());
+      _legacy = null;
       _bind();
     }
   }
@@ -117,7 +134,10 @@ class _PersonalityReportHistoryScreenState
         return;
       }
       setState(() {
-        _entries = more ? [..._entries, ...page.entries] : page.entries;
+        final combined = more ? [..._entries, ...page.entries] : page.entries;
+        final seen = <String>{};
+        _entries =
+            combined.where((entry) => seen.add(entry.report.reportId)).toList();
         _cursor = page.nextCursor;
         _loading = false;
         _loadingMore = false;
@@ -167,16 +187,39 @@ class _PersonalityReportHistoryScreenState
     final owner = _owner;
     if (owner == null) return;
     await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => PersonalizedReportScreen(
+        builder: (_) => PersonalityReportScreen(
+            repo: _repo,
+            legacyFirst: true,
+            legacySource: _legacySource,
+            viewService: _views,
             expectedOwnerUid: owner,
-            onReportViewed: () => _views.recordLegacyView(ownerUid: owner))));
+            onLegacyReportViewed: () =>
+                _views.recordLegacyView(ownerUid: owner))));
   }
 
   @override
   void dispose() {
     _version++;
     unawaited(_ownerSubscription?.cancel());
+    unawaited(_legacySubscription?.cancel());
     super.dispose();
+  }
+
+  bool get _hasFirst {
+    final state = _legacy;
+    if (_owner == null ||
+        state?.ownerUid != _owner ||
+        state?.phase != LegacyFirstReportPhase.available ||
+        _legacySource?.currentUid != _owner ||
+        state?.report == null) {
+      return false;
+    }
+    try {
+      LegacyFirstReportSnapshot.fromMap(state!.report!);
+      return true;
+    } on FormatException {
+      return false;
+    }
   }
 
   @override
@@ -186,7 +229,7 @@ class _PersonalityReportHistoryScreenState
         Text('作成時点の記録を、そのまま振り返れます。',
             style: TextStyle(color: AppTheme.secondaryText(context))),
         const SizedBox(height: 14),
-        if (_owner != null)
+        if (_hasFirst)
           StatusCard(
               level: StatusCardLevel.neutral,
               radius: 24,
@@ -195,7 +238,7 @@ class _PersonalityReportHistoryScreenState
               child: ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.insights_rounded),
-                  title: const Text('初回コンディションレポート'),
+                  title: const Text('初回分析の記録'),
                   subtitle: const Text('最初に準備できた指標のスナップショット'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: _openFirst)),
@@ -207,12 +250,14 @@ class _PersonalityReportHistoryScreenState
                   child: CircularProgressIndicator()))
         else if (_entries.isEmpty && !_error)
           const Padding(
-              padding: EdgeInsets.all(20), child: Text('個性レポートはまだ届いていません。')),
+              padding: EdgeInsets.all(20), child: Text('レポートはまだ届いていません。')),
         for (final entry in _entries)
           Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: _HistoryTile(
-                  entry: entry, onOpen: () => _open(entry.report))),
+                  key: ValueKey('report-history-${entry.report.reportId}'),
+                  entry: entry,
+                  onOpen: () => _open(entry.report))),
         if (_error)
           Column(children: [
             const Text('レポート履歴を取得できませんでした。'),
@@ -232,7 +277,7 @@ class _PersonalityReportHistoryScreenState
 }
 
 class _HistoryTile extends StatelessWidget {
-  const _HistoryTile({required this.entry, required this.onOpen});
+  const _HistoryTile({super.key, required this.entry, required this.onOpen});
   final PersonalityHistoryEntry entry;
   final VoidCallback onOpen;
   @override
@@ -240,11 +285,7 @@ class _HistoryTile extends StatelessWidget {
     final report = entry.report;
     final date = DateFormat('yyyy年M月d日')
         .format(report.generatedAt.toUtc().add(const Duration(hours: 9)));
-    final metric = report.type == PersonalityReportType.both
-        ? '体重・活動量'
-        : report.body != null
-            ? '体重'
-            : '活動量';
+    final metric = PersonalityReportViewModel(report).metricLabel;
     final values = [
       if (report.body != null) '体重 ${report.body!.median.round()}g',
       if (report.activity != null) '活動量 ${report.activity!.median.round()}m/日'
@@ -257,7 +298,7 @@ class _HistoryTile extends StatelessWidget {
         child: ListTile(
             contentPadding: EdgeInsets.zero,
             onTap: onOpen,
-            title: Text(report.isDaily ? '日次の個性レポート' : '個性レポート'),
+            title: const Text('うちの子レポート'),
             subtitle: Text('$date\n対象: $metric\n$values'),
             isThreeLine: true,
             trailing: Text(entry.isViewed ? '閲覧済み' : '未読',

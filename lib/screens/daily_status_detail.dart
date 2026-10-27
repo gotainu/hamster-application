@@ -1,6 +1,13 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/current_weight_analysis.dart';
+import '../services/current_weight_analysis_repo.dart';
+import '../viewmodels/health_analysis_view_model.dart';
+import '../widgets/health_individual_analysis.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import '../models/activity_distribution.dart';
@@ -31,16 +38,29 @@ import '../widgets/health_score_trend_chart.dart';
 import '../widgets/app_habitat_background.dart';
 import '../theme/app_theme.dart';
 import '../widgets/hamster_feedback_popup.dart';
+import 'graph_function.dart';
+
+Widget _healthAnalysisBackground({
+  required Widget child,
+  Widget Function(Widget child)? backgroundBuilder,
+}) =>
+    (backgroundBuilder ?? (child) => AppHabitatBackground(child: child))(child);
 
 class DailyStatusDetailScreen extends StatefulWidget {
   const DailyStatusDetailScreen({
     super.key,
     this.incidentId,
     this.incidentDomain,
+    this.dataLoader,
+    this.weightAnalysisSource,
+    this.backgroundBuilder,
   });
 
   final String? incidentId;
   final String? incidentDomain;
+  final Future<DailyStatusDetailData> Function()? dataLoader;
+  final WeightAnalysisSource? weightAnalysisSource;
+  final Widget Function(Widget child)? backgroundBuilder;
 
   @override
   State<DailyStatusDetailScreen> createState() =>
@@ -48,18 +68,71 @@ class DailyStatusDetailScreen extends StatefulWidget {
 }
 
 class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
-  final _assessmentRepo = EnvironmentAssessmentRepo();
-  final _healthAssessmentRepo = HealthAssessmentRepo();
+  late final _assessmentRepo = EnvironmentAssessmentRepo();
+  late final _healthAssessmentRepo = HealthAssessmentRepo();
   final _anomalyDetectionService = const AnomalyDetectionService();
   final _activityTrendService = const ActivityTrendService();
-  final _distanceRepo = DistanceRecordsRepo();
+  late final _distanceRepo = DistanceRecordsRepo();
   final _environmentStatusService = const EnvironmentStatusService();
   final _dailyStatusSummaryService = const DailyStatusSummaryService();
-  final _weightRepo = WeightRecordsRepo();
+  late final _weightRepo = WeightRecordsRepo();
   final _weightTrendService = const WeightTrendEvaluationService();
 
-  Future<_DetailBundle> _loadBundle() async {
-    final healthAssessment = await _healthAssessmentRepo.fetchLatest();
+  late final Future<DailyStatusDetailData> _bundleFuture;
+  final _analysis = ValueNotifier<CurrentWeightAnalysis?>(null);
+  StreamSubscription<CurrentWeightAnalysis?>? _analysisSubscription;
+  var _analysisGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _bundleFuture = (widget.dataLoader ?? _loadBundle)();
+    _subscribeAnalysis();
+  }
+
+  void _subscribeAnalysis() {
+    final token = ++_analysisGeneration;
+    _analysis.value = null;
+    final source = widget.weightAnalysisSource ??
+        CurrentWeightAnalysisRepo(
+            includeIndividualAnalysisWithoutReference: true,
+            includeInsights: true);
+    _analysisSubscription = source.watchCurrent().listen((value) {
+      if (mounted && token == _analysisGeneration) _analysis.value = value;
+    }, onError: (Object error, StackTrace trace) {
+      if (mounted && token == _analysisGeneration) _analysis.value = null;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant DailyStatusDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weightAnalysisSource != widget.weightAnalysisSource) {
+      unawaited(_analysisSubscription?.cancel());
+      _subscribeAnalysis();
+    }
+  }
+
+  @override
+  void dispose() {
+    _analysisGeneration++;
+    unawaited(_analysisSubscription?.cancel());
+    _analysis.dispose();
+    super.dispose();
+  }
+
+  Future<DailyStatusDetailData> _loadBundle() async {
+    final ownerId = FirebaseAuth.instance.currentUser?.uid;
+    HealthAssessment? healthAssessment;
+    var healthAssessmentServerConfirmed = false;
+    try {
+      healthAssessment = await _healthAssessmentRepo.fetchLatestFromServer();
+      healthAssessmentServerConfirmed = true;
+    } catch (_) {
+      // Existing health evaluation remains available offline. Extra comparison
+      // is withheld unless both Gold and Silver were confirmed by the server.
+      healthAssessment = await _healthAssessmentRepo.fetchLatest();
+    }
     final healthHistory =
         await _healthAssessmentRepo.fetchRecentHistory(limit: 7);
     final latest = await _assessmentRepo.fetchLatest();
@@ -110,7 +183,10 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
     final weightRecords = await _weightRepo.fetchAll();
     final weightEvaluation = _weightTrendService.evaluate(weightRecords);
 
-    return _DetailBundle(
+    return DailyStatusDetailData(
+      ownerId: ownerId,
+      healthAssessmentServerConfirmed: healthAssessmentServerConfirmed &&
+          FirebaseAuth.instance.currentUser?.uid == ownerId,
       healthAssessment: healthAssessment,
       healthHistory: healthHistory,
       assessment: latest,
@@ -131,7 +207,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
       colors: [Colors.transparent, Colors.transparent],
     );
 
-    return AppHabitatBackground(
+    return _healthAnalysisBackground(
+      backgroundBuilder: widget.backgroundBuilder,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -145,8 +222,8 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
           decoration: BoxDecoration(gradient: gradient),
           child: SafeArea(
             top: false,
-            child: FutureBuilder<_DetailBundle>(
-              future: _loadBundle(),
+            child: FutureBuilder<DailyStatusDetailData>(
+              future: _bundleFuture,
               builder: (context, snap) {
                 if (!snap.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -191,6 +268,39 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                       )
                     else
                       _OverallSummaryCard(assessment: a!),
+                    if (hasHealth)
+                      ValueListenableBuilder<CurrentWeightAnalysis?>(
+                        valueListenable: _analysis,
+                        builder: (context, analysis, _) {
+                          final viewModel = HealthAnalysisViewModel(
+                            assessment: healthAssessment!,
+                            assessmentServerConfirmed:
+                                bundle.healthAssessmentServerConfirmed,
+                            ownerId: bundle.ownerId,
+                            analysis: analysis,
+                          );
+                          if (!viewModel.hasBodyAnalysis) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 14),
+                            child: HealthWeightAnalysisEntry(
+                              viewModel: viewModel,
+                              onTap: () =>
+                                  Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => HealthWeightDetailScreen(
+                                  assessment: healthAssessment,
+                                  analysisListenable: _analysis,
+                                  ownerId: bundle.ownerId,
+                                  assessmentServerConfirmed:
+                                      bundle.healthAssessmentServerConfirmed,
+                                  backgroundBuilder: widget.backgroundBuilder,
+                                ),
+                              )),
+                            ),
+                          );
+                        },
+                      ),
                     if (widget.incidentId != null) ...[
                       const SizedBox(height: 18),
                       _HealthIncidentActionCard(
@@ -205,8 +315,13 @@ class _DailyStatusDetailScreenState extends State<DailyStatusDetailScreen> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => _HealthAssessmentBreakdownScreen(
+                              builder: (_) => HealthAssessmentBreakdownScreen(
                                 assessment: healthAssessment,
+                                analysisListenable: _analysis,
+                                ownerId: bundle.ownerId,
+                                assessmentServerConfirmed:
+                                    bundle.healthAssessmentServerConfirmed,
+                                backgroundBuilder: widget.backgroundBuilder,
                               ),
                             ),
                           );
@@ -685,7 +800,9 @@ class _HealthIncidentActionCardState extends State<_HealthIncidentActionCard> {
   }
 }
 
-class _DetailBundle {
+class DailyStatusDetailData {
+  final String? ownerId;
+  final bool healthAssessmentServerConfirmed;
   final HealthAssessment? healthAssessment;
   final List<HealthAssessment> healthHistory;
   final EnvironmentAssessment? assessment;
@@ -698,7 +815,9 @@ class _DetailBundle {
   final List<WeightRecord> weightRecords;
   final WeightTrendEvaluation weightEvaluation;
 
-  _DetailBundle({
+  DailyStatusDetailData({
+    this.ownerId,
+    this.healthAssessmentServerConfirmed = false,
     required this.healthAssessment,
     required this.healthHistory,
     required this.assessment,
@@ -1625,34 +1744,47 @@ class _HealthDomainGaugeTile extends StatelessWidget {
   }
 }
 
-class _HealthAssessmentBreakdownScreen extends StatelessWidget {
+/// Health scores remain the persisted Gold evaluation. Additional analysis
+/// shares the summary's server-confirmed, current-day source and date context.
+class HealthAssessmentBreakdownScreen extends StatelessWidget {
   final HealthAssessment assessment;
+  final ValueListenable<CurrentWeightAnalysis?> analysisListenable;
+  final String? ownerId;
+  final bool assessmentServerConfirmed;
+  final Widget Function(Widget child)? backgroundBuilder;
 
-  const _HealthAssessmentBreakdownScreen({
+  const HealthAssessmentBreakdownScreen({
+    super.key,
     required this.assessment,
+    required this.analysisListenable,
+    required this.ownerId,
+    required this.assessmentServerConfirmed,
+    this.backgroundBuilder,
   });
 
   @override
   Widget build(BuildContext context) {
-    const gradient = LinearGradient(
-      colors: [Colors.transparent, Colors.transparent],
-    );
-
-    return AppHabitatBackground(
-      child: Scaffold(
+    final scaffold = Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('統合評価の内訳'),
         backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: const Text('統合評価の内訳'),
-          backgroundColor: Colors.transparent,
-          foregroundColor: AppTheme.overlayAppBarForeground(context),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-        ),
-        body: Container(
-          decoration: BoxDecoration(gradient: gradient),
-          child: SafeArea(
-            top: false,
-            child: ListView(
+        foregroundColor: AppTheme.overlayAppBarForeground(context),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<CurrentWeightAnalysis?>(
+          valueListenable: analysisListenable,
+          builder: (context, analysis, _) {
+            final viewModel = HealthAnalysisViewModel(
+              assessment: assessment,
+              assessmentServerConfirmed: assessmentServerConfirmed,
+              ownerId: ownerId,
+              analysis: analysis,
+            );
+            return ListView(
               padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
               children: [
                 _HealthDomainBreakdownCard(
@@ -1663,11 +1795,32 @@ class _HealthAssessmentBreakdownScreen extends StatelessWidget {
                 _HealthDomainBreakdownCard(
                   title: '体重',
                   domain: assessment.domains.body,
+                  footer: Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      key: const ValueKey('health-weight-detail-link'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppTheme.primaryText(context),
+                      ),
+                      onPressed: () =>
+                          Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => HealthWeightDetailScreen(
+                          assessment: assessment,
+                          analysisListenable: analysisListenable,
+                          ownerId: ownerId,
+                          assessmentServerConfirmed: assessmentServerConfirmed,
+                          backgroundBuilder: backgroundBuilder,
+                        ),
+                      )),
+                      child: const Text('体重の個体別分析を見る'),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 _HealthDomainBreakdownCard(
                   title: '活動量',
                   domain: assessment.domains.activity,
+                  footer: HealthActivityAnalysisStatus(viewModel: viewModel),
                 ),
                 const SizedBox(height: 14),
                 _HealthDomainBreakdownCard(
@@ -1675,21 +1828,98 @@ class _HealthAssessmentBreakdownScreen extends StatelessWidget {
                   domain: assessment.domains.condition,
                 ),
               ],
-            ),
+            );
+          },
+        ),
+      ),
+    );
+    return (backgroundBuilder ??
+        (child) => AppHabitatBackground(child: child))(scaffold);
+  }
+}
+
+class HealthWeightDetailScreen extends StatelessWidget {
+  final HealthAssessment assessment;
+  final ValueListenable<CurrentWeightAnalysis?> analysisListenable;
+  final String? ownerId;
+  final bool assessmentServerConfirmed;
+  final Widget Function(Widget child)? backgroundBuilder;
+  final WidgetBuilder? currentWeightAnalysisBuilder;
+
+  const HealthWeightDetailScreen({
+    super.key,
+    required this.assessment,
+    required this.analysisListenable,
+    required this.ownerId,
+    required this.assessmentServerConfirmed,
+    this.backgroundBuilder,
+    this.currentWeightAnalysisBuilder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scaffold = Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        title: const Text('体重の詳細'),
+        backgroundColor: Colors.transparent,
+        foregroundColor: AppTheme.overlayAppBarForeground(context),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        top: false,
+        child: ValueListenableBuilder<CurrentWeightAnalysis?>(
+          valueListenable: analysisListenable,
+          builder: (context, analysis, _) => ListView(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+            children: [
+              Text(
+                '評価日：${assessment.dateKey}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.secondaryText(context),
+                    ),
+              ),
+              const SizedBox(height: 14),
+              _HealthDomainBreakdownCard(
+                title: '体重の健康評価',
+                domain: assessment.domains.body,
+              ),
+              const SizedBox(height: 14),
+              HealthWeightIndividualAnalysis(
+                viewModel: HealthAnalysisViewModel(
+                  assessment: assessment,
+                  assessmentServerConfirmed: assessmentServerConfirmed,
+                  ownerId: ownerId,
+                  analysis: analysis,
+                ),
+                onOpenCurrentAnalysis: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: currentWeightAnalysisBuilder ??
+                        (_) => const GraphFunctionScreen(
+                            initialWeightAnalysis: true),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
+    return (backgroundBuilder ??
+        (child) => AppHabitatBackground(child: child))(scaffold);
   }
 }
 
 class _HealthDomainBreakdownCard extends StatelessWidget {
   final String title;
   final HealthDomainAssessment domain;
+  final Widget? footer;
 
   const _HealthDomainBreakdownCard({
     required this.title,
     required this.domain,
+    this.footer,
   });
 
   @override
@@ -1826,6 +2056,10 @@ class _HealthDomainBreakdownCard extends StatelessWidget {
                     ),
                   ),
                 ),
+          ],
+          if (footer != null) ...[
+            const SizedBox(height: 14),
+            footer!,
           ],
         ],
       ),

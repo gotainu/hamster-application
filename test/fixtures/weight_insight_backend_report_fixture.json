@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 1,
+  "analysisSpecVersion": "personality_v1",
+  "reportId": "daily_2026-10-11",
+  "reportKind": "daily",
+  "petId": "main_pet",
+  "reportType": "weight_only",
+  "evaluationDateKey": "2026-10-11",
+  "cutoffDateKey": "2026-10-10",
+  "silverDateKey": "2026-10-11",
+  "generatedAt": "2026-10-11T02:00:00.000Z",
+  "readyMetrics": [
+    "body"
+  ],
+  "silverSchemaVersion": 5,
+  "silverGeneratedAt": "2026-10-11T02:00:00.000Z",
+  "petSnapshot": {
+    "species": "シリアン",
+    "speciesCode": "syrian",
+    "birthdayDateKey": "2026-01-01",
+    "ageMonths": 9,
+    "ageAtBaselineStartMonths": 8
+  },
+  "metrics": {
+    "body": {
+      "unit": "g",
+      "baseline": {
+        "status": "ready",
+        "method": "median_mad_ewma_v1",
+        "median": 100,
+        "mad": 0,
+        "ewma": 100.28811999999999,
+        "ewmaAlpha": 0.3,
+        "recordCount": 8,
+        "requiredRecordCount": 7,
+        "spanDays": 14,
+        "requiredSpanDays": 14,
+        "firstDateKey": "2026-09-22",
+        "lastDateKey": "2026-10-05",
+        "deviationPct": 3,
+        "robustZScore": null
+      },
+      "latestValue": 103,
+      "latestDateKey": "2026-10-10",
+      "difference": {
+        "absolute": 3,
+        "percent": 3
+      },
+      "interpretations": [
+        {
+          "code": "individual_weight",
+          "text": "この子の普段の体重は、観察記録では約100gです。"
+        },
+        {
+          "code": "latest_above_baseline",
+          "text": "最近の記録は、普段の基準より3g多い値でした。"
+        },
+        {
+          "code": "observation_window",
+          "text": "2026-09-22から2026-10-05まで、14日間に記録した8日分をもとにしています。"
+        }
+      ],
+      "populationComparison": {
+        "applicability": "not_applicable",
+        "reason": "reference_unavailable",
+        "species": "syrian",
+        "ageBand": "adult_over_3_months",
+        "cohort": null,
+        "position": null,
+        "expressionJa": "適用できる種別・成人期の比較データがないため公開研究との比較を適用しません。",
+        "limitations": [
+          "2016年の英国の一次診療施設を受診したハムスターの記録であり、健康な個体だけの標準体重や日本の全個体を代表するものではありません。",
+          "論文は各個体の3か月超の体重記録の平均を集計しています。比較する個体のベースライン中央値とは測定のまとめ方が異なります。",
+          "表の種別総個体数は成人体重を解析した標本数ではありません。成人体重の種別解析数は公開表からは確認できません。",
+          "中央値と四分位点だけでは正確なパーセンタイルは計算できず、中央50%の範囲を健康・異常の判定に使うことはできません。"
+        ]
+      }
+    }
+  },
+  "readinessSnapshot": {
+    "body": {
+      "status": "ready",
+      "method": "median_mad_ewma_v1",
+      "median": 100,
+      "mad": 0,
+      "ewma": 100.28811999999999,
+      "ewmaAlpha": 0.3,
+      "recordCount": 8,
+      "requiredRecordCount": 7,
+      "spanDays": 14,
+      "requiredSpanDays": 14,
+      "firstDateKey": "2026-09-22",
+      "lastDateKey": "2026-10-05",
+      "deviationPct": 3,
+      "robustZScore": null
+    }
+  },
+  "limitations": [],
+  "access": {
+    "mode": "read_only",
+    "requiresSubscription": false
+  },
+  "insightSnapshot": {
+    "schemaVersion": 1,
+    "kind": "report_snapshot",
+    "calculationSpecVersion": "weight_insights_v1",
+    "evaluationDateKey": "2026-10-11",
+    "generatedAt": "2026-10-11T02:00:00.000Z",
+    "source": {
+      "silverDateKey": "2026-10-11",
+      "silverSchemaVersion": 5,
+      "silverGeneratedAt": "2026-10-11T02:00:00.000Z",
+      "evidenceHash": "241bfab61234ee2858072c70502793e1396a16267932545f9243a82023a406c9"
+    },
+    "contentHash": "fab0d7d394e6d4f616c52ef97e7d5652674f23b1b4540fe6c194fa6dea2fb458",
+    "insights": [
+      {
+        "id": "weight_period_difference",
+        "kind": "weight_period_difference",
+        "metric": "body",
+        "evaluationDateKey": "2026-10-11",
+        "observationStartDateKey": "2026-09-22",
+        "observationEndDateKey": "2026-10-10",
+        "records": [
+          {
+            "dateKey": "2026-09-22",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-09-29",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-09-30",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-01",
+            "value": 104
+          },
+          {
+            "dateKey": "2026-10-02",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-03",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-04",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-05",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-10",
+            "value": 103
+          }
+        ],
+        "validRecordCount": 9,
+        "unit": "g",
+        "dataQuality": {
+          "baselineStatus": "ready",
+          "latestDateKey": "2026-10-10",
+          "daysSinceMeasurement": 1,
+          "missingDaysNotImputed": true
+        },
+        "eligible": true,
+        "calculationSpecVersion": "weight_insights_v1",
+        "sourceGeneratedAt": "2026-10-11T02:00:00.000Z",
+        "evidence": {
+          "startWeightGrams": 100,
+          "endWeightGrams": 103,
+          "differenceGrams": 3,
+          "absoluteDifferenceGrams": 3,
+          "startDateKey": "2026-09-22",
+          "endDateKey": "2026-10-10",
+          "windowDays": 30
+        },
+        "interpretationCode": "weight_increased",
+        "priority": 10,
+        "limitations": [
+          "期間内の最初と最後の実測値の差です。継続的な増減や健康状態は判断できません。"
+        ]
+      },
+      {
+        "id": "weight_observed_range",
+        "kind": "weight_observed_range",
+        "metric": "body",
+        "evaluationDateKey": "2026-10-11",
+        "observationStartDateKey": "2026-09-22",
+        "observationEndDateKey": "2026-10-05",
+        "records": [
+          {
+            "dateKey": "2026-09-22",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-09-29",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-09-30",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-01",
+            "value": 104
+          },
+          {
+            "dateKey": "2026-10-02",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-03",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-04",
+            "value": 100
+          },
+          {
+            "dateKey": "2026-10-05",
+            "value": 100
+          }
+        ],
+        "validRecordCount": 8,
+        "unit": "g",
+        "dataQuality": {
+          "baselineStatus": "ready",
+          "latestDateKey": "2026-10-10",
+          "daysSinceMeasurement": 1,
+          "missingDaysNotImputed": true
+        },
+        "eligible": true,
+        "calculationSpecVersion": "weight_insights_v1",
+        "sourceGeneratedAt": "2026-10-11T02:00:00.000Z",
+        "evidence": {
+          "minimumGrams": 100,
+          "maximumGrams": 104,
+          "allEqual": false
+        },
+        "interpretationCode": "weight_observed_range",
+        "priority": 20,
+        "limitations": [
+          "採用した実測記録の範囲です。健康上の正常範囲ではありません。"
+        ]
+      }
+    ]
+  }
+}

@@ -7,7 +7,6 @@ import 'package:hamster_project/models/environment_assessment.dart';
 import 'package:hamster_project/models/environment_assessment_history.dart';
 import 'package:hamster_project/models/anomaly_detection.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
-import 'package:hamster_project/models/daily_star_progress.dart';
 import 'package:hamster_project/models/health_assessment.dart';
 import 'package:hamster_project/models/pet_profile.dart';
 import 'package:hamster_project/services/anomaly_detection_service.dart';
@@ -18,11 +17,9 @@ import 'package:hamster_project/services/health_assessment_repo.dart';
 import 'package:hamster_project/services/pet_profile_repo.dart';
 import 'package:hamster_project/screens/switchbot_setup.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
-import 'package:hamster_project/screens/personality_report_screen.dart';
-import 'package:hamster_project/services/personality_report_view_service.dart';
+import 'package:hamster_project/services/child_report_navigation.dart';
 import 'package:hamster_project/models/personality_report.dart';
 import 'package:hamster_project/widgets/personality_report_entry.dart';
-import 'package:hamster_project/screens/daily_stars.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/semantic_trend_chart.dart';
 import 'package:hamster_project/widgets/status_card.dart';
@@ -132,28 +129,14 @@ class HomeScreenState extends State<HomeScreen> {
 
   Future<void> _openPersonalityReport(PersonalityReport selectedReport) async {
     if (!mounted) return;
-    final ownerUid = FirebaseAuth.instance.currentUser?.uid;
-    final presentationId =
-        'personality_${DateTime.now().microsecondsSinceEpoch}';
-    final views = PersonalityReportViewService.production();
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => PersonalityReportScreen(
-          reportId: selectedReport.reportId,
-          expectedOwnerUid: ownerUid,
-          onReportViewed: (report) async {
-            if (ownerUid == null) return;
-            await views.recordView(
-              ownerUid: ownerUid,
-              reportId: report.reportId,
-              petId: report.petId,
-              schemaVersion: report.schemaVersion,
-              presentationId: presentationId,
-            );
-          },
-        ),
-      ),
-    );
+    await openChildReport(context,
+        reportId: selectedReport.reportId,
+        expectedOwnerUid: FirebaseAuth.instance.currentUser?.uid);
+  }
+
+  Future<void> _openLatestReport() async {
+    if (!mounted) return;
+    await openChildReport(context);
   }
 
   @override
@@ -273,36 +256,6 @@ class HomeScreenState extends State<HomeScreen> {
                                 );
                               },
                             ),
-                          const SizedBox(height: 20),
-                          ValueListenableBuilder<DailyRecordCompletion?>(
-                            valueListenable: widget.recordCompletionListenable,
-                            builder: (context, completion, _) {
-                              if (completion == null) {
-                                return const SizedBox.shrink();
-                              }
-                              return Column(
-                                children: [
-                                  const _HomeContentTitle(title: '今日の記録'),
-                                  const SizedBox(height: 8),
-                                  DailyStarsStrip(
-                                    progress: DailyStarProgress.fromCompletion(
-                                      completion,
-                                    ),
-                                    prominent: true,
-                                    onTap: () => Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => DailyStarsScreen(
-                                          completionListenable:
-                                              widget.recordCompletionListenable,
-                                          onRecord: widget.onOpenQuickRecord,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          ),
                           if (!isLoading && anomalyDetection.hasAnomaly) ...[
                             const SizedBox(height: 14),
                             Container(
@@ -333,6 +286,7 @@ class HomeScreenState extends State<HomeScreen> {
                               onOpen: _openPersonalityReport),
                           const SizedBox(height: 14),
                           AnalysisProgressCard(
+                            onViewAnalysis: _openLatestReport,
                             onOpenRecord: () =>
                                 widget.onOpenQuickRecord?.call(),
                             onOpenSwitchbot: _openSwitchbot,

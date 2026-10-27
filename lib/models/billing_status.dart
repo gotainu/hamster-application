@@ -43,9 +43,14 @@ class BillingStatus {
             status == BillingStatusValue.trialing);
   }
 
+  /// Managing an existing subscription does not grant feature access.
+  bool get canManageSubscription => isPaid || needsPaymentAttention;
+
   bool get canUsePaidFeatures {
-    return isPaid && !isExpired;
+    return canUsePaidFeaturesAt(DateTime.now());
   }
+
+  bool canUsePaidFeaturesAt(DateTime now) => isPaid && !isExpiredAt(now);
 
   bool get isCancellationScheduled {
     return canUsePaidFeatures && cancelAtPeriodEnd;
@@ -65,9 +70,14 @@ class BillingStatus {
   }
 
   bool get isExpired {
+    return isExpiredAt(DateTime.now());
+  }
+
+  bool isExpiredAt(DateTime now) {
     final end = currentPeriodEnd;
     if (end == null) return false;
-    return DateTime.now().isAfter(end);
+    // Match the server/Rules contract: access is valid only before the end.
+    return !now.isBefore(end);
   }
 
   String get planLabel {
@@ -80,6 +90,7 @@ class BillingStatus {
   }
 
   String get statusLabel {
+    if (isPaid && isExpired) return '利用期間終了';
     switch (status) {
       case BillingStatusValue.active:
         return '有効';

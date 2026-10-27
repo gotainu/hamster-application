@@ -54,6 +54,30 @@ class HealthAssessmentRepo {
     );
   }
 
+  /// Additional individual-analysis UI must align with a confirmed health
+  /// evaluation. This opt-in read never substitutes a cached assessment.
+  Future<HealthAssessment?> fetchLatestFromServer() async {
+    final ownerId = _uid;
+    final document = _latestDocument();
+    if (document == null) return null;
+
+    final snapshot =
+        await document.get(const GetOptions(source: Source.server));
+    final data = snapshot.data();
+    if (_uid != ownerId ||
+        !snapshot.exists ||
+        data == null ||
+        snapshot.metadata.isFromCache ||
+        snapshot.metadata.hasPendingWrites) {
+      return null;
+    }
+
+    return HealthAssessment.fromMap(
+      data,
+      fallbackDateKey: latestDocumentId,
+    );
+  }
+
   Stream<HealthAssessment?> watchLatest() {
     final document = _latestDocument();
     if (document == null) {

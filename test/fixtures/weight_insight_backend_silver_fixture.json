@@ -1,0 +1,200 @@
+{
+  "weightInsightEvidence": {
+    "schemaVersion": 1,
+    "calculationSpecVersion": "weight_insights_v1",
+    "evaluationDateKey": "2026-10-11",
+    "periodWindowDays": 30,
+    "baselineObservations": [
+      {
+        "dateKey": "2026-09-22",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-09-29",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-09-30",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-01",
+        "value": 104
+      },
+      {
+        "dateKey": "2026-10-02",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-03",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-04",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-05",
+        "value": 100
+      }
+    ],
+    "periodObservations": [
+      {
+        "dateKey": "2026-09-22",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-09-29",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-09-30",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-01",
+        "value": 104
+      },
+      {
+        "dateKey": "2026-10-02",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-03",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-04",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-05",
+        "value": 100
+      },
+      {
+        "dateKey": "2026-10-10",
+        "value": 103
+      }
+    ]
+  },
+  "dateKey": "2026-10-11",
+  "environment": {
+    "sourceKind": "none",
+    "sourceDateKey": null,
+    "status": null,
+    "level": null,
+    "headline": null,
+    "todayAction": null,
+    "why": null,
+    "avgTemp": null,
+    "avgHum": null,
+    "tempRatio": null,
+    "humRatio": null,
+    "dangerMinutes": null,
+    "spikesTemp": null,
+    "spikesHum": null,
+    "sourceDocCount": null,
+    "assessmentVersion": null,
+    "sourceEvaluatedAt": null,
+    "windowDays": 7,
+    "windowRecordCount": 0,
+    "highTemperatureDays": 0,
+    "lowTemperatureDays": 0,
+    "highHumidityDays": 0,
+    "lowHumidityDays": 0,
+    "latestDailyTemp": null,
+    "latestDailyHum": null,
+    "temperatureTrend": "unknown",
+    "humidityTrend": "unknown"
+  },
+  "activity": {
+    "assessmentDateKey": "2026-10-11",
+    "sourceDateKey": "2026-10-10",
+    "lagDays": 1,
+    "windowStartDateKey": "2026-10-10",
+    "windowEndDateKey": "2026-10-10",
+    "hasRecord": false,
+    "distanceMeters": null,
+    "rotations": null,
+    "wheelDiameterCm": null,
+    "avg7DistanceMeters": null,
+    "deltaPct": null,
+    "personalBaseline": {
+      "status": "learning",
+      "method": "median_mad_ewma_v1",
+      "recordCount": 0,
+      "requiredRecordCount": 7,
+      "spanDays": 0,
+      "requiredSpanDays": 14,
+      "firstDateKey": null,
+      "lastDateKey": null,
+      "median": null,
+      "mad": null,
+      "ewma": null,
+      "ewmaAlpha": 0.3,
+      "deviationPct": null,
+      "robustZScore": null
+    },
+    "windowDays": 90,
+    "windowRecordCount": 0,
+    "recordDate": null
+  },
+  "body": {
+    "latestWeightGrams": 103,
+    "latestWeightDate": "2026-10-10T00:00:00.000Z",
+    "daysSinceMeasurement": 1,
+    "previousWeightGrams": 100,
+    "previousDifferenceGrams": 3,
+    "previousChangeRate": 0.03,
+    "windowDays": 30,
+    "windowChangeRate": 0.03,
+    "personalBaseline": {
+      "status": "ready",
+      "method": "median_mad_ewma_v1",
+      "recordCount": 8,
+      "requiredRecordCount": 7,
+      "spanDays": 14,
+      "requiredSpanDays": 14,
+      "firstDateKey": "2026-09-22",
+      "lastDateKey": "2026-10-05",
+      "median": 100,
+      "mad": 0,
+      "ewma": 100.28811999999999,
+      "ewmaAlpha": 0.3,
+      "deviationPct": 3,
+      "robustZScore": null
+    },
+    "windowRecordCount": 9,
+    "totalRecordCount": 9
+  },
+  "condition": {
+    "recorded": false,
+    "condition": null,
+    "concernTags": [],
+    "observationLevels": {},
+    "memo": "",
+    "recordDate": null
+  },
+  "nutrition": {
+    "recorded": false,
+    "foodOfferedGrams": null,
+    "foodRemainingGrams": null,
+    "foodConsumedGrams": null,
+    "memo": "",
+    "recordDate": null
+  },
+  "dataQuality": {
+    "availableDomains": [
+      "body"
+    ],
+    "missingDomains": [
+      "environment",
+      "activity",
+      "condition"
+    ],
+    "staleDomains": [],
+    "completeness": 0.25
+  },
+  "schemaVersion": 5,
+  "generatedAt": "2026-10-11T02:00:00.000Z"
+}

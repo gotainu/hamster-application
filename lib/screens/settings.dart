@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
 import '../services/app_analytics.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/ai_text_consent_store.dart';
 import '../services/billing_status_repo.dart';
 import '../services/notification_settings_service.dart';
 import '../widgets/hamster_feedback_popup.dart';
@@ -35,9 +36,12 @@ class _SettingScreenState extends State<SettingScreen> {
   final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
   final BillingStatusRepo _billingStatusRepo = BillingStatusRepo();
 
+  final AiTextConsentStore _aiTextConsentStore = AiTextConsentStore();
+
   PackageInfo? _packageInfo;
 
   bool _isOpeningContact = false;
+  bool _isRevokingAiTextConsent = false;
   bool _isDeletingAiChatHistory = false;
   bool _isDeletingAccount = false;
   bool _isSigningOut = false;
@@ -215,6 +219,14 @@ class _SettingScreenState extends State<SettingScreen> {
         'Account deleted. deletedDocuments=${result['deletedDocuments']}',
       );
 
+      try {
+        await _aiTextConsentStore.revoke(uid);
+      } catch (_) {
+        // Account deletion has already succeeded. Do not report that server
+        // operation as failed or skip sign-out for a device storage failure.
+        debugPrint('[AiTextConsent] Local removal failed after account deletion');
+      }
+
       await FirebaseAuth.instance.signOut();
 
       if (!mounted) return;
@@ -229,6 +241,67 @@ class _SettingScreenState extends State<SettingScreen> {
         setState(() {
           _isDeletingAccount = false;
         });
+      }
+    }
+  }
+
+  Future<void> _revokeAiTextConsent() async {
+    if (_isRevokingAiTextConsent) return;
+    final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    if (ownerUid == null) {
+      HamsterFeedbackPopup.show(context, message: 'ログイン情報を確認してください。');
+      return;
+    }
+    setState(() => _isRevokingAiTextConsent = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('AI相談の情報送信への同意を取り消しますか？'),
+          content: const Text(
+            '次回AI相談を送信する前に、情報送信への同意を再確認します。相談履歴や飼育記録は削除されません。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('同意を取り消す'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      if (FirebaseAuth.instance.currentUser?.uid != ownerUid) {
+        HamsterFeedbackPopup.show(context, message: 'アカウントが変わりました。設定を開き直してください。');
+        return;
+      }
+      await _aiTextConsentStore.revoke(ownerUid);
+      if (!mounted || FirebaseAuth.instance.currentUser?.uid != ownerUid) return;
+      HamsterFeedbackPopup.show(context, message: 'AI相談の情報送信への同意を取り消しました。');
+    } catch (_) {
+      if (mounted && FirebaseAuth.instance.currentUser?.uid == ownerUid) {
+        HamsterFeedbackPopup.show(context, message: '同意を取り消せませんでした。もう一度お試しください。');
+      }
+    } finally {
+      if (mounted) setState(() => _isRevokingAiTextConsent = false);
+    }
+  }
+
+  Future<void> _openPublishedPrivacyPolicy() async {
+    try {
+      final opened = await launchUrl(
+        Uri.parse('https://hamster-breeding-app.web.app/privacy/'),
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        HamsterFeedbackPopup.show(context, message: '公開中のプライバシーポリシーを開けませんでした。');
+      }
+    } catch (_) {
+      if (mounted) {
+        HamsterFeedbackPopup.show(context, message: '公開中のプライバシーポリシーを開けませんでした。');
       }
     }
   }
@@ -514,6 +587,7 @@ class _SettingScreenState extends State<SettingScreen> {
     required String title,
     required IconData icon,
     required List<_PolicySectionData> sections,
+    VoidCallback? onOpenPublishedPolicy,
   }) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -521,6 +595,7 @@ class _SettingScreenState extends State<SettingScreen> {
           title: title,
           icon: icon,
           sections: sections,
+          onOpenPublishedPolicy: onOpenPublishedPolicy,
         ),
       ),
     );
@@ -1016,6 +1091,19 @@ class _SettingScreenState extends State<SettingScreen> {
                       : const Icon(Icons.chevron_right),
                 ),
                 _settingsTile(
+                  icon: Icons.verified_user_outlined,
+                  title: 'AI相談の情報送信への同意を取り消す',
+                  subtitle: '次回送信前に同意を再確認します',
+                  onTap: _isRevokingAiTextConsent ? null : _revokeAiTextConsent,
+                  trailing: _isRevokingAiTextConsent
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.chevron_right),
+                ),
+                _settingsTile(
                   icon: Icons.privacy_tip_rounded,
                   title: 'プライバシーポリシー',
                   subtitle: '保存するデータ、利用目的、削除について',
@@ -1024,6 +1112,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       title: 'プライバシーポリシー',
                       icon: Icons.privacy_tip_rounded,
                       sections: _privacyPolicySections,
+                      onOpenPublishedPolicy: _openPublishedPrivacyPolicy,
                     );
                   },
                 ),
@@ -1127,11 +1216,13 @@ class _PolicyInfoScreen extends StatelessWidget {
     required this.title,
     required this.icon,
     required this.sections,
+    this.onOpenPublishedPolicy,
   });
 
   final String title;
   final IconData icon;
   final List<_PolicySectionData> sections;
+  final VoidCallback? onOpenPublishedPolicy;
 
   @override
   Widget build(BuildContext context) {
@@ -1194,6 +1285,12 @@ class _PolicyInfoScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (onOpenPublishedPolicy != null)
+                  TextButton.icon(
+                    onPressed: onOpenPublishedPolicy,
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('公開中のプライバシーポリシーを見る'),
+                  ),
                 ...sections.map(
                   (section) => _PolicySectionCard(section: section),
                 ),

@@ -7,20 +7,16 @@ import '../models/hamster_avatar.dart';
 import '../models/health_assessment.dart';
 import '../models/daily_record_completion.dart';
 import '../models/pet_profile.dart';
-import '../models/star_rewards_progress.dart';
 import '../services/hamster_avatar_appearance_resolver.dart';
 import '../services/hamster_avatar_asset_resolver.dart';
 import '../services/hamster_avatar_condition_resolver.dart';
 import '../services/health_assessment_repo.dart';
 import '../services/pet_profile_repo.dart';
-import '../services/star_rewards_repo.dart';
 import '../theme/app_theme.dart';
 import 'hamster_avatar_view.dart';
-import 'collectible_glyph.dart';
 import 'shine_border.dart';
 
 class MainDrawer extends StatelessWidget {
-  static final StarRewardsRepo _starRewardsRepo = StarRewardsRepo();
   const MainDrawer({
     super.key,
     required this.onSelectScreen,
@@ -129,40 +125,21 @@ class MainDrawer extends StatelessWidget {
                                 );
                               },
                             ),
-                            StreamBuilder<StarRewardsProgress?>(
-                              stream: _starRewardsRepo.watchProgress(),
-                              builder: (context, snapshot) {
-                                final progress = snapshot.data;
-                                final collectible = CollectibleCopy.of(context);
-                                if (progress == null) {
-                                  return const SizedBox.shrink();
-                                }
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: _DrawerGroup(
-                                    children: [
-                                      _DrawerItem(
-                                        icon: Icons.star_rounded,
-                                        customIcon: const CollectibleGlyph(
-                                          filled: true,
-                                          size: 23,
-                                        ),
-                                        title: collectible.collectionTitle,
-                                        subtitle:
-                                            '合計${progress.total}${collectible.countUnit}',
-                                        onTap: () => onSelectScreen('stars'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
+                            const SizedBox(height: 12),
+                            _DrawerGroup(children: [
+                              _DrawerItem(
+                                icon: Icons.calendar_today_outlined,
+                                title: '記録カレンダー',
+                                subtitle: '達成した日とこれまでの実績を見る',
+                                onTap: () => onSelectScreen('record_calendar'),
+                              ),
+                            ]),
                             const SizedBox(height: 12),
                             _DrawerGroup(children: [
                               _DrawerItem(
                                 icon: Icons.auto_stories_outlined,
-                                title: 'レポート履歴',
-                                subtitle: '個性と初回コンディションを振り返る',
+                                title: 'うちの子レポート',
+                                subtitle: '最新の分析とこれまでの記録を見る',
                                 onTap: () => onSelectScreen('report_history'),
                               ),
                             ]),
@@ -595,14 +572,12 @@ class _DrawerItem extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.customIcon,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final Widget? customIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -633,12 +608,11 @@ class _DrawerItem extends StatelessWidget {
                       ),
                     ),
                     child: Center(
-                      child: customIcon ??
-                          Icon(
-                            icon,
-                            color: AppTheme.drawerIconForeground(context),
-                            size: 23,
-                          ),
+                      child: Icon(
+                        icon,
+                        color: AppTheme.drawerIconForeground(context),
+                        size: 23,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),

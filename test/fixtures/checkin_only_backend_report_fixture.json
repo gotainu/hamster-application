@@ -1,0 +1,148 @@
+{
+  "insightSnapshot": {
+    "schemaVersion": 1,
+    "kind": "report_snapshot",
+    "calculationSpecVersion": "weight_insights_v1",
+    "evaluationDateKey": "2026-10-08",
+    "generatedAt": "2026-10-08T00:00:00.000Z",
+    "source": {
+      "silverDateKey": "2026-10-08",
+      "silverSchemaVersion": 5,
+      "silverGeneratedAt": "2026-10-08T00:00:00.000Z",
+      "evidenceHash": "6595d4db2b15883c55bb069a171136236736fcd88906725faff9369a90dc84c0"
+    },
+    "contentHash": "b0af78b966e4cacbef4b932d671affbbd66b5664da6bceeb44ff58d6c94d1eb1",
+    "insights": [],
+    "checkinInsights": {
+      "schemaVersion": 1,
+      "calculationSpecVersion": "checkin_insights_v1",
+      "catalogVersion": "observation_catalog_v1",
+      "evaluationDateKey": "2026-10-08",
+      "windowStartDateKey": "2026-09-24",
+      "windowEndDateKey": "2026-10-07",
+      "sourceGeneratedAt": "2026-10-08T00:00:00.000Z",
+      "evidenceHash": "443e54df847d13ad0141dcdc89de3991f746329a91fa9bd49ee48bc967997302",
+      "insights": [
+        {
+          "id": "checkin_item_repetition_appetite",
+          "kind": "checkin_item_repetition",
+          "metric": "condition",
+          "evaluationDateKey": "2026-10-08",
+          "observationStartDateKey": "2026-09-24",
+          "observationEndDateKey": "2026-10-07",
+          "validRecordCount": 7,
+          "unit": "days",
+          "evidence": {
+            "windowDays": 14,
+            "validRecordDayCount": 7,
+            "selectionVerifiedDayCount": 7,
+            "concernDayCount": 3,
+            "matchingDayCount": 3,
+            "missingDayCount": 7,
+            "invalidDayCount": 0,
+            "itemAnsweredDayCount": null,
+            "itemId": "appetite",
+            "itemLabel": "食欲"
+          },
+          "dataQuality": {
+            "missingDaysNotImputed": true,
+            "normalDefaultsAreNotAnswers": true
+          },
+          "interpretationCode": "checkin_item_repeated",
+          "eligible": true,
+          "priority": 40,
+          "discovery": true,
+          "semanticFingerprint": "ffe858393d1cf14cb9a38e2549257c992e4b33e12c13ffcdce23eef53066b096",
+          "sourceGeneratedAt": "2026-10-08T00:00:00.000Z",
+          "limitations": [
+            "記録された様子の頻度です。実際の発生頻度や健康状態・病気・原因は判断できません。",
+            "未回答・欠測を変化なしとして補っていません。"
+          ]
+        }
+      ]
+    }
+  },
+  "schemaVersion": 1,
+  "analysisSpecVersion": "personality_v1",
+  "reportId": "daily_2026-10-08",
+  "reportKind": "daily",
+  "petId": "main_pet",
+  "reportType": "observation_only",
+  "evaluationDateKey": "2026-10-08",
+  "cutoffDateKey": "2026-10-07",
+  "silverDateKey": "2026-10-08",
+  "generatedAt": "2026-10-08T00:00:00.000Z",
+  "readyMetrics": [],
+  "latestValidDates": {
+    "body": "2026-09-29"
+  },
+  "inputFingerprint": "4689de87cf89030ff8541916d795b809fd231448eff00035f9caae54509f4748",
+  "featureSnapshotSource": "fresh_bronze_cutoff_rebuild",
+  "silverSchemaVersion": 5,
+  "silverGeneratedAt": "2026-10-08T00:00:00.000Z",
+  "silverUpdatedAt": "2026-10-11T07:33:05.215Z",
+  "petSnapshot": {
+    "species": "シリアン",
+    "speciesCode": "syrian",
+    "birthdayDateKey": "2026-01-01",
+    "ageMonths": 9,
+    "ageAtBaselineStartMonths": null
+  },
+  "metrics": {},
+  "readinessSnapshot": {
+    "body": {
+      "status": "learning",
+      "method": "median_mad_ewma_v1",
+      "median": null,
+      "mad": null,
+      "ewma": null,
+      "ewmaAlpha": 0.3,
+      "recordCount": 0,
+      "requiredRecordCount": 7,
+      "spanDays": 0,
+      "requiredSpanDays": 14,
+      "firstDateKey": null,
+      "lastDateKey": null,
+      "deviationPct": null,
+      "robustZScore": null
+    },
+    "activity": {
+      "status": "learning",
+      "method": "median_mad_ewma_v1",
+      "median": null,
+      "mad": null,
+      "ewma": null,
+      "ewmaAlpha": 0.3,
+      "recordCount": 0,
+      "requiredRecordCount": 7,
+      "spanDays": 0,
+      "requiredSpanDays": 14,
+      "firstDateKey": null,
+      "lastDateKey": null,
+      "deviationPct": null,
+      "robustZScore": null
+    }
+  },
+  "checkinPublication": {
+    "schemaVersion": 1,
+    "publicationSpecVersion": "checkin_publication_v1",
+    "evaluationDateKey": "2026-10-08",
+    "windowEndDateKey": "2026-10-07",
+    "materialityKeys": [
+      "2045bb7f391668db6c48268f49a13714f54ec775ed34ea5015b3a884f6994116"
+    ],
+    "coveredMaterialityKeys": [
+      "eb7548928314824318dcb20641761ce1036f92669d4ff00f16935045c2074802"
+    ],
+    "semanticSignature": "3723d40a0184eb972d95043ee5056b0a5d6ac4c643b5c533ad6806980695ec39"
+  },
+  "limitations": [
+    "観察記録に基づく特徴の説明です。肥満・健康・病気の診断ではありません。",
+    "日別の活動記録から、夜型や深夜に活発かどうかは判断できません。",
+    "平滑化した値だけで、長期的な増減は断定できません。"
+  ],
+  "access": {
+    "mode": "read_only",
+    "requiresSubscription": false
+  }
+}

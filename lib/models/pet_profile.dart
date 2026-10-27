@@ -7,6 +7,10 @@ class PetProfile {
   final String species;
   final String? color;
   final String? imageUrl;
+  final String? subjectId;
+  final int revision;
+  final String birthdayPrecision;
+  final int profileHistoryRevision;
 
   const PetProfile({
     required this.name,
@@ -14,7 +18,12 @@ class PetProfile {
     required this.species,
     required this.color,
     required this.imageUrl,
-  });
+    this.subjectId,
+    this.revision = 0,
+    String? birthdayPrecision,
+    this.profileHistoryRevision = 0,
+  }) : birthdayPrecision = birthdayPrecision ??
+            (birthday == null ? 'unknown' : 'legacy_unspecified');
 
   static PetProfile fromMap(Map<String, dynamic> m) {
     final b = m['birthday'];
@@ -25,9 +34,15 @@ class PetProfile {
     return PetProfile(
       name: (m['name'] ?? '') as String,
       birthday: birthday,
-      species: (m['species'] ?? 'シリアン') as String,
+      species: (m['species'] ?? '') as String,
       color: m['color'] as String?,
       imageUrl: m['imageUrl'] as String?,
+      subjectId: m['subjectId'] as String?,
+      revision: m['revision'] is int ? m['revision'] as int : 0,
+      birthdayPrecision: m['birthdayPrecision'] as String?,
+      profileHistoryRevision: m['profileHistoryRevision'] is int
+          ? m['profileHistoryRevision'] as int
+          : 0,
     );
   }
 
@@ -41,6 +56,7 @@ class PetProfile {
   Map<String, dynamic> toMapForSave() => {
         'name': name.trim(),
         'birthday': birthday != null ? Timestamp.fromDate(birthday!) : null,
+        'birthdayPrecision': birthdayPrecision,
         'species': species,
         'color': color,
         'imageUrl': imageUrl,

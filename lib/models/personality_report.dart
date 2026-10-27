@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'weight_insight.dart';
+import 'checkin_insight.dart';
+
 /// The original immutable milestone IDs and date-keyed daily reports coexist.
 bool isPersonalityReportId(String id) {
   if (RegExp(r'^personality_v1_(body|activity|body_activity)$').hasMatch(id)) {
@@ -17,7 +20,7 @@ bool isPersonalityReportId(String id) {
       date.day == day;
 }
 
-enum PersonalityReportType { weightOnly, activityOnly, both }
+enum PersonalityReportType { weightOnly, activityOnly, both, observationOnly }
 
 enum PersonalityReportPhase { loading, learning, available, unavailable }
 
@@ -75,6 +78,8 @@ class PersonalityReport {
   final PersonalityMetricSnapshot? body;
   final PersonalityMetricSnapshot? activity;
   final List<String> limitations;
+  final ReportInsightSnapshot? insightSnapshot;
+  final CheckinReportInsightSnapshot? checkinInsightSnapshot;
   bool get isDaily => reportId.startsWith('daily_');
   const PersonalityReport._({
     required this.reportId,
@@ -89,6 +94,8 @@ class PersonalityReport {
     required this.body,
     required this.activity,
     required this.limitations,
+    this.insightSnapshot,
+    this.checkinInsightSnapshot,
   });
 
   factory PersonalityReport.fromMap(Map<String, dynamic> data,
@@ -97,18 +104,27 @@ class PersonalityReport {
       'weight_only' => PersonalityReportType.weightOnly,
       'activity_only' => PersonalityReportType.activityOnly,
       'both' => PersonalityReportType.both,
+      'observation_only' => PersonalityReportType.observationOnly,
       _ => throw const FormatException('Unsupported personality report type'),
     };
     final id = _text(data['reportId']);
     final ready = _strings(data['readyMetrics']);
-    final expected = type == PersonalityReportType.both
-        ? ['body', 'activity']
-        : [type == PersonalityReportType.weightOnly ? 'body' : 'activity'];
+    final observationOnly = type == PersonalityReportType.observationOnly;
+    final expected = switch (type) {
+      PersonalityReportType.both => ['body', 'activity'],
+      PersonalityReportType.weightOnly => ['body'],
+      PersonalityReportType.activityOnly => ['activity'],
+      PersonalityReportType.observationOnly => <String>[],
+    };
     if (data['schemaVersion'] != 1 ||
         data['analysisSpecVersion'] != 'personality_v1' ||
         data['petId'] != 'main_pet' ||
         id == null ||
         !isPersonalityReportId(id) ||
+        (observationOnly &&
+            (!id.startsWith('daily_') ||
+                data['readyMetrics'] is! List ||
+                (data['readyMetrics'] as List).isNotEmpty)) ||
         (!id.startsWith('daily_') &&
             id != 'personality_v1_${expected.join('_')}') ||
         (expectedReportId != null && expectedReportId != id) ||
@@ -148,6 +164,38 @@ class PersonalityReport {
       return PersonalityMetricSnapshot.fromMap(value, metric: name);
     }
 
+    ReportInsightSnapshot? snapshot;
+    CheckinReportInsightSnapshot? checkinSnapshot;
+    // Legacy and malformed optional evidence never replace or invalidate the
+    // immutable report. Only its own committed daily snapshot may be displayed.
+    if (id.startsWith('daily_') &&
+        data['insightSnapshot'] is Map &&
+        cutoff != null) {
+      try {
+        snapshot = ReportInsightSnapshot.fromMap(_map(data['insightSnapshot']),
+            evaluationDateKey: evaluation,
+            generatedAt: generatedAt,
+            cutoffDateKey: cutoff);
+      } on FormatException {
+        snapshot = null;
+      }
+      try {
+        checkinSnapshot = CheckinReportInsightSnapshot.fromMap(
+            _map(data['insightSnapshot']),
+            evaluationDateKey: evaluation,
+            generatedAt: generatedAt,
+            cutoffDateKey: cutoff);
+      } on FormatException {
+        checkinSnapshot = null;
+      }
+    }
+    // An observation-only daily must contain its own published, valid frozen
+    // evidence. An absent optional snapshot still leaves older metric reports
+    // readable, but cannot manufacture a new observation report.
+    if (observationOnly &&
+        (checkinSnapshot == null || checkinSnapshot.insights.isEmpty)) {
+      throw const FormatException('Missing published observation snapshot');
+    }
     return PersonalityReport._(
       reportId: id,
       petId: 'main_pet',
@@ -161,6 +209,8 @@ class PersonalityReport {
       body: expected.contains('body') ? metric('body') : null,
       activity: expected.contains('activity') ? metric('activity') : null,
       limitations: List.unmodifiable(_strings(data['limitations'])),
+      insightSnapshot: snapshot,
+      checkinInsightSnapshot: checkinSnapshot,
     );
   }
 }

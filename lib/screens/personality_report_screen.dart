@@ -7,10 +7,18 @@ import '../models/personality_report.dart';
 import '../services/personality_reports_repo.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/personality_report_view_model.dart';
+import '../viewmodels/weight_insights_view_model.dart';
+import '../viewmodels/weight_research_comparison_view_model.dart';
 import '../widgets/metric_pair_comparison_bars.dart';
 import '../widgets/metric_value_comparison.dart';
 import '../widgets/status_card.dart';
+import '../widgets/insights_card.dart';
 import '../widgets/metric_comparison_bar.dart';
+import '../services/legacy_first_reports_repo.dart';
+import '../services/personality_report_view_service.dart';
+import '../widgets/legacy_first_report_body.dart';
+import 'personality_report_history_screen.dart';
+import '../widgets/report_continuation_link.dart';
 
 /// A free read-only presentation of an immutable generated snapshot.
 class PersonalityReportScreen extends StatefulWidget {
@@ -19,13 +27,25 @@ class PersonalityReportScreen extends StatefulWidget {
       this.repo,
       this.reportId,
       this.expectedOwnerUid,
-      this.onReportViewed});
+      this.onReportViewed,
+      this.legacySource,
+      this.legacyFirst = false,
+      this.onLegacyReportViewed,
+      this.logLegacyView,
+      this.legacyAutoPresented = false,
+      this.viewService});
   final PersonalityReportsSource? repo;
   final String? reportId;
 
   /// When supplied, this route never displays another account's same-ID report.
   final String? expectedOwnerUid;
   final FutureOr<void> Function(PersonalityReport report)? onReportViewed;
+  final LegacyFirstReportSource? legacySource;
+  final bool legacyFirst;
+  final bool legacyAutoPresented;
+  final FutureOr<void> Function()? onLegacyReportViewed;
+  final Future<void> Function(String ownerUid, int revision)? logLegacyView;
+  final PersonalityReportViewService? viewService;
   @override
   State<PersonalityReportScreen> createState() =>
       _PersonalityReportScreenState();
@@ -34,6 +54,8 @@ class PersonalityReportScreen extends StatefulWidget {
 class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
   late PersonalityReportsSource _repo;
   late Stream<PersonalityReportState> _stream;
+  LegacyFirstReportSource? _legacy;
+  PersonalityReportViewService? _defaultViews;
   int _readVersion = 0;
   PersonalityReportState? _currentState;
   final _viewed = <String>{};
@@ -44,13 +66,26 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
   }
 
   void _bind() {
-    _repo = widget.repo ?? PersonalityReportsRepo();
-    _stream = _readStream();
+    _repo = widget.repo ??
+        (widget.legacyFirst
+            ? const _LegacyOnlyReportSource()
+            : PersonalityReportsRepo());
+    _legacy = widget.legacySource ??
+        (widget.repo == null ? LegacyFirstReportsRepo() : null);
+    _defaultViews = widget.viewService ??
+        (widget.repo == null && widget.legacySource == null
+            ? PersonalityReportViewService.production()
+            : null);
+    _stream = widget.legacyFirst ? const Stream.empty() : _readStream();
   }
 
   Stream<PersonalityReportState> _readStream() {
     final id = widget.reportId;
-    if (id == null) return _repo.watchLatest();
+    if (id == null) {
+      return _repo is PersonalityNewestReportsSource
+          ? (_repo as PersonalityNewestReportsSource).watchNewest()
+          : _repo.watchLatest();
+    }
     final source = _repo;
     return source is PersonalitySpecificReportSource
         ? source.watchReport(id)
@@ -62,6 +97,8 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.repo != widget.repo ||
         oldWidget.reportId != widget.reportId ||
+        oldWidget.legacySource != widget.legacySource ||
+        oldWidget.legacyFirst != widget.legacyFirst ||
         oldWidget.expectedOwnerUid != widget.expectedOwnerUid) {
       _readVersion++;
       _currentState = null;
@@ -92,7 +129,17 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
       }
       _viewed.add(key);
       try {
-        await widget.onReportViewed?.call(report);
+        if (widget.onReportViewed != null) {
+          await widget.onReportViewed!.call(report);
+        } else if (state.ownerUid != null) {
+          await _defaultViews?.recordView(
+              ownerUid: state.ownerUid!,
+              reportId: report.reportId,
+              petId: report.petId,
+              schemaVersion: report.schemaVersion,
+              presentationId:
+                  'child_report_${DateTime.now().microsecondsSinceEpoch}');
+        }
       } catch (_) {
         // Optional A3/Analytics persistence must never prevent reading a report.
       }
@@ -105,31 +152,75 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
     // this route becomes current and actually renders again.
     final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? true;
     return Scaffold(
-      appBar: AppBar(title: const Text('うちの子の個性レポート')),
-      body: StreamBuilder<PersonalityReportState>(
-        key: ValueKey(_readVersion),
-        stream: _stream,
-        builder: (context, snapshot) {
-          final incoming = snapshot.hasError
-              ? const PersonalityReportState.unavailable(null)
-              : snapshot.data ?? const PersonalityReportState.loading(null);
-          final initialLoading =
-              incoming.phase == PersonalityReportPhase.loading &&
-                  incoming.ownerUid == null;
-          final state = _isExpectedOwner(incoming) || initialLoading
-              ? incoming
-              : PersonalityReportState.unavailable(widget.expectedOwnerUid);
-          _currentState = state;
-          if (state.phase == PersonalityReportPhase.available &&
-              state.report != null) {
-            if (isCurrentRoute) _reportRendered(state);
-            return _ReportContent(report: state.report!);
-          }
-          return _StateContent(phase: state.phase, onRetry: _retry);
-        },
-      ),
+      appBar: AppBar(title: const Text('うちの子レポート'), actions: [
+        if (!widget.legacyFirst && _repo is PersonalityReportsHistorySource)
+          IconButton(
+              tooltip: 'レポート履歴',
+              icon: const Icon(Icons.history_rounded),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => PersonalityReportHistoryScreen(
+                      repo: _repo as PersonalityReportsHistorySource,
+                      viewService: widget.viewService,
+                      legacySource: _legacy)))),
+      ]),
+      body: widget.legacyFirst
+          ? _legacyBody()
+          : StreamBuilder<PersonalityReportState>(
+              key: ValueKey(_readVersion),
+              stream: _stream,
+              builder: (context, snapshot) {
+                final incoming = snapshot.hasError
+                    ? const PersonalityReportState.unavailable(null)
+                    : snapshot.data ??
+                        const PersonalityReportState.loading(null);
+                final initialLoading =
+                    incoming.phase == PersonalityReportPhase.loading &&
+                        incoming.ownerUid == null;
+                final state = _isExpectedOwner(incoming) || initialLoading
+                    ? incoming
+                    : PersonalityReportState.unavailable(
+                        widget.expectedOwnerUid);
+                _currentState = state;
+                if (state.phase == PersonalityReportPhase.available &&
+                    state.report != null) {
+                  if (isCurrentRoute) _reportRendered(state);
+                  return _ReportContent(report: state.report!);
+                }
+                if (state.phase == PersonalityReportPhase.learning &&
+                    _legacy != null &&
+                    widget.reportId == null) {
+                  return _legacyBody(ownerUid: state.ownerUid, fallback: true);
+                }
+                return _StateContent(phase: state.phase, onRetry: _retry);
+              },
+            ),
     );
   }
+
+  Widget _legacyBody({String? ownerUid, bool fallback = false}) =>
+      LegacyFirstReportBody(
+          source: _legacy,
+          expectedOwnerUid: widget.expectedOwnerUid ?? ownerUid,
+          autoPresented: widget.legacyAutoPresented,
+          onReportViewed: widget.onLegacyReportViewed ??
+              () {
+                final uid = _legacy?.currentUid;
+                return uid == null
+                    ? Future<void>.value()
+                    : _defaultViews?.recordLegacyView(ownerUid: uid) ??
+                        Future<void>.value();
+              },
+          logView: widget.logLegacyView,
+          missingBuilder: fallback
+              ? (_) => _StateContent(
+                  phase: PersonalityReportPhase.learning, onRetry: _retry)
+              : null);
+}
+
+class _LegacyOnlyReportSource implements PersonalityReportsSource {
+  const _LegacyOnlyReportSource();
+  @override
+  Stream<PersonalityReportState> watchLatest() => const Stream.empty();
 }
 
 class _StateContent extends StatelessWidget {
@@ -152,10 +243,10 @@ class _StateContent extends StatelessWidget {
         const SizedBox(height: 24),
         Text(
             loading
-                ? '個性レポートを確認しています'
+                ? 'レポートを確認しています'
                 : learning
                     ? 'うちの子らしさを集めています'
-                    : '個性レポートを確認できませんでした',
+                    : 'レポートを確認できませんでした',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
@@ -203,6 +294,9 @@ class _ReportContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vm = PersonalityReportViewModel(report);
+    final insights =
+        WeightInsightsViewModel.fromSnapshot(report.insightSnapshot);
+    final checkins = vm.checkinInsights;
     return DecoratedBox(
       decoration: AppTheme.dataPageDecoration(context),
       child: SafeArea(
@@ -213,7 +307,7 @@ class _ReportContent extends StatelessWidget {
             Text('作成 ${vm.generatedAtLabel}',
                 style: AppTheme.dataCaptionStyle(context)),
             const SizedBox(height: AppTheme.dataSmallGap),
-            Text(vm.overviewSummary,
+            Text(insights.primaryText ?? vm.overviewSummary,
                 key: const ValueKey('personality-overview'),
                 style: AppTheme.dataDiscoveryStyle(context)),
             const SizedBox(height: AppTheme.dataSectionGap),
@@ -221,15 +315,33 @@ class _ReportContent extends StatelessWidget {
             if (vm.body != null && vm.activity != null)
               const SizedBox(height: AppTheme.dataSectionGap),
             if (vm.activity != null) _MetricCard(metric: vm.activity!),
+            if (checkins.items.isNotEmpty) ...[
+              const SizedBox(height: AppTheme.dataSectionGap),
+              InsightsCard(
+                title: '今日の様子の記録から',
+                contentKey: const ValueKey('checkin-insights-card'),
+                items: checkins.items,
+                evaluationDateKey: report.evaluationDateKey,
+                maxItems: 1,
+                evaluationCaption: '生成時点の観察記録',
+              ),
+            ],
             if (vm.body == null || vm.activity == null) ...[
               const SizedBox(height: AppTheme.dataSectionGap),
-              Text(vm.body == null ? '体重はこれから' : '活動量はこれから',
+              Text(
+                  vm.body == null && vm.activity == null
+                      ? '体重・活動量はこれから'
+                      : vm.body == null
+                          ? '体重はこれから'
+                          : '活動量はこれから',
                   style: AppTheme.dataBodyStyle(context)),
               Text('生成時点では準備中のため、このレポートには含まれていません。',
                   style: AppTheme.dataCaptionStyle(context)),
             ],
             const SizedBox(height: AppTheme.dataSectionGap),
             _Details(vm: vm),
+            const SizedBox(height: AppTheme.dataContentGap),
+            const ReportContinuationLink(),
           ],
         ),
       ),
@@ -284,13 +396,15 @@ class _MetricCard extends StatelessWidget {
             MetricComparisonBar(
                 value: snapshot.median,
                 referenceValue: snapshot.population!.median,
-                valueLabel: 'この子',
-                referenceLabel: '参考中央値',
+                valueLabel:
+                    WeightResearchComparisonViewModel.compactIndividualLabel,
+                referenceLabel:
+                    WeightResearchComparisonViewModel.compactReferenceLabel,
                 unit: 'g',
                 semanticUnit: 'グラム',
                 referenceStart: snapshot.population!.p25,
                 referenceEnd: snapshot.population!.p75,
-                rangeLabel: '中央50%',
+                rangeLabel: WeightResearchComparisonViewModel.compactRangeLabel,
                 showAxisLabels: false,
                 compact: true),
           ],

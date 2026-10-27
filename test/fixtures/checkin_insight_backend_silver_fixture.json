@@ -1,0 +1,417 @@
+{
+  "dateKey": "2026-10-11",
+  "schemaVersion": 5,
+  "generatedAt": "2026-10-11T02:00:00.000Z",
+  "body": {
+    "latestWeightGrams": null,
+    "latestWeightDate": null,
+    "daysSinceMeasurement": null,
+    "previousWeightGrams": null,
+    "previousDifferenceGrams": null,
+    "previousChangeRate": null,
+    "windowDays": 30,
+    "windowChangeRate": null,
+    "personalBaseline": {
+      "status": "learning",
+      "method": "median_mad_ewma_v1",
+      "recordCount": 0,
+      "requiredRecordCount": 7,
+      "spanDays": 0,
+      "requiredSpanDays": 14,
+      "firstDateKey": null,
+      "lastDateKey": null,
+      "median": null,
+      "mad": null,
+      "ewma": null,
+      "ewmaAlpha": 0.3,
+      "deviationPct": null,
+      "robustZScore": null
+    },
+    "windowRecordCount": 0,
+    "totalRecordCount": 0
+  },
+  "weightInsightEvidence": {
+    "schemaVersion": 1,
+    "calculationSpecVersion": "weight_insights_v1",
+    "evaluationDateKey": "2026-10-11",
+    "periodWindowDays": 30,
+    "baselineObservations": [],
+    "periodObservations": []
+  },
+  "checkinInsightEvidence": {
+    "schemaVersion": 1,
+    "calculationSpecVersion": "checkin_insights_v1",
+    "catalogVersion": "observation_catalog_v1",
+    "evaluationDateKey": "2026-10-11",
+    "windowStartDateKey": "2026-09-28",
+    "windowEndDateKey": "2026-10-11",
+    "windowDays": 14,
+    "records": [
+      {
+        "dateKey": "2026-10-04",
+        "sourceDocumentId": "2026-10-04",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "slightlyConcerned",
+        "selectedItemIds": [
+          "appetite"
+        ],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "changed",
+            "origin": "selected_tag"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-05",
+        "sourceDocumentId": "2026-10-05",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "slightlyConcerned",
+        "selectedItemIds": [
+          "appetite"
+        ],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "changed",
+            "origin": "selected_tag"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-06",
+        "sourceDocumentId": "2026-10-06",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "slightlyConcerned",
+        "selectedItemIds": [
+          "appetite"
+        ],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "changed",
+            "origin": "selected_tag"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-07",
+        "sourceDocumentId": "2026-10-07",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "normal",
+        "selectedItemIds": [],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-08",
+        "sourceDocumentId": "2026-10-08",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "normal",
+        "selectedItemIds": [],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-09",
+        "sourceDocumentId": "2026-10-09",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "normal",
+        "selectedItemIds": [],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      },
+      {
+        "dateKey": "2026-10-10",
+        "sourceDocumentId": "2026-10-10",
+        "sourceUpdatedAt": null,
+        "schemaVersion": 2,
+        "catalogVersion": "observation_catalog_v1",
+        "legacy": false,
+        "condition": "normal",
+        "selectedItemIds": [],
+        "selectionVerified": true,
+        "invalidObservationData": false,
+        "items": {
+          "appetite": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "water": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "elimination": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "breathing": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "movement": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "eyesNose": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "coatSkin": {
+            "level": "normal",
+            "origin": "automatic_normal"
+          },
+          "other": {
+            "level": null,
+            "origin": "unanswered"
+          },
+          "chewing": {
+            "level": null,
+            "origin": "unanswered"
+          }
+        }
+      }
+    ],
+    "validRecordDayCount": 7,
+    "selectionVerifiedDayCount": 7,
+    "itemAnsweredDayCount": null,
+    "concernDayCount": 3,
+    "missingDayCount": 7,
+    "invalidDayCount": 0,
+    "duplicateRecordCount": 0,
+    "invalidObservationRecordDayCount": 0,
+    "evidenceHash": "2f8f897baed1028a662d3c6849abba4a6fdc0ed1454f02c992ad52c9707cdfec"
+  }
+}

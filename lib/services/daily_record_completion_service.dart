@@ -3,6 +3,7 @@ import 'dart:async';
 import '../models/daily_record_completion.dart';
 import '../models/weight_record.dart';
 import 'daily_checkin_repo.dart';
+import 'daily_care_actions_repo.dart';
 import 'distance_records_repo.dart';
 import 'weight_records_repo.dart';
 
@@ -10,16 +11,19 @@ class DailyRecordCompletionService {
   final DailyCheckinRepo _checkinRepo;
   final DistanceRecordsRepo _distanceRepo;
   final WeightRecordsRepo _weightRepo;
+  final DailyCareActionsRepo _careRepo;
   final int weightReminderDays;
 
   DailyRecordCompletionService({
     DailyCheckinRepo? checkinRepo,
     DistanceRecordsRepo? distanceRepo,
     WeightRecordsRepo? weightRepo,
+    DailyCareActionsRepo? careRepo,
     this.weightReminderDays = 7,
   })  : _checkinRepo = checkinRepo ?? DailyCheckinRepo(),
         _distanceRepo = distanceRepo ?? DistanceRecordsRepo(),
-        _weightRepo = weightRepo ?? WeightRecordsRepo();
+        _weightRepo = weightRepo ?? WeightRecordsRepo(),
+        _careRepo = careRepo ?? DailyCareActionsRepo();
 
   Stream<DailyRecordCompletion> watch({
     DateTime? referenceDate,
@@ -34,10 +38,12 @@ class DailyRecordCompletionService {
     var weightLoaded = false;
 
     var conditionCompleted = false;
+    var careCompleted = false;
     var wheelCompleted = false;
     WeightRecord? latestWeight;
 
     StreamSubscription<dynamic>? conditionSubscription;
+    StreamSubscription<dynamic>? careSubscription;
     StreamSubscription<dynamic>? wheelSubscription;
     StreamSubscription<dynamic>? weightSubscription;
 
@@ -46,7 +52,7 @@ class DailyRecordCompletionService {
 
       controller.add(
         DailyRecordCompletion(
-          conditionCompleted: conditionCompleted,
+          conditionCompleted: conditionCompleted || careCompleted,
           wheelCompleted: wheelCompleted,
           latestWeight: latestWeight,
           weightReminderDays: weightReminderDays,
@@ -64,6 +70,15 @@ class DailyRecordCompletionService {
           emit();
         }, onError: controller.addError);
 
+        careSubscription = _careRepo
+            .watchByDay(_checkinRepo.dateKeyLocal(reference))
+            .listen((record) {
+          careCompleted = record?.hasExplicitAnswer == true;
+          emit();
+        }, onError: (Object _, StackTrace __) {
+          careCompleted = false;
+          emit();
+        });
         wheelSubscription =
             _distanceRepo.watchDailyRecord(wheelRecordDate).listen((record) {
           wheelLoaded = true;
@@ -79,6 +94,7 @@ class DailyRecordCompletionService {
       },
       onCancel: () async {
         await conditionSubscription?.cancel();
+        await careSubscription?.cancel();
         await wheelSubscription?.cancel();
         await weightSubscription?.cancel();
       },

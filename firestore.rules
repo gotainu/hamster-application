@@ -67,15 +67,43 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // Client-owned
+      // Permanent subject identity and the current main-pet profile are
+      // committed together by the authenticated profile callable.
       match /pet_profiles/{docId} {
         allow read: if isOwner(uid);
-        allow create, update, delete: if isOwner(uid) && docId == 'main_pet';
+        allow write: if false;
+        match /mutations/{mutationId} {
+          allow read: if isOwner(uid) && docId == 'main_pet';
+          allow write: if false;
+        }
+      }
+
+      match /pet_subjects/{subjectId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /profile_history/{historyId} {
+          allow read: if isOwner(uid) && historyId == 'main_profile';
+          allow write: if false;
+          match /revisions/{revisionId} {
+            allow read: if isOwner(uid) && historyId == 'main_profile';
+            allow write: if false;
+          }
+        }
       }
 
       match /breeding_environments/{docId} {
         allow read: if isOwner(uid);
-        allow create, update, delete: if isOwner(uid) && docId == 'main_env';
+        // Current values, append-only revisions and mutation receipts commit
+        // together through the authenticated environment callable.
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid) && docId == 'main_env';
+          allow write: if false;
+        }
+        match /mutations/{mutationId} {
+          allow read: if isOwner(uid) && docId == 'main_env';
+          allow write: if false;
+        }
       }
 
       match /owner_profiles/{docId} {
@@ -83,19 +111,96 @@ service cloud.firestore {
         allow create, update, delete: if isOwner(uid) && docId == 'main';
       }
 
+      // Current measurement and accepted history commit together via callable.
       match /weight_records/{docId} {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && canCreateRecord(uid);
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /weight_record_history/{recordId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+      match /weight_record_days/{dayKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+      match /weight_record_mutations/{mutationId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
 
       match /daily_checkins/{docId} {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && canCreateRecord(uid);
+        allow read: if isOwner(uid);
+        // A direct write would bypass the accepted observation history.
+        allow write: if false;
       }
 
+      // Observation-day metadata, original events, accepted revisions and
+      // receipts are server-owned. Current daily display remains separate.
+      match /observation_days/{dayKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /events/{eventId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+        match /mutations/{mutationId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+
+      // Care mutations and their append-only history are accepted atomically
+      // by the authenticated callable; direct clients may only read their own.
+      match /daily_care_actions/{dayKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+        match /mutations/{mutationId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+
+      // Current measurement and accepted history commit together via callable.
       match /distance_records/{docId} {
-        allow read, delete: if isOwner(uid);
-        allow create, update: if isOwner(uid) && canCreateRecord(uid);
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+      match /distance_record_history/{recordId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+      match /distance_record_days/{dayKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+        match /revisions/{revisionId} {
+          allow read: if isOwner(uid);
+          allow write: if false;
+        }
+      }
+      match /distance_record_mutations/{mutationId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
       }
 
       match /settings/notifications {
@@ -155,6 +260,19 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      // Acquisition evidence and Silver quality are internal server data.
+      // Owners continue reading existing readings; these paths add no client
+      // access, including descendants used for immutable outcomes/revisions.
+      match /sensor_acquisition_attempts/{document=**} {
+        allow read, write: if false;
+      }
+      match /sensor_polling_state/{document=**} {
+        allow read, write: if false;
+      }
+      match /sensor_quality_snapshots/{document=**} {
+        allow read, write: if false;
+      }
+
       match /billing/subscription {
         allow read: if isOwner(uid);
         allow write: if false;
@@ -172,6 +290,12 @@ service cloud.firestore {
         match /ai_usage/{usageId} { allow read, write: if false; }
       }
 
+
+      // Current-day Insights are server-generated; clients only fetch their own.
+      match /individual_insights/{dateKey} {
+        allow get: if isOwner(uid);
+        allow list, create, update, delete: if false;
+      }
 
       match /analysis_readiness/{metric} {
         allow read: if isOwner(uid);
@@ -234,6 +358,44 @@ service cloud.firestore {
       }
 
       match /rewards/stars {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Current-period savings are a server-owned view of existing awards,
+      // separate from permanent balance and lifetime achievements.
+      match /rewards/continuity {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /continuity_days/{dayKey} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /continuity_credits/{creditId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      match /continuity_periods/{periodId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Prevent a permanent award from being mirrored into multiple periods.
+      match /continuity_award_links/{awardId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Pending reward receipts are an internal delivery outbox, not client data.
+      match /care_reward_receipts/{receiptId} {
+        allow read, write: if false;
+      }
+
+      match /condition_award_days/{dayKey} {
         allow read: if isOwner(uid);
         allow write: if false;
       }
@@ -306,11 +468,27 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Reference cohort management is server-only; clients use report snapshots.
+    // Published weight references may be read by signed-in clients for current
+    // analysis. Discovery/listing and all management remain server-only.
     match /reference_cohorts/{cohortId} {
-      allow read, write: if false;
+      function publishedWeightReference(data) {
+        return data.cohortId == cohortId
+          && data.sourceType == 'published_research'
+          && data.metric == 'weight'
+          && data.unit == 'g';
+      }
+
+      allow get: if signedIn()
+        && publishedWeightReference(resource.data)
+        && resource.data.currentReferenceVersion is string
+        && resource.data.currentReferenceVersion.size() > 0;
+      allow list, write: if false;
+
       match /versions/{versionId} {
-        allow read, write: if false;
+        allow get: if signedIn()
+          && publishedWeightReference(resource.data)
+          && resource.data.referenceVersion == versionId;
+        allow list, write: if false;
       }
     }
 

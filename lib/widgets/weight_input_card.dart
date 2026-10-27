@@ -4,8 +4,10 @@ import 'package:intl/intl.dart';
 
 import '../models/weight_record.dart';
 import '../services/weight_records_repo.dart';
+import '../services/measurement_history_client.dart';
 import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/measurement_input_view_model.dart';
 
 typedef WeightSavedCallback = void Function(WeightRecord record);
 
@@ -35,6 +37,11 @@ class _WeightInputCardState extends State<WeightInputCard> {
   bool _editing = true;
   String? _message;
   bool _error = false;
+  bool _loadFailed = false;
+  bool _legacyConfirmed = false;
+  Map<String, dynamic>? _timing;
+  Map<String, dynamic>? _pending;
+  String? _originalDayKey;
 
   @override
   void initState() {
@@ -65,17 +72,33 @@ class _WeightInputCardState extends State<WeightInputCard> {
 
   bool get _canSave {
     final value = _weight;
-    return !_loading && !_saving && value != null && value > 0 && value <= 1000;
+    return !_loadFailed &&
+        !_loading &&
+        !_saving &&
+        _pending == null &&
+        _timing != null &&
+        (_savedRecord?.subjectId != null ||
+            _savedRecord == null ||
+            _legacyConfirmed) &&
+        value != null &&
+        value > 0 &&
+        value <= 1000;
   }
 
   Future<void> _load() async {
     setState(() {
       _loading = true;
+      _loadFailed = false;
       _message = null;
       _error = false;
     });
 
     try {
+      final pending = await _repo.history.pending();
+      _pending = pending;
+      if (pending != null) {
+        _selectedDate = DateTime.parse(pending['dayKey'] as String);
+      }
       final results = await Future.wait([
         _repo.fetchByDate(_selectedDate),
         _repo.fetchLatestBefore(_selectedDate),
@@ -88,17 +111,30 @@ class _WeightInputCardState extends State<WeightInputCard> {
 
       setState(() {
         _savedRecord = saved;
+        _pending = pending;
+        _originalDayKey = null;
+        _legacyConfirmed = false;
+        _timing = saved?.timing;
+        if (pending != null) {
+          _timing = pending['timing'] is Map
+              ? Map<String, dynamic>.from(pending['timing'] as Map)
+              : null;
+        }
         _previousRecord = previous;
-        _editing = saved == null;
+        _editing = saved == null || pending != null;
 
-        _weightController.text = saved == null
-            ? ''
-            : _formatWeight(saved.weightGrams);
-        _memoController.text = saved?.memo ?? '';
+        _weightController.text =
+            saved == null ? '' : _formatWeight(saved.weightGrams);
+        _memoController.text = pending?['memo'] as String? ?? saved?.memo ?? '';
+        if (pending?['weightGrams'] is num) {
+          _weightController.text =
+              _formatWeight((pending!['weightGrams'] as num).toDouble());
+        }
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
+        _loadFailed = true;
         _message = '読み込みに失敗しました: $error';
         _error = true;
       });
@@ -109,7 +145,8 @@ class _WeightInputCardState extends State<WeightInputCard> {
     }
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickDate({bool correction = false}) async {
+    if (_saving || _pending != null) return;
     final now = DateTime.now();
 
     final picked = await showDatePicker(
@@ -123,8 +160,19 @@ class _WeightInputCardState extends State<WeightInputCard> {
 
     if (picked == null) return;
 
-    setState(() => _selectedDate = picked);
-    await _load();
+    if (correction && _savedRecord != null) {
+      setState(() {
+        _originalDayKey = _savedRecord!.dayKey;
+        _selectedDate = picked;
+        if (_timing?['precision'] == 'date_only' ||
+            _timing?['timePrecision'] == 'date_only') {
+          _timing = measurementDateTiming(_repo.dateKeyLocal(picked));
+        }
+      });
+    } else {
+      setState(() => _selectedDate = picked);
+      await _load();
+    }
   }
 
   Future<void> _save() async {
@@ -146,19 +194,19 @@ class _WeightInputCardState extends State<WeightInputCard> {
     });
 
     try {
-      await _repo.save(
+      final record = await _repo.saveRecord(
         date: _selectedDate,
         weightGrams: weight,
         memo: _memoController.text,
+        expectedRecord: _savedRecord,
+        timing: _timing,
+        legacyConfirmed: _legacyConfirmed,
+        originalDayKey: _originalDayKey,
       );
-      await OnboardingStateRepo().recordFirstMonitoringData('weight');
-
-      final record = WeightRecord(
-        dayKey: DateFormat('yyyy-MM-dd').format(_selectedDate),
-        date: _selectedDate,
-        weightGrams: weight,
-        memo: _memoController.text.trim(),
-      );
+      // The confirmed measurement receipt remains authoritative if this auxiliary update fails.
+      try {
+        await OnboardingStateRepo().recordFirstMonitoringData('weight');
+      } catch (_) {}
 
       if (!mounted) return;
 
@@ -172,30 +220,136 @@ class _WeightInputCardState extends State<WeightInputCard> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _message = '保存に失敗しました: $error';
+        _message = MeasurementInputViewModel.failureMessage(error);
         _error = true;
       });
+    } finally {
+      _pending = await _repo.history.pending();
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _reviewLatest() async {
+    if (_saving || _pending != null) return;
+    setState(() => _saving = true);
+    try {
+      final sourceDate = _originalDayKey == null
+          ? _selectedDate
+          : DateTime.parse(_originalDayKey!);
+      final latest = await _repo.fetchByDate(sourceDate);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      final yes = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+                  title: const Text('最新の記録を確認'),
+                  content: Text(latest == null
+                      ? 'この日の記録は現在ありません。入力を残して、新しい記録として保存できます。'
+                      : '最新の体重: ${_formatWeight(latest.weightGrams)}g\n入力を残して、この最新記録を訂正できます。'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('戻る')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('入力を残して続ける'))
+                  ]));
+      if (yes == true && mounted) {
+        setState(() {
+          _savedRecord = latest;
+          if (latest == null) _originalDayKey = null;
+          _legacyConfirmed = false;
+          _loadFailed = false;
+          _message = '最新の記録を確認しました。入力は残しています。';
+          _error = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = '最新の記録を確認できませんでした。入力は残しています。';
+          _error = true;
+        });
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  String _formatWeight(double value) {
-    return value == value.roundToDouble()
-        ? value.toStringAsFixed(0)
-        : value.toStringAsFixed(1);
+  Future<void> _retry() async {
+    setState(() => _saving = true);
+    try {
+      final result = await _repo.history.retryPending();
+      final day = DateTime.parse(result['dayKey'] as String);
+      final current = await _repo.fetchByDate(day);
+      if (!mounted) return;
+      _selectedDate = day;
+      _savedRecord = current;
+      _originalDayKey = null;
+      _timing = current?.timing;
+      _weightController.text =
+          current == null ? '' : _formatWeight(current.weightGrams);
+      _memoController.text = current?.memo ?? '';
+      _editing = current == null;
+      if (current != null) widget.onSaved?.call(current);
+      _message = '保存を確認しました。';
+      _error = false;
+    } catch (error) {
+      _message = MeasurementInputViewModel.failureMessage(error);
+      _error = true;
+    } finally {
+      _pending = await _repo.history.pending();
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
-  String? _comparisonText(WeightRecord record) {
-    final previous = _previousRecord;
-    if (previous == null) return null;
-
-    final difference = record.weightGrams - previous.weightGrams;
-    if (difference.abs() < 0.05) return '前回と同じ体重です';
-
-    final sign = difference > 0 ? '+' : '';
-    return '前回比 $sign${difference.toStringAsFixed(1)}g';
+  Future<void> _cancelRecord() async {
+    if (_savedRecord == null || _savedRecord!.subjectId == null) {
+      setState(() {
+        _message = '旧記録は現在のハムスターの記録として確認・保存してから取り消せます。';
+        _error = true;
+      });
+      return;
+    }
+    final yes = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('体重の記録を取り消しますか？'),
+                content: const Text('訂正前の内容と取消の履歴は残ります。'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('戻る')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('取り消す'))
+                ]));
+    if (yes != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.cancelRecord(_savedRecord!,
+          legacyConfirmed: _legacyConfirmed);
+      if (!mounted) return;
+      _savedRecord = null;
+      _weightController.clear();
+      _memoController.clear();
+      _editing = true;
+      _timing = null;
+      _message = '記録を取り消しました。';
+      _error = false;
+    } catch (error) {
+      _message = MeasurementInputViewModel.failureMessage(error);
+      _error = true;
+    } finally {
+      _pending = await _repo.history.pending();
+      if (mounted) setState(() => _saving = false);
+    }
   }
+
+  String _formatWeight(double value) =>
+      MeasurementInputViewModel.formatWeight(value);
+  String? _comparisonText(WeightRecord record) =>
+      MeasurementInputViewModel.weightComparison(record, _previousRecord);
 
   Widget _savedSummary(BuildContext context) {
     final record = _savedRecord!;
@@ -218,31 +372,31 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 Text(
                   '${_formatWeight(record.weightGrams)}g',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                        fontWeight: FontWeight.w900,
+                      ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   DateFormat('yyyy/M/d').format(record.date),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                  ),
+                        color: AppTheme.secondaryText(context),
+                      ),
                 ),
                 if (comparison != null) ...[
                   const SizedBox(height: 3),
                   Text(
                     comparison,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppTheme.accent,
-                      fontWeight: FontWeight.w800,
-                    ),
+                          color: AppTheme.accent,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                 ],
               ],
             ),
           ),
           TextButton(
-            onPressed: () => setState(() => _editing = true),
+            onPressed: _saving ? null : () => setState(() => _editing = true),
             child: const Text('編集'),
           ),
         ],
@@ -293,8 +447,8 @@ class _WeightInputCardState extends State<WeightInputCard> {
                     Text(
                       '体重',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
                     const SizedBox(height: 3),
                     Text(
@@ -307,7 +461,8 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 ),
               ),
               IconButton(
-                onPressed: _pickDate,
+                onPressed:
+                    _saving || _pending != null ? null : () => _pickDate(),
                 tooltip: '測定日を変更',
                 icon: const Icon(Icons.calendar_month_outlined),
               ),
@@ -325,6 +480,7 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 Expanded(
                   child: TextField(
                     controller: _weightController,
+                    enabled: !_saving && _pending == null,
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
@@ -347,8 +503,8 @@ class _WeightInputCardState extends State<WeightInputCard> {
                   child: Text(
                     DateFormat('M/d').format(_selectedDate),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                 ),
               ],
@@ -356,6 +512,7 @@ class _WeightInputCardState extends State<WeightInputCard> {
             const SizedBox(height: 12),
             TextField(
               controller: _memoController,
+              enabled: !_saving && _pending == null,
               minLines: 1,
               maxLines: 3,
               decoration: const InputDecoration(
@@ -364,18 +521,74 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 border: OutlineInputBorder(),
               ),
             ),
+            const SizedBox(height: 10),
+            if (_pending == null) ...[
+              DropdownButtonFormField<String>(
+                key: const ValueKey('weight-timing'),
+                isExpanded: true,
+                value: MeasurementInputViewModel.timingChoice(_timing),
+                decoration: const InputDecoration(labelText: '測定時期の確認'),
+                items: [
+                  if (MeasurementInputViewModel.timingChoice(_timing) ==
+                      'instant')
+                    const DropdownMenuItem(
+                        value: 'instant', child: Text('保存済みの測定時刻を維持')),
+                  DropdownMenuItem(
+                      value: 'date_only', child: Text('選んだ日に測定（時刻は不要）')),
+                  DropdownMenuItem(value: 'unknown', child: Text('測定時期は不明'))
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) => setState(() => _timing = value == 'instant'
+                        ? _timing
+                        : value == 'date_only'
+                            ? measurementDateTiming(
+                                _repo.dateKeyLocal(_selectedDate))
+                            : {...unknownMeasurementTiming}),
+              ),
+              if (_savedRecord != null && _savedRecord!.subjectId == null)
+                CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('現在のハムスターの記録であることを確認'),
+                    value: _legacyConfirmed,
+                    onChanged: _saving
+                        ? null
+                        : (value) =>
+                            setState(() => _legacyConfirmed = value ?? false)),
+              if (_savedRecord != null)
+                Wrap(children: [
+                  TextButton(
+                      onPressed:
+                          _saving ? null : () => _pickDate(correction: true),
+                      child: const Text('日付を訂正')),
+                  TextButton(
+                      onPressed: _saving || _savedRecord!.subjectId == null
+                          ? null
+                          : _cancelRecord,
+                      child: const Text('この記録を取り消す')),
+                ]),
+            ] else ...[
+              const Text('同期待ちの記録があります。同じ内容で再送します。'),
+              TextButton(
+                  onPressed: _saving ? null : _retry,
+                  child: const Text('同じ内容を再送')),
+            ],
             if (_message != null) ...[
               const SizedBox(height: 10),
               Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _error
-                      ? Theme.of(context).colorScheme.error
-                      : AppTheme.accent,
-                  fontWeight: FontWeight.w700,
-                ),
+                      color: _error
+                          ? Theme.of(context).colorScheme.error
+                          : AppTheme.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
             ],
+            if (_error && _pending == null)
+              TextButton(
+                  onPressed: _saving ? null : _reviewLatest,
+                  child: const Text('入力を残して最新の記録を確認')),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,

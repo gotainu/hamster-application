@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "current",
+  "calculationSpecVersion": "weight_insights_v1",
+  "evaluationDateKey": "2026-10-11",
+  "generatedAt": "2026-10-11T02:00:00.000Z",
+  "source": {
+    "silverDateKey": "2026-10-11",
+    "silverSchemaVersion": 5,
+    "silverGeneratedAt": "2026-10-11T02:00:00.000Z",
+    "evidenceHash": "548759acb5b1ec742be0b46f3fbec590371112c0acc623215ff11abce1354043"
+  },
+  "contentHash": "331eb41e9bb502462eb53b2b54c3b8d804549a9ff8ad35c835a2f9564c13906f",
+  "insights": [],
+  "checkinInsights": {
+    "schemaVersion": 1,
+    "calculationSpecVersion": "checkin_insights_v1",
+    "catalogVersion": "observation_catalog_v1",
+    "evaluationDateKey": "2026-10-11",
+    "windowStartDateKey": "2026-09-28",
+    "windowEndDateKey": "2026-10-11",
+    "sourceGeneratedAt": "2026-10-11T02:00:00.000Z",
+    "evidenceHash": "2f8f897baed1028a662d3c6849abba4a6fdc0ed1454f02c992ad52c9707cdfec",
+    "insights": [
+      {
+        "id": "checkin_item_repetition_appetite",
+        "kind": "checkin_item_repetition",
+        "metric": "condition",
+        "evaluationDateKey": "2026-10-11",
+        "observationStartDateKey": "2026-09-28",
+        "observationEndDateKey": "2026-10-11",
+        "validRecordCount": 7,
+        "unit": "days",
+        "evidence": {
+          "windowDays": 14,
+          "validRecordDayCount": 7,
+          "selectionVerifiedDayCount": 7,
+          "concernDayCount": 3,
+          "matchingDayCount": 3,
+          "missingDayCount": 7,
+          "invalidDayCount": 0,
+          "itemAnsweredDayCount": null,
+          "itemId": "appetite",
+          "itemLabel": "食欲"
+        },
+        "dataQuality": {
+          "missingDaysNotImputed": true,
+          "normalDefaultsAreNotAnswers": true
+        },
+        "interpretationCode": "checkin_item_repeated",
+        "eligible": true,
+        "priority": 40,
+        "discovery": true,
+        "semanticFingerprint": "b7156c7410b34fc4128463a35ec689fad9c23e24b7350052cb761b61438ec59e",
+        "sourceGeneratedAt": "2026-10-11T02:00:00.000Z",
+        "limitations": [
+          "記録された様子の頻度です。実際の発生頻度や健康状態・病気・原因は判断できません。",
+          "未回答・欠測を変化なしとして補っていません。"
+        ]
+      }
+    ]
+  }
+}

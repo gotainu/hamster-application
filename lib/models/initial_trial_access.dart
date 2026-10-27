@@ -12,8 +12,9 @@ class InitialTrialAccess {
   final String? policyVersion;
   final int aiRequestLimit;
   final int aiRequestUsed;
-  bool get isActive =>
-      status == 'active' && endsAt != null && DateTime.now().isBefore(endsAt!);
+  bool get isActive => isActiveAt(DateTime.now());
+  bool isActiveAt(DateTime now) =>
+      status == 'active' && endsAt != null && now.isBefore(endsAt!);
   factory InitialTrialAccess.empty() => const InitialTrialAccess(
       status: null,
       endsAt: null,

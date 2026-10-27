@@ -372,7 +372,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isPaid = billing.isPaid;
+    final canManageSubscription = billing.canManageSubscription;
     final visual = _visualForBillingStatus();
 
     final periodEndText = billing.currentPeriodEnd == null
@@ -435,7 +435,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
                   ),
             ),
           ),
-          if (isPaid) ...[
+          if (canManageSubscription) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -553,6 +553,10 @@ class _BillingStatusHeroCard extends StatelessWidget {
   }) {
     final base = '現在の状態: ${billing.planLabel} / ${billing.statusLabel}';
 
+    if (billing.isPaid && !billing.canUsePaidFeatures) {
+      return periodEndText == null ? base : '$base\n利用期間の終了日: $periodEndText';
+    }
+
     if (billing.isCancellationScheduled) {
       final endText = cancellationEndText ?? periodEndText;
       if (endText == null) {
@@ -589,6 +593,15 @@ class _BillingStatusHeroCard extends StatelessWidget {
   }
 
   _BillingStatusVisual _visualForBillingStatus() {
+    if (billing.isPaid && !billing.canUsePaidFeatures) {
+      return const _BillingStatusVisual(
+        icon: Icons.event_busy_rounded,
+        accentColor: AppTheme.accent,
+        title: '有料プランの利用期間が終了しました',
+        description: '現在は有料機能を利用できません。管理画面で契約とお支払いの状態を確認できます。',
+        checkoutNote: '契約の確認や支払い方法の変更は、Stripeの安全な管理画面で行えます。',
+      );
+    }
     switch (billing.status) {
       case BillingStatusValue.active:
       case BillingStatusValue.trialing:
@@ -616,8 +629,8 @@ class _BillingStatusHeroCard extends StatelessWidget {
           accentColor: Color(0xFFFFB020),
           title: 'お支払いの確認が必要です',
           description:
-              '前回のお支払いを確認できませんでした。有料機能は一時停止されています。再度登録するか、支払い方法を確認してください。',
-          checkoutNote: '支払い状態を復旧するには、Stripeの決済ページで再度手続きしてください。',
+              '前回のお支払いを確認できませんでした。有料機能は一時停止されています。管理画面で支払い方法を確認してください。',
+          checkoutNote: '支払い状態はStripeの安全な管理画面で確認できます。',
         );
 
       case BillingStatusValue.unpaid:
@@ -625,8 +638,8 @@ class _BillingStatusHeroCard extends StatelessWidget {
           icon: Icons.block_rounded,
           accentColor: Color(0xFFFF6B6B),
           title: '有料プランは停止中です',
-          description: 'お支払いを確認できなかったため、有料機能は停止されています。再度登録すると、有料機能を利用できます。',
-          checkoutNote: 'Stripeの安全な決済ページで再登録できます。',
+          description: 'お支払いを確認できなかったため、有料機能は停止されています。管理画面で支払い方法を確認してください。',
+          checkoutNote: '支払い状態はStripeの安全な管理画面で確認できます。',
         );
 
       case BillingStatusValue.canceled:
@@ -634,7 +647,7 @@ class _BillingStatusHeroCard extends StatelessWidget {
           icon: Icons.workspace_premium_rounded,
           accentColor: AppTheme.accent,
           title: '有料プランは未契約です',
-          description: '有料プランはキャンセルされています。再度登録すると、有料機能を利用できます。',
+          description: '日々の記録と個体別分析、AI相談を再開できます。作成済みのうちの子レポートは、契約なしでも振り返れます。',
           checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
         );
 
@@ -652,7 +665,8 @@ class _BillingStatusHeroCard extends StatelessWidget {
           icon: Icons.workspace_premium_rounded,
           accentColor: AppTheme.accent,
           title: '有料プランは未契約です',
-          description: '有料プランに登録すると、温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
+          description:
+              '日々の記録と個体別分析、AI相談を続けて、うちの子の変化を確認できます。作成済みのうちの子レポートは、無料体験後も閲覧できます。',
           checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
         );
 

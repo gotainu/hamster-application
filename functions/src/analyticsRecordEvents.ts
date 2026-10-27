@@ -7,9 +7,9 @@ const REGION = 'asia-northeast1';
 type RecordKind = 'weight' | 'activity' | 'daily_checkin' | 'switchbot_reading';
 
 function hasMeasurement(kind: RecordKind, data: Record<string, unknown>): boolean {
-  if (kind === 'weight') return typeof data.weightGrams === 'number' && data.weightGrams > 0;
-  if (kind === 'activity') return typeof data.distance === 'number' && data.distance >= 0;
-  if (kind === 'daily_checkin') return typeof data.condition === 'string' && data.condition.length > 0;
+  if (kind === 'weight') return typeof data.weightGrams === 'number' && Number.isFinite(data.weightGrams) && data.weightGrams > 0;
+  if (kind === 'activity') return typeof data.distance === 'number' && Number.isFinite(data.distance) && data.distance >= 0;
+  if (kind === 'daily_checkin') return ['normal', 'slightlyConcerned', 'veryConcerned'].includes(String(data.condition));
   return typeof data.temperature === 'number' || typeof data.humidity === 'number';
 }
 
@@ -27,6 +27,7 @@ async function recordFirstAcceptedData(params: {
   sourceId: string;
   source: 'manual' | 'sensor';
   data: Record<string, unknown>;
+  sourceAcceptedAt?: FirebaseFirestore.Timestamp;
 }): Promise<void> {
   if (!hasMeasurement(params.kind, params.data)) return;
   const user = admin.firestore().collection('users').doc(params.uid);
@@ -48,7 +49,9 @@ async function recordFirstAcceptedData(params: {
       recordType: params.kind,
       rawDocumentId: params.sourceId,
       observationAt: observationAt(params.data, params.sourceId),
-      serverReceivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      // Keep the accepted record time separate from this retryable trigger's write.
+      occurredAt: params.data.acceptedAt ?? params.sourceAcceptedAt ?? null,
+      serverReceivedAt: params.data.acceptedAt ?? params.sourceAcceptedAt ?? null,
       measurementVersion: 'accepted_data_v1',
     });
   });
@@ -58,7 +61,7 @@ export const analyticsWeightRecordCreated = onDocumentCreated(
   {document: 'users/{uid}/weight_records/{sourceId}', region: REGION},
   async (event) => recordFirstAcceptedData({
     uid: event.params.uid, kind: 'weight', sourceId: event.params.sourceId,
-    source: 'manual', data: event.data?.data() ?? {},
+    source: 'manual', data: event.data?.data() ?? {}, sourceAcceptedAt: event.data?.createTime,
   }),
 );
 
@@ -66,7 +69,7 @@ export const analyticsActivityRecordCreated = onDocumentCreated(
   {document: 'users/{uid}/distance_records/{sourceId}', region: REGION},
   async (event) => recordFirstAcceptedData({
     uid: event.params.uid, kind: 'activity', sourceId: event.params.sourceId,
-    source: 'manual', data: event.data?.data() ?? {},
+    source: 'manual', data: event.data?.data() ?? {}, sourceAcceptedAt: event.data?.createTime,
   }),
 );
 
@@ -74,7 +77,7 @@ export const analyticsDailyCheckinCreated = onDocumentCreated(
   {document: 'users/{uid}/daily_checkins/{sourceId}', region: REGION},
   async (event) => recordFirstAcceptedData({
     uid: event.params.uid, kind: 'daily_checkin', sourceId: event.params.sourceId,
-    source: 'manual', data: event.data?.data() ?? {},
+    source: 'manual', data: event.data?.data() ?? {}, sourceAcceptedAt: event.data?.createTime,
   }),
 );
 
@@ -82,6 +85,6 @@ export const analyticsSwitchbotReadingCreated = onDocumentCreated(
   {document: 'users/{uid}/switchbot_readings/{sourceId}', region: REGION},
   async (event) => recordFirstAcceptedData({
     uid: event.params.uid, kind: 'switchbot_reading', sourceId: event.params.sourceId,
-    source: 'sensor', data: event.data?.data() ?? {},
+    source: 'sensor', data: event.data?.data() ?? {}, sourceAcceptedAt: event.data?.createTime,
   }),
 );

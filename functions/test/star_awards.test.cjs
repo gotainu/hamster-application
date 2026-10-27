@@ -1,115 +1,17 @@
 'use strict';
+const assert=require('node:assert/strict'),{test}=require('node:test');
+const {loadStarSource,fakeFirestore,Stamp}=require('./support/star_source_loader.cjs');
+const NOW=new Date('2026-10-12T01:00:00Z');
+function setup(){const{db,admin}=fakeFirestore({clock:()=>NOW});const load=loadStarSource({admin,now:()=>NOW});return{db,stars:load('stars/starAwards'),core:load('stars/continuity')};}
+test('existing fixed IDs, date eligibility, first program and fifty milestone unchanged',()=>{const{stars}=setup();assert.equal(stars.starAwardId('2026-10-12','wheel'),'2026-10-12_wheel');assert.equal(stars.isAwardDateEligible('2026-10-11',NOW),true);assert.equal(stars.isAwardDateEligible('2026-10-10',NOW),false);assert.equal(stars.isStarProgramDate('2026-09-16'),false);assert.equal(stars.crossedStarMilestone(49,50),true);assert.equal(stars.crossedStarMilestone(50,51),false);});
+test('duplicate existing award is idempotent and condition missing source does not award',async()=>{const{db,stars}=setup();const p={db,uid:'alice',missionDateKey:'2026-10-12',kind:'open_app',now:NOW};assert.deepEqual(await stars.awardStar(p),{awarded:true,total:1});assert.deepEqual(await stars.awardStar(p),{awarded:false,total:1});assert.deepEqual(await stars.awardStar({...p,kind:'condition',sourceRef:db.doc('users/alice/daily_checkins/2026-10-12')}),{awarded:false,total:1});});
+test('condition server receipt day guard prevents care/health and different observed days doubling',async()=>{const{db,stars}=setup();const a={db,uid:'daily',missionDateKey:'2026-10-11',kind:'condition',acceptedAt:NOW,now:NOW};assert.equal((await stars.awardStar(a)).awarded,true);assert.equal((await stars.awardStar({...a,missionDateKey:'2026-10-12'})).awarded,false);assert.equal(db.documents.get('users/daily/rewards/stars').lifetimeEarned,1);assert.equal([...db.documents.keys()].filter(k=>k.includes('/star_awards/')).length,1);});
+test('bounded legacy ledger protects already awarded receipt day without migration',async()=>{const{db,stars}=setup();db.documents.set('users/legacy/rewards/stars',{balance:10,total:10,lifetimeEarned:12});db.documents.set('users/legacy/star_awards/2026-10-11_condition',{kind:'condition',awardedAt:new Stamp(NOW)});assert.deepEqual(await stars.awardStar({db,uid:'legacy',kind:'condition',missionDateKey:'2026-10-12',acceptedAt:NOW,now:NOW}),{awarded:false,total:10});assert.equal(db.documents.get('users/legacy/rewards/stars').lifetimeEarned,12);assert.equal([...db.documents.keys()].filter(k=>k.includes('/star_awards/')).length,1);});
+test('open and wheel retain independent daily categories and fifty cumulative milestone',async()=>{const{db,stars}=setup();db.documents.set('users/m/rewards/stars',{balance:49,total:49,lifetimeEarned:49});await stars.awardStar({db,uid:'m',missionDateKey:'2026-10-12',kind:'open_app',now:NOW});assert.equal(db.documents.get('users/m/star_milestones/50').milestone,50);assert.equal((await stars.awardStar({db,uid:'m',missionDateKey:'2026-10-12',kind:'wheel',now:NOW})).awarded,true);assert.equal(db.documents.get('users/m/rewards/stars').balance,51);});
+test('normal/slightlyConcerned/veryConcerned receive equal one star',async()=>{for(const condition of ['normal','slightlyConcerned','veryConcerned']){const{db,stars}=setup();const uid=condition,path=`users/${uid}/daily_checkins/2026-10-12`;db.documents.set(path,{condition,__acceptedAt:NOW});const r=await stars.processStarRecord({db,uid,kind:'condition',sourceDateKey:'2026-10-12',snapshot:await db.doc(path).get(),now:NOW});assert.equal(r.total,1);assert.equal(db.documents.get(`users/${uid}/rewards/continuity`).periodEarned,1);}});
+test('source manual required for continuity, existing wheel permanent reward remains',async()=>{const{db,stars}=setup();const p='users/sensor/distance_records/2026-10-11';db.documents.set(p,{source:'sensor',distance:100,__acceptedAt:NOW});await stars.processStarRecord({db,uid:'sensor',kind:'wheel',sourceDateKey:'2026-10-11',snapshot:await db.doc(p).get(),now:NOW});assert.equal(db.documents.get('users/sensor/rewards/stars').balance,1);assert.equal(db.documents.has('users/sensor/rewards/continuity'),false);});
+test('open-only does not achieve or start period; old record existence cannot claim today',async()=>{const{db,stars}=setup();db.documents.set('users/opener/daily_checkins/2026-10-12',{condition:'normal',__acceptedAt:new Date('2026-10-11T01:00:00Z')});const result=await stars.claimDailyOpenStar({auth:{uid:'opener'}});assert.equal(result.total,1);assert.equal(db.documents.has('users/opener/rewards/continuity'),false);assert.equal([...db.documents.keys()].filter(k=>k.startsWith('users/opener/continuity_days/')).length,0);});
 
-const assert = require('node:assert/strict');
-const {
-  awardStar,
-  crossedStarMilestone,
-  isAwardDateEligible,
-  isStarProgramDate,
-  starAwardId,
-} = require('../lib/stars/starAwards');
+test('new ledger receipt date takes precedence over late awardedAt for next-day eligibility',async()=>{const{db,stars}=setup();db.documents.set('users/late/rewards/stars',{balance:1,total:1,lifetimeEarned:1});db.documents.set('users/late/star_awards/2026-10-11_condition',{kind:'condition',acceptedDateKey:'2026-10-11',awardedAt:new Stamp(NOW)});assert.equal((await stars.awardStar({db,uid:'late',kind:'condition',missionDateKey:'2026-10-12',acceptedAt:NOW,now:NOW})).awarded,true);assert.equal(db.documents.get('users/late/rewards/stars').balance,2);});
 
-function fakeFirestore() {
-  const documents = new Map();
-  return {
-    documents,
-    doc(path) { return { path }; },
-    async runTransaction(action) {
-      const writes = [];
-      const transaction = {
-        async get(ref) {
-          const data = documents.get(ref.path);
-          return { exists: data !== undefined, data: () => data };
-        },
-        create(ref, data) { writes.push(['create', ref.path, data]); },
-        set(ref, data) { writes.push(['set', ref.path, data]); },
-      };
-      const result = await action(transaction);
-      for (const [method, path, data] of writes) {
-        if (method === 'create') {
-          assert.equal(documents.has(path), false);
-        }
-        documents.set(path, { ...(documents.get(path) ?? {}), ...data });
-      }
-      return result;
-    },
-  };
-}
-
-async function main() {
-  assert.equal(starAwardId('2026-09-15', 'wheel'), '2026-09-15_wheel');
-  assert.equal(
-    isAwardDateEligible('2026-09-15', new Date('2026-09-15T03:00:00Z')),
-    true,
-  );
-  assert.equal(
-    isAwardDateEligible('2026-09-13', new Date('2026-09-15T03:00:00Z')),
-    false,
-  );
-  assert.equal(crossedStarMilestone(49, 50), true);
-  assert.equal(crossedStarMilestone(50, 51), false);
-  assert.equal(isStarProgramDate('2026-09-16'), false);
-  assert.equal(isStarProgramDate('2026-09-17'), true);
-
-  const db = fakeFirestore();
-  const first = await awardStar({
-    db,
-    uid: 'alice',
-    missionDateKey: '2026-09-17',
-    kind: 'open_app',
-  });
-  const duplicate = await awardStar({
-    db,
-    uid: 'alice',
-    missionDateKey: '2026-09-17',
-    kind: 'open_app',
-  });
-  assert.deepEqual(first, { awarded: true, total: 1 });
-  assert.deepEqual(duplicate, { awarded: false, total: 1 });
-
-  const missingSource = db.doc('users/alice/daily_checkins/2026-09-17');
-  const absent = await awardStar({
-    db,
-    uid: 'alice',
-    missionDateKey: '2026-09-17',
-    kind: 'condition',
-    sourceRef: missingSource,
-  });
-  assert.deepEqual(absent, { awarded: false, total: 1 });
-  db.documents.set(missingSource.path, { condition: 'normal' });
-  const present = await awardStar({
-    db,
-    uid: 'alice',
-    missionDateKey: '2026-09-17',
-    kind: 'condition',
-    sourceRef: missingSource,
-  });
-  assert.deepEqual(present, { awarded: true, total: 2 });
-
-  db.documents.set('users/alice/rewards/stars', {
-    total: 49,
-    balance: 49,
-    lifetimeEarned: 49,
-  });
-  const fiftieth = await awardStar({
-    db,
-    uid: 'alice',
-    missionDateKey: '2026-09-17',
-    kind: 'wheel',
-  });
-  assert.deepEqual(fiftieth, { awarded: true, total: 50 });
-  assert.equal(
-    db.documents.get('users/alice/star_milestones/50').milestone,
-    50,
-  );
-  assert.equal(
-    db.documents.get('users/alice/rewards/stars').lifetimeEarned,
-    50,
-  );
-  console.log('Star award tests passed.');
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+test('permanently invalid record day is ignored without retry/write',async()=>{const{db,stars}=setup();assert.deepEqual(await stars.processStarRecord({db,uid:'invalid',kind:'condition',sourceDateKey:'invalid',snapshot:{exists:true},now:NOW}),{awarded:false,total:0});assert.equal(db.writes.length,0);});

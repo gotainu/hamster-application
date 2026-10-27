@@ -7,6 +7,7 @@ import {
   HealthOverallAssessment,
 } from './healthTypes';
 import { formatDateKey } from './dateKey';
+import {observationLabel} from './observationCatalog';
 
 const TEMP_MIN = 20;
 const TEMP_MAX = 26;
@@ -810,29 +811,7 @@ function ifValue(
 }
 
 function conditionObservationLabel(tag: string): string {
-  switch (tag) {
-    case 'appetite':
-      return '食欲';
-    case 'water':
-      return '飲水';
-    case 'elimination':
-    case 'poop':
-      return '排泄';
-    case 'breathing':
-      return '呼吸';
-    case 'movement':
-      return '姿勢・動き';
-    case 'eyesNose':
-      return '目・鼻';
-    case 'coatSkin':
-      return '被毛・皮膚';
-    case 'chewing':
-      return 'かじり方';
-    case 'other':
-      return 'その他';
-    default:
-      return tag;
-  }
+  return observationLabel(tag);
 }
 
 function buildNutritionAssessment(

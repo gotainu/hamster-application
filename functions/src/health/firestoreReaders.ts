@@ -15,6 +15,8 @@ import {
   normalizeDateKey,
 } from './dateKey';
 
+import type {CheckinRecordInput} from './checkinInsights';
+
 type Json = Record<string, unknown>;
 
 export async function fetchHealthSourceData(params: {
@@ -36,6 +38,7 @@ export async function fetchHealthSourceData(params: {
     weightRecords,
     dailyCheckin,
     nutrition,
+    dailyCheckinWindow,
   ] = await Promise.all([
     fetchEnvironmentAssessment({
       db: params.db,
@@ -66,6 +69,7 @@ export async function fetchHealthSourceData(params: {
       uid: params.uid,
       dateKey,
     }),
+    fetchDailyCheckinWindow({db: params.db, uid: params.uid, dateKey}),
   ]);
 
   return {
@@ -75,6 +79,7 @@ export async function fetchHealthSourceData(params: {
     weightRecords,
     dailyCheckin,
     nutrition,
+    dailyCheckinWindow,
   };
 }
 
@@ -159,6 +164,33 @@ export async function fetchDistanceWindow(params: {
       date: asDate(data.date),
     };
   });
+}
+
+/** Read 15 days once: Current uses D-13..D; new reports use D-14..D-1.
+ * Canonical, compact legacy IDs and explicit dayKey rows are deduplicated by
+ * document path before strict date/value normalization. No memo is copied. */
+export async function fetchDailyCheckinWindow(params: {
+  db: FirebaseFirestore.Firestore; uid: string; dateKey: string;
+}): Promise<CheckinRecordInput[]> {
+  const end = normalizeDateKey(params.dateKey);
+  const start = addDaysToDateKey(end, -14);
+  const collection = params.db.collection('users').doc(params.uid).collection('daily_checkins');
+  const snapshots = await Promise.all([
+    collection.orderBy(admin.firestore.FieldPath.documentId()).startAt(start).endAt(end).get(),
+    collection.orderBy(admin.firestore.FieldPath.documentId()).startAt(compactDateKey(start)).endAt(compactDateKey(end)).get(),
+    collection.where('dayKey', '>=', start).where('dayKey', '<=', end).get(),
+  ]);
+  const result = new Map<string, CheckinRecordInput>();
+  for (const snapshot of snapshots) for (const document of snapshot.docs) {
+    const data = document.data() as Json;
+    const safe: Json = {};
+    for (const key of ['dayKey', 'date', 'condition', 'concernTags', 'observationLevels', 'schemaVersion',
+      'observationCatalogVersion', 'observationResponseMode', 'answeredObservationIds']) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) safe[key] = data[key];
+    }
+    result.set(document.id, {id: document.id, data: safe, updatedAt: document.updateTime?.toDate() ?? asDate(data.updatedAt)});
+  }
+  return [...result.values()];
 }
 
 export async function fetchDailyCheckin(params: {

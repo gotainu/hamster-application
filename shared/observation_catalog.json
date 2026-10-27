@@ -1,0 +1,97 @@
+{
+  "version": "observation_catalog_v1",
+  "items": [
+    {
+      "id": "appetite",
+      "label": "食欲",
+      "order": 10,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "water",
+      "label": "飲水",
+      "order": 20,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "elimination",
+      "label": "排泄",
+      "order": 30,
+      "active": true,
+      "legacyIds": [
+        "poop"
+      ],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "breathing",
+      "label": "呼吸",
+      "order": 40,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "movement",
+      "label": "姿勢・動き",
+      "order": 50,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "eyesNose",
+      "label": "目・鼻",
+      "order": 60,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "coatSkin",
+      "label": "被毛・皮膚",
+      "order": 70,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": true,
+      "defaultNormal": true
+    },
+    {
+      "id": "other",
+      "label": "その他",
+      "order": 80,
+      "active": true,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": false,
+      "defaultNormal": false
+    },
+    {
+      "id": "chewing",
+      "label": "かじり方",
+      "order": 90,
+      "active": false,
+      "legacyIds": [],
+      "legacyNames": [],
+      "insightEligible": false,
+      "defaultNormal": false
+    }
+  ]
+}

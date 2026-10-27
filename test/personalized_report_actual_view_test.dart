@@ -84,7 +84,7 @@ void main() {
     await t.pump();
     await t.pump();
     expect(logs, isEmpty);
-    expect(find.text('初回レポート'), findsNothing);
+    expect(find.text('初回分析の記録'), findsNothing);
   });
   testWidgets(
       'covered legacy report has no view until current route is visible',
@@ -115,14 +115,14 @@ void main() {
     source.changes.add(ready());
     await t.pump();
     await t.pump();
-    expect(find.text('初回レポート'), findsOneWidget);
+    expect(find.text('初回分析の記録'), findsOneWidget);
     expect(views, 1);
     expect(logs, ['a']);
     source.currentUid = 'b';
     source.changes.add(ready('b'));
     await t.pump();
     await t.pump();
-    expect(find.text('初回レポート'), findsNothing);
+    expect(find.text('初回分析の記録'), findsNothing);
     expect(find.text('レポートを取得できませんでした。'), findsOneWidget);
     expect(views, 1);
     expect(logs, ['a']);

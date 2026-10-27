@@ -4,32 +4,81 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/daily_record_completion.dart';
+import '../services/care_continuity_repo.dart';
+import '../services/star_rewards_repo.dart';
+import '../models/star_rewards_progress.dart';
+import '../widgets/care_continuity_panel.dart';
 import '../models/daily_star_progress.dart';
 import '../theme/app_theme.dart';
 import '../widgets/collectible_glyph.dart';
 
-class DailyStarsScreen extends StatelessWidget {
+class DailyStarsScreen extends StatefulWidget {
   final ValueListenable<DailyRecordCompletion?> completionListenable;
   final Future<void> Function()? onRecord;
+  final CareContinuitySource? continuitySource;
+  final StarRewardsRepo? rewardsRepo;
+  final Stream<StarRewardsProgress?>? rewardsProgressStream;
 
   const DailyStarsScreen({
     super.key,
     required this.completionListenable,
     this.onRecord,
+    this.continuitySource,
+    this.rewardsRepo,
+    this.rewardsProgressStream,
   });
+
+  @override
+  State<DailyStarsScreen> createState() => _DailyStarsScreenState();
+}
+
+class _DailyStarsScreenState extends State<DailyStarsScreen> {
+  late final CareContinuitySource _source;
+  late final Stream<StarRewardsProgress?> _rewardsProgress;
+  @override
+  void initState() {
+    super.initState();
+    _source = widget.continuitySource ?? CareContinuityRepo();
+    _rewardsProgress = widget.rewardsProgressStream ??
+        (widget.rewardsRepo ?? StarRewardsRepo()).watchProgress();
+  }
+
+  void _showHelp(BuildContext context) {
+    final copy = CollectibleCopy.of(context);
+    showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('たくわえについて'),
+                content: SingleChildScrollView(
+                    child: Text(
+                        '有効な記録を1回保存すると、その日の達成になります。アプリを開くだけでは達成になりません。\n\n'
+                        'たくわえは、この期間に集めた${copy.name}の分です。2日続けて記録を休むと、翌日0時（日本時間）に空になります。\n\n'
+                        '飼育記録、過去の達成、これまでに集めた${copy.name}は残ります。カレンダーは記録を受け付けた日で表示します。')),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('閉じる'))
+                ]));
+  }
 
   @override
   Widget build(BuildContext context) {
     final collectible = CollectibleCopy.of(context);
     final isSeed = collectible.isSeed;
-    final foreground = isSeed ? const Color(0xFF27323B) : Colors.white;
+    final foreground = AppTheme.primaryText(context);
     final backgroundAsset = isSeed
         ? 'assets/images/theme/bg_default_day.webp'
         : 'assets/images/theme/bg_default_night.webp';
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(collectible.dailyTitle),
+        title: const Text('記録カレンダー'),
+        actions: [
+          IconButton(
+              tooltip: 'たくわえについて',
+              icon: const Icon(Icons.info_outline_rounded),
+              onPressed: () => _showHelp(context))
+        ],
         backgroundColor: Colors.transparent,
         foregroundColor: foreground,
         surfaceTintColor: Colors.transparent,
@@ -46,13 +95,11 @@ class DailyStarsScreen extends StatelessWidget {
           ),
           DecoratedBox(
             decoration: BoxDecoration(
-              color: isSeed
-                  ? Colors.white.withValues(alpha: .26)
-                  : const Color(0xFF070B14).withValues(alpha: .38),
+              color: AppTheme.careDetailOverlay(context),
             ),
           ),
           ValueListenableBuilder<DailyRecordCompletion?>(
-            valueListenable: completionListenable,
+            valueListenable: widget.completionListenable,
             builder: (context, completion, _) {
               if (completion == null) {
                 return const Center(child: CircularProgressIndicator());
@@ -60,27 +107,48 @@ class DailyStarsScreen extends StatelessWidget {
               final progress = DailyStarProgress.fromCompletion(completion);
               return ListView(
                 padding: EdgeInsets.fromLTRB(
-                  22,
-                  MediaQuery.paddingOf(context).top + kToolbarHeight + 30,
-                  22,
-                  32,
+                  AppTheme.careDetailPadding.left,
+                  MediaQuery.paddingOf(context).top +
+                      kToolbarHeight +
+                      AppTheme.careDetailPadding.top,
+                  AppTheme.careDetailPadding.right,
+                  MediaQuery.paddingOf(context).bottom +
+                      AppTheme.careDetailPadding.bottom,
                 ),
                 children: [
-                  Center(child: DailyStarsStrip(progress: progress)),
-                  const SizedBox(height: 32),
-                  ...progress.slots.map((slot) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _StarTaskTile(
-                          slot: slot,
-                          onTap: slot.kind == DailyStarSlotKind.openApp ||
-                                  onRecord == null
-                              ? null
-                              : () async {
-                                  Navigator.of(context).pop();
-                                  await onRecord!();
-                                },
-                        ),
-                      )),
+                  CareContinuityPanel(
+                      source: _source,
+                      progress: progress,
+                      showCalendar: true,
+                      pastAchievements: StreamBuilder<StarRewardsProgress?>(
+                        stream: _rewardsProgress,
+                        builder: (context, snapshot) => _CollectedRewards(
+                            progress: snapshot.hasError ? null : snapshot.data),
+                      ),
+                      onRecord: widget.onRecord == null
+                          ? null
+                          : () => widget.onRecord!()),
+                  const SizedBox(height: AppTheme.careSectionGap),
+                  ExpansionTile(
+                      tilePadding: EdgeInsets.zero,
+                      title: const Text('今日の記録の内訳'),
+                      children: progress.slots
+                          .map((slot) => Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: AppTheme.careContentGap),
+                                child: _StarTaskTile(
+                                  slot: slot,
+                                  onTap:
+                                      slot.kind == DailyStarSlotKind.openApp ||
+                                              widget.onRecord == null
+                                          ? null
+                                          : () async {
+                                              Navigator.of(context).pop();
+                                              await widget.onRecord!();
+                                            },
+                                ),
+                              ))
+                          .toList()),
                 ],
               );
             },
@@ -91,16 +159,48 @@ class DailyStarsScreen extends StatelessWidget {
   }
 }
 
+/// Displays saved permanent totals; continuity remains a separate server view.
+class _CollectedRewards extends StatelessWidget {
+  const _CollectedRewards({required this.progress});
+  final StarRewardsProgress? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final copy = CollectibleCopy.of(context);
+    final saved = progress;
+    if (saved == null) {
+      return Text('累計は同期後に確認できます', style: AppTheme.dataCaptionStyle(context));
+    }
+    return Column(children: [
+      for (final row in [
+        ('これまで${copy.collectedLabel}', saved.lifetimeEarned),
+        ('保有している${copy.name}', saved.total),
+      ])
+        Padding(
+          padding: const EdgeInsets.only(top: AppTheme.careContentGap),
+          child: Row(children: [
+            Expanded(
+                child: Text(row.$1, style: AppTheme.dataBodyStyle(context))),
+            Text('${row.$2}${copy.countUnit}',
+                style: AppTheme.dataTitleStyle(context)),
+          ]),
+        ),
+    ]);
+  }
+}
+
 class DailyStarsStrip extends StatelessWidget {
   final DailyStarProgress progress;
   final VoidCallback? onTap;
   final bool prominent;
+  final double glyphSize;
 
   const DailyStarsStrip({
     super.key,
     required this.progress,
     this.onTap,
     this.prominent = false,
+    this.glyphSize = 52,
   });
 
   @override
@@ -114,7 +214,7 @@ class DailyStarsStrip extends StatelessWidget {
               for (final slot in progress.slots)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: _AnimatedStar(slot: slot),
+                  child: _AnimatedStar(slot: slot, size: glyphSize),
                 ),
             ],
           );
@@ -192,7 +292,9 @@ class _AnimatedStar extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       key: ValueKey('${slot.kind}-${slot.filled}'),
       tween: Tween(begin: slot.filled ? 0.72 : 1, end: 1),
-      duration: const Duration(milliseconds: 450),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 450),
       curve: Curves.easeOutBack,
       builder: (context, scale, child) => Transform.scale(
         scale: scale,

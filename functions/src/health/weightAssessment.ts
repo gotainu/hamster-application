@@ -11,6 +11,7 @@ import {
 import {
   buildPersonalBaseline,
   robustZScore,
+  selectPersonalBaselineObservations,
 } from './personalBaseline';
 
 export interface WeightAssessmentConfig {
@@ -46,8 +47,10 @@ export function evaluateWeightRecords(params: {
     ...params.config,
   };
 
-  const records = normalizeWeightRecords(params.records)
-    .filter((record) => record.dayKey <= referenceDateKey);
+  const selected = selectWeightAnalysisObservations({
+    records: params.records, referenceDateKey, windowDays: config.windowDays,
+  });
+  const records = selected.records;
 
   if (records.length === 0) {
     return {
@@ -86,13 +89,7 @@ export function evaluateWeightRecords(params: {
       ? previousDifferenceGrams! / previous.weightGrams
       : null;
 
-  const windowRecords = records.filter((record) =>
-    isDateKeyWithinWindow({
-      targetDateKey: record.dayKey,
-      referenceDateKey,
-      windowDays: config.windowDays,
-    }),
-  );
+  const windowRecords = selected.windowRecords;
 
   const windowFirst =
     windowRecords.length >= 2 ? windowRecords[0] : null;
@@ -103,20 +100,8 @@ export function evaluateWeightRecords(params: {
         windowFirst.weightGrams
       : null;
 
-  const baselineRecords = records.filter(
-    (record) =>
-      record.dayKey < latest.dayKey &&
-      isDateKeyWithinWindow({
-        targetDateKey: record.dayKey,
-        referenceDateKey: latest.dayKey,
-        windowDays: 90,
-      }),
-  );
   const baseline = buildPersonalBaseline({
-    observations: baselineRecords.map((record) => ({
-      dateKey: record.dayKey,
-      value: record.weightGrams,
-    })),
+    observations: selected.baselineObservations,
   });
   const baselineDeviationRate =
     baseline.status === 'ready' &&
@@ -273,6 +258,30 @@ export function evaluateWeightRecords(params: {
       ],
       sourceUpdatedAt: features.latestWeightDate,
     },
+  };
+}
+
+/** Existing normalized daily measurements and baseline adoption, shared by
+ * health evaluation and measurement-only Insights. No imputed days. */
+export function selectWeightAnalysisObservations(params: {
+  records: WeightRecordSource[];
+  referenceDateKey: string;
+  windowDays?: number;
+}) {
+  const referenceDateKey = assertDateKey(params.referenceDateKey);
+  const records = normalizeWeightRecords(params.records)
+    .filter(record => record.dayKey <= referenceDateKey);
+  const windowRecords = records.filter(record => isDateKeyWithinWindow({
+    targetDateKey: record.dayKey, referenceDateKey,
+    windowDays: params.windowDays ?? DEFAULT_WEIGHT_ASSESSMENT_CONFIG.windowDays,
+  }));
+  const latest = records[records.length - 1];
+  const baselineRecords = latest ? records.filter(record => record.dayKey < latest.dayKey && isDateKeyWithinWindow({
+    targetDateKey: record.dayKey, referenceDateKey: latest.dayKey, windowDays: 90,
+  })) : [];
+  return {records, windowRecords,
+    baselineObservations: selectPersonalBaselineObservations({observations: baselineRecords.map(record => ({dateKey: record.dayKey, value: record.weightGrams}))}),
+    periodObservations: windowRecords.map(record => ({dateKey: record.dayKey, value: record.weightGrams})),
   };
 }
 

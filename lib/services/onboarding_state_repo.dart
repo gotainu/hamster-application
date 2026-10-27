@@ -178,16 +178,14 @@ class OnboardingStateRepo {
       final snapshot = await transaction.get(doc);
       final data = snapshot.data() ?? <String, dynamic>{};
       if (data['firstAiConsultationCompleted'] == true) return;
-      final wasHomeAiOnboardingPending =
-          data['homeAiOnboardingPending'] == true;
+      final hasRecordedMonitoring =
+          data['firstMonitoringDataRecordedAt'] != null;
       transaction.set(
         doc,
         {
           'firstAiConsultationCompleted': true,
           'homeAiOnboardingPending': false,
-          'monitoringIntroCtaPending':
-              data['monitoringIntroCtaPending'] == true ||
-                  wasHomeAiOnboardingPending,
+          'monitoringIntroCtaPending': !hasRecordedMonitoring,
           'updatedAt': FieldValue.serverTimestamp(),
         },
         SetOptions(merge: true),

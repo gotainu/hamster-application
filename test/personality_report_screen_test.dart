@@ -86,7 +86,7 @@ void main() {
     await _show(tester, source, onViewed: (_) {
       views++;
     });
-    expect(find.text('個性レポートを確認しています'), findsOneWidget);
+    expect(find.text('レポートを確認しています'), findsOneWidget);
     expect(find.text('体重'), findsNothing);
     expect(views, 0);
   });
@@ -105,7 +105,7 @@ void main() {
     final source = _Source(const PersonalityReportState.unavailable('owner-a'));
     addTearDown(source.changes.close);
     await _show(tester, source);
-    expect(find.text('個性レポートを確認できませんでした'), findsOneWidget);
+    expect(find.text('レポートを確認できませんでした'), findsOneWidget);
     expect(find.text('うちの子らしさを集めています'), findsNothing);
     source.current = _ready('weight_only');
     await tester.tap(find.text('再試行'));
@@ -190,7 +190,7 @@ void main() {
     });
     expect(find.text('100'), findsNothing);
     expect(find.text('体重'), findsNothing);
-    expect(find.text('個性レポートを確認できませんでした'), findsOneWidget);
+    expect(find.text('レポートを確認できませんでした'), findsOneWidget);
     expect(views, 0);
     await tester.tap(find.text('再試行'));
     await tester.pump();
@@ -217,7 +217,7 @@ void main() {
     await tester.pump();
     expect(find.text('100'), findsNothing);
     expect(find.text('体重'), findsNothing);
-    expect(find.text('個性レポートを確認できませんでした'), findsOneWidget);
+    expect(find.text('レポートを確認できませんでした'), findsOneWidget);
     expect(viewed, ['personality_v1_body']);
   });
   testWidgets('account-switch loading clears previous owner content',
@@ -228,7 +228,7 @@ void main() {
     source.emit(const PersonalityReportState.loading('owner-b'));
     await tester.pump();
     expect(find.text('体重'), findsNothing);
-    expect(find.text('個性レポートを確認しています'), findsOneWidget);
+    expect(find.text('レポートを確認しています'), findsOneWidget);
   });
   testWidgets('measurement details are opt-in and explain zero MAD',
       (tester) async {

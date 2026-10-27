@@ -4,7 +4,9 @@ import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/daily_star_progress.dart';
 import 'package:hamster_project/models/weight_record.dart';
 import 'package:hamster_project/screens/daily_stars.dart';
+import 'package:hamster_project/models/star_rewards_progress.dart';
 import 'package:hamster_project/widgets/collectible_glyph.dart';
+import 'care_continuity_test_support.dart';
 
 void main() {
   final today = DateTime(2026, 9, 15);
@@ -98,10 +100,19 @@ void main() {
     addTearDown(notifier.dispose);
     await tester.pumpWidget(
       MaterialApp(
-        home: DailyStarsScreen(completionListenable: notifier),
+        home: DailyStarsScreen(
+            completionListenable: notifier,
+            continuitySource: ContinuityTestSource(continuityFixture()),
+            rewardsProgressStream: Stream.value(
+                const StarRewardsProgress(total: 11, lifetimeEarned: 20))),
       ),
     );
 
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.text('今日の記録の内訳'), 220,
+        scrollable: find.byType(Scrollable).first);
+    await tester.tap(find.text('今日の記録の内訳'));
+    await tester.pumpAndSettle();
     expect(find.text('アプリを開く'), findsOneWidget);
     expect(find.text('昨日の走った記録'), findsOneWidget);
     expect(find.text('今日の様子'), findsOneWidget);

@@ -420,3 +420,137 @@ test('actual current Silver trigger continues daily enqueue without changing v1 
   await triggers.personalityHealthFeaturesWritten({params: {uid, dateKey: DAY}, data: {after: {exists: true}}});
   await unchanged(queue(uid), queuedBefore);
 });
+
+
+const checkinDates = ['2026-10-03','2026-10-04','2026-10-05','2026-10-06','2026-10-07','2026-10-08','2026-10-09'];
+function checkinData(key, kind='C', index=0) {
+ const tags=kind==='A'&&index<3?['appetite']:kind==='B'&&index<2?['other']:[];
+ return {dayKey:key,schemaVersion:2,condition:tags.length?'slightlyConcerned':'normal',concernTags:tags,
+  observationLevels:Object.fromEntries(['appetite','water','elimination','breathing','movement','eyesNose','coatSkin'].map(id=>[id,tags.includes(id)?'changed':'normal']))};
+}
+async function seedObservations(uid,kind='C',count=7,{body=false}={}) {
+ if(body) await seed(uid,{newDay:'2026-10-07'});
+ else await user(uid).collection('personalized_reports').doc('first').set({generation:{status:'generated'},readyMetrics:['body'],untouched:true});
+ const batch=db.batch();checkinDates.slice(0,count).forEach((key,index)=>batch.set(user(uid).collection('daily_checkins').doc(key),checkinData(key,kind,index)));await batch.commit();
+ await currentSilver(uid,'2026-10-09',PREVIOUS);
+}
+for(const kind of ['A','B','C']) test(`observation-only ${kind} queues and creates an immutable report without ready body/activity`,async()=>{
+ const uid=`observation-only-${kind}`;await seedObservations(uid,kind);const first=await snap(user(uid).collection('personalized_reports').doc('first'));
+ const silverRef=user(uid).collection('daily_health_features').doc('2026-10-09');const silverBefore=await snap(silverRef);
+ const storedEvidence=(await silverRef.get()).data().checkinInsightEvidence;
+ assert.equal(typeof storedEvidence.records[0].sourceUpdatedAt.toDate,'function','Persisted Evidence must exercise Firestore Timestamp roundtrip');
+ assert.equal((await enqueue(uid)).status,'queued');assert.match((await queue(uid).get()).data().checkinPublicationCandidate.semanticSignature,/^[a-f0-9]{64}$/);
+ await unchanged(silverRef,silverBefore);assert.equal((await run(uid)).status,'created');
+ const value=(await report(uid).get()).data();assert.equal(value.reportType,'observation_only');assert.deepEqual(value.readyMetrics,[]);assert.deepEqual(value.metrics,{});
+ assert.equal(value.insightSnapshot.checkinInsights.insights.length,1);assert.equal(value.insightSnapshot.checkinInsights.windowStartDateKey,'2026-09-26');assert.equal(value.insightSnapshot.checkinInsights.windowEndDateKey,'2026-10-09');
+ assert.equal((await pointer(uid).get()).exists,false);assert.ok((await dailyPointer(uid).get()).data().checkinPublicationState.seenMaterialityKeys.length>0);
+ await unchanged(user(uid).collection('personalized_reports').doc('first'),first);
+});
+test('below seven observation days cannot enqueue or publish',async()=>{
+ const uid='observation-insufficient';await seedObservations(uid,'A',6);
+ assert.equal((await enqueue(uid)).status,'unchanged');assert.equal((await run(uid)).status,'not_queued');
+});
+test('C extra days and same-meaning A/B updates never publish successive copies',async()=>{
+ for(const kind of ['A','B','C']) {
+  const uid=`observation-no-spam-${kind}`;await seedObservations(uid,kind);await enqueue(uid);await run(uid);const old=await snap(report(uid));
+  await user(uid).collection('daily_checkins').doc(DAY).set(checkinData(DAY));
+  await currentSilver(uid,DAY,new Date('2026-10-10T03:00:00Z'));
+  assert.equal((await enqueue(uid,new Date('2026-10-10T03:00:00Z'))).status,'unchanged');
+  assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'not_queued');await unchanged(report(uid),old);
+ }
+});
+test('new item discovery after C updates daily pointer, preserving all old reports',async()=>{
+ const uid='observation-C-to-A';await seedObservations(uid,'C');await enqueue(uid);await run(uid);const old=await snap(report(uid));
+ for(let index=0;index<3;index++)await user(uid).collection('daily_checkins').doc(checkinDates[index]).set(checkinData(checkinDates[index],'A',index));
+ await currentSilver(uid,DAY,new Date('2026-10-10T03:00:00Z'));assert.equal((await enqueue(uid,new Date('2026-10-10T03:00:00Z'))).status,'queued');
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'created');await unchanged(report(uid),old);
+ assert.equal((await dailyPointer(uid).get()).data().reportId,'daily_2026-10-11');
+});
+test('historical correction and deletion invalidating an observation candidate cancel fresh cutoff publication',async()=>{
+ for(const action of ['correct','delete']) {
+  const uid=`observation-cancel-${action}`;await seedObservations(uid,'A');await enqueue(uid);
+  if(action==='correct') for(let index=0;index<3;index++) await user(uid).collection('daily_checkins').doc(checkinDates[index]).set(checkinData(checkinDates[index],index<2?'B':'C',index));
+  else await user(uid).collection('daily_checkins').doc(checkinDates[0]).delete();
+  if(action==='correct') { // Record continuity is an eligible fresh meaning, rather than stale A.
+   assert.equal((await run(uid)).status,'created');assert.notEqual((await report(uid).get()).data().insightSnapshot.checkinInsights.insights[0].kind,'checkin_item_repetition');
+  } else {assert.equal((await run(uid)).status,'learning');assert.equal((await report(uid).get()).exists,false);}
+ }
+});
+test('observation and body queues merge into one daily report and keep v1 pointer unchanged',async()=>{
+ const uid='observation-body-conflict';await seedObservations(uid,'A',7,{body:true});
+ await user(uid).collection('weight_records').doc('2026-10-09').set({dayKey:'2026-10-09',weightGrams:100});await currentSilver(uid,'2026-10-09',PREVIOUS);
+ const old=await snap(pointer(uid));await Promise.all(Array.from({length:6},()=>enqueue(uid)));const results=await Promise.all(Array.from({length:5},()=>run(uid)));
+ assert.equal(results.filter(x=>x.status==='created').length,1);assert.deepEqual((await report(uid).get()).data().readyMetrics,['body']);
+ assert.equal((await report(uid).get()).data().insightSnapshot.checkinInsights.insights[0].kind,'checkin_item_repetition');await unchanged(pointer(uid),old);
+});
+test('observation queue update during prepared cutoff is retained for next morning',async()=>{
+ const uid='observation-racing-queue';await seedObservations(uid,'C');await enqueue(uid);let raced=false;
+ const racing=new Proxy(db,{get(target,key){if(key==='runTransaction')return async action=>{if(!raced){raced=true;for(let index=0;index<3;index++)await user(uid).collection('daily_checkins').doc(checkinDates[index]).set(checkinData(checkinDates[index],'A',index));await currentSilver(uid,DAY,MORNING);await enqueue(uid,new Date('2026-10-10T00:01:00Z'));}return target.runTransaction(action);};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+ await currentSilver(uid,DAY,MORNING);assert.equal((await run(uid,{db:racing})).status,'deferred_newer_observation');
+ assert.equal((await report(uid).get()).exists,false);
+ assert.equal((await queue(uid).get()).data().dueDateKey,'2026-10-11');
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'created');
+ assert.equal((await report(uid,'2026-10-11').get()).data().insightSnapshot.checkinInsights.insights[0].kind,'checkin_item_repetition');
+});
+
+test('JST 08:59 observation from today is queued for tomorrow, never included in this morning cutoff',async()=>{
+ const uid='observation-jst-future-cutoff';await seedObservations(uid,'C',6);
+ await user(uid).collection('daily_checkins').doc(DAY).set(checkinData(DAY));await currentSilver(uid,DAY,new Date('2026-10-09T23:59:00Z'));
+ const next=await daily.enqueueDailyPersonalityReport({db,uid,sourceDateKey:DAY,now:new Date('2026-10-09T23:59:00Z')});assert.equal(next.status,'queued');assert.equal(next.dueDateKey,'2026-10-11');
+ assert.equal((await run(uid)).status,'not_queued');assert.equal((await report(uid).get()).exists,false);
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'created');
+});
+test('an earlier body queue cannot consume today observation work excluded from its cutoff',async()=>{
+ const uid='observation-earlier-body-queue';await seedObservations(uid,'C',6,{body:true});
+ await user(uid).collection('weight_records').doc('2026-10-09').set({dayKey:'2026-10-09',weightGrams:100});await currentSilver(uid,'2026-10-09',PREVIOUS);await enqueue(uid);
+ await user(uid).collection('daily_checkins').doc(DAY).set(checkinData(DAY));await currentSilver(uid,DAY,MORNING);await enqueue(uid,new Date('2026-10-10T00:01:00Z'));
+ assert.equal((await queue(uid).get()).data().dueDateKey,DAY);assert.equal((await run(uid)).status,'created');
+ assert.equal((await report(uid).get()).data().insightSnapshot.checkinInsights.insights.length,0);assert.equal((await queue(uid).get()).data().dueDateKey,'2026-10-11');
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'created');
+ assert.equal((await report(uid,'2026-10-11').get()).data().insightSnapshot.checkinInsights.insights[0].kind,'checkin_record_continuity');
+});
+
+test('A corrected to the same underlying B concern stage is not redelivered as a new discovery',async()=>{
+ const uid='observation-A-covered-B';await seedObservations(uid,'A');await enqueue(uid);await run(uid);const old=await snap(report(uid));
+ await user(uid).collection('daily_checkins').doc(checkinDates[0]).set(checkinData(checkinDates[0],'B',0));
+ await currentSilver(uid,DAY,new Date('2026-10-10T03:00:00Z'));
+ assert.equal((await enqueue(uid,new Date('2026-10-10T03:00:00Z'))).status,'unchanged');assert.equal((await queue(uid).get()).exists,false);
+ await unchanged(report(uid),old);
+});
+test('a cancellation queued during fresh cutoff preparation cannot publish stale C or erase newer queue',async()=>{
+ const uid='observation-cancel-race';await seedObservations(uid,'C');await enqueue(uid);await currentSilver(uid,DAY,MORNING);let raced=false;
+ const racing=new Proxy(db,{get(target,key){if(key==='runTransaction')return async action=>{if(!raced){raced=true;await user(uid).collection('daily_checkins').doc(checkinDates[0]).delete();await currentSilver(uid,DAY,MORNING);assert.equal((await enqueue(uid,new Date('2026-10-10T00:01:00Z'))).status,'queued');}return target.runTransaction(action);};const value=Reflect.get(target,key);return typeof value==='function'?value.bind(target):value;}});
+ assert.equal((await run(uid,{db:racing})).status,'deferred_newer_observation');assert.equal((await report(uid).get()).exists,false);
+ assert.equal((await queue(uid).get()).data().dueDateKey,'2026-10-11');assert.equal((await queue(uid).get()).data().checkinPublicationCandidate,null);
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'learning');
+ assert.equal((await queue(uid).get()).exists,false);assert.equal((await report(uid,'2026-10-11').get()).exists,false);
+});
+
+test('past report snapshot without publication state needs no migration scan: normal issuance saves state once',async()=>{
+ const uid='observation-no-migration';await seedObservations(uid,'C');
+ const past=report(uid,'2026-10-09');
+ await past.set({schemaVersion:1,reportKind:'daily',reportId:'daily_2026-10-09',evaluationDateKey:'2026-10-09',readyMetrics:[],metrics:{},latestValidDates:{},
+  insightSnapshot:{checkinInsights:{schemaVersion:1,calculationSpecVersion:'checkin_insights_v1',evaluationDateKey:'2026-10-09',windowEndDateKey:'2026-10-08',
+    insights:[{kind:'checkin_record_continuity',metric:'condition',eligible:true,evidence:{matchingDayCount:7}}]}}});
+ await dailyPointer(uid).set({reportId:'daily_2026-10-09',reportKind:'daily',evaluationDateKey:'2026-10-09',readyMetrics:[]});
+ const pastBefore=await snap(past);const firstBefore=await snap(user(uid).collection('personalized_reports').doc('first'));
+ assert.equal((await enqueue(uid)).status,'queued');assert.equal((await run(uid)).status,'created');
+ const state=(await dailyPointer(uid).get()).data().checkinPublicationState;
+ assert.equal(state.publicationSpecVersion,'checkin_publication_v1');assert.equal(state.seenMaterialityKeys.length,1);
+ await unchanged(past,pastBefore);await unchanged(user(uid).collection('personalized_reports').doc('first'),firstBefore);
+ const published=await snap(report(uid));const pointerBefore=await snap(dailyPointer(uid));
+ await user(uid).collection('daily_checkins').doc(DAY).set(checkinData(DAY));await currentSilver(uid,DAY,new Date('2026-10-10T03:00:00Z'));
+ assert.equal((await enqueue(uid,new Date('2026-10-10T03:00:00Z'))).status,'unchanged');
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'not_queued');
+ await unchanged(report(uid),published);await unchanged(dailyPointer(uid),pointerBefore);await unchanged(past,pastBefore);
+});
+test('successful new publication preserves every saved semantic key while accumulating new discovery state',async()=>{
+ const uid='observation-state-accumulates';await seedObservations(uid,'C',7,{body:true});await enqueue(uid);await run(uid);
+ const saved=(await dailyPointer(uid).get()).data().checkinPublicationState;
+ for(let index=0;index<3;index++)await user(uid).collection('daily_checkins').doc(checkinDates[index]).set(checkinData(checkinDates[index],'A',index));
+ await user(uid).collection('weight_records').doc(DAY).set({dayKey:DAY,weightGrams:100});await currentSilver(uid,DAY,new Date('2026-10-10T03:00:00Z'));
+ assert.equal((await enqueue(uid,new Date('2026-10-10T03:00:00Z'))).status,'queued');
+ assert.equal((await run(uid,{evaluationDateKey:'2026-10-11',now:new Date('2026-10-11T00:00:00Z')})).status,'created');
+ const after=(await dailyPointer(uid).get()).data().checkinPublicationState;
+ assert.ok(saved.seenMaterialityKeys.every(key=>after.seenMaterialityKeys.includes(key)));assert.ok(after.seenMaterialityKeys.length>saved.seenMaterialityKeys.length);
+});

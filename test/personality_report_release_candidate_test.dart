@@ -19,7 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/personality_report.dart';
 import 'package:hamster_project/screens/home.dart';
-import 'package:hamster_project/screens/personalized_report_screen.dart';
+import 'package:hamster_project/widgets/personality_report_entry.dart';
 import 'package:hamster_project/screens/personality_report_screen.dart';
 import 'package:hamster_project/screens/personality_report_history_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
@@ -393,16 +393,16 @@ Future<void> _openHistory(WidgetTester tester) async {
 
 Future<void> _openOld(WidgetTester tester) async {
   await _openHistory(tester);
-  final button = find.text('初回コンディションレポート');
+  final button = find.text('初回分析の記録');
   await tester.ensureVisible(button);
   await tester.tap(button);
   await _frames(tester);
-  expect(find.byType(PersonalizedReportScreen), findsOneWidget);
-  expect(find.byType(PersonalityReportScreen), findsNothing);
-  expect(find.text('初回レポート'), findsOneWidget);
-  expect(find.text('対象指標: 体重'), findsOneWidget);
-  expect(find.text('対象指標: 体重・活動量'), findsNothing);
-  expect(find.text('改訂: 1'), findsOneWidget);
+  expect(find.byType(PersonalityReportScreen), findsOneWidget);
+  expect(find.text('初回分析の記録'), findsOneWidget);
+  expect(find.text('体重'), findsOneWidget);
+  expect(find.text('活動量'), findsNothing);
+  expect(find.text('作成 2026/10/7'), findsOneWidget);
+  expect(find.textContaining('数値は保存されていません'), findsOneWidget);
 }
 
 Future<void> _returnHome(WidgetTester tester) async {
@@ -412,13 +412,16 @@ Future<void> _returnHome(WidgetTester tester) async {
   }
 }
 
+Finder _unreadButton() => find.descendant(
+    of: find.byType(PersonalityReportEntry),
+    matching: find.text('うちの子レポートを見る'));
+
 Future<void> _openNew(WidgetTester tester) async {
-  final button = find.text('個性レポートを見る');
+  final button = _unreadButton();
   await tester.ensureVisible(button);
   await tester.tap(button);
   await _frames(tester);
   expect(find.byType(PersonalityReportScreen), findsOneWidget);
-  expect(find.byType(PersonalizedReportScreen), findsNothing);
   expect(find.byKey(const ValueKey('personality-overview')), findsOneWidget);
   expect(find.text('100'), findsWidgets);
   await tester.scrollUntilVisible(find.byType(MetricComparisonBar), 200);
@@ -492,7 +495,7 @@ void main() {
     await _home(tester, observer);
     expect(find.text('レポートを見る'), findsNothing);
     expect(find.text('個体別コンディション分析を準備中'), findsNothing);
-    expect(find.text('新しい個性レポートが届きました'), findsOneWidget);
+    expect(find.text('新しいうちの子レポートが届きました'), findsOneWidget);
     expect(find.byType(PersonalityReportScreen), findsNothing);
     expect(observer.pushes, 1);
     expect(db.writes, isEmpty);
@@ -504,7 +507,7 @@ void main() {
     await _home(tester, _Observer());
     await _openNew(tester);
     await _returnHome(tester);
-    expect(find.text('個性レポートを見る'), findsNothing);
+    expect(_unreadButton(), findsNothing);
     expect(
         db.documents[
                 'users/$_uid/report_view_states/personality_v1_body_activity']![
@@ -523,7 +526,7 @@ void main() {
     };
     db.changes.add(null);
     await _frames(tester);
-    expect(find.text('新しい個性レポートが届きました'), findsOneWidget);
+    expect(find.text('新しいうちの子レポートが届きました'), findsOneWidget);
     expect(
         db.documents
             .containsKey('users/$_uid/report_view_states/daily_2026-10-10'),
@@ -551,14 +554,14 @@ void main() {
     };
     final dailyBefore = _canonical(daily);
     await _home(tester, _Observer());
-    expect(find.text('新しい個性レポートが届きました'), findsOneWidget);
+    expect(find.text('新しいうちの子レポートが届きました'), findsOneWidget);
     expect(db.writes, isEmpty);
     expect(db.documents.containsKey(dailyViewPath), isFalse);
     await _openNew(tester);
     expect(db.documents[dailyViewPath]!['reportId'], 'daily_2026-10-10');
     expect(db.documents[dailyViewPath]!['viewedAt'], isA<Timestamp>());
     await _returnHome(tester);
-    expect(find.text('個性レポートを見る'), findsNothing);
+    expect(_unreadButton(), findsNothing);
     expect(_canonical(db.documents[_pointerPath]), legacyBefore);
     expect(_canonical(db.documents[dailyReportPath]), dailyBefore);
     expect(_canonical(db.documents[_firstPath]), firstBefore);
@@ -581,8 +584,10 @@ void main() {
     await _home(tester, _Observer());
     expect(db.writes, isEmpty);
     await _openHistory(tester);
-    await tester.ensureVisible(find.text('個性レポート'));
-    await tester.tap(find.text('個性レポート'));
+    await tester.ensureVisible(find
+        .byKey(const ValueKey('report-history-personality_v1_body_activity')));
+    await tester.tap(find
+        .byKey(const ValueKey('report-history-personality_v1_body_activity')));
     await _frames(tester);
     expect(
         db.documents.containsKey(
@@ -593,7 +598,7 @@ void main() {
             .containsKey('users/$_uid/report_view_states/daily_2026-10-10'),
         isFalse);
     await _returnHome(tester);
-    expect(find.text('個性レポートを見る'), findsOneWidget);
+    expect(_unreadButton(), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets(
@@ -601,12 +606,12 @@ void main() {
       (tester) async {
     db.cachedPaths.add(_dailyPointerPath);
     await _home(tester, _Observer());
-    expect(find.text('個性レポートを見る'), findsNothing);
+    expect(_unreadButton(), findsNothing);
     expect(db.writes, isEmpty);
     db.cachedPaths.remove(_dailyPointerPath);
     db.changes.add(null);
     await _frames(tester);
-    expect(find.text('個性レポートを見る'), findsOneWidget);
+    expect(_unreadButton(), findsOneWidget);
     expect(db.writes, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -615,7 +620,7 @@ void main() {
       (tester) async {
     db.documents.remove(_pointerPath);
     await _home(tester, _Observer());
-    expect(find.text('個性レポートを見る'), findsNothing);
+    expect(_unreadButton(), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     db.documents[_pointerPath] = {
       'reportId': 'personality_v1_body_activity',
@@ -625,11 +630,11 @@ void main() {
         'users/$_uid/report_view_states/personality_v1_body_activity';
     db.cachedPaths.add(marker);
     await _home(tester, _Observer());
-    expect(find.text('個性レポートを見る'), findsNothing);
+    expect(_unreadButton(), findsNothing);
     db.cachedPaths.remove(marker);
     db.changes.add(null);
     await _frames(tester);
-    expect(find.text('個性レポートを見る'), findsOneWidget);
+    expect(_unreadButton(), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('actual Home keeps health alert and anomaly before unread report',
@@ -646,7 +651,7 @@ void main() {
       'level': '危険'
     };
     await _home(tester, _Observer());
-    final report = find.text('新しい個性レポートが届きました');
+    final report = find.text('新しいうちの子レポートが届きました');
     expect(find.text('総合コンディション'), findsOneWidget);
     expect(find.text('最近の気になる変化'), findsOneWidget);
     expect(tester.getTopLeft(find.text('総合コンディション')).dy,
@@ -669,14 +674,16 @@ void main() {
     db.documents['users/$_uid/analysis_readiness/activity'] = {
       'currentStatus': 'learning',
       'validRecordCount': 5,
-      'observationSpanDays': 5
+      'observationSpanDays': 5,
+      'requiredRecordCount': 7,
+      'requiredObservationSpanDays': 14
     };
     final before = _canonical(body),
         firstBefore = _canonical(db.documents[_firstPath]);
     await _home(tester, _Observer());
-    expect(find.textContaining('活動量: 有効記録 5/7'), findsOneWidget);
-    await tester.ensureVisible(find.text('個性レポートを見る'));
-    await tester.tap(find.text('個性レポートを見る'));
+    expect(find.text('記録 5 / 7 件'), findsOneWidget);
+    await tester.ensureVisible(_unreadButton());
+    await tester.tap(_unreadButton());
     await _frames(tester);
     expect(find.byKey(const ValueKey('personality-overview')), findsOneWidget);
     expect(find.text('100'), findsWidgets);
@@ -698,8 +705,8 @@ void main() {
     final before = _canonical(db.documents[path]),
         firstBefore = _canonical(db.documents[_firstPath]);
     await _home(tester, _Observer());
-    await tester.ensureVisible(find.text('個性レポートを見る'));
-    await tester.tap(find.text('個性レポートを見る'));
+    await tester.ensureVisible(_unreadButton());
+    await tester.tap(_unreadButton());
     await _frames(tester);
     db.documents[_pointerPath] = {
       'reportId': 'personality_v1_body_activity',
@@ -711,7 +718,7 @@ void main() {
     expect(
         find.byKey(const ValueKey('personality-activity-card')), findsNothing);
     await _returnHome(tester);
-    expect(find.text('個性レポートを見る'), findsOneWidget);
+    expect(_unreadButton(), findsOneWidget);
     await _openNew(tester);
     expect(_canonical(db.documents[path]), before);
     expect(_canonical(db.documents[_firstPath]), firstBefore);
@@ -729,8 +736,8 @@ void main() {
                 recordCompletionListenable: completion,
                 onSelectScreen: (value) => selected = value))));
     await _frames(tester);
-    await tester.ensureVisible(find.text('レポート履歴'));
-    await tester.tap(find.text('レポート履歴'));
+    await tester.ensureVisible(find.text('うちの子レポート'));
+    await tester.tap(find.text('うちの子レポート'));
     expect(selected, 'report_history');
     expect(find.text('記録する'), findsOneWidget);
     expect(find.text('ペットのプロフィール'), findsOneWidget);
@@ -738,14 +745,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets(
-      'legacy absent in server shows empty state, not permanent spinner',
+      'history does not invent a missing legacy report or mark it viewed',
       (tester) async {
     db.documents.remove(_firstPath);
     await _home(tester, _Observer());
     await _openHistory(tester);
-    await tester.tap(find.text('初回コンディションレポート'));
-    await _frames(tester);
-    expect(find.text('初回レポートはまだありません'), findsOneWidget);
+    expect(find.text('初回分析の記録'), findsNothing);
+    expect(find.text('うちの子レポート'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(db.writes, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());

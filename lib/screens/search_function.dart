@@ -20,6 +20,11 @@ import '../models/hamster_avatar.dart';
 import '../models/pet_profile.dart';
 import '../models/feature_trial_access.dart';
 import '../services/ai_chat_history_repo.dart';
+import '../services/ai_text_consent_store.dart';
+import '../services/ai_text_consent_gate.dart';
+import '../widgets/ai_text_consent_dialog.dart';
+import '../services/ai_access_failure.dart';
+import '../services/pending_chat_request_store.dart';
 import '../services/app_analytics.dart';
 import '../services/chat_request_sanitizer.dart';
 import '../services/hamster_avatar_appearance_resolver.dart';
@@ -240,6 +245,9 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   String? _activeArchiveId;
 
   bool _isLoading = false;
+  bool _isPreparingTextSend = false;
+  final _textConsentStore = AiTextConsentStore();
+  late final _textConsentGate = AiTextConsentGate(store: _textConsentStore);
   bool _openingMonitoringIntro = false;
   bool _isRestoringHistory = true;
   bool _hasRestoredHistory = false;
@@ -257,6 +265,11 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   final List<Map<String, String>> _conversationHistory = [];
   String? _retryRequestText;
   String? _retryRequestId;
+  String? _retryRequestBody;
+  String? _conversationOwnerUid;
+  bool _pendingStorageReady = false;
+  final _pendingRequests = PendingChatRequestStore();
+  final _unreplayableRestoredTexts = <String>{};
   final Set<String> _feedbackSavingMessageIds = <String>{};
   StreamSubscription<Amplitude>? _amplitudeSub;
   List<double> _voiceWaveform = List<double>.filled(28, 0.14);
@@ -282,6 +295,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   @override
   void initState() {
     super.initState();
+    _conversationOwnerUid = FirebaseAuth.instance.currentUser?.uid;
     _onboardingStream = _onboardingRepo.watchState();
     _restoreChatHistory();
     _listenUserAvatar();
@@ -374,16 +388,44 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     unawaited(_confirmStartNewChat());
   }
 
+  bool _isRequestOwner(String uid) =>
+      mounted &&
+      _conversationOwnerUid == uid &&
+      FirebaseAuth.instance.currentUser?.uid == uid;
+
+  void _requireRequestOwner(String uid) {
+    if (!_isRequestOwner(uid)) {
+      throw const AiAccessFailure(
+          'auth_required', 'ログイン中のアカウントが変わりました。相談画面を開き直してください。');
+    }
+  }
+
+  void _requireTextConsentCurrent(String uid, int generation) {
+    _requireRequestOwner(uid);
+    if (_textConsentStore.generationFor(uid) != generation) {
+      throw const AiAccessFailure(
+        'ai_consent_required',
+        'AI相談の情報送信への同意が取り消されました。送信する場合は、もう一度同意してください。',
+      );
+    }
+  }
+
   Future<void> _restoreChatHistory() async {
     setState(() {
       _isRestoringHistory = true;
     });
 
+    final ownerUid = _conversationOwnerUid;
     try {
+      if (ownerUid == null) {
+        throw const AiAccessFailure('auth_required', 'もう一度ログインしてください。');
+      }
+      _requireRequestOwner(ownerUid);
+      final pending = await _pendingRequests.read(ownerUid);
+      _requireRequestOwner(ownerUid);
       final savedMessages =
           await _chatHistoryRepo.fetchRecentMessages(limit: 50);
-
-      if (!mounted) return;
+      _requireRequestOwner(ownerUid);
 
       final restoredMessages = <ChatMessage>[];
       final restoredHistory = <Map<String, String>>[];
@@ -409,11 +451,23 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
         });
       }
 
-      final lastSaved = savedMessages.isEmpty ? null : savedMessages.last;
-      final unresolvedRequestId = lastSaved?.isUser == true &&
-              (lastSaved?.requestId?.isNotEmpty ?? false)
-          ? lastSaved!.requestId
-          : null;
+      // Legacy request IDs alone are insufficient to recreate a server digest.
+      // A repeated restored question without its exact persisted body fails
+      // closed, even when an older assistant write changed message ordering.
+      final unreplayable = savedMessages
+          .where((message) =>
+              message.isUser && (message.requestId?.isNotEmpty ?? false))
+          .map((message) => message.content)
+          .toSet();
+      if (pending != null &&
+          !savedMessages
+              .any((message) => message.requestId == pending.requestId)) {
+        restoredMessages.add(ChatMessage(
+            id: 'request_${pending.requestId}',
+            content: pending.query,
+            isUser: true));
+        restoredHistory.add({'role': 'user', 'content': pending.query});
+      }
 
       setState(() {
         _messages
@@ -425,9 +479,13 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
           ..addAll(restoredHistory);
 
         _activeArchiveId = null;
-        _retryRequestText =
-            unresolvedRequestId == null ? null : lastSaved!.content;
-        _retryRequestId = unresolvedRequestId;
+        _retryRequestText = pending?.query;
+        _retryRequestId = pending?.requestId;
+        _retryRequestBody = pending?.body;
+        _unreplayableRestoredTexts
+          ..clear()
+          ..addAll(unreplayable);
+        _pendingStorageReady = true;
         _hasRestoredHistory = restoredMessages.isNotEmpty;
 
         if (_messages.isNotEmpty) {
@@ -442,13 +500,19 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       });
 
       _scrollToBottom();
-    } catch (e) {
+    } catch (error) {
+      debugPrint('[AiChat] restore failed type=${error.runtimeType}');
       if (!mounted) return;
 
       setState(() {
+        _pendingStorageReady = false;
+        _messages.clear();
+        _conversationHistory.clear();
         _messages.add(
           ChatMessage(
-            content: '履歴の読み込みに失敗しました: $e',
+            content: error is PendingChatStorageFailure
+                ? '相談の送信状態を安全に確認できませんでした。相談画面を開き直し、問題が続く場合はお問い合わせください。'
+                : '相談履歴を確認できませんでした。相談画面を開き直してください。',
             isUser: false,
           ),
         );
@@ -495,13 +559,23 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     });
 
     try {
+      final ownerUid = _conversationOwnerUid;
+      if (ownerUid == null) return;
+      _requireRequestOwner(ownerUid);
       await _chatHistoryRepo.archiveAndClearMainThread();
-
-      if (!mounted) return;
+      _requireRequestOwner(ownerUid);
+      if (_retryRequestId != null) {
+        await _pendingRequests.clear(ownerUid, _retryRequestId!);
+        _requireRequestOwner(ownerUid);
+      }
 
       setState(() {
         _messages.clear();
         _conversationHistory.clear();
+        _retryRequestText = null;
+        _retryRequestId = null;
+        _retryRequestBody = null;
+        _unreplayableRestoredTexts.clear();
         _hasRestoredHistory = false;
         _showDescriptionCard = true;
         _cardOpacity = 1.0;
@@ -1019,21 +1093,33 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
     }
   }
 
-  Future<ChatApiResult> _fetchAIResponseWithHistory(
-    String userMessage, {
-    required String requestId,
+  String _chatRequestBody(String query, String requestId,
+          Iterable<Map<String, String>> history) =>
+      json.encode({
+        'query': query,
+        'history': sanitizeChatRequestHistory(history),
+        'request_id': requestId,
+      });
+
+  Future<ChatApiResult> _fetchAIResponseWithHistory({
+    required String requestBody,
+    required String ownerUid,
+    required int consentGeneration,
   }) async {
     final url = Uri.parse('$_ragApiBaseUrl/chat');
-
+    _requireTextConsentCurrent(ownerUid, consentGeneration);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      throw Exception('ログイン情報を確認できませんでした。もう一度ログインしてください。');
+      throw const AiAccessFailure(
+          'auth_required', 'ログイン情報を確認できませんでした。もう一度ログインしてください。');
     }
 
     final idToken = await user.getIdToken();
+    _requireTextConsentCurrent(ownerUid, consentGeneration);
 
     if (idToken == null || idToken.isEmpty) {
-      throw Exception('認証トークンを取得できませんでした。もう一度ログインしてください。');
+      throw const AiAccessFailure(
+          'auth_required', 'ログイン情報を確認できませんでした。もう一度ログインしてください。');
     }
 
     String? appCheckToken;
@@ -1046,14 +1132,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       );
     }
 
-    final historyToSend = sanitizeChatRequestHistory(_conversationHistory);
-
-    final requestBody = json.encode({
-      'query': userMessage,
-      'history': historyToSend,
-      'request_id': requestId,
-    });
-
+    _requireTextConsentCurrent(ownerUid, consentGeneration);
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $idToken',
@@ -1068,6 +1147,7 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       body: requestBody,
     );
 
+    _requireRequestOwner(ownerUid);
     if (res.statusCode == 200) {
       final decoded =
           json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
@@ -1106,29 +1186,10 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       );
     }
 
-    if (res.statusCode == 401) {
-      throw Exception('認証に失敗しました。ログインし直してください。');
-    }
-
-    if (res.statusCode == 429) {
-      throw Exception('AI相談の利用上限に達している可能性があります。少し時間をおいて再度お試しください。');
-    }
-
-    if (res.statusCode == 422) {
-      throw Exception('質問または会話履歴が長すぎるか、形式を確認できませんでした。質問を短くして再度お試しください。');
-    }
-
-    if (res.statusCode == 409) {
-      throw Exception(
-        '前回の相談を確認中です。同じ内容を連続して送信せず、少し時間をおいて画面を開き直してください。',
-      );
-    }
-
-    if (res.statusCode >= 500) {
-      throw Exception('AIサーバー側で一時的なエラーが発生しました。少し時間をおいて再度お試しください。');
-    }
-
-    throw Exception('API通信に失敗しました (HTTP ${res.statusCode})');
+    throw AiAccessFailure.fromChatResponse(
+      res.statusCode,
+      utf8.decode(res.bodyBytes, allowMalformed: true),
+    );
   }
 
   void _startDotTimer() {
@@ -1149,7 +1210,30 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
   }
 
   void _handleSend() async {
-    if (_isViewingArchivedThread) return;
+    // Keep the lock through consent and the existing send, including cached
+    // consent reads and any entitlement waits before _isLoading becomes true.
+    if (_isPreparingTextSend || _isLoading) return;
+    _isPreparingTextSend = true;
+    try {
+      await _handleSendWithConsent();
+    } finally {
+      _isPreparingTextSend = false;
+    }
+  }
+
+  Future<void> _handleSendWithConsent() async {
+    if (_isViewingArchivedThread || _isRestoringHistory) return;
+    final ownerUid = _conversationOwnerUid;
+    if (ownerUid == null || !_isRequestOwner(ownerUid)) {
+      _showFeedback('ログイン中のアカウントが変わりました。相談画面を開き直してください。',
+          tone: HamsterFeedbackTone.warning);
+      return;
+    }
+    if (!_pendingStorageReady) {
+      _showFeedback('相談の送信状態を安全に確認できません。相談画面を開き直してください。',
+          tone: HamsterFeedbackTone.warning);
+      return;
+    }
 
     final text = _textController.text.trim();
     if (text.isEmpty || _isLoading) return;
@@ -1161,6 +1245,31 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       return;
     }
 
+    final consentGeneration = _textConsentStore.generationFor(ownerUid);
+    try {
+      final accepted = await _textConsentGate.ensureConsent(
+        ownerUid: ownerUid,
+        isRequestOwner: () => _isRequestOwner(ownerUid),
+        requestConsent: () => showAiTextConsentDialog(context),
+      );
+      if (!accepted ||
+          !_isRequestOwner(ownerUid) ||
+          _textConsentStore.generationFor(ownerUid) != consentGeneration ||
+          _isViewingArchivedThread ||
+          _isRestoringHistory ||
+          _textController.text.trim() != text) {
+        return;
+      }
+    } catch (_) {
+      if (_isRequestOwner(ownerUid)) {
+        _showFeedback(
+          'AI相談の情報送信への同意を確認・保存できませんでした。相談画面を開き直してください。',
+          tone: HamsterFeedbackTone.warning,
+        );
+      }
+      return;
+    }
+
     final hasHistory =
         _conversationHistory.any((message) => message['role'] == 'assistant');
     unawaited(
@@ -1169,8 +1278,10 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
 
     if (widget.trialFeature == TrialFeature.ai) {
       final billing = await _billingRepo.fetchBillingStatus();
+      if (!_isRequestOwner(ownerUid)) return;
       if (!billing.canUsePaidFeatures) {
         final trial = await _trialRepo.fetch();
+        if (!_isRequestOwner(ownerUid)) return;
         if (!trial.allows(TrialFeature.ai)) {
           if (!mounted) return;
           _showFeedback(
@@ -1182,14 +1293,25 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       }
     }
 
-    final requestId = _retryRequestText == text && _retryRequestId != null
+    final retrying = _retryRequestText == text &&
+        _retryRequestId != null &&
+        _retryRequestBody != null;
+    if (!retrying && _unreplayableRestoredTexts.contains(text)) {
+      _showFeedback('以前の相談の処理結果を確認できていません。新しく送り直さず、お問い合わせください。',
+          tone: HamsterFeedbackTone.warning);
+      return;
+    }
+    if (!_isRequestOwner(ownerUid)) return;
+    final requestId = retrying
         ? _retryRequestId!
         : 'chat_${DateTime.now().microsecondsSinceEpoch}_${Random.secure().nextInt(1 << 32)}';
 
     setState(() {
       _hasRestoredHistory = false;
-      _messages.add(ChatMessage(content: text, isUser: true));
-      _conversationHistory.add({'role': 'user', 'content': text});
+      if (!retrying) {
+        _messages.add(ChatMessage(content: text, isUser: true));
+        _conversationHistory.add({'role': 'user', 'content': text});
+      }
       _isLoading = true;
       _messages.add(
         ChatMessage(
@@ -1200,21 +1322,38 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       );
     });
 
+    // A retry must preserve the entire original payload: its server-owned
+    // reservation is keyed by both request ID and query/history digest.
+    final requestBody = retrying
+        ? _retryRequestBody!
+        : _chatRequestBody(text, requestId, _conversationHistory);
+    _retryRequestText = text;
+    _retryRequestId = requestId;
+    _retryRequestBody = requestBody;
+
     _textController.clear();
     _scrollToBottom();
 
     try {
+      _requireTextConsentCurrent(ownerUid, consentGeneration);
+      await _pendingRequests.write(PendingChatRequest(
+          ownerUid: ownerUid,
+          requestId: requestId,
+          query: text,
+          body: requestBody));
+      _requireTextConsentCurrent(ownerUid, consentGeneration);
       await _chatHistoryRepo.addUserMessage(
         content: text,
         requestId: requestId,
       );
+      _requireTextConsentCurrent(ownerUid, consentGeneration);
       _startDotTimer();
       final result = await _fetchAIResponseWithHistory(
-        text,
-        requestId: requestId,
+        requestBody: requestBody,
+        ownerUid: ownerUid,
+        consentGeneration: consentGeneration,
       );
-
-      if (!mounted) return;
+      _requireRequestOwner(ownerUid);
 
       setState(() {
         _messages.removeWhere((msg) => msg.isLoading);
@@ -1236,15 +1375,16 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       });
 
       final assistantMessage = _messages.last;
-      unawaited(
-        _chatHistoryRepo.addAssistantMessage(
-          messageId: assistantMessage.id!,
-          content: result.answer,
-          originalQuery: text,
-          chunks: result.chunks.map((e) => e.toJson()).toList(),
-          ragMetadata: result.ragMetadata,
-        ),
+      await _chatHistoryRepo.addAssistantMessage(
+        messageId: assistantMessage.id!,
+        content: result.answer,
+        originalQuery: text,
+        chunks: result.chunks.map((e) => e.toJson()).toList(),
+        ragMetadata: result.ragMetadata,
       );
+      _requireRequestOwner(ownerUid);
+      await _pendingRequests.clear(ownerUid, requestId);
+      _requireRequestOwner(ownerUid);
       unawaited(
         AppAnalytics.logAiConsultationCompleted(
           retrievedChunkCount: result.chunks.length,
@@ -1253,10 +1393,15 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       if (_retryRequestId == requestId) {
         _retryRequestId = null;
         _retryRequestText = null;
+        _retryRequestBody = null;
       }
       if (widget.trialFeature == TrialFeature.ai) {
         final billing = await _billingRepo.fetchBillingStatus();
-        if (!billing.canUsePaidFeatures) await _trialRepo.consumeAiTrial();
+        _requireRequestOwner(ownerUid);
+        if (!billing.canUsePaidFeatures) {
+          await _trialRepo.consumeAiTrial();
+          _requireRequestOwner(ownerUid);
+        }
       }
       final onConsultationCompleted = widget.onConsultationCompleted;
       if (onConsultationCompleted != null) {
@@ -1264,18 +1409,33 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       }
 
       _scrollToBottom();
-    } catch (e) {
-      _retryRequestText = text;
-      _retryRequestId = requestId;
+    } catch (error) {
+      final failure = AiAccessFailure.fromChatError(error);
+      debugPrint('[AiChat] failed code=${failure.code} '
+          'status=${failure.statusCode ?? 0} requestId=$requestId');
       unawaited(AppAnalytics.logAiConsultationFailed());
 
       if (!mounted) return;
+      if (!_isRequestOwner(ownerUid)) {
+        setState(() {
+          _messages.clear();
+          _conversationHistory.clear();
+          _retryRequestText = null;
+          _retryRequestId = null;
+          _retryRequestBody = null;
+          _pendingStorageReady = false;
+        });
+        _showFeedback('ログイン中のアカウントが変わりました。相談画面を開き直してください。',
+            tone: HamsterFeedbackTone.warning);
+        return;
+      }
+      if (error is PendingChatStorageFailure) _pendingStorageReady = false;
 
       setState(() {
         _messages.removeWhere((msg) => msg.isLoading);
         _messages.add(
           ChatMessage(
-            content: 'エラー: $e',
+            content: failure.message,
             isUser: false,
           ),
         );

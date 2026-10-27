@@ -825,6 +825,91 @@ class AppTheme {
       primaryText(context).withValues(alpha: 0.70);
   static Color comparisonTrackColor(BuildContext context) => chartGrid(context);
 
+  // ===== Analysis preparation (opt-in; no global ThemeData changes) =====
+  // Explanation-only illustration, not a pet photograph or a new avatar state.
+  static const String analysisPreparationIllustrationAsset =
+      'assets/avatars/syrian/golden/analysis_preparing_v1.png';
+  static const analysisPreparationReadyPadding = EdgeInsets.all(8);
+  static const double analysisPreparationIllustrationSize = 108;
+  static const double analysisPreparationCompactIllustrationSize = 88;
+  static const double analysisPreparationMetricGap = 18;
+  static const double analysisPreparationTrackHeight = 5;
+  static const double analysisPreparationCompactWidth = 260;
+  static Color analysisPreparationProgressColor(BuildContext context) =>
+      isDark(context) ? quickRecordGlow(context) : primaryAction;
+  static TextStyle analysisPreparationMessageStyle(BuildContext context) =>
+      dataBodyStyle(context).copyWith(
+          fontSize: 18, fontWeight: FontWeight.w600, height: 1.45);
+
+  // ===== Record achievement surfaces (opt-in; no global theme changes) =====
+  static const double careSectionGap = 24;
+  static const double careContentGap = 12;
+  static const double careChoiceGap = 6;
+  static const double careCalendarDaySize = 36;
+  static const double careCalendarRowHeight = 48;
+  static const double careCalendarBandRadius = 18;
+  static const double careHeroSymbolSize = 40;
+  static const double careHomeSymbolSize = 24;
+  static const double careHomeSlotSize = 24;
+  static const double careDetailSlotSize = 32;
+  static const double careTodayRingWidth = 1.5;
+  static const double careCalendarRestMarkWidth = 6;
+  static const double careCalendarRestMarkHeight = 1.5;
+  static const careHomePadding = EdgeInsets.all(16);
+  static const careDetailPadding =
+      EdgeInsets.symmetric(horizontal: 20, vertical: 16);
+  static Color careAchievementGold(BuildContext context) =>
+      isDark(context) ? const Color(0xFFFFD782) : const Color(0xFF8D6419);
+  static Color careCalendarBand(BuildContext context) =>
+      isDark(context) ? const Color(0xFFE8BC62) : const Color(0xFFECC875);
+  static Color careCalendarOnBand(BuildContext context) =>
+      const Color(0xFF352A16);
+  static Color careCalendarTodayRing(BuildContext context) =>
+      primaryText(context);
+  static Color careRestText(BuildContext context) => secondaryText(context);
+  static TextStyle careAchievementNumberStyle(BuildContext context,
+          {bool compact = false, double width = 360}) =>
+      dataValueStyle(context).copyWith(
+          fontSize: compact
+              ? 40
+              : width < 340
+                  ? 80
+                  : 96,
+          fontWeight: FontWeight.w600,
+          height: 1.06,
+          letterSpacing: -3,
+          color: careAchievementGold(context));
+  static TextStyle careAchievementUnitStyle(BuildContext context,
+          {bool compact = false}) =>
+      dataBodyStyle(context).copyWith(
+          fontSize: compact ? 16 : 20,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0,
+          color: careAchievementGold(context));
+  static TextStyle careDurationValueStyle(BuildContext context) =>
+      dataBodyStyle(context)
+          .copyWith(fontSize: 48, fontWeight: FontWeight.w600);
+  static Color careChoiceSelectedSurface(BuildContext context) =>
+      quickRecordGlow(context).withValues(alpha: .18);
+  static Color careChoiceSelectedForeground(BuildContext context) =>
+      primaryText(context);
+  static Color careChoiceUnselectedForeground(BuildContext context) =>
+      secondaryText(context);
+  static SliderThemeData careInputSliderTheme(BuildContext context) =>
+      SliderTheme.of(context).copyWith(
+        trackHeight: comparisonTrackHeight,
+        activeTrackColor: quickRecordGlow(context),
+        inactiveTrackColor:
+            comparisonReferenceColor(context).withValues(alpha: .5),
+        thumbColor: quickRecordGlow(context),
+        overlayColor: quickRecordGlow(context).withValues(alpha: .15),
+        activeTickMarkColor: Colors.transparent,
+        inactiveTickMarkColor: Colors.transparent,
+      );
+  static Color careDetailOverlay(BuildContext context) => isDark(context)
+      ? darkBg.withValues(alpha: .58)
+      : Colors.white.withValues(alpha: .48);
+
   // ダークテーマ
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,

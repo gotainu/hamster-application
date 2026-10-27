@@ -9,6 +9,14 @@ abstract interface class PersonalityReportsSource {
   Stream<PersonalityReportState> watchLatest();
 }
 
+/// The unified detail may compare immutable publication dates across pointers.
+/// The original daily reader remains available; unified detail and unread
+/// selection use the same watchNewest() path.
+abstract interface class PersonalityNewestReportsSource
+    implements PersonalityReportsSource {
+  Stream<PersonalityReportState> watchNewest();
+}
+
 /// Optional extension used by immutable history detail screens. Existing latest
 /// sources and their test fakes remain source-compatible.
 abstract interface class PersonalitySpecificReportSource
@@ -42,7 +50,10 @@ bool _isViewed(Map<String, dynamic>? data, String reportId) {
 /// Owner-only reads of the pointer and its immutable report. Subscription/trial
 /// state is deliberately not read: generated reports remain available afterward.
 class PersonalityReportsRepo
-    implements PersonalityReportsHistorySource, PersonalityUnreadReportsSource {
+    implements
+        PersonalityReportsHistorySource,
+        PersonalityUnreadReportsSource,
+        PersonalityNewestReportsSource {
   PersonalityReportsRepo({FirebaseAuth? auth, FirebaseFirestore? db})
       : _auth = auth ?? FirebaseAuth.instance,
         _db = db ?? FirebaseFirestore.instance;
@@ -51,6 +62,70 @@ class PersonalityReportsRepo
 
   @override
   Stream<PersonalityReportState> watchLatest() => _watch();
+
+  @override
+  Stream<PersonalityReportState> watchNewest() {
+    late StreamController<PersonalityReportState> controller;
+    StreamSubscription<PersonalityReportState>? dailySub, v1Sub;
+    PersonalityReportState? daily, v1;
+    var cancelled = false;
+    void emit() {
+      if (cancelled) return;
+      final a = daily, b = v1;
+      final uid = a?.ownerUid ?? b?.ownerUid;
+      if (a == null || b == null || a.ownerUid != b.ownerUid) {
+        controller.add(PersonalityReportState.loading(uid));
+        return;
+      }
+      if (a.phase == PersonalityReportPhase.unavailable ||
+          b.phase == PersonalityReportPhase.unavailable) {
+        controller.add(PersonalityReportState.unavailable(uid));
+        return;
+      }
+      if (a.phase == PersonalityReportPhase.loading ||
+          b.phase == PersonalityReportPhase.loading) {
+        controller.add(PersonalityReportState.loading(uid));
+        return;
+      }
+      final reports = [a, b]
+          .where((x) =>
+              x.phase == PersonalityReportPhase.available && x.report != null)
+          .toList()
+        ..sort((x, y) =>
+            y.report!.generatedAt.compareTo(x.report!.generatedAt) != 0
+                ? y.report!.generatedAt.compareTo(x.report!.generatedAt)
+                : x.report!.isDaily != y.report!.isDaily
+                    ? (y.report!.isDaily ? 1 : 0) - (x.report!.isDaily ? 1 : 0)
+                    : y.report!.reportId.compareTo(x.report!.reportId));
+      controller.add(reports.isEmpty
+          ? PersonalityReportState.learning(uid)
+          : reports.first);
+    }
+
+    controller = StreamController<PersonalityReportState>(onListen: () {
+      dailySub = _watch(dailyOnly: true).listen((s) {
+        daily = s;
+        emit();
+      }, onError: (Object e, StackTrace st) {
+        daily = PersonalityReportState.unavailable(daily?.ownerUid);
+        emit();
+      });
+      v1Sub = _watch(v1Only: true).listen((s) {
+        v1 = s;
+        emit();
+      }, onError: (Object e, StackTrace st) {
+        v1 = PersonalityReportState.unavailable(v1?.ownerUid);
+        emit();
+      });
+    }, onCancel: () async {
+      cancelled = true;
+      await Future.wait([
+        if (dailySub != null) dailySub!.cancel(),
+        if (v1Sub != null) v1Sub!.cancel()
+      ]);
+    });
+    return controller.stream;
+  }
 
   @override
   Stream<PersonalityReportState> watchReport(String reportId) {
@@ -156,7 +231,7 @@ class PersonalityReportsRepo
     }
 
     controller = StreamController<PersonalityReportState>(onListen: () {
-      latestSubscription = watchLatest().listen((state) {
+      latestSubscription = watchNewest().listen((state) {
         if (cancelled) return;
         if (state.phase != PersonalityReportPhase.available ||
             state.report == null ||
@@ -225,7 +300,8 @@ class PersonalityReportsRepo
     return controller.stream;
   }
 
-  Stream<PersonalityReportState> _watch({String? fixedReportId}) {
+  Stream<PersonalityReportState> _watch(
+      {String? fixedReportId, bool v1Only = false, bool dailyOnly = false}) {
     late StreamController<PersonalityReportState> controller;
     StreamSubscription<User?>? authSubscription;
     StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
@@ -367,6 +443,10 @@ class PersonalityReportsRepo
         bindReport(uid, user, fixedReportId, owner);
         return;
       }
+      if (v1Only) {
+        bindLegacyPointer(uid, user, owner);
+        return;
+      }
       pointerSubscription = user
           .collection('report_pointers')
           .doc('personality_daily')
@@ -385,7 +465,12 @@ class PersonalityReportsRepo
         }
         final data = pointer.data();
         if (data == null) {
-          bindLegacyPointer(uid, user, owner);
+          if (dailyOnly) {
+            clearReport();
+            add(PersonalityReportState.learning(uid));
+          } else {
+            bindLegacyPointer(uid, user, owner);
+          }
           return;
         }
         clearLegacyPointer();

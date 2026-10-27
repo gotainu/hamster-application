@@ -16,7 +16,8 @@ import '../widgets/hamster_avatar_view.dart';
 import '../widgets/hamster_feedback_popup.dart';
 
 class PetProfileEditScreen extends StatefulWidget {
-  const PetProfileEditScreen({super.key});
+  const PetProfileEditScreen({super.key, this.repo});
+  final PetProfileRepo? repo;
   @override
   State<PetProfileEditScreen> createState() => _PetProfileEditScreenState();
 }
@@ -27,15 +28,19 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   final _nameController = TextEditingController();
   final _birthdayController = TextEditingController();
 
-  final _repo = PetProfileRepo();
+  late final PetProfileRepo _repo;
 
   File? _pickedImageFile;
   String? _existingImageUrl; // 既存URL（プレビュー用）
   DateTime? _birthday;
+  String _birthdayPrecision = 'unknown';
+  PetProfile? _loadedProfile;
 
   String _selectedSpecies = 'シリアン';
   String? _selectedColor;
   bool _isLoading = false;
+  bool _profileLoadFailed = false;
+  bool _profilePending = false;
 
   static const _avatarAppearanceResolver = HamsterAvatarAppearanceResolver();
   static const _avatarAssetResolver = HamsterAvatarAssetResolver();
@@ -44,6 +49,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repo ?? PetProfileRepo();
     _nameController.addListener(_refreshPreview);
     _fetchExistingData();
   }
@@ -61,44 +67,57 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
   // ---------- data load ----------
   Future<void> _fetchExistingData() async {
-    final p = await _repo.fetchMainPet(); // ★ Firestore直叩き禁止：Repo経由
-    if (!mounted) return;
+    setState(() => _isLoading = true);
+    try {
+      final pending = await _repo.fetchPendingProfile();
+      final p = pending ?? await _repo.fetchMainPet();
+      _profilePending = pending != null;
+      _profileLoadFailed = false;
+      if (!mounted) return;
 
-    if (p == null) {
-      // 未登録の場合は初期値のまま
-      setState(() {
-        _nameController.text = '';
-        _birthday = null;
-        _birthdayController.clear();
-        _selectedSpecies = 'シリアン';
-        _selectedColor =
-            _avatarAppearanceResolver.defaultColorForSpecies(_selectedSpecies);
-        _existingImageUrl = null;
-      });
-      return;
-    }
-
-    setState(() {
-      _nameController.text = p.name;
-      _birthday = p.birthday;
-      if (p.birthday != null) {
-        final d = p.birthday!;
-        _birthdayController.text =
-            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-      } else {
-        _birthdayController.clear();
+      if (p == null) {
+        // 未登録の場合は初期値のまま
+        setState(() {
+          _nameController.text = '';
+          _birthday = null;
+          _birthdayController.clear();
+          _selectedSpecies = 'シリアン';
+          _selectedColor = _avatarAppearanceResolver
+              .defaultColorForSpecies(_selectedSpecies);
+          _existingImageUrl = null;
+        });
+        return;
       }
-      _selectedSpecies = p.species.trim().isEmpty ? 'シリアン' : p.species;
-      _selectedColor = _avatarAppearanceResolver.normalizeColorForSelection(
-        species: _selectedSpecies,
-        color: p.color,
-      );
-      _existingImageUrl = p.imageUrl;
-    });
+
+      setState(() {
+        _loadedProfile = p;
+        _nameController.text = p.name;
+        _birthday = p.birthday;
+        _birthdayPrecision = p.birthdayPrecision;
+        if (p.birthday != null) {
+          final d = p.birthday!;
+          _birthdayController.text =
+              '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        } else {
+          _birthdayController.clear();
+        }
+        _selectedSpecies = p.species;
+        _selectedColor = _avatarAppearanceResolver.normalizeColorForSelection(
+          species: _selectedSpecies,
+          color: p.color,
+        );
+        _existingImageUrl = p.imageUrl;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _profileLoadFailed = true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   // ---------- helpers ----------
   Future<void> _pickBirthday() async {
+    if (_isLoading || _profilePending) return;
     final now = DateTime.now();
     final initialDate = _birthday ?? DateTime(now.year - 1);
     final firstDate = DateTime(now.year - 5);
@@ -115,6 +134,9 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
     setState(() {
       _birthday = picked;
+      if (_birthdayPrecision == 'unknown') {
+        _birthdayPrecision = 'legacy_unspecified';
+      }
       _birthdayController.text =
           '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
     });
@@ -122,6 +144,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
   // UserImagePicker から受け取る
   void _pickImage(File image) {
+    if (_isLoading || _profilePending) return;
     setState(() {
       _pickedImageFile = image;
       // 新規選択時は既存URLをクリア（プレビューがローカル優先になる）
@@ -131,18 +154,20 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
   Future<void> _onDeleteImage() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null || _isLoading || _profilePending) return;
 
     final urlToDelete = _existingImageUrl;
 
-    setState(() {
-      _pickedImageFile = null;
-      _existingImageUrl = null;
-    });
-
     try {
       // ★ Firestore直叩き禁止：Repo経由で imageUrl を消す
-      await _repo.deleteImageUrl();
+      _loadedProfile =
+          await _repo.deleteImageUrl(expectedProfile: _loadedProfile);
+      if (mounted) {
+        setState(() {
+          _pickedImageFile = null;
+          _existingImageUrl = null;
+        });
+      }
 
       // Storage 側の実体も削除（任意：失敗しても握りつぶす）
       if (urlToDelete != null) {
@@ -177,12 +202,30 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   }
 
   Future<void> _submitForm() async {
+    if (_isLoading || _profileLoadFailed) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
     setState(() => _isLoading = true);
+    if (_profilePending) {
+      try {
+        await _repo.retryPending();
+        if (mounted) {
+          HamsterFeedbackPopup.show(context, message: '保存を確認しました');
+          Navigator.pop(context, true);
+        }
+      } catch (_) {
+        if (mounted) {
+          HamsterFeedbackPopup.show(context,
+              message: '保存を確認できませんでした。同じ内容で再送できます。');
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
+      return;
+    }
 
     String? imageUrl = _existingImageUrl;
 
@@ -207,13 +250,17 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
 
     try {
       // ★ Firestore直叩き禁止：Repo経由で保存
-      await _repo.saveMainPet(
+      _loadedProfile = await _repo.saveMainPet(
         PetProfile(
           name: _nameController.text.trim(),
           birthday: _birthday,
+          birthdayPrecision: _birthdayPrecision,
           species: _selectedSpecies,
           color: _selectedColor,
           imageUrl: imageUrl,
+          subjectId: _loadedProfile?.subjectId,
+          revision: _loadedProfile?.revision ?? 0,
+          profileHistoryRevision: _loadedProfile?.profileHistoryRevision ?? 0,
         ),
       );
 
@@ -221,8 +268,60 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
       HamsterFeedbackPopup.show(context, message: 'ペット情報を変更しました！');
       Navigator.pop(context, true);
     } catch (_) {
+      _profilePending = await _repo.pendingMutation() != null;
       if (!mounted) return;
-      HamsterFeedbackPopup.show(context, message: '保存に失敗しました…');
+      HamsterFeedbackPopup.show(context, message: '保存を確認できませんでした。入力は残しています。');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _cancelAttributeCorrection() async {
+    final profile = _loadedProfile;
+    if (profile?.subjectId == null || _isLoading || _profilePending) return;
+    setState(() => _isLoading = true);
+    try {
+      final now = DateTime.now();
+      final day =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final history = await _repo.readHistoryAt(
+          subjectId: profile!.subjectId!, evaluationDateKey: day);
+      final entries = history['revisions'] is List
+          ? history['revisions'] as List
+          : const [];
+      final corrections = entries
+          .whereType<Map>()
+          .where((e) => e['kind'] == 'correction' && e['cancelled'] != true)
+          .toList()
+        ..sort(
+            (a, b) => (b['revision'] as int).compareTo(a['revision'] as int));
+      if (!mounted) return;
+      if (corrections.isEmpty) {
+        HamsterFeedbackPopup.show(context, message: '取り消せる属性の訂正はありません');
+        return;
+      }
+      final yes = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+                  title: const Text('直前の属性訂正を取り消しますか？'),
+                  content: const Text('種類・生年月日の訂正を取り消します。後の訂正と履歴は残ります。'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('戻る')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('取り消す'))
+                  ]));
+      if (yes != true) return;
+      await _repo.cancelAttributeCorrection(profile,
+          targetHistoryRevision: corrections.first['revision'] as int);
+      if (mounted) await _fetchExistingData();
+    } catch (_) {
+      _profilePending = await _repo.pendingMutation() != null;
+      if (mounted) {
+        HamsterFeedbackPopup.show(context, message: '取消を確認できませんでした。入力は残しています。');
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -232,8 +331,10 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final speciesList =
-        _avatarAppearanceResolver.speciesOptionsForCurrent(_selectedSpecies);
+    final speciesList = [
+      if (_selectedSpecies.trim().isEmpty) '',
+      ..._avatarAppearanceResolver.speciesOptionsForCurrent(_selectedSpecies),
+    ];
     final colorList =
         _avatarAppearanceResolver.colorOptionsFor(_selectedSpecies);
     final selectedColor =
@@ -292,6 +393,7 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                         const SizedBox(height: 18),
                         TextFormField(
                           controller: _nameController,
+                          enabled: !_isLoading && !_profilePending,
                           decoration:
                               const InputDecoration(labelText: 'ハムスターの名前'),
                           validator: (v) => (v == null || v.trim().isEmpty)
@@ -307,8 +409,38 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                             suffixIcon: Icon(Icons.calendar_today),
                           ),
                           onTap: _pickBirthday,
-                          validator: (_) =>
-                              _birthday == null ? '生年月日を選択してください' : null,
+                          validator: (_) => _birthday == null &&
+                                  _birthdayPrecision != 'unknown'
+                              ? '生年月日を選択してください'
+                              : null,
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: _birthdayPrecision,
+                          isExpanded: true,
+                          decoration:
+                              const InputDecoration(labelText: '生年月日の確かさ'),
+                          items: const [
+                            DropdownMenuItem(
+                                value: 'date_only', child: Text('生年月日を確認している')),
+                            DropdownMenuItem(
+                                value: 'approximate_date',
+                                child: Text('およその生年月日')),
+                            DropdownMenuItem(
+                                value: 'unknown', child: Text('生年月日は不明')),
+                            DropdownMenuItem(
+                                value: 'legacy_unspecified',
+                                child: Text('以前の記録（確かさ未確認）'))
+                          ],
+                          onChanged: _isLoading || _profilePending
+                              ? null
+                              : (value) => setState(() {
+                                    _birthdayPrecision = value!;
+                                    if (value == 'unknown') {
+                                      _birthday = null;
+                                      _birthdayController.clear();
+                                    }
+                                  }),
                         ),
                         const SizedBox(height: 18),
                         DropdownButtonFormField<String>(
@@ -318,19 +450,22 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                           items: speciesList
                               .map((s) => DropdownMenuItem(
                                     value: s,
-                                    child: Text(s,
+                                    child: Text(s.isEmpty ? '種類は不明（未確認）' : s,
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodyMedium),
                                   ))
                               .toList(),
-                          onChanged: (v) {
-                            setState(() {
-                              _selectedSpecies = v!;
-                              _selectedColor = _avatarAppearanceResolver
-                                  .defaultColorForSpecies(_selectedSpecies);
-                            });
-                          },
+                          onChanged: _isLoading || _profilePending
+                              ? null
+                              : (v) {
+                                  setState(() {
+                                    _selectedSpecies = v!;
+                                    _selectedColor = _avatarAppearanceResolver
+                                        .defaultColorForSpecies(
+                                            _selectedSpecies);
+                                  });
+                                },
                         ),
                         const SizedBox(height: 18),
                         DropdownButtonFormField<String>(
@@ -345,20 +480,37 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                                             .bodyMedium),
                                   ))
                               .toList(),
-                          onChanged: (v) => setState(() => _selectedColor = v),
+                          onChanged: _isLoading || _profilePending
+                              ? null
+                              : (v) => setState(() => _selectedColor = v),
                           validator: (v) => v == null ? '毛色を選択してください' : null,
                         ),
                         const SizedBox(height: 24),
                         _PetIdentityPreview(
                           name: _nameController.text.trim(),
                           birthday: _birthday,
-                          species: _selectedSpecies,
+                          species: _selectedSpecies.isEmpty
+                              ? '不明'
+                              : _selectedSpecies,
                           color: selectedColor ?? '未選択',
                           presentation: avatarPreview,
                         ),
                         const SizedBox(height: 22),
+                        if (_profileLoadFailed)
+                          TextButton(
+                              onPressed: _fetchExistingData,
+                              child: const Text('プロフィールを再読み込み')),
+                        if (_profilePending)
+                          const Text('プロフィールは同期待ちです。同じ内容で再送できます。'),
+                        if (_loadedProfile?.subjectId != null &&
+                            !_profilePending)
+                          TextButton(
+                              onPressed: _isLoading
+                                  ? null
+                                  : _cancelAttributeCorrection,
+                              child: const Text('直前の属性訂正を取り消す')),
                         ElevatedButton(
-                          onPressed: _submitForm,
+                          onPressed: _profileLoadFailed ? null : _submitForm,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 36, vertical: 16),
@@ -368,7 +520,11 @@ class _PetProfileEditScreenState extends State<PetProfileEditScreen> {
                             ),
                           ),
                           child: Text(
-                            '設定を保存',
+                            _profilePending
+                                ? '同じ内容を再送'
+                                : _isLoading
+                                    ? '保存中…'
+                                    : '設定を保存',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodyMedium

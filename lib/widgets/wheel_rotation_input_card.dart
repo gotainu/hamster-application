@@ -6,13 +6,14 @@ import '../screens/breeding_environment_edit_screen.dart';
 import '../services/distance_records_repo.dart';
 import '../services/onboarding_state_repo.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/measurement_input_view_model.dart';
+import 'status_card.dart';
 
-typedef WheelRotationSavedCallback =
-    void Function({
-      required DateTime date,
-      required int rotations,
-      double? distanceMeters,
-    });
+typedef WheelRotationSavedCallback = void Function({
+  required DateTime date,
+  required int rotations,
+  double? distanceMeters,
+});
 
 class WheelRotationInputCard extends StatefulWidget {
   final DistanceRecordsRepo? distanceRepo;
@@ -47,6 +48,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   }
 
   final _wheelCtrl = TextEditingController();
+  final _diameterCtrl = TextEditingController();
 
   double? _distance;
   DailyDistanceRecord? _savedRecord;
@@ -54,10 +56,19 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
 
   bool _loadingWheel = true;
   bool _loadingRecord = true;
+  bool _recordLoadFailed = false;
   bool _saving = false;
   String? _message;
   bool _isErrorMessage = false;
   int _calcSeq = 0;
+  Map<String, dynamic>? _pending;
+  bool _legacyConfirmed = false, _diameterCorrection = false;
+  double? _correctedDiameter;
+  double? get _editingDiameter =>
+      _correctedDiameter ??
+      (_savedRecord == null
+          ? _repo.cachedWheelDiameterCm
+          : _savedRecord!.wheelDiameterCm);
 
   @override
   void initState() {
@@ -74,10 +85,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   @override
   void dispose() {
     _wheelCtrl.dispose();
+    _diameterCtrl.dispose();
     super.dispose();
   }
 
-  bool get _wheelReady => _repo.cachedWheelDiameterCm != null;
+  bool get _wheelReady => _editingDiameter != null;
 
   int? get _rotations {
     final text = _wheelCtrl.text.trim();
@@ -86,7 +98,16 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   }
 
   bool get _canSave {
-    return !_loadingWheel && _wheelReady && _rotations != null && !_saving;
+    return !_recordLoadFailed &&
+        !_loadingWheel &&
+        !_loadingRecord &&
+        _wheelReady &&
+        _rotations != null &&
+        !_saving &&
+        _pending == null &&
+        (_savedRecord == null ||
+            _savedRecord!.subjectId != null ||
+            _legacyConfirmed);
   }
 
   Future<void> _refreshWheelDiameter() async {
@@ -110,16 +131,26 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   Future<void> _loadSavedRecord() async {
     setState(() {
       _loadingRecord = true;
+      _recordLoadFailed = false;
     });
 
     try {
+      final pending = await _repo.history.pending();
+      _pending = pending;
+      if (pending != null) {
+        _selectedRecordDate = DateTime.parse(pending['dayKey'] as String);
+      }
       final record = await _repo.fetchDailyRecord(_selectedRecordDate);
 
       if (!mounted) return;
 
       setState(() {
         _savedRecord = record;
-        _isEditing = record == null;
+        _pending = pending;
+        _legacyConfirmed = false;
+        _diameterCorrection = false;
+        _correctedDiameter = null;
+        _isEditing = record == null || pending != null;
 
         if (record != null) {
           _wheelCtrl.text = record.rotations?.toString() ?? '';
@@ -128,7 +159,18 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
           _wheelCtrl.clear();
           _distance = null;
         }
+        if (pending != null) {
+          _wheelCtrl.text = pending['rotations']?.toString() ?? '';
+        }
       });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _recordLoadFailed = true;
+          _message = '記録を読み込めませんでした。入力は保存できません。';
+          _isErrorMessage = true;
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -148,7 +190,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
       return;
     }
 
-    final dist = await _repo.previewDistanceFromRotations(rotations);
+    final diameter = _editingDiameter;
+    final dist = diameter == null
+        ? null
+        : await _repo.previewDistanceFromRotations(rotations,
+            wheelDiameterCm: diameter);
 
     if (!mounted) return;
     if (seq != _calcSeq) return;
@@ -159,6 +205,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
   }
 
   Future<void> _pickRecordDate() async {
+    if (_saving || _pending != null) return;
     final now = DateTime.now();
 
     final picked = await showDatePicker(
@@ -183,7 +230,10 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
 
   Future<void> _openEnvironmentSettings() async {
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const BreedingEnvironmentEditScreen()),
+      MaterialPageRoute(
+          builder: (_) => const BreedingEnvironmentEditScreen(
+                focusWheelDiameter: true,
+              )),
     );
 
     if (!mounted) return;
@@ -210,25 +260,25 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
     });
 
     try {
-      await _repo.addWheelRotationRecord(
+      final record = await _repo.saveRotationRecord(
         rotations: rotations,
         date: _selectedRecordDate,
+        expectedRecord: _savedRecord,
+        legacyConfirmed: _legacyConfirmed,
+        diameterCorrection: _diameterCorrection,
+        wheelDiameterCm: _correctedDiameter,
       );
-      await OnboardingStateRepo().recordFirstMonitoringData('wheel');
+      // The confirmed measurement receipt remains authoritative if this auxiliary update fails.
+      try {
+        await OnboardingStateRepo().recordFirstMonitoringData('wheel');
+      } catch (_) {}
 
-      final savedDistance =
-          _distance ?? await _repo.previewDistanceFromRotations(rotations);
+      final savedDistance = record.distance;
 
       if (!mounted) return;
 
       setState(() {
-        _savedRecord = DailyDistanceRecord(
-          dayKey: DateFormat('yyyy-MM-dd').format(_selectedRecordDate),
-          date: _selectedRecordDate,
-          distance: savedDistance ?? 0,
-          rotations: rotations,
-          wheelDiameterCm: _repo.cachedWheelDiameterCm,
-        );
+        _savedRecord = record;
         _isEditing = false;
         _message =
             '${DateFormat('yyyy/MM/dd').format(_selectedRecordDate)} の記録を保存しました';
@@ -251,10 +301,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
       if (!mounted) return;
 
       setState(() {
-        _message = '保存に失敗しました: $e';
+        _message = MeasurementInputViewModel.failureMessage(e);
         _isErrorMessage = true;
       });
     } finally {
+      _pending = await _repo.history.pending();
       if (mounted) {
         setState(() {
           _saving = false;
@@ -263,15 +314,157 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
     }
   }
 
-  String _formatDistance(double? meters) {
-    if (meters == null) return '-';
-
-    if (meters >= 1000) {
-      return '${(meters / 1000).toStringAsFixed(2)} km';
-    }
-
-    return '${meters.toStringAsFixed(0)} m';
+  Future<void> _correctDiameter() async {
+    final controller = _diameterCtrl;
+    controller.text = _editingDiameter?.toString() ?? '';
+    final value = await showDialog<double>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('この記録の車輪直径を訂正'),
+                content: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const Text('測定時に使った直径を確認して入力してください。この記録だけを再計算します。'),
+                  TextField(
+                      controller: controller,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                          labelText: '確認した直径', suffixText: 'cm'))
+                ]),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('戻る')),
+                  TextButton(
+                      onPressed: () {
+                        final d = double.tryParse(controller.text);
+                        if (d != null && d.isFinite && d > 0 && d <= 100) {
+                          Navigator.pop(context, d);
+                        }
+                      },
+                      child: const Text('確認した直径を使う'))
+                ]));
+    if (value == null || !mounted) return;
+    setState(() {
+      _correctedDiameter = value;
+      _diameterCorrection = true;
+    });
+    await _recalcDistance(_wheelCtrl.text);
   }
+
+  Future<void> _reviewLatest() async {
+    if (_saving || _pending != null) return;
+    setState(() => _saving = true);
+    try {
+      final latest = await _repo.fetchDailyRecord(_selectedRecordDate);
+      if (!mounted) return;
+      setState(() => _saving = false);
+      final yes = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+                  title: const Text('最新の記録を確認'),
+                  content: Text(latest == null
+                      ? 'この日の記録は現在ありません。入力を残して、新しい記録として保存できます。'
+                      : '最新の記録: ${latest.rotations?.toString() ?? '距離を直接入力'} / ${_formatDistance(latest.distance)}\n入力を残して、この最新記録を訂正できます。'),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('戻る')),
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('入力を残して続ける'))
+                  ]));
+      if (yes == true && mounted) {
+        setState(() {
+          _savedRecord = latest;
+          _legacyConfirmed = false;
+          _recordLoadFailed = false;
+          _correctedDiameter = null;
+          _diameterCorrection = false;
+          _message = '最新の記録を確認しました。入力は残しています。';
+          _isErrorMessage = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _message = '最新の記録を確認できませんでした。入力は残しています。';
+          _isErrorMessage = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _retry() async {
+    setState(() => _saving = true);
+    try {
+      final result = await _repo.history.retryPending();
+      final day = DateTime.parse(result['dayKey'] as String);
+      final current = await _repo.fetchDailyRecord(day);
+      if (!mounted) return;
+      _selectedRecordDate = day;
+      _savedRecord = current;
+      _correctedDiameter = null;
+      _diameterCorrection = false;
+      _wheelCtrl.text = current?.rotations?.toString() ?? '';
+      _distance = current?.distance;
+      _isEditing = current == null;
+      _message = '保存を確認しました。';
+      _isErrorMessage = false;
+    } catch (error) {
+      _message = MeasurementInputViewModel.failureMessage(error);
+      _isErrorMessage = true;
+    } finally {
+      _pending = await _repo.history.pending();
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _cancelRecord() async {
+    if (_savedRecord == null || _savedRecord!.subjectId == null) {
+      setState(() {
+        _message = '旧記録は現在のハムスターの記録として確認・保存してから取り消せます。';
+        _isErrorMessage = true;
+      });
+      return;
+    }
+    final yes = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+                title: const Text('走った記録を取り消しますか？'),
+                content: const Text('訂正前の内容と取消の履歴は残ります。'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('戻る')),
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('取り消す'))
+                ]));
+    if (yes != true || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await _repo.cancelRecord(_savedRecord!,
+          legacyConfirmed: _legacyConfirmed);
+      if (!mounted) return;
+      _savedRecord = null;
+      _wheelCtrl.clear();
+      _distance = null;
+      _isEditing = true;
+      _message = '記録を取り消しました。';
+      _isErrorMessage = false;
+    } catch (error) {
+      _message = MeasurementInputViewModel.failureMessage(error);
+      _isErrorMessage = true;
+    } finally {
+      _pending = await _repo.history.pending();
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  String _formatDistance(double? meters) =>
+      MeasurementInputViewModel.formatDistance(meters);
 
   bool _isDefaultYesterday(DateTime date) {
     final now = DateTime.now();
@@ -316,8 +509,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                           ? '昨日の記録済み'
                           : '${DateFormat('M/d').format(record.date)}の記録済み',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                            fontWeight: FontWeight.w900,
+                          ),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -326,21 +519,24 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                         _formatDistance(record.distance),
                       ].join(' / '),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: secondary,
-                        fontWeight: FontWeight.w700,
-                      ),
+                            color: secondary,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
                   ],
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  setState(() {
-                    _isEditing = true;
-                    _message = null;
-                    _isErrorMessage = false;
-                  });
-                },
+                onPressed: _saving
+                    ? null
+                    : () {
+                        setState(() {
+                          _isEditing = true;
+                          _message = null;
+                          _isErrorMessage = false;
+                        });
+                        _recalcDistance(_wheelCtrl.text);
+                      },
                 child: const Text('編集'),
               ),
             ],
@@ -351,11 +547,11 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
           Text(
             _message!,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: _isErrorMessage
-                  ? Theme.of(context).colorScheme.error
-                  : AppTheme.accent,
-              fontWeight: FontWeight.w700,
-            ),
+                  color: _isErrorMessage
+                      ? Theme.of(context).colorScheme.error
+                      : AppTheme.accent,
+                  fontWeight: FontWeight.w700,
+                ),
           ),
         ],
       ],
@@ -412,8 +608,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                     Text(
                       widget.title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -434,7 +630,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
             _buildSavedSummary(context)
           else ...[
             InkWell(
-              onTap: _pickRecordDate,
+              onTap:
+                  _saving || _pending != null ? null : () => _pickRecordDate(),
               borderRadius: BorderRadius.circular(14),
               child: Container(
                 width: double.infinity,
@@ -461,8 +658,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                       child: Text(
                         dateLabel,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                     ),
                     const Icon(Icons.expand_more_rounded),
@@ -473,7 +670,7 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
             const SizedBox(height: 14),
             TextField(
               controller: _wheelCtrl,
-              enabled: !_loadingWheel && _wheelReady,
+              enabled: !_loadingWheel && !_saving && _pending == null,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -484,8 +681,8 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                 helperText: _loadingWheel
                     ? '車輪設定を確認中…'
                     : _wheelReady
-                    ? '入力すると距離を自動計算します'
-                    : null,
+                        ? '入力すると距離を自動計算します'
+                        : null,
                 border: const OutlineInputBorder(),
               ),
             ),
@@ -505,49 +702,94 @@ class _WheelRotationInputCardState extends State<WheelRotationInputCard> {
                 children: [
                   Icon(Icons.straighten_rounded, size: 20, color: secondary),
                   const SizedBox(width: 10),
-                  Text(
+                  Expanded(
+                      child: Text(
                     '推定走行距離',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: secondary),
-                  ),
-                  const Spacer(),
+                  )),
+                  const SizedBox(width: 8),
                   Text(
                     _formatDistance(_distance),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
+                          fontWeight: FontWeight.w900,
+                        ),
                   ),
                 ],
               ),
             ),
-            if (!_loadingWheel && !_wheelReady) ...[
+            if (!_loadingWheel && !_wheelReady && _savedRecord == null) ...[
               const SizedBox(height: 12),
-              Text(
-                '車輪の直径が未設定です。回転数から距離を計算するために、先に飼育環境を設定してください。',
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: secondary),
+              StatusCard(
+                key: const ValueKey('wheel-diameter-guide'),
+                level: StatusCardLevel.caution,
+                emphasize: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('距離の計算に、車輪の直径が必要です。'),
+                    const SizedBox(height: 10),
+                    OutlinedButton(
+                      onPressed: _openEnvironmentSettings,
+                      child: const Text('車輪の直径を設定する'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _openEnvironmentSettings,
-                icon: const Icon(Icons.settings_rounded),
-                label: const Text('飼育環境を設定する'),
-              ),
+            ],
+            const SizedBox(height: 10),
+            if (_pending == null) ...[
+              if (_savedRecord != null && _savedRecord!.subjectId == null)
+                CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('現在のハムスターの記録であることを確認'),
+                    value: _legacyConfirmed,
+                    onChanged: _saving
+                        ? null
+                        : (value) =>
+                            setState(() => _legacyConfirmed = value ?? false)),
+              if (_savedRecord != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                    _editingDiameter == null
+                        ? 'この記録の車輪直径は不明です。確認した直径を入力してください。'
+                        : 'この記録の車輪直径: ${_editingDiameter!.toStringAsFixed(1)} cm',
+                    style: Theme.of(context).textTheme.bodySmall),
+                Wrap(children: [
+                  TextButton(
+                      onPressed: _saving ? null : _correctDiameter,
+                      child: Text(
+                          _editingDiameter == null ? '直径を確認して入力' : '直径を訂正')),
+                  TextButton(
+                      onPressed: _saving || _savedRecord!.subjectId == null
+                          ? null
+                          : _cancelRecord,
+                      child: const Text('この記録を取り消す'))
+                ]),
+              ],
+            ] else ...[
+              const Text('同期待ちの記録があります。同じ内容で再送します。'),
+              TextButton(
+                  onPressed: _saving ? null : _retry,
+                  child: const Text('同じ内容を再送')),
             ],
             if (_message != null) ...[
               const SizedBox(height: 12),
               Text(
                 _message!,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: _isErrorMessage
-                      ? Theme.of(context).colorScheme.error
-                      : AppTheme.accent,
-                  fontWeight: FontWeight.w700,
-                ),
+                      color: _isErrorMessage
+                          ? Theme.of(context).colorScheme.error
+                          : AppTheme.accent,
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
             ],
+            if (_isErrorMessage && _pending == null)
+              TextButton(
+                  onPressed: _saving ? null : _reviewLatest,
+                  child: const Text('入力を残して最新の記録を確認')),
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,

@@ -1,6 +1,8 @@
 import 'package:intl/intl.dart';
 
 import '../models/personality_report.dart';
+import 'weight_research_comparison_view_model.dart';
+import 'checkin_insights_view_model.dart';
 
 /// Presentation of a committed Gold snapshot. This never reads current records,
 /// recomputes a baseline, or changes the server's population applicability.
@@ -16,6 +18,8 @@ class PersonalityReportViewModel {
   final PersonalityReport report;
   final PersonalityMetricViewModel? body;
   final PersonalityMetricViewModel? activity;
+  CheckinInsightsViewModel get checkinInsights =>
+      CheckinInsightsViewModel.fromSnapshot(report.checkinInsightSnapshot);
 
   List<String> get discoveries => List.unmodifiable([
         if (body?.discovery != null) body!.discovery!,
@@ -29,6 +33,9 @@ class PersonalityReportViewModel {
       if (body != null) body!.snapshot,
       if (activity != null) activity!.snapshot,
     ];
+    if (metrics.isEmpty) {
+      return '14日間の様子の記録から見えてきたこと。';
+    }
     final first = metrics.first;
     final commonPeriod = metrics.every((metric) =>
         metric.firstDateKey == first.firstDateKey &&
@@ -52,6 +59,14 @@ class PersonalityReportViewModel {
         PersonalityReportType.weightOnly => '体重の記録で見えてきた個性',
         PersonalityReportType.activityOnly => '走る記録で見えてきた個性',
         PersonalityReportType.both => '体重と走る記録で見えてきた個性',
+        PersonalityReportType.observationOnly => '様子の記録で見えてきた個性',
+      };
+
+  String get metricLabel => switch (report.type) {
+        PersonalityReportType.weightOnly => '体重',
+        PersonalityReportType.activityOnly => '活動量',
+        PersonalityReportType.both => '体重・活動量',
+        PersonalityReportType.observationOnly => '今日の様子',
       };
 
   bool get isDaily => report.isDaily;
@@ -93,23 +108,23 @@ class PersonalityMetricViewModel {
       ? '未記録'
       : '${_number(snapshot.latestValue!, digits: isBody ? 1 : 0)}${snapshot.unit}';
 
-  bool get populationApplicable =>
-      isBody && snapshot.population?.isApplicable == true;
+  WeightResearchComparisonViewModel? get _weightComparison =>
+      isBody ? WeightResearchComparisonViewModel.fromSnapshot(snapshot) : null;
+
+  bool get populationApplicable => _weightComparison != null;
 
   /// The compact comparison is arithmetic on two saved Gold values. Missing
   /// applicability or latest data withholds the pill instead of implying zero.
   double? get _comparisonDelta {
     if (isBody) {
-      final reference = snapshot.population?.median;
-      return populationApplicable && reference != null
-          ? snapshot.median - reference
-          : null;
+      return _weightComparison?.delta;
     }
     final latest = snapshot.latestValue;
     return latest == null ? null : latest - snapshot.median;
   }
 
   String? get comparisonDeltaValue {
+    if (isBody) return _weightComparison?.deltaValue;
     final delta = _comparisonDelta;
     if (delta == null) return null;
     if (delta == 0) return isBody ? '0g' : '±0m';
@@ -118,6 +133,7 @@ class PersonalityMetricViewModel {
   }
 
   String? get comparisonDeltaCaption {
+    if (isBody) return _weightComparison?.deltaCaption;
     final delta = _comparisonDelta;
     if (delta == null) return null;
     if (delta == 0) return isBody ? '同じ水準' : '普段と同じ';
@@ -127,30 +143,18 @@ class PersonalityMetricViewModel {
   }
 
   String? get comparisonDeltaContext {
-    final delta = _comparisonDelta;
-    if (!isBody || delta == null) return null;
-    return delta == 0 ? '参考中央値と' : '参考中央値より';
+    return _weightComparison?.deltaContext;
   }
 
   String get summary {
     if (isBody) {
-      if (!populationApplicable) return 'この子の記録から見える普段の体重';
-      final reference = snapshot.population!.median!;
-      if (snapshot.median == reference) return '同種の参考中央値と同じ水準';
-      final difference = _differenceLabel(snapshot.median - reference);
-      return '同種の参考中央値より$difference'
-          '${snapshot.median < reference ? '軽め' : '重め'}';
+      return _weightComparison?.summary ?? 'この子の記録から見える普段の体重';
     }
     return latestComparison ?? caption;
   }
 
   String? get discovery {
-    if (isBody) {
-      if (!populationApplicable) return null;
-      final reference = snapshot.population!.median!;
-      if (snapshot.median == reference) return '同種の参考中央値と同じ水準';
-      return '同種の参考中央値より${snapshot.median < reference ? '軽め' : '重め'}';
-    }
+    if (isBody) return _weightComparison?.discovery;
     final latest = snapshot.latestValue;
     if (latest == null) return null;
     if (latest == snapshot.median) return '走行距離は普段と同じ水準';
@@ -171,6 +175,7 @@ class PersonalityMetricViewModel {
   /// A small real difference must not become "0g" or "0m" after display
   /// rounding. Equality wording is reserved for equal saved values.
   String _differenceLabel(double difference) {
+    if (isBody) return weightDifferenceLabel(difference);
     final absolute = difference.abs();
     final displayStep = isBody ? 0.1 : 1.0;
     if (absolute < displayStep) {

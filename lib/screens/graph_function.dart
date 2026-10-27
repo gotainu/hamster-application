@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -5,15 +6,25 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../models/health_record.dart';
+import '../models/current_weight_analysis.dart';
+import '../models/checkin_insight.dart';
 import '../models/weight_record.dart';
 import '../models/switchbot_reading.dart';
 import '../services/distance_records_repo.dart';
+import '../services/child_report_navigation.dart';
+import '../services/current_weight_analysis_repo.dart';
+import '../services/current_checkin_insights_repo.dart';
 import '../services/environment_status_service.dart';
 import '../services/switchbot_repo.dart';
 import '../services/weight_records_repo.dart';
 import '../services/weight_trend_evaluation_service.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/weight_insights_view_model.dart';
+import '../viewmodels/checkin_insights_view_model.dart';
+import '../widgets/insights_card.dart';
+import '../widgets/weight_insights_card.dart';
 import '../widgets/floating_bottom_navigation.dart';
+import '../widgets/weight_research_comparison_card.dart';
 import 'switchbot_setup.dart';
 
 enum _TrendMetric {
@@ -33,9 +44,26 @@ enum _TrendPeriod {
 class GraphFunctionScreen extends StatefulWidget {
   final bool embeddedInTab;
 
+  /// Opens the current analysis separately from a dated health assessment.
+  final bool initialWeightAnalysis;
+
+  /// Optional read-only sources keep graph rendering independently testable.
+  /// The current analysis is intentionally independent of the chart period.
+  final WeightAnalysisSource? weightAnalysisSource;
+  final CheckinInsightsSource? checkinInsightsSource;
+  final Stream<List<WeightRecord>>? weightRecordsStream;
+  final Stream<SwitchbotConfig?>? switchbotConfigStream;
+  final Stream<List<HealthRecord>>? activityRecordsStream;
+
   const GraphFunctionScreen({
     super.key,
     this.embeddedInTab = false,
+    this.initialWeightAnalysis = false,
+    this.weightAnalysisSource,
+    this.checkinInsightsSource,
+    this.weightRecordsStream,
+    this.switchbotConfigStream,
+    this.activityRecordsStream,
   });
 
   @override
@@ -43,9 +71,82 @@ class GraphFunctionScreen extends StatefulWidget {
 }
 
 class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
-  final DistanceRecordsRepo _distanceRepo = DistanceRecordsRepo();
-  final SwitchbotRepo _sbRepo = SwitchbotRepo();
-  final WeightRecordsRepo _weightRepo = WeightRecordsRepo();
+  late final DistanceRecordsRepo _distanceRepo = DistanceRecordsRepo();
+  late final SwitchbotRepo _sbRepo = SwitchbotRepo();
+  late final WeightRecordsRepo _weightRepo = WeightRecordsRepo();
+  StreamSubscription<CurrentWeightAnalysis?>? _weightAnalysisSubscription;
+  CurrentWeightAnalysis? _currentWeightAnalysis;
+  int _weightAnalysisGeneration = 0;
+  StreamSubscription<CurrentCheckinAnalysis?>? _checkinSubscription;
+  CurrentCheckinAnalysis? _currentCheckins;
+  int _checkinGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialWeightAnalysis) {
+      _selectedMetric = _TrendMetric.weight;
+    }
+    _subscribeWeightAnalysis();
+    _subscribeCheckinInsights();
+  }
+
+  @override
+  void didUpdateWidget(covariant GraphFunctionScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.weightAnalysisSource != widget.weightAnalysisSource) {
+      _weightAnalysisSubscription?.cancel();
+      _currentWeightAnalysis = null;
+      _subscribeWeightAnalysis();
+    }
+    if (oldWidget.checkinInsightsSource != widget.checkinInsightsSource) {
+      _checkinSubscription?.cancel();
+      _currentCheckins = null;
+      _subscribeCheckinInsights();
+    }
+  }
+
+  void _subscribeCheckinInsights() {
+    final generation = ++_checkinGeneration;
+    final source = widget.checkinInsightsSource ?? CurrentCheckinInsightsRepo();
+    _checkinSubscription = source.watchCurrent().listen((value) {
+      if (mounted && generation == _checkinGeneration) {
+        setState(() => _currentCheckins = value);
+      }
+    }, onError: (Object error, StackTrace trace) {
+      if (mounted && generation == _checkinGeneration) {
+        setState(() => _currentCheckins = null);
+      }
+    });
+  }
+
+  void _subscribeWeightAnalysis() {
+    final generation = ++_weightAnalysisGeneration;
+    _weightAnalysisSubscription = (widget.weightAnalysisSource ??
+            CurrentWeightAnalysisRepo(
+              includeIndividualAnalysisWithoutReference: true,
+              includeInsights: true,
+            ))
+        .watchCurrent()
+        .listen((analysis) {
+      if (mounted && generation == _weightAnalysisGeneration) {
+        setState(() => _currentWeightAnalysis = analysis);
+      }
+    }, onError: (Object error, StackTrace stack) {
+      if (mounted && generation == _weightAnalysisGeneration) {
+        setState(() => _currentWeightAnalysis = null);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _weightAnalysisGeneration++;
+    _weightAnalysisSubscription?.cancel();
+    _checkinGeneration++;
+    _checkinSubscription?.cancel();
+    super.dispose();
+  }
 
   static const EnvironmentStatusService _environmentStatusService =
       EnvironmentStatusService();
@@ -55,13 +156,16 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
   _TrendMetric _selectedMetric = _TrendMetric.activity;
   _TrendPeriod _selectedPeriod = _TrendPeriod.days7;
 
+  bool get _showCurrentWeightAnalysis =>
+      widget.initialWeightAnalysis && _selectedMetric == _TrendMetric.weight;
+
   @override
   Widget build(BuildContext context) {
     final topContentInset =
         MediaQuery.paddingOf(context).top + kToolbarHeight + 12;
 
     return StreamBuilder<SwitchbotConfig?>(
-      stream: _sbRepo.watchSwitchbotConfig(),
+      stream: widget.switchbotConfigStream ?? _sbRepo.watchSwitchbotConfig(),
       builder: (context, configSnap) {
         final config = configSnap.data;
         final linked = config?.isLinked ?? false;
@@ -72,7 +176,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
           appBar: widget.embeddedInTab
               ? null
               : AppBar(
-                  title: const Text('最近の変化'),
+                  title: Text(_showCurrentWeightAnalysis ? '現在の体重分析' : '最近の変化'),
                 ),
           body: ListView(
             padding: EdgeInsets.fromLTRB(
@@ -84,6 +188,15 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
                   : 28,
             ),
             children: [
+              if (_showCurrentWeightAnalysis) ...[
+                Text(
+                  _currentWeightAnalysis == null
+                      ? '健康評価とは別に、現在の記録を確認します。'
+                      : '健康評価とは別の分析です。分析日：${_currentWeightAnalysis!.evaluationDateKey}',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+              ],
               if (widget.embeddedInTab) ...[
                 const _TrendsHeader(),
                 const SizedBox(height: 18),
@@ -95,6 +208,14 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
               _buildSelectedMetricPanel(
                 linked: linked,
                 hasDevice: hasDevice,
+              ),
+              _buildCheckinInsights(),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => openChildReport(context),
+                  child: const Text('うちの子レポートを見る'),
+                ),
               ),
               if (_selectedMetric == _TrendMetric.temperature ||
                   _selectedMetric == _TrendMetric.humidity) ...[
@@ -268,7 +389,8 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   Widget _buildActivityPanel() {
     return StreamBuilder<List<HealthRecord>>(
-      stream: _distanceRepo.watchDistanceSeries(),
+      stream:
+          widget.activityRecordsStream ?? _distanceRepo.watchDistanceSeries(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -487,7 +609,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
 
   Widget _buildWeightPanel() {
     return StreamBuilder<List<WeightRecord>>(
-      stream: _weightRepo.watchAll(),
+      stream: widget.weightRecordsStream ?? _weightRepo.watchAll(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
             !snapshot.hasData) {
@@ -561,9 +683,49 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
               yMaximum: maximumValue + padding,
               plotBands: const [],
             ),
+            _buildWeightInsights(),
+            _buildWeightResearchComparison(),
           ],
         );
       },
+    );
+  }
+
+  Widget _buildWeightInsights() {
+    final vm = WeightInsightsViewModel.fromCurrent(_currentWeightAnalysis);
+    if (vm.items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.dataSectionGap),
+      child: WeightInsightsCard(
+        viewModel: vm,
+        evaluationDateKey: _currentWeightAnalysis!.evaluationDateKey,
+      ),
+    );
+  }
+
+  Widget _buildCheckinInsights() {
+    final vm = CheckinInsightsViewModel.fromCurrent(_currentCheckins);
+    if (vm.items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: AppTheme.dataSectionGap),
+      child: InsightsCard(
+        title: '今日の様子の記録から',
+        contentKey: const ValueKey('checkin-insights-card'),
+        items: vm.items,
+        evaluationDateKey: _currentCheckins!.evaluationDateKey,
+        maxItems: 1,
+      ),
+    );
+  }
+
+  Widget _buildWeightResearchComparison() {
+    final analysis = _currentWeightAnalysis;
+    if (analysis == null || !analysis.canCompare) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: WeightResearchComparisonCard(analysis: analysis),
     );
   }
 
@@ -1258,7 +1420,7 @@ class _GraphFunctionScreenState extends State<GraphFunctionScreen> {
       return '${value.round()}%';
     }
 
-    return '${value.toStringAsFixed(0)} m';
+    return '${value.toStringAsFixed(0)} $unit';
   }
 
   Widget _buildUnavailableEnvironmentCard({

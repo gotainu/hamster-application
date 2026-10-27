@@ -62,7 +62,7 @@ class _PersonalityReportEntryState extends State<PersonalityReportEntry> {
                         Icon(Icons.pets_rounded, color: AppTheme.accent),
                         const SizedBox(width: 10),
                         Expanded(
-                            child: Text('新しい個性レポートが届きました',
+                            child: Text('新しいうちの子レポートが届きました',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleMedium
@@ -73,9 +73,13 @@ class _PersonalityReportEntryState extends State<PersonalityReportEntry> {
                           style: TextStyle(
                               color: AppTheme.secondaryText(context))),
                       TextButton.icon(
+                          style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.isDark(context)
+                                  ? AppTheme.quickRecordGlow(context)
+                                  : AppTheme.accent),
                           onPressed: () => widget.onOpen(report),
                           icon: const Icon(Icons.auto_stories_outlined),
-                          label: const Text('個性レポートを見る')),
+                          label: const Text('うちの子レポートを見る')),
                     ])));
       });
 }

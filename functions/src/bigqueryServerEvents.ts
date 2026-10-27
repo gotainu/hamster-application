@@ -4,6 +4,7 @@ import * as https from 'node:https';
 import {URL} from 'node:url';
 import {onDocumentCreated, onDocumentUpdated} from 'firebase-functions/v2/firestore';
 import {isValidationUid} from './validationIdentity';
+import {classifyAnalytics} from './analyticsClassification';
 
 const REGION = 'asia-northeast1';
 const TABLE = 'server_events_raw';
@@ -69,14 +70,18 @@ function requestJson(url: string, accessToken: string, body: unknown): Promise<a
   });
 }
 
-function serverEventRow(params: {
+export function serverEventRow(params: {
   uid: string;
   sourceCollection: 'journey_events' | 'analysis_events';
   eventId: string;
   data: FirebaseFirestore.DocumentData;
 }): ServerEventRow {
   const data = params.data;
+  const classification = classifyAnalytics(params.uid, data);
   return {
+    environment: classification.environment,
+    account_classification: classification.accountClassification,
+    billing_livemode: classification.billingLivemode,
     source_event_id: `${params.uid}:${params.sourceCollection}:${params.eventId}`,
     source_collection: params.sourceCollection,
     user_id: params.uid,
@@ -88,7 +93,7 @@ function serverEventRow(params: {
     trial_ends_at: iso(data.trialEndsAt ?? data.endsAt),
     actor: typeof data.actor === 'string' ? data.actor : null,
     source: typeof data.source === 'string' ? data.source : null,
-    test_only: data.testOnly === true,
+    test_only: classification.accountClassification === 'test',
     request_id: typeof data.requestId === 'string' ? data.requestId : null,
     reservation_micros: typeof data.reservedCostMicros === 'number' ? data.reservedCostMicros : null,
     record_type: typeof data.recordType === 'string' ? data.recordType : null,
@@ -169,7 +174,6 @@ export const ingestJourneyEventToBigQuery = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
     const uid = event.params.uid;
-    if (!isValidationUid(uid) || data.testOnly !== true) return;
     const eventId = event.params.eventId;
     const row = serverEventRow({uid, eventId, sourceCollection: 'journey_events', data});
     await insertServerEvent(row.source_event_id as string, row);
@@ -182,7 +186,6 @@ export const ingestAnalysisEventToBigQuery = onDocumentCreated(
     const data = event.data?.data();
     if (!data) return;
     const uid = event.params.uid;
-    if (!isValidationUid(uid) || data.testOnly !== true) return;
     const eventId = event.params.eventId;
     const row = serverEventRow({uid, eventId, sourceCollection: 'analysis_events', data});
     await insertServerEvent(row.source_event_id as string, row);

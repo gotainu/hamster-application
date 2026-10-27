@@ -2,26 +2,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/weight_record.dart';
+import 'measurement_history_client.dart';
 
 typedef Json = Map<String, dynamic>;
 
 class WeightRecordsRepo {
-  final FirebaseFirestore _db;
-  final FirebaseAuth _auth;
+  final FirebaseFirestore? _db;
+  final FirebaseAuth? _auth;
+  final MeasurementHistoryClient history;
 
   WeightRecordsRepo({
     FirebaseFirestore? db,
     FirebaseAuth? auth,
-  })  : _db = db ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance;
+    MeasurementHistoryClient? historyClient,
+  })  : _db = db,
+        _auth = auth,
+        history = historyClient ??
+            MeasurementHistoryClient(kind: 'weight', db: db, auth: auth);
 
-  String? get _uid => _auth.currentUser?.uid;
+  String? get _uid => (_auth ?? FirebaseAuth.instance).currentUser?.uid;
 
   CollectionReference<Json>? _col() {
     final uid = _uid;
     if (uid == null) return null;
 
-    return _db.collection('users').doc(uid).collection('weight_records');
+    return (_db ?? FirebaseFirestore.instance)
+        .collection('users')
+        .doc(uid)
+        .collection('weight_records');
   }
 
   DateTime normalizeLocalDay(DateTime value) {
@@ -47,7 +55,7 @@ class WeightRecordsRepo {
     final doc = _docByDate(value);
     if (doc == null) return null;
 
-    final snapshot = await doc.get();
+    final snapshot = await doc.get(const GetOptions(source: Source.server));
     final data = snapshot.data();
 
     if (!snapshot.exists || data == null) return null;
@@ -149,32 +157,57 @@ class WeightRecordsRepo {
     required double weightGrams,
     String memo = '',
   }) async {
+    final existing = await fetchByDate(date);
+    await saveRecord(
+        date: date,
+        weightGrams: weightGrams,
+        memo: memo,
+        expectedRecord: existing);
+  }
+
+  Future<WeightRecord> saveRecord(
+      {required DateTime date,
+      required double weightGrams,
+      String memo = '',
+      WeightRecord? expectedRecord,
+      Map<String, dynamic>? timing,
+      bool legacyConfirmed = false,
+      String? originalDayKey}) async {
     if (!weightGrams.isFinite || weightGrams <= 0 || weightGrams > 1000) {
       throw ArgumentError.value(
-        weightGrams,
-        'weightGrams',
-        '体重は0より大きく1000g以下で入力してください',
-      );
+          weightGrams, 'weightGrams', '体重は0より大きく1000g以下で入力してください');
     }
-
-    final doc = _docByDate(date);
-    if (doc == null) return;
-
-    final localDay = normalizeLocalDay(date);
-    final snapshot = await doc.get();
-
-    final data = <String, dynamic>{
-      'dayKey': dateKeyLocal(localDay),
-      'date': Timestamp.fromDate(localDay.toUtc()),
+    final day = dateKeyLocal(date);
+    final result = await history.save({
+      'dayKey': day,
+      'date': normalizeLocalDay(date).toUtc().toIso8601String(),
+      'subjectId': expectedRecord?.subjectId ?? await history.currentSubject(),
+      'expectedRevision':
+          expectedRecord?.revision ?? await history.dayRevision(day),
+      'operation': 'save',
+      'inputUiVersion': 'measurement_history_v1',
       'weightGrams': weightGrams,
       'memo': memo.trim(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    };
+      'timing': measurementWireTiming(
+          timing ?? expectedRecord?.timing ?? measurementDateTiming(day)),
+      if (legacyConfirmed) 'legacyConfirmed': true,
+      if (originalDayKey != null) 'originalDayKey': originalDayKey,
+    });
+    return WeightRecord.fromJson(
+        Map<String, dynamic>.from(result['projection'] as Map),
+        fallbackDayKey: day);
+  }
 
-    if (!snapshot.exists) {
-      data['createdAt'] = FieldValue.serverTimestamp();
-    }
-
-    await doc.set(data, SetOptions(merge: true));
+  Future<void> cancelRecord(WeightRecord record,
+      {bool legacyConfirmed = false}) async {
+    await history.save({
+      'dayKey': record.dayKey,
+      'date': record.date.toUtc().toIso8601String(),
+      'subjectId': record.subjectId ?? await history.currentSubject(),
+      'expectedRevision': record.revision,
+      'operation': 'cancel',
+      'inputUiVersion': 'measurement_history_v1',
+      if (legacyConfirmed) 'legacyConfirmed': true
+    });
   }
 }

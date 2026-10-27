@@ -17,7 +17,7 @@ void main() {
         'v3 $type has compact header, large values and meaningful charts',
         (tester) async {
       await showPersonalityV3(tester, personalityV3Fixture(type: type));
-      expect(find.widgetWithText(AppBar, 'うちの子の個性レポート'), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'うちの子レポート'), findsOneWidget);
       expect(
           find.byKey(const ValueKey('personality-overview')), findsOneWidget);
       expect(find.textContaining('作成 '), findsOneWidget);

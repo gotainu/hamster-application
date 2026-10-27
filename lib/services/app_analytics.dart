@@ -1,5 +1,9 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 /// Firebase Analytics へ送るプロダクトイベントの唯一の入口。
 ///
@@ -10,8 +14,15 @@ final class AppAnalytics {
   AppAnalytics._();
 
   static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
-  static const bool _isTestBuild =
-      bool.fromEnvironment('HAMCARE_TEST_BUILD', defaultValue: false);
+  static const bool _isTestBuild = bool.fromEnvironment(
+    'HAMCARE_TEST_BUILD',
+    defaultValue: false,
+  );
+  static const String _configuredEnvironment = String.fromEnvironment(
+    'HAMCARE_ANALYTICS_ENVIRONMENT',
+  );
+  static const Uuid _uuid = Uuid();
+  static int _identityEpoch = 0;
   static Future<void> _identityBarrier = Future<void>.value();
   static String? _requestedUserId;
   static bool _identityReady = false;
@@ -31,6 +42,8 @@ final class AppAnalytics {
   /// is already the current account. Analytics failures stay non-fatal.
   static Future<void> _queueUserId(String? uid) {
     _requestedUserId = uid;
+    _identityReady = false;
+    _identityEpoch++;
     final target = uid;
     _identityBarrier = _identityBarrier.then((_) async {
       if (_requestedUserId != target) return;
@@ -54,17 +67,13 @@ final class AppAnalytics {
     required int concernTagCount,
     required bool hasMemo,
   }) {
-    return _log('daily_input_complete', {
-      'condition': condition,
-      'concern_tag_count': concernTagCount,
-      'has_memo': hasMemo ? 1 : 0,
-    });
+    // Preserve this caller contract without exporting health answers, tag
+    // counts or memo presence. Successful saves are authoritative server events.
+    return _log('daily_input_complete');
   }
 
   static Future<void> logAiConsultationStarted({required bool hasHistory}) {
-    return _log('ai_consultation_started', {
-      'has_history': hasHistory ? 1 : 0,
-    });
+    return _log('ai_consultation_started', {'has_history': hasHistory ? 1 : 0});
   }
 
   static Future<void> logAiConsultationCompleted({
@@ -83,21 +92,19 @@ final class AppAnalytics {
     String event, {
     required String flowVersion,
     String? outcome,
-  }) =>
-      _log(event, {
-        'flow_version': flowVersion,
-        if (outcome != null) 'outcome': outcome,
-      });
+  }) => _log(event, {
+    'flow_version': flowVersion,
+    if (outcome != null) 'outcome': outcome,
+  });
 
   static Future<void> logPaywallPresented({
     required String featureName,
     required String presentationId,
-  }) =>
-      _log('paywall_presented', {
-        'flow_version': 'initial_trial_v2',
-        'feature_name': featureName,
-        'presentation_id': presentationId,
-      });
+  }) => _log('paywall_presented', {
+    'flow_version': 'initial_trial_v2',
+    'feature_name': featureName,
+    'presentation_id': presentationId,
+  });
 
   static Future<void> logAnalysisReportViewed({
     required String reportId,
@@ -106,17 +113,13 @@ final class AppAnalytics {
     required String presentationId,
     required bool autoPresented,
     String? expectedUserId,
-  }) =>
-      _log(
-          'personalized_report_viewed',
-          {
-            'report_id': reportId,
-            'pet_id': petId,
-            'analysis_revision': revision,
-            'presentation_id': presentationId,
-            'auto_presented': autoPresented ? 1 : 0,
-          },
-          expectedUserId);
+  }) => _log('personalized_report_viewed', {
+    'report_id': reportId,
+    'pet_id': petId,
+    'analysis_revision': revision,
+    'presentation_id': presentationId,
+    'auto_presented': autoPresented ? 1 : 0,
+  }, expectedUserId);
 
   static Future<void> logPersonalityReportViewed({
     required String? expectedUserId,
@@ -125,24 +128,17 @@ final class AppAnalytics {
     required int revision,
     required String presentationId,
     required bool isFirstView,
-  }) =>
-      _log(
-          'personalized_report_viewed',
-          {
-            'report_id': reportId,
-            'pet_id': petId,
-            'analysis_revision': revision,
-            'presentation_id': presentationId,
-            'auto_presented': 0,
-            'report_kind': 'personality',
-            'is_first_view': isFirstView ? 1 : 0,
-          },
-          expectedUserId);
+  }) => _log('personalized_report_viewed', {
+    'report_id': reportId,
+    'pet_id': petId,
+    'analysis_revision': revision,
+    'presentation_id': presentationId,
+    'auto_presented': 0,
+    'report_kind': 'personality',
+    'is_first_view': isFirstView ? 1 : 0,
+  }, expectedUserId);
 
-  static Future<void> logOnboardingEvent(
-    String event, {
-    String? method,
-  }) {
+  static Future<void> logOnboardingEvent(String event, {String? method}) {
     return _log(event, {
       'flow_version': 2,
       if (method != null) 'method': method,
@@ -153,27 +149,25 @@ final class AppAnalytics {
     required String method,
     required int position,
     required String presentationId,
-  }) =>
-      _log('monitoring_method_selected', {
-        'flow_version': 3,
-        'offer_version': 'monitoring_methods_v1',
-        'offered_order': 'switchbot,daily_checkin,weight,wheel',
-        'selected_method': method,
-        'selected_position': position,
-        'presentation_id': presentationId,
-      });
+  }) => _log('monitoring_method_selected', {
+    'flow_version': 3,
+    'offer_version': 'monitoring_methods_v1',
+    'offered_order': 'switchbot,daily_checkin,weight,wheel',
+    'selected_method': method,
+    'selected_position': position,
+    'presentation_id': presentationId,
+  });
 
   static Future<void> logMonitoringMethodPresented({
     required String presentationId,
-  }) =>
-      _log('monitoring_method_presented', {
-        'flow_version': 3,
-        'offer_version': 'monitoring_methods_v1',
-        'offered_order': 'switchbot,daily_checkin,weight,wheel',
-        'availability':
-            'switchbot:available,daily_checkin:available,weight:available,wheel:available',
-        'presentation_id': presentationId,
-      });
+  }) => _log('monitoring_method_presented', {
+    'flow_version': 3,
+    'offer_version': 'monitoring_methods_v1',
+    'offered_order': 'switchbot,daily_checkin,weight,wheel',
+    'availability':
+        'switchbot:available,daily_checkin:available,weight:available,wheel:available',
+    'presentation_id': presentationId,
+  });
 
   static Future<void> logNotificationOpened({
     required String source,
@@ -186,9 +180,7 @@ final class AppAnalytics {
   }
 
   static Future<void> logNotificationSettingChanged({required bool enabled}) {
-    return _log('notification_setting_change', {
-      'enabled': enabled ? 1 : 0,
-    });
+    return _log('notification_setting_change', {'enabled': enabled ? 1 : 0});
   }
 
   static Future<void> logCheckoutStarted() {
@@ -212,18 +204,57 @@ final class AppAnalytics {
     });
   }
 
+  /// Debug APKs and explicit test builds never enter general-user metrics.
+  /// This classifies the transport, not the account: server-side test-account
+  /// classification is also required when normal release builds are tested.
+  static String get _environment {
+    if (_configuredEnvironment == 'emulator') return 'emulator';
+    if (_configuredEnvironment == 'test' || _isTestBuild || kDebugMode) {
+      return 'test';
+    }
+    if (_configuredEnvironment.isNotEmpty && _configuredEnvironment != 'live') {
+      return 'unknown';
+    }
+    return kReleaseMode ? 'live' : 'unknown';
+  }
+
+  static String _eventId(String name, Map<String, Object>? parameters) {
+    final presentationId = parameters?['presentation_id'];
+    if (presentationId is String && presentationId.isNotEmpty) {
+      // Exact display retries share an ID. A report/revision or gated feature
+      // changed within the same route presentation is a genuinely new display.
+      // The fixed tuple is independent of parameter-map insertion order.
+      final displayKey = jsonEncode([
+        name,
+        presentationId,
+        parameters?['report_id'],
+        parameters?['pet_id'],
+        parameters?['analysis_revision'],
+        parameters?['feature_name'],
+      ]);
+      // Hashing keeps GA4's string limit without sending UID in parameters.
+      return 'client_${sha256.convert(utf8.encode(displayKey))}';
+    }
+    return 'client_${_uuid.v4()}';
+  }
+
   static Future<void> _log(
     String name, [
     Map<String, Object>? parameters,
     String? expectedUserId,
   ]) async {
-    // Do not make callers coordinate authentication and analytics themselves.
-    // A failed identity update is caught above and never blocks product UI.
+    // Pin ownership at invocation. If logout/account-switch begins while an
+    // event waits for identity, discard it rather than attribute A's action to B.
+    final owner = _requestedUserId;
+    final identityEpoch = _identityEpoch;
+    final eventId = _eventId(name, parameters);
     await _identityBarrier;
-    if (expectedUserId != null && _requestedUserId != expectedUserId) return;
-    if (!_identityReady) {
+    if (identityEpoch != _identityEpoch || owner != _requestedUserId) return;
+    if (expectedUserId != null && owner != expectedUserId) return;
+    if (!_identityReady || owner == null) {
       debugPrint(
-          '[Analytics] $name skipped because the current user ID is unconfirmed');
+        '[Analytics] $name skipped because the current user ID is unconfirmed',
+      );
       return;
     }
     try {
@@ -232,7 +263,9 @@ final class AppAnalytics {
         parameters: {
           ...?parameters,
           'analytics_identity_version': 'firebase_uid_v1',
-          if (_isTestBuild) 'test_only': 1,
+          'event_id': eventId,
+          'analytics_environment': _environment,
+          'test_only': _environment == 'live' ? 0 : 1,
         },
       );
     } catch (error) {

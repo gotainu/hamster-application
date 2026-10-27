@@ -71,7 +71,7 @@ void main() {
   }
 
   testWidgets(
-      'history shows date, type, metrics, features, seen and old first entry',
+      'history shows saved modern reports without an unconfirmed first entry',
       (t) async {
     final a = daily('2026-10-10');
     source.reports[a.reportId] = a;
@@ -79,8 +79,8 @@ void main() {
         'owner-a', [PersonalityHistoryEntry(a, isViewed: false)]));
     await show(t);
     expect(find.text('レポート履歴'), findsOneWidget);
-    expect(find.text('初回コンディションレポート'), findsOneWidget);
-    expect(find.text('日次の個性レポート'), findsOneWidget);
+    expect(find.text('初回分析の記録'), findsNothing);
+    expect(find.text('うちの子レポート'), findsOneWidget);
     expect(find.textContaining('対象: 体重・活動量'), findsOneWidget);
     expect(find.textContaining('628m/日'), findsOneWidget);
     expect(find.text('未読'), findsOneWidget);
@@ -103,10 +103,39 @@ void main() {
     await t.tap(find.text('さらに読み込む'));
     await t.pumpAndSettle();
     expect(source.requests, [null, cursor]);
-    expect(find.text('日次の個性レポート'), findsNWidgets(2));
+    expect(find.text('うちの子レポート'), findsNWidgets(2));
     expect(find.text('閲覧済み'), findsOneWidget);
     expect(find.text('未読'), findsOneWidget);
     expect(find.text('さらに読み込む'), findsNothing);
+  });
+  testWidgets(
+      'repeated same-ID page is deduplicated while equal-valued snapshots on different days remain',
+      (t) async {
+    final a = PersonalityReport.fromMap(
+        personalityV2UiFixture(reportId: 'daily_2026-10-10')
+          ..['generatedAt'] = '2026-10-10T00:00:00Z');
+    final b = PersonalityReport.fromMap(
+        personalityV2UiFixture(reportId: 'daily_2026-10-09')
+          ..['generatedAt'] = '2026-10-09T00:00:00Z');
+    final cursor =
+        PersonalityHistoryCursor('owner-a', Timestamp.now(), a.reportId);
+    source.pages.addAll([
+      () async => PersonalityHistoryPage(
+          'owner-a', [PersonalityHistoryEntry(a, isViewed: true)],
+          nextCursor: cursor),
+      () async => PersonalityHistoryPage('owner-a', [
+            PersonalityHistoryEntry(a, isViewed: true),
+            PersonalityHistoryEntry(b, isViewed: false)
+          ]),
+    ]);
+    await show(t);
+    await t.tap(find.text('さらに読み込む'));
+    await t.pumpAndSettle();
+    expect(find.text('うちの子レポート'), findsNWidgets(2));
+    expect(find.text('閲覧済み'), findsOneWidget);
+    expect(find.text('未読'), findsOneWidget);
+    expect(find.textContaining('2026年10月10日'), findsOneWidget);
+    expect(find.textContaining('2026年10月9日'), findsOneWidget);
   });
   testWidgets(
       'old history exact-ID detail marks only after drawing and retains newer unread',
@@ -121,8 +150,8 @@ void main() {
         ])));
     await show(t);
     expect(marked, isEmpty);
-    await t.ensureVisible(find.text('個性レポート'));
-    await t.tap(find.text('個性レポート'));
+    await t.ensureVisible(find.text('うちの子レポート').last);
+    await t.tap(find.text('うちの子レポート').last);
     await t.pumpAndSettle();
     expect(find.byType(PersonalityReportScreen), findsOneWidget);
     expect(
@@ -139,14 +168,13 @@ void main() {
     expect(find.text('閲覧済み'), findsOneWidget);
     expect(find.text('未読'), findsOneWidget);
   });
-  testWidgets(
-      'empty history retains first access and shows no invented personality',
+  testWidgets('empty history has no invented first or modern report entry',
       (t) async {
     source.pages
         .add(() => Future.value(const PersonalityHistoryPage('owner-a', [])));
     await show(t);
-    expect(find.text('個性レポートはまだ届いていません。'), findsOneWidget);
-    expect(find.text('初回コンディションレポート'), findsOneWidget);
+    expect(find.text('レポートはまだ届いていません。'), findsOneWidget);
+    expect(find.text('初回分析の記録'), findsNothing);
   });
   testWidgets('unavailable history is retryable and never treated as empty',
       (t) async {
@@ -155,11 +183,11 @@ void main() {
         .add(() => Future.value(const PersonalityHistoryPage('owner-a', [])));
     await show(t);
     expect(find.text('レポート履歴を取得できませんでした。'), findsOneWidget);
-    expect(find.text('個性レポートはまだ届いていません。'), findsNothing);
+    expect(find.text('レポートはまだ届いていません。'), findsNothing);
     await t.tap(find.text('再試行'));
     await t.pumpAndSettle();
     expect(source.requests, hasLength(2));
-    expect(find.text('個性レポートはまだ届いていません。'), findsOneWidget);
+    expect(find.text('レポートはまだ届いていません。'), findsOneWidget);
   });
   testWidgets(
       'account switch clears prior history and rejects old in-flight page',
@@ -179,7 +207,7 @@ void main() {
     pending.complete(PersonalityHistoryPage('owner-a',
         [PersonalityHistoryEntry(daily('2026-10-10'), isViewed: false)]));
     await t.pumpAndSettle();
-    expect(find.text('日次の個性レポート'), findsNothing);
-    expect(find.text('個性レポートはまだ届いていません。'), findsOneWidget);
+    expect(find.text('うちの子レポート'), findsNothing);
+    expect(find.text('レポートはまだ届いていません。'), findsOneWidget);
   });
 }

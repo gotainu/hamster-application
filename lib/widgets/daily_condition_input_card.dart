@@ -1,7 +1,19 @@
 import 'dart:ui';
+import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import '../models/observation_catalog.dart';
+import '../models/daily_observation_history.dart';
+import '../viewmodels/observation_input_view_model.dart';
+import 'observation_timing_input.dart';
+import '../models/care_action_catalog.dart';
+import '../services/daily_care_actions_repo.dart';
+import '../services/care_continuity_repo.dart';
+import '../models/daily_care_actions.dart';
+import '../viewmodels/care_action_input_view_model.dart';
+import 'care_action_input_fields.dart';
 import '../services/app_analytics.dart';
 import '../services/daily_checkin_repo.dart';
 import '../services/onboarding_state_repo.dart';
@@ -11,12 +23,22 @@ class DailyConditionInputCard extends StatefulWidget {
   final DailyCheckinStore? repo;
   final DateTime? date;
   final VoidCallback? onSaved;
+  final List<ObservationCatalogItem> catalog;
+  final CareActionStore? careRepo;
+  final List<CareActionCatalogItem> careCatalog;
+  final VoidCallback? onCareSaved;
+  final CareContinuitySource? continuitySource;
 
   const DailyConditionInputCard({
     super.key,
     this.repo,
     this.date,
     this.onSaved,
+    this.catalog = observationCatalog,
+    this.careRepo,
+    this.careCatalog = careActionCatalog,
+    this.onCareSaved,
+    this.continuitySource,
   });
 
   @override
@@ -27,6 +49,14 @@ class DailyConditionInputCard extends StatefulWidget {
 class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   late final DailyCheckinStore _repo;
   late final DateTime _date;
+  late final CareActionStore _careRepo;
+  late final CareActionInputViewModel _care;
+  bool _healthDirty = false;
+  ObservationInputViewModel? _observation;
+  bool _healthLoadFailed = false;
+  String? _careMessage;
+  bool _careLoadFailed = false;
+  CareActionMutation? _rewardRetry;
 
   final _memoCtrl = TextEditingController();
   final Set<String> _selectedTags = <String>{};
@@ -41,54 +71,40 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
 
   static const _brandAsset = 'store_assets/icons/google_play_icon_512.png';
 
-  static const _observations = <_ObservationChoice>[
-    _ObservationChoice(
-      id: 'appetite',
-      label: '食欲',
-      icon: Icons.restaurant_rounded,
-    ),
-    _ObservationChoice(
-      id: 'water',
-      label: '飲水',
-      icon: Icons.water_drop_rounded,
-    ),
-    _ObservationChoice(
-      id: 'elimination',
-      label: '排泄',
-      icon: Icons.grain_rounded,
-    ),
-    _ObservationChoice(
-      id: 'breathing',
-      label: '呼吸',
-      icon: Icons.air_rounded,
-    ),
-    _ObservationChoice(
-      id: 'movement',
-      label: '姿勢・動き',
-      icon: Icons.directions_run_rounded,
-    ),
-    _ObservationChoice(
-      id: 'eyesNose',
-      label: '目・鼻',
-      icon: Icons.visibility_rounded,
-    ),
-    _ObservationChoice(
-      id: 'coatSkin',
-      label: '被毛・皮膚',
-      icon: Icons.auto_awesome_rounded,
-    ),
-    _ObservationChoice(
-      id: 'other',
-      label: 'その他',
-      icon: Icons.more_horiz_rounded,
-    ),
-  ];
+  List<_ObservationChoice> get _observations => [
+        for (final item in activeObservationItems(catalog: widget.catalog))
+          _ObservationChoice(
+            id: item.id,
+            label: item.label,
+            icon: _observationIcon(item.id),
+          ),
+      ];
+
+  // Presentation only: labels, ordering and available items come from Catalog.
+  static IconData _observationIcon(String id) => switch (id) {
+        'appetite' => Icons.restaurant_rounded,
+        'water' => Icons.water_drop_rounded,
+        'elimination' => Icons.grain_rounded,
+        'breathing' => Icons.air_rounded,
+        'movement' => Icons.directions_run_rounded,
+        'eyesNose' => Icons.visibility_rounded,
+        'coatSkin' => Icons.auto_awesome_rounded,
+        _ => Icons.more_horiz_rounded,
+      };
 
   @override
   void initState() {
     super.initState();
     _repo = widget.repo ?? DailyCheckinRepo();
     _date = widget.date ?? DateTime.now();
+    if (_repo is DailyObservationStore) {
+      _observation = ObservationInputViewModel(
+          date: _repo.normalizeLocalDay(_date),
+          dayKey: _repo.dateKeyLocal(_date));
+    }
+    _careRepo = widget.careRepo ?? DailyCareActionsRepo();
+    _care = CareActionInputViewModel(
+        dayKey: _repo.dateKeyLocal(_date), catalog: widget.careCatalog);
     _load();
   }
 
@@ -105,25 +121,94 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     });
 
     try {
-      final checkin = await _repo.fetchByDate(_date);
+      DailyCheckin? checkin;
+      if (_repo is DailyObservationStore) {
+        final loaded =
+            await (_repo as DailyObservationStore).loadObservation(_date);
+        _observation!.load(loaded);
+        _healthLoadFailed = !loaded.serverConfirmed;
+        checkin = loaded.current;
+      } else {
+        checkin = await _repo.fetchByDate(_date);
+      }
       if (!mounted) return;
 
-      if (checkin != null) {
+      final loadedCheckin = checkin;
+      if (loadedCheckin != null) {
         setState(() {
-          _savedCheckin = checkin;
-          _condition = checkin.condition;
+          _savedCheckin = loadedCheckin;
+          _condition = loadedCheckin.condition;
+          _healthDirty = false;
           _isEditing = false;
           _selectedTags
             ..clear()
-            ..addAll(checkin.concernTags);
-          _memoCtrl.text = checkin.memo;
-          _memoExpanded = checkin.memo.trim().isNotEmpty;
+            ..addAll(normalizeObservationIds(
+              loadedCheckin.concernTags,
+              catalog: widget.catalog,
+            ));
+          _memoCtrl.text = loadedCheckin.memo;
+          _memoExpanded = loadedCheckin.memo.trim().isNotEmpty;
+        });
+      }
+      if (loadedCheckin == null &&
+          (_observation?.state.serverConfirmed ?? true)) {
+        setState(() {
+          _savedCheckin = null;
+          _condition = null;
+          _healthDirty = false;
+          _selectedTags.clear();
+          _memoCtrl.clear();
+          _memoExpanded = false;
+          _isEditing = true;
+        });
+      }
+      final pending = _observation?.state.pending;
+      if (pending != null) {
+        setState(() {
+          _isEditing = true;
+          _message = '今日の様子は同期待ちです。まだ保存確定ではありません。';
+          if (pending.operation != ObservationOperation.cancel) {
+            _condition = DailyCondition.values.byName(pending.condition!);
+            _selectedTags
+              ..clear()
+              ..addAll(pending.concernTags);
+            _memoCtrl.text = pending.memo;
+            _memoExpanded = pending.memo.isNotEmpty;
+            _healthDirty = true;
+            _observation!.operation = pending.operation;
+            _observation!.timing = pending.timing;
+          }
         });
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _message = '読み込みに失敗しました');
+      setState(() {
+        _healthLoadFailed = true;
+        _message = '今日の様子を確認できません。保存済みとして扱いません。';
+      });
     } finally {
+      try {
+        final result = await _careRepo.load(_care.dayKey);
+        if (mounted) {
+          setState(() {
+            _care.load(result);
+            _careLoadFailed = false;
+            _careMessage =
+                result.pending != null ? 'ケア記録は同期待ちです。確定した報酬はまだありません。' : null;
+            if ((result.record != null || result.pending != null) &&
+                _observation?.state.pending == null) {
+              _isEditing = false;
+            }
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _careLoadFailed = true;
+            _careMessage = 'ケア記録を確認できません。今日の様子は保存できます。';
+          });
+        }
+      }
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -132,9 +217,25 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
       _condition == DailyCondition.slightlyConcerned ||
       _condition == DailyCondition.veryConcerned;
 
+  bool get _healthConfirmed =>
+      !_healthLoadFailed && (_observation == null || _observation!.canSave);
+
   bool get _canSave =>
       !_isLoading &&
       !_isSaving &&
+      ((_healthDirty &&
+              _condition != null &&
+              (!_showConcernFields || _selectedTags.isNotEmpty)) ||
+          (!_careLoadFailed && _care.canConfirmAndSave)) &&
+      (!_healthDirty ||
+          (!_showConcernFields || _selectedTags.isNotEmpty) &&
+              _healthConfirmed);
+
+  bool get _canSaveHealthOnly =>
+      !_isLoading &&
+      !_isSaving &&
+      _healthDirty &&
+      _healthConfirmed &&
       _condition != null &&
       (!_showConcernFields || _selectedTags.isNotEmpty);
 
@@ -167,7 +268,29 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         _memoCtrl.clear();
         _memoExpanded = false;
       }
+      _updateHealthDirty();
     });
+  }
+
+  void _updateHealthDirty() {
+    final saved = _savedCheckin;
+    if (saved == null) {
+      _healthDirty = _condition != null;
+      return;
+    }
+    final savedTags =
+        normalizeObservationIds(saved.concernTags, catalog: widget.catalog)
+            .toSet();
+    _healthDirty = _condition != saved.condition ||
+        _selectedTags.length != savedTags.length ||
+        !_selectedTags.every(savedTags.contains) ||
+        _memoCtrl.text.trim() != saved.memo.trim() ||
+        (_observation?.operation == ObservationOperation.newObservation &&
+            _observation?.timing != null) ||
+        (_observation?.operation == ObservationOperation.correction &&
+            _observation?.timing != null &&
+            jsonEncode(_observation!.timing!.toMap()) !=
+                jsonEncode(saved.timing?.toMap()));
   }
 
   void _toggleTag(String id) {
@@ -177,94 +300,280 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
       } else {
         _selectedTags.add(id);
       }
+      _updateHealthDirty();
       _message = null;
     });
   }
 
-  Future<void> _save() async {
+  Future<void> _save(
+      {bool retryCare = false,
+      bool cancelCare = false,
+      bool healthOnly = false}) async {
+    if (_isSaving || _isLoading) return;
     final condition = _condition;
-    if (condition == null || (_showConcernFields && _selectedTags.isEmpty)) {
+    final saveHealth =
+        !retryCare && !cancelCare && _healthDirty && condition != null;
+    if (!healthOnly &&
+        !retryCare &&
+        !cancelCare &&
+        !_careLoadFailed &&
+        (!_healthDirty || !_showConcernFields || _selectedTags.isNotEmpty)) {
+      _care.confirmDefaults();
+    }
+    final saveCare = !healthOnly &&
+        !_careLoadFailed &&
+        (_care.canSave || retryCare || cancelCare);
+    if ((!saveHealth && !saveCare) ||
+        (saveHealth &&
+            (!_healthConfirmed ||
+                (_showConcernFields && _selectedTags.isEmpty)))) {
       return;
     }
-
     FocusScope.of(context).unfocus();
     setState(() {
       _isSaving = true;
       _message = null;
+      _careMessage = null;
     });
-
-    final tags = _showConcernFields
-        ? _selectedTags.toList(growable: false)
-        : const <String>[];
-    final observationLevels = buildDailyObservationLevels(
-      condition: condition,
-      concernTags: tags,
-    );
-    final memo = _showConcernFields ? _memoCtrl.text.trim() : '';
-
-    try {
-      await _repo.saveDailyCheckin(
-        date: _date,
-        condition: condition,
-        concernTags: tags,
-        observationLevels: observationLevels,
-        memo: memo,
-      );
-      if (!mounted) return;
-
-      setState(() {
-        _savedCheckin = DailyCheckin(
-          dayKey: _repo.dateKeyLocal(_date),
-          date: _repo.normalizeLocalDay(_date),
-          condition: condition,
-          concernTags: tags,
-          observationLevels: observationLevels,
-          memo: memo,
-        );
-        _isEditing = false;
-      });
-
-      // 進捗記録が失敗しても、ユーザーの大切な日次記録は失敗扱いにしない。
+    var healthSaved = false;
+    var careSaved = false;
+    if (saveHealth) {
+      final tags = _showConcernFields
+          ? _selectedTags.toList(growable: false)
+          : const <String>[];
+      final levels = buildDailyObservationLevels(
+          condition: condition, concernTags: tags, catalog: widget.catalog);
+      final memo = _showConcernFields ? _memoCtrl.text.trim() : '';
       try {
-        await OnboardingStateRepo().recordFirstMonitoringData('daily_checkin');
-      } catch (_) {}
+        ObservationSaveResult? historyResult;
+        if (_repo is DailyObservationStore) {
+          historyResult = await (_repo as DailyObservationStore)
+              .saveObservation(_observation!
+                  .mutation(condition: condition, tags: tags, memo: memo));
+          if (!historyResult.confirmed) {
+            final state = _observation!.state;
+            _observation!.state = ObservationLoadResult(
+                current: state.current,
+                pending: historyResult.mutation,
+                revision: state.revision,
+                subjectId: state.subjectId,
+                hasProfile: state.hasProfile);
+            if (mounted) {
+              setState(() => _message = '今日の様子は同期待ちです。まだ保存確定ではありません。');
+            }
+          }
+          healthSaved = historyResult.confirmed;
+        } else {
+          await _repo.saveDailyCheckin(
+              date: _date,
+              condition: condition,
+              concernTags: tags,
+              observationLevels: levels,
+              memo: memo);
+          healthSaved = true;
+        }
+        if (mounted && healthSaved) {
+          if (historyResult != null) {
+            await _applyHistoryResult(historyResult);
+          } else {
+            setState(() {
+              _healthDirty = false;
+              _savedCheckin = DailyCheckin(
+                  dayKey: _repo.dateKeyLocal(_date),
+                  date: _repo.normalizeLocalDay(_date),
+                  condition: condition,
+                  concernTags: tags,
+                  observationLevels: levels,
+                  memo: memo);
+            });
+          }
+        }
+        // Saved records and care submission must not wait for analytics or
+        // onboarding connectivity. The same existing effects run separately.
+        if (healthSaved) {
+          unawaited(_recordHealthProgress(condition, tags, memo));
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _healthLoadFailed = _observation != null;
+            _message = '今日の様子の保存に失敗しました。入力は残っています。';
+          });
+        }
+      }
+    }
+    if (saveCare) {
+      try {
+        final result = await _careRepo.save(_care.mutation(cancel: cancelCare));
+        careSaved = result.confirmed;
+        if (mounted) {
+          setState(() {
+            _care.apply(result);
+            _rewardRetry = result.confirmed &&
+                    (result.rewardStatus == 'failed' ||
+                        result.confirmationPending)
+                ? result.mutation
+                : null;
+            _careMessage = !result.confirmed
+                ? 'ケア記録は同期待ちです。確定した報酬はまだありません。'
+                : cancelCare
+                    ? 'ケア記録を取り消しました。今日の様子は変更していません。'
+                    : result.rewardStatus == 'failed'
+                        ? 'ケア記録は保存済みです。報酬だけ再確認できます。'
+                        : result.confirmationPending
+                            ? 'ケア記録は保存済みです。報酬は再確認待ちです。'
+                            : result.achievementRecorded
+                                ? 'ケア記録を保存しました。今日の継続達成を記録しました。'
+                                : 'ケア記録を保存しました。';
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _careMessage = 'ケア記録の保存に失敗しました。今日の様子の保存結果は変わりません。');
+        }
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _isSaving = false;
+      if (!_healthDirty && !_care.dirty) _isEditing = false;
+    });
+    if (healthSaved && (!saveCare || careSaved)) widget.onSaved?.call();
+    if (careSaved && !cancelCare) widget.onCareSaved?.call();
+  }
 
-      await AppAnalytics.logDailyInputComplete(
-        condition: condition.name,
-        concernTagCount: tags.length,
-        hasMemo: memo.isNotEmpty,
-      );
-      widget.onSaved?.call();
-    } catch (error) {
+  Future<void> _applyHistoryResult(ObservationSaveResult result) async {
+    ObservationLoadResult state;
+    if (result.replayed) {
+      // Receipt is immutable and may predate later edits. Do not present it as
+      // the latest projection after a retry.
+      try {
+        state = await (_repo as DailyObservationStore).loadObservation(_date);
+      } catch (_) {
+        state = const ObservationLoadResult(serverConfirmed: false);
+      }
+    } else {
+      state = ObservationLoadResult(
+          current: result.projection == null
+              ? null
+              : DailyCheckin.fromJson(result.projection!,
+                  fallbackDayKey: _repo.dateKeyLocal(_date)),
+          revision: result.revision!,
+          subjectId: result.subjectId,
+          hasProfile: true);
+    }
+    if (!mounted) return;
+    setState(() {
+      _healthLoadFailed = !state.serverConfirmed;
+      _observation!.load(state);
+      _savedCheckin = state.current;
+      _condition = state.current?.condition;
+      _selectedTags
+        ..clear()
+        ..addAll(state.current?.concernTags ?? const []);
+      _memoCtrl.text = state.current?.memo ?? '';
+      _memoExpanded = _memoCtrl.text.isNotEmpty;
+      _healthDirty = false;
+      _isEditing = state.current == null;
+      if (!state.serverConfirmed) {
+        _message = '保存は受理済みですが、最新の様子を確認できません。再読み込みしてください。';
+      }
+    });
+  }
+
+  Future<void> _saveHistoryOnly({bool cancel = false}) async {
+    if (_isSaving || _repo is! DailyObservationStore) return;
+    final model = _observation!;
+    final mutation = cancel
+        ? model.mutation(
+            condition: _condition!,
+            tags: _selectedTags.toList(),
+            memo: _memoCtrl.text,
+            cancel: true)
+        : model.state.pending;
+    if (mutation == null) return;
+    setState(() => _isSaving = true);
+    try {
+      final result =
+          await (_repo as DailyObservationStore).saveObservation(mutation);
       if (!mounted) return;
-      setState(() => _message = '保存に失敗しました');
+      if (result.confirmed) {
+        await _applyHistoryResult(result);
+        if (!mounted) return;
+        if (!_healthLoadFailed) {
+          setState(
+              () => _message = cancel ? '今日の様子を取り消しました。' : '今日の様子を保存しました。');
+        }
+        final current = _savedCheckin;
+        if (!cancel && current != null) {
+          unawaited(_recordHealthProgress(
+              current.condition, current.concernTags, current.memo));
+          widget.onSaved?.call();
+        }
+      } else {
+        setState(() => _message = '今日の様子は同期待ちです。まだ保存確定ではありません。');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _message = '保存結果を確認できません。入力は残っています。');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  String _observationLabel(String id) {
-    for (final observation in _observations) {
-      if (observation.id == id) return observation.label;
+  Future<void> _retryReward() async {
+    final mutation = _rewardRetry;
+    if (mutation == null || _isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final result = await (widget.continuitySource ?? CareContinuityRepo())
+          .retryCareReward(
+              dayKey: mutation.dayKey, mutationId: mutation.mutationId);
+      if (mounted) {
+        setState(() {
+          if (result.confirmed) _rewardRetry = null;
+          _careMessage = result.confirmationPending
+              ? 'ケア記録は保存済みです。報酬は再確認待ちです。'
+              : result.confirmed
+                  ? '保存済みのケア記録の報酬を確認しました。'
+                  : 'ケア記録は保存済みです。報酬の再確認は後でもできます。';
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _careMessage = 'ケア記録は保存済みです。報酬の再確認は後でもできます。');
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
-    return switch (id) {
-      'poop' => '排泄',
-      'chewing' => 'かじり方',
-      _ => id,
-    };
   }
 
+  Future<void> _recordHealthProgress(
+      DailyCondition condition, List<String> tags, String memo) async {
+    try {
+      await OnboardingStateRepo().recordFirstMonitoringData('daily_checkin');
+    } catch (_) {}
+    try {
+      await AppAnalytics.logDailyInputComplete(
+          condition: condition.name,
+          concernTagCount: tags.length,
+          hasMemo: memo.isNotEmpty);
+    } catch (_) {}
+  }
+
+  String _observationLabel(String id) =>
+      observationLabel(id, catalog: widget.catalog);
+
   Widget _buildSavedSummary(BuildContext context) {
-    final checkin = _savedCheckin!;
-    final color = _conditionColor(context, checkin.condition);
-    final tagText = checkin.concernTags
+    final checkin = _savedCheckin;
+    final color = checkin == null
+        ? AppTheme.quickRecordGlow(context)
+        : _conditionColor(context, checkin.condition);
+    final tagText = (checkin?.concernTags ?? const <String>[])
         .map(_observationLabel)
         .where((label) => label.isNotEmpty)
         .join('・');
 
     return Semantics(
       liveRegion: true,
-      label: '今日の観察を保存しました',
+      label: checkin == null ? 'ケア記録の保存状態' : '今日の観察を保存しました',
       child: Container(
         key: const ValueKey('saved-summary'),
         width: double.infinity,
@@ -291,15 +600,17 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '記録しました',
+                    _care.pending != null ? '同期待ち' : '記録しました',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
                   ),
                   Text(
-                    tagText.isEmpty
-                        ? _conditionLabel(checkin.condition)
-                        : '${_conditionLabel(checkin.condition)}・$tagText',
+                    checkin == null
+                        ? _care.draftSummary
+                        : tagText.isEmpty
+                            ? _conditionLabel(checkin.condition)
+                            : '${_conditionLabel(checkin.condition)}・$tagText',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -313,6 +624,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
             TextButton(
               onPressed: () => setState(() {
                 _isEditing = true;
+                _healthDirty = false;
                 _message = null;
               }),
               child: const Text('編集'),
@@ -328,23 +640,39 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
       key: const ValueKey('checkin-editor'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: DailyCondition.values.map((condition) {
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  right: condition == DailyCondition.veryConcerned ? 0 : 7,
-                ),
-                child: _ConditionChoiceCard(
+        LayoutBuilder(builder: (context, constraints) {
+          final stacked = constraints.maxWidth < 340 &&
+              MediaQuery.textScalerOf(context).scale(16) > 20;
+          final choices = DailyCondition.values
+              .map((condition) => _ConditionChoiceCard(
                   label: _conditionLabel(condition),
                   color: _conditionColor(context, condition),
                   selected: _condition == condition,
-                  onTap: () => _selectCondition(condition),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
+                  onTap: () => _selectCondition(condition)))
+              .toList();
+          if (stacked) {
+            return Column(children: [
+              for (final choice in choices)
+                Padding(
+                    padding: const EdgeInsets.only(bottom: 7), child: choice)
+            ]);
+          }
+          return Row(children: [
+            for (var index = 0; index < choices.length; index++)
+              Expanded(
+                  child: Padding(
+                      padding: EdgeInsets.only(
+                          right: index == choices.length - 1 ? 0 : 7),
+                      child: choices[index]))
+          ]);
+        }),
+        if (_observation != null && _condition != null) ...[
+          const SizedBox(height: 8),
+          ObservationTimingInput(
+              model: _observation!,
+              enabled: !_isSaving && !_healthLoadFailed,
+              onChanged: () => setState(_updateHealthDirty)),
+        ],
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 240),
           child: !_showConcernFields
@@ -408,6 +736,8 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                                 padding: const EdgeInsets.only(top: 2),
                                 child: TextField(
                                   controller: _memoCtrl,
+                                  onChanged: (_) =>
+                                      setState(_updateHealthDirty),
                                   minLines: 2,
                                   maxLines: 4,
                                   maxLength: 240,
@@ -429,6 +759,35 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                   ),
                 ),
         ),
+        const SizedBox(height: 18),
+        CareActionInputFields(
+            model: _care,
+            enabled: !_isSaving && !_careLoadFailed,
+            onChanged: () => setState(() => _careMessage = null)),
+        if (_observation != null && _savedCheckin != null)
+          TextButton(
+              onPressed: _isSaving || _observation!.state.pending != null
+                  ? null
+                  : () => _saveHistoryOnly(cancel: true),
+              child: const Text('今日の様子を取り消す')),
+        if (_observation?.state.pending != null)
+          TextButton(
+              onPressed: _isSaving ? null : () => _saveHistoryOnly(),
+              child: const Text('今日の様子を再送する')),
+        if (_healthLoadFailed)
+          TextButton(
+              onPressed: _isSaving ? null : _load,
+              child: const Text('今日の様子を再読み込み')),
+        if (_observation != null &&
+            !_observation!.state.hasProfile &&
+            !_healthLoadFailed)
+          const Text('先にうちの子のプロフィールを登録してください。'),
+        if (_care.confirmedSaved)
+          TextButton(
+              onPressed: _isSaving || _care.pending != null
+                  ? null
+                  : () => _save(cancelCare: true),
+              child: const Text('ケア記録を取り消す')),
         if (_message != null) ...[
           const SizedBox(height: 10),
           Text(
@@ -439,10 +798,15 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                 ),
           ),
         ],
-        const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
+        const SizedBox(height: AppTheme.careContentGap),
+        if (!_careLoadFailed && _care.pending == null)
+          Text(_care.draftSummary,
+              key: const ValueKey('care-confirmation-summary'),
+              style: AppTheme.dataCaptionStyle(context)),
+        const SizedBox(height: AppTheme.careContentGap),
+        ConstrainedBox(
+          constraints:
+              const BoxConstraints(minHeight: 52, minWidth: double.infinity),
           child: FilledButton.icon(
             onPressed: _canSave ? _save : null,
             icon: _isSaving
@@ -452,9 +816,16 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.check_rounded),
-            label: Text(_isSaving ? '保存中…' : '記録する'),
+            label: Text(_isSaving ? '保存中…' : 'この内容で記録'),
           ),
         ),
+        Align(
+            alignment: Alignment.center,
+            child: TextButton(
+                key: const ValueKey('health-only-save'),
+                onPressed:
+                    _canSaveHealthOnly ? () => _save(healthOnly: true) : null,
+                child: const Text('様子だけ記録'))),
       ],
     );
   }
@@ -507,11 +878,41 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                 const LinearProgressIndicator()
               else
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  child: _savedCheckin != null && !_isEditing
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 260),
+                  child: (_savedCheckin != null ||
+                              _care.confirmedSaved ||
+                              _care.pending != null) &&
+                          !_isEditing
                       ? _buildSavedSummary(context)
                       : _buildEditor(context),
                 ),
+              if (_message != null && !_isEditing) Text(_message!),
+              if (_careMessage != null) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                    liveRegion: true,
+                    child: AnimatedSwitcher(
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
+                        child: Text(_careMessage!,
+                            key: ValueKey(_careMessage),
+                            style: Theme.of(context).textTheme.bodySmall))),
+              ],
+              if (_rewardRetry != null)
+                TextButton(
+                    onPressed: _isSaving ? null : _retryReward,
+                    child: const Text('報酬だけ再確認する')),
+              if (_care.pending != null)
+                TextButton(
+                    onPressed: _isSaving ? null : () => _save(retryCare: true),
+                    child: const Text('ケア記録を再送する')),
+              if (_careLoadFailed)
+                TextButton(
+                    onPressed: _isSaving ? null : _load,
+                    child: const Text('ケア記録を再読み込み')),
             ],
           ),
         ),

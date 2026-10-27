@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/health_record.dart';
 import 'wheel_repo.dart';
+import 'measurement_history_client.dart';
 
 typedef Json = Map<String, dynamic>;
 
@@ -23,6 +24,9 @@ class DailyDistanceRecord {
   final double distance;
   final int? rotations;
   final double? wheelDiameterCm;
+  final String? subjectId, recordId;
+  final int revision;
+  final Map<String, dynamic>? timing;
 
   const DailyDistanceRecord({
     required this.dayKey,
@@ -30,6 +34,10 @@ class DailyDistanceRecord {
     required this.distance,
     this.rotations,
     this.wheelDiameterCm,
+    this.subjectId,
+    this.recordId,
+    this.revision = 0,
+    this.timing,
   });
 
   factory DailyDistanceRecord.fromJson(
@@ -42,6 +50,12 @@ class DailyDistanceRecord {
     final wheelDiameterRaw = json['wheelDiameterCm'];
 
     return DailyDistanceRecord(
+      subjectId: json['subjectId'] as String?,
+      recordId: json['recordId'] as String?,
+      revision: json['revision'] is int ? json['revision'] as int : 0,
+      timing: json['timing'] is Map
+          ? Map<String, dynamic>.from(json['timing'] as Map)
+          : null,
       dayKey: json['dayKey'] as String? ?? fallbackDayKey,
       date: fallbackDate,
       distance: distanceRaw is num ? distanceRaw.toDouble() : 0,
@@ -53,9 +67,10 @@ class DailyDistanceRecord {
 }
 
 class DistanceRecordsRepo {
-  final FirebaseFirestore _db;
-  final FirebaseAuth _auth;
-  final WheelRepo _wheelRepo;
+  final FirebaseFirestore? _db;
+  final FirebaseAuth? _auth;
+  final MeasurementHistoryClient history;
+  final WheelRepo? _wheelRepo;
 
   double? _cachedWheelDiameterCm;
 
@@ -63,16 +78,22 @@ class DistanceRecordsRepo {
     FirebaseFirestore? db,
     FirebaseAuth? auth,
     WheelRepo? wheelRepo,
-  })  : _db = db ?? FirebaseFirestore.instance,
-        _auth = auth ?? FirebaseAuth.instance,
-        _wheelRepo = wheelRepo ?? WheelRepo();
+    MeasurementHistoryClient? historyClient,
+  })  : _db = db,
+        _auth = auth,
+        history = historyClient ??
+            MeasurementHistoryClient(kind: 'distance', db: db, auth: auth),
+        _wheelRepo = wheelRepo;
 
-  String? get _uid => _auth.currentUser?.uid;
+  String? get _uid => (_auth ?? FirebaseAuth.instance).currentUser?.uid;
 
   CollectionReference<Json>? _col() {
     final uid = _uid;
     if (uid == null) return null;
-    return _db.collection('users').doc(uid).collection('distance_records');
+    return (_db ?? FirebaseFirestore.instance)
+        .collection('users')
+        .doc(uid)
+        .collection('distance_records');
   }
 
   DocumentReference<Json>? _docByLocalDate(DateTime dayLocal) {
@@ -128,7 +149,7 @@ class DistanceRecordsRepo {
     final doc = _docByLocalDate(dayLocal);
     if (doc == null) return 0;
 
-    final snap = await doc.get();
+    final snap = await doc.get(const GetOptions(source: Source.server));
     if (!snap.exists) return 0;
 
     final data = snap.data();
@@ -141,7 +162,7 @@ class DistanceRecordsRepo {
     final doc = _docByLocalDate(dayLocal);
     if (doc == null) return null;
 
-    final snap = await doc.get();
+    final snap = await doc.get(const GetOptions(source: Source.server));
     if (!snap.exists) return null;
 
     final data = snap.data();
@@ -220,7 +241,8 @@ class DistanceRecordsRepo {
   // ★ 直径キャッシュ更新
   // -------------------------
   Future<double?> refreshWheelDiameter() async {
-    final d = await _wheelRepo.fetchWheelDiameter();
+    final d = await (_wheelRepo ?? WheelRepo(db: _db, auth: _auth))
+        .fetchWheelDiameter();
     _cachedWheelDiameterCm = (d != null && d > 0) ? d : null;
     return _cachedWheelDiameterCm;
   }
@@ -230,10 +252,11 @@ class DistanceRecordsRepo {
   // -------------------------
   // ★ プレビュー距離計算（m）
   // -------------------------
-  Future<double?> previewDistanceFromRotations(int rotations) async {
+  Future<double?> previewDistanceFromRotations(int rotations,
+      {double? wheelDiameterCm}) async {
     if (rotations < 0) return null;
 
-    var d = _cachedWheelDiameterCm;
+    var d = wheelDiameterCm ?? _cachedWheelDiameterCm;
     d ??= await refreshWheelDiameter();
 
     if (d == null || d <= 0) return null;
@@ -244,61 +267,104 @@ class DistanceRecordsRepo {
   // -------------------------
   // ★ 回転数→距離→日次レコードを上書き保存
   // -------------------------
-  Future<void> addWheelRotationRecord({
-    required int rotations,
-    DateTime? date,
-    String source = 'wheel_manual',
-  }) async {
-    final doc = _docByLocalDate(date ?? DateTime.now());
-    if (doc == null) return;
-
-    if (rotations < 0) {
-      throw ArgumentError.value(rotations, 'rotations', '回転数は0以上にしてください');
-    }
-
-    var d = _cachedWheelDiameterCm;
-    d ??= await refreshWheelDiameter();
-
-    if (d == null || d <= 0) {
-      throw const MissingWheelDiameterException();
-    }
-
-    final localDay = _normalizeLocalDay(date ?? DateTime.now());
-    final distanceM = rotations * (math.pi * d) / 100.0;
-
-    await doc.set({
-      'dayKey': _dateKeyLocal(localDay),
-      'date': Timestamp.fromDate(localDay.toUtc()),
-      'distance': distanceM,
-      'rotations': rotations,
-      'wheelDiameterCm': d,
-      'source': source,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  Future<void> addWheelRotationRecord(
+      {required int rotations,
+      DateTime? date,
+      String source = 'wheel_manual'}) async {
+    final day = date ?? DateTime.now();
+    await saveRotationRecord(
+        rotations: rotations,
+        date: day,
+        expectedRecord: await fetchDailyRecord(day),
+        source: source);
   }
 
-  // -------------------------
-  // 距離を直接、日次レコードへ上書き保存
-  // -------------------------
-  Future<void> addDistanceRecord({
-    required DateTime date,
-    required double distance,
-    String source = 'wheel_manual',
-  }) async {
-    final doc = _docByLocalDate(date);
-    if (doc == null) return;
+  Future<DailyDistanceRecord> saveRotationRecord(
+      {required int rotations,
+      required DateTime date,
+      DailyDistanceRecord? expectedRecord,
+      Map<String, dynamic>? timing,
+      bool legacyConfirmed = false,
+      bool diameterCorrection = false,
+      double? wheelDiameterCm,
+      String? originalDayKey,
+      String source = 'wheel_manual'}) async {
+    if (rotations < 0) throw ArgumentError.value(rotations, 'rotations');
+    return _saveRecord(
+        date: date,
+        expectedRecord: expectedRecord,
+        timing: timing,
+        legacyConfirmed: legacyConfirmed,
+        originalDayKey: originalDayKey,
+        values: {
+          'mode': 'rotations',
+          'rotations': rotations,
+          'source': source,
+          if (diameterCorrection) 'diameterCorrection': true,
+          if (diameterCorrection) 'wheelDiameterCm': wheelDiameterCm
+        });
+  }
 
-    final localDay = _normalizeLocalDay(date);
+  Future<void> addDistanceRecord(
+      {required DateTime date,
+      required double distance,
+      String source = 'wheel_manual'}) async {
+    if (!distance.isFinite || distance < 0) {
+      throw ArgumentError.value(distance, 'distance');
+    }
+    await _saveRecord(
+        date: date,
+        expectedRecord: await fetchDailyRecord(date),
+        values: {
+          'mode': 'direct_distance',
+          'distance': distance,
+          'source': source
+        });
+  }
 
-    await doc.set({
-      'dayKey': _dateKeyLocal(localDay),
-      'date': Timestamp.fromDate(localDay.toUtc()),
-      'distance': distance,
-      'source': source,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+  Future<DailyDistanceRecord> _saveRecord(
+      {required DateTime date,
+      required Map<String, dynamic> values,
+      DailyDistanceRecord? expectedRecord,
+      Map<String, dynamic>? timing,
+      bool legacyConfirmed = false,
+      String? originalDayKey}) async {
+    final day = _dateKeyLocal(date);
+    // A selected date identifies the daily record, not its measured coverage.
+    final preservedTiming =
+        expectedRecord?.dayKey == day ? expectedRecord?.timing : null;
+    final result = await history.save({
+      'dayKey': day,
+      'date': _normalizeLocalDay(date).toUtc().toIso8601String(),
+      'subjectId': expectedRecord?.subjectId ?? await history.currentSubject(),
+      'expectedRevision':
+          expectedRecord?.revision ?? await history.dayRevision(day),
+      'operation': 'save',
+      'inputUiVersion': 'measurement_history_v1',
+      ...values,
+      'timing': measurementWireTiming(timing ??
+          preservedTiming ??
+          {...unknownMeasurementTiming, 'windowMeaning': 'unknown'}),
+      if (legacyConfirmed) 'legacyConfirmed': true,
+      if (originalDayKey != null) 'originalDayKey': originalDayKey
+    });
+    return DailyDistanceRecord.fromJson(
+        Map<String, dynamic>.from(result['projection'] as Map),
+        fallbackDayKey: day,
+        fallbackDate: _normalizeLocalDay(date));
+  }
+
+  Future<void> cancelRecord(DailyDistanceRecord record,
+      {bool legacyConfirmed = false}) async {
+    await history.save({
+      'dayKey': record.dayKey,
+      'date': record.date.toUtc().toIso8601String(),
+      'subjectId': record.subjectId ?? await history.currentSubject(),
+      'expectedRevision': record.revision,
+      'operation': 'cancel',
+      'inputUiVersion': 'measurement_history_v1',
+      if (legacyConfirmed) 'legacyConfirmed': true
+    });
   }
 
   // -------------------------

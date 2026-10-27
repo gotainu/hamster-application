@@ -9,14 +9,15 @@ import 'package:hamster_project/screens/graph_function.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/screens/record_screen.dart';
-import 'package:hamster_project/screens/star_collection.dart';
+import 'package:hamster_project/screens/daily_stars.dart';
 import 'package:hamster_project/screens/daily_status_detail.dart';
-import 'package:hamster_project/screens/personality_report_history_screen.dart';
+import 'package:hamster_project/services/child_report_navigation.dart';
 import 'package:hamster_project/services/daily_record_completion_service.dart';
 import 'package:hamster_project/services/star_rewards_repo.dart';
 import 'package:hamster_project/services/app_analytics.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
+import 'package:hamster_project/widgets/record_calendar_action.dart';
 import 'package:hamster_project/widgets/collectible_glyph.dart';
 import 'package:hamster_project/widgets/paid_feature_gate.dart';
 import 'package:hamster_project/widgets/floating_bottom_navigation.dart';
@@ -24,7 +25,6 @@ import 'package:hamster_project/widgets/quick_record_sheet.dart';
 import 'package:hamster_project/widgets/screen_edge_fade.dart';
 import 'package:hamster_project/widgets/app_habitat_background.dart';
 import 'package:hamster_project/theme/app_theme.dart';
-import 'package:hamster_project/models/feature_trial_access.dart';
 import 'package:hamster_project/services/onboarding_state_repo.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
@@ -290,11 +290,11 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       ),
       const PaidFeatureGate(
         featureName: '変化',
-        lockedTitle: '5日間の無料体験が終わりました',
+        lockedTitle: '21日間の無料体験が終わりました',
         lockedMessage: '変化の確認を続けるには、有料プランをご利用ください。',
         icon: Icons.insights_rounded,
         showBackground: false,
-        trialFeature: TrialFeature.changes,
+        useInitialTrial: true,
         child: GraphFunctionScreen(embeddedInTab: true),
       ),
     ];
@@ -379,6 +379,18 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
     }
   }
 
+  void _openRecordCalendar() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DailyStarsScreen(
+          completionListenable: _recordCompletionNotifier,
+          onRecord: _showQuickRecordSheet,
+          rewardsRepo: _starRewardsRepo,
+        ),
+      ),
+    );
+  }
+
   void _setScreen(String identifier) {
     Navigator.of(context).pop();
 
@@ -389,14 +401,14 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
         screen = _buildRecordDestination();
         break;
       case 'report_history':
-        screen = const PersonalityReportHistoryScreen();
-        break;
+        unawaited(openChildReport(context));
+        return;
       case 'settings':
         screen = const SettingScreen();
         break;
-      case 'stars':
-        screen = StarCollectionScreen(repo: _starRewardsRepo);
-        break;
+      case 'record_calendar':
+        _openRecordCalendar();
+        return;
       case 'pets_profile':
         screen = const PetProfileScreen();
         break;
@@ -447,25 +459,27 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
               ),
         ),
         centerTitle: true,
-        actions: selectedIndex == 1
-            ? [
-                IconButton(
-                  tooltip: '相談履歴',
-                  onPressed: () {
-                    _searchKey.currentState?.openChatHistory();
-                  },
-                  icon: const Icon(Icons.history_rounded),
-                ),
-                IconButton(
-                  tooltip: '新しく相談',
-                  onPressed: () {
-                    _searchKey.currentState?.requestStartNewChat();
-                  },
-                  icon: const Icon(Icons.add_comment_rounded),
-                ),
-                const SizedBox(width: 4),
-              ]
-            : null,
+        actions: selectedIndex == 0
+            ? [RecordCalendarAction(onPressed: _openRecordCalendar)]
+            : selectedIndex == 1
+                ? [
+                    IconButton(
+                      tooltip: '相談履歴',
+                      onPressed: () {
+                        _searchKey.currentState?.openChatHistory();
+                      },
+                      icon: const Icon(Icons.history_rounded),
+                    ),
+                    IconButton(
+                      tooltip: '新しく相談',
+                      onPressed: () {
+                        _searchKey.currentState?.requestStartNewChat();
+                      },
+                      icon: const Icon(Icons.add_comment_rounded),
+                    ),
+                    const SizedBox(width: 4),
+                  ]
+                : null,
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
         shadowColor: Colors.transparent,

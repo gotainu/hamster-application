@@ -45,8 +45,7 @@ export function buildPersonalBaseline(params: {
   config?: Partial<PersonalBaselineConfig>;
 }): PersonalBaseline {
   const config = normalizedConfig(params.config);
-  const observations = normalizeObservations(params.observations)
-    .slice(-config.maxRecords);
+  const observations = selectPersonalBaselineObservations(params);
   const firstDateKey = observations[0]?.dateKey ?? null;
   const lastDateKey =
     observations[observations.length - 1]?.dateKey ?? null;
@@ -85,6 +84,16 @@ export function buildPersonalBaseline(params: {
     ewma,
     ewmaAlpha: config.ewmaAlpha,
   };
+}
+
+/** Shared exact adopted-record selection. Statistics remain in the existing
+ * builder; consumers cannot accidentally use uncapped or duplicate records. */
+export function selectPersonalBaselineObservations(params: {
+  observations: NumericBaselineObservation[];
+  config?: Partial<PersonalBaselineConfig>;
+}): NumericBaselineObservation[] {
+  const config = normalizedConfig(params.config);
+  return normalizeObservations(params.observations).slice(-config.maxRecords);
 }
 
 export function robustZScore(params: {

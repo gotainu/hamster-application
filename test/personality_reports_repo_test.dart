@@ -630,4 +630,84 @@ void main() {
     expect(v1Read.isDaily, isFalse);
     expect(pointer().metadataFlags, isEmpty);
   });
+  test(
+      'unified newest compares saved publication dates and does not hide a newer v1 metric expansion',
+      () async {
+    subscription = repo.watchNewest().listen(states.add);
+    await _flush();
+    dailyPointer().emit({'reportId': 'daily_2026-10-09', 'petId': 'main_pet'});
+    pointer().emit(pointerData);
+    await _flush();
+    db
+        .doc('users/owner-a/personality_reports/daily_2026-10-09')
+        .emit(dailyData()..['generatedAt'] = '2026-10-09T00:00:00Z');
+    await _flush();
+    expect(states.last.report, isNull,
+        reason: 'Both server pointer paths must be confirmed');
+    report()
+        .emit(personalityFixture()..['generatedAt'] = '2026-10-10T00:00:00Z');
+    await _flush();
+    expect(states.last.report!.reportId, 'personality_v1_body');
+    db
+        .doc('users/owner-a/personality_reports/daily_2026-10-09')
+        .emit(dailyData()..['generatedAt'] = '2026-10-11T00:00:00Z');
+    await _flush();
+    expect(states.last.report!.reportId, 'daily_2026-10-09');
+  });
+  test(
+      'unified newest never mixes owners or turns pointer errors into old report fallback',
+      () async {
+    subscription = repo.watchNewest().listen(states.add);
+    await _flush();
+    dailyPointer().emit(null);
+    await _flush();
+    pointer().emit(pointerData);
+    await _flush();
+    report().emit(personalityFixture());
+    await _flush();
+    expect(states.last.report!.reportId, 'personality_v1_body');
+    auth.switchTo('owner-b');
+    await _flush();
+    report().emit(personalityFixture());
+    await _flush();
+    expect(states.last.ownerUid, 'owner-b');
+    expect(states.last.report, isNull);
+    dailyPointer('owner-b').error();
+    pointer('owner-b').emit(null);
+    await _flush();
+    expect(states.last.phase, PersonalityReportPhase.unavailable);
+    expect(states.last.report, isNull);
+  });
+  test(
+      'unified newest unread follows newer v1 and exact-ID view hides it without resurfacing an older daily',
+      () async {
+    subscription = repo.watchUnreadLatest().listen(states.add);
+    await _flush();
+    dailyPointer().emit({'reportId': 'daily_2026-10-09', 'petId': 'main_pet'});
+    pointer().emit(
+        {'reportId': 'personality_v1_body_activity', 'petId': 'main_pet'});
+    await _flush();
+    db
+        .doc('users/owner-a/personality_reports/daily_2026-10-09')
+        .emit(dailyData()..['generatedAt'] = '2026-10-09T00:00:00Z');
+    db
+        .doc('users/owner-a/personality_reports/personality_v1_body_activity')
+        .emit(personalityFixture(type: 'both')
+          ..['generatedAt'] = '2026-10-10T00:00:00Z');
+    await _flush();
+    seen('personality_v1_body_activity').emit(null);
+    await _flush();
+    expect(states.last.report!.reportId, 'personality_v1_body_activity');
+    seen('daily_2026-10-09')
+        .emit({'reportId': 'daily_2026-10-09', 'viewedAt': Timestamp.now()});
+    await _flush();
+    expect(states.last.report!.reportId, 'personality_v1_body_activity');
+    seen('personality_v1_body_activity').emit({
+      'reportId': 'personality_v1_body_activity',
+      'viewedAt': Timestamp.now()
+    });
+    await _flush();
+    expect(states.last.phase, PersonalityReportPhase.learning);
+    expect(states.last.report, isNull);
+  });
 }

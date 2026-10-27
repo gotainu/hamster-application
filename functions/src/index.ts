@@ -7,11 +7,11 @@ import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
 import Stripe from 'stripe';
 import { defineSecret } from 'firebase-functions/params';
-import {
-  isPaidStripeSubscription,
-  selectPreferredPaidSubscription,
-} from './stripeSubscriptionPriority';
+import {syncStripeSubscription} from './stripeSubscriptionSync';
+import {blockAnalyticsEventsForDeletion} from './analyticsJourneyEvents';
 import { getFeatureAccess } from './featureTrials';
+import {runSensorAcquisition, deriveSchedulerContext, SensorRequestError, SensorApiResult, SensorSchedulerContext, SensorAcquisitionRoute} from './sensorQuality/acquisition';
+import {blockSensorCaptureForDeletion} from './sensorQuality/configuration';
 export {activateFeatureTrial, consumeAiTrial, startInitialTrial, consumeInitialTrialAi} from './featureTrials';
 export {
   analyticsWeightRecordCreated,
@@ -24,6 +24,8 @@ export {
   ingestAnalysisEventToBigQuery,
   ingestAiProviderUsageToBigQuery,
 } from './bigqueryServerEvents';
+export {analyticsAccountRegistered, analyticsWeightRevisionAccepted, analyticsActivityRevisionAccepted,
+  analyticsObservationRevisionAccepted, analyticsCareRevisionAccepted, analyticsSubscriptionCommitted} from './analyticsJourneyEvents';
 
 
 admin.initializeApp();
@@ -434,14 +436,10 @@ export const createStripeCustomerPortalSession = onCall(
     try {
       if (stripeSubscriptionId) {
         try {
-          const subscription = await stripe.subscriptions.retrieve(
-            stripeSubscriptionId,
-          );
-
-          await saveStripeSubscriptionToFirestore({
+          const subscription = await saveStripeSubscriptionToFirestore({
             stripe,
             uid,
-            subscription,
+            subscriptionId: stripeSubscriptionId,
           });
 
           logger.info(
@@ -522,41 +520,6 @@ function createStripeClient(): Stripe {
   });
 }
 
-function toFirestoreTimestampFromUnixSeconds(
-  seconds: number | null | undefined,
-): FirebaseFirestore.Timestamp | null {
-  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
-    return null;
-  }
-
-  return admin.firestore.Timestamp.fromMillis(seconds * 1000);
-}
-
-function mapStripeSubscriptionStatus(
-  status: Stripe.Subscription.Status | string | null | undefined,
-): string {
-  switch (status) {
-    case 'active':
-      return 'active';
-    case 'trialing':
-      return 'trialing';
-    case 'past_due':
-      return 'past_due';
-    case 'canceled':
-      return 'canceled';
-    case 'unpaid':
-      return 'unpaid';
-    case 'incomplete':
-      return 'incomplete';
-    case 'incomplete_expired':
-      return 'incomplete';
-    case 'paused':
-      return 'unpaid';
-    default:
-      return 'unknown';
-  }
-}
-
 async function findUidByStripeSubscription(
   subscription: Stripe.Subscription,
 ): Promise<string | null> {
@@ -611,121 +574,19 @@ async function assertPaidFeatureAccess(uid: string): Promise<void> {
   }
 }
 
-async function findPreferredPaidSubscription(params: {
-  stripe: Stripe;
-  customerId: string;
-}): Promise<Stripe.Subscription | null> {
-  const { stripe, customerId } = params;
-  const subscriptions = await stripe.subscriptions.list({
-    customer: customerId,
-    status: 'all',
-    limit: 100,
-  });
-
-  return selectPreferredPaidSubscription(subscriptions.data);
-}
-
 async function saveStripeSubscriptionToFirestore(params: {
   stripe: Stripe;
   uid: string;
-  subscription: Stripe.Subscription;
+  subscriptionId: string;
   checkoutSessionId?: string | null;
-}): Promise<void> {
-  const { stripe, uid, checkoutSessionId } = params;
-  let subscription = params.subscription;
-
-  const incomingCustomerId =
-    typeof subscription.customer === 'string'
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
-
-  if (!isPaidStripeSubscription(subscription) && incomingCustomerId) {
-    const preferredSubscription = await findPreferredPaidSubscription({
-      stripe,
-      customerId: incomingCustomerId,
-    });
-
-    if (
-      preferredSubscription &&
-      preferredSubscription.id !== subscription.id
-    ) {
-      logger.info(
-        'Preserving paid subscription over non-paid Stripe event',
-        {
-          uid,
-          ignoredSubscriptionId: subscription.id,
-          ignoredStatus: subscription.status,
-          preferredSubscriptionId: preferredSubscription.id,
-          preferredStatus: preferredSubscription.status,
-        },
-      );
-      subscription = preferredSubscription;
-    }
-  }
-
-  const customerId =
-    typeof subscription.customer === 'string'
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
-
-  const status = mapStripeSubscriptionStatus(subscription.status);
-  const isPaid = status === 'active' || status === 'trialing';
-
-  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
-    (subscription as any).current_period_end ??
-      (subscription.items?.data?.[0] as any)?.current_period_end,
-  );
-  const cancelAtPeriodEnd = Boolean(
-    (subscription as any).cancel_at_period_end,
-  );
-
-  const cancelAt = toFirestoreTimestampFromUnixSeconds(
-    (subscription as any).cancel_at,
-  );
-  const priceId = subscription.items.data[0]?.price?.id ?? null;
-  const productId =
-    typeof subscription.items.data[0]?.price?.product === 'string'
-      ? subscription.items.data[0]?.price?.product
-      : subscription.items.data[0]?.price?.product?.id ?? null;
-
-  const billingRef = db
-    .collection('users')
-    .doc(uid)
-    .collection('billing')
-    .doc('subscription');
-
-  const updateData: FirebaseFirestore.DocumentData = {
-    provider: 'stripe',
-    plan: isPaid ? 'paid' : 'none',
-    status,
-    stripeCustomerId: customerId,
-    stripeSubscriptionId: subscription.id,
-    stripePriceId: priceId,
-    stripeProductId: productId,
-    currentPeriodEnd,
-    cancelAtPeriodEnd,
-    cancelAt,
-    checkoutSessionId: checkoutSessionId ?? admin.firestore.FieldValue.delete(),
-    latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  };
-
-  if (isPaid) {
-    updateData.canceledAt = admin.firestore.FieldValue.delete();
-  }
-
-  await billingRef.set(updateData, { merge: true });
-
-
-  logger.info('Stripe subscription saved to Firestore', {
-    uid,
-    status,
-    plan: isPaid ? 'paid' : 'none',
+}): Promise<Stripe.Subscription> {
+  const subscription = await syncStripeSubscription({db, ...params});
+  logger.info('Stripe subscription synchronized from current state', {
+    uid: params.uid,
     subscriptionId: subscription.id,
-    customerId,
-    priceId,
-    currentPeriodEnd: currentPeriodEnd?.toDate().toISOString() ?? null,
+    status: subscription.status,
   });
+  return subscription;
 }
 
 async function markStripeSubscriptionCanceled(
@@ -733,78 +594,14 @@ async function markStripeSubscriptionCanceled(
   subscription: Stripe.Subscription,
 ): Promise<void> {
   const uid = await findUidByStripeSubscription(subscription);
-
   if (!uid) {
     logger.warn('Could not find uid for canceled Stripe subscription', {
       subscriptionId: subscription.id,
-      customer:
-        typeof subscription.customer === 'string'
-          ? subscription.customer
-          : subscription.customer?.id ?? null,
     });
     return;
   }
-
-  const customerId =
-    typeof subscription.customer === 'string'
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
-
-  if (customerId) {
-    const preferredSubscription = await findPreferredPaidSubscription({
-      stripe,
-      customerId,
-    });
-
-    if (preferredSubscription) {
-      await saveStripeSubscriptionToFirestore({
-        stripe,
-        uid,
-        subscription: preferredSubscription,
-      });
-
-      logger.info(
-        'Preserved another paid subscription after cancellation event',
-        {
-          uid,
-          canceledSubscriptionId: subscription.id,
-          preferredSubscriptionId: preferredSubscription.id,
-          preferredStatus: preferredSubscription.status,
-        },
-      );
-      return;
-    }
-  }
-
-  const currentPeriodEnd = toFirestoreTimestampFromUnixSeconds(
-    (subscription as any).current_period_end ??
-      (subscription.items?.data?.[0] as any)?.current_period_end,
-  );
-
-  await db
-    .collection('users')
-    .doc(uid)
-    .collection('billing')
-    .doc('subscription')
-    .set(
-      {
-        provider: 'stripe',
-        plan: 'none',
-        status: 'canceled',
-        stripeSubscriptionId: subscription.id,
-        currentPeriodEnd,
-        cancelAtPeriodEnd: false,
-        cancelAt: admin.firestore.FieldValue.delete(),
-        canceledAt: admin.firestore.FieldValue.serverTimestamp(),
-        latestStripeEventAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-
-  logger.info('Stripe subscription marked canceled', {
-    uid,
-    subscriptionId: subscription.id,
+  await saveStripeSubscriptionToFirestore({
+    stripe, uid, subscriptionId: subscription.id,
   });
 }
 
@@ -847,7 +644,7 @@ async function updateStripeSubscriptionFromInvoice(
   await saveStripeSubscriptionToFirestore({
     stripe,
     uid,
-    subscription,
+    subscriptionId,
   });
 
   logger.info('Stripe invoice subscription status synced', {
@@ -945,14 +742,10 @@ export const stripeWebhook = onRequest(
             break;
           }
 
-          const subscription = await stripe.subscriptions.retrieve(
-            subscriptionId,
-          );
-
           await saveStripeSubscriptionToFirestore({
             stripe,
             uid,
-            subscription,
+            subscriptionId,
             checkoutSessionId: session.id,
           });
 
@@ -975,7 +768,7 @@ export const stripeWebhook = onRequest(
           await saveStripeSubscriptionToFirestore({
             stripe,
             uid,
-            subscription,
+            subscriptionId: subscription.id,
           });
 
           break;
@@ -1285,42 +1078,46 @@ async function loadUserConfig(uid: string) {
   return { token, secret, meterDeviceId };
 }
 
-/** 温湿度計 1台分の /status を取得 */
-async function getMeterStatus(deviceId: string, token: string, secret: string) {
+/** The legacy values are unchanged; validity is evidence for quality only. */
+async function getMeterStatus(deviceId: string, token: string, secret: string): Promise<SensorApiResult> {
   const url = `https://api.switch-bot.com/v1.1/devices/${deviceId}/status`;
-  const res = await fetch(url, { method: 'GET', headers: buildHeaders(token, secret) });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`switchbot http ${res.status} ${body}`);
-  }
-
-  const j = (await res.json()) as any;
+  let headers: Record<string, string>;
+  try {headers = buildHeaders(token, secret);} catch {throw new SensorRequestError('unknown_error');}
+  let res: Response;
+  try {res = await fetch(url, {method: 'GET', headers});}
+  catch {throw new SensorRequestError('network_error');}
+  if (!res.ok) throw new SensorRequestError('http_error', res.status);
+  let j: any;
+  try {j = await res.json();} catch {throw new SensorRequestError('parse_error', res.status);}
   const b = j?.body ?? {};
   return {
-    temperature: typeof b.temperature === 'number' ? b.temperature : null,
-    humidity: typeof b.humidity === 'number' ? b.humidity : null,
-    battery: typeof b.battery === 'number' ? b.battery : null,
+    reading: {
+      temperature: typeof b.temperature === 'number' ? b.temperature : null,
+      humidity: typeof b.humidity === 'number' ? b.humidity : null,
+      battery: typeof b.battery === 'number' ? b.battery : null,
+    },
+    api: {httpStatus: res.status, providerStatusCode: typeof j?.statusCode === 'number' ? j.statusCode : null,
+      responseShape: j?.body !== null && typeof j?.body === 'object' && !Array.isArray(j.body) ? 'valid' : 'invalid'},
   };
 }
 
-/** Firestore への保存 */
-async function saveReading(
-  uid: string,
-  r: { temperature: number | null; humidity: number | null; battery: number | null },
-) {
-  const ts = new Date().toISOString();
-  await db.collection('users').doc(uid).collection('switchbot_readings').doc(ts).set(
-    {
-      ts,
-      temperature: r.temperature,
-      humidity: r.humidity,
-      battery: r.battery,
-      source: 'status',
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true },
-  );
+type SensorPollingRunContext = {route: SensorAcquisitionRoute; invocationId: string; scheduler?: SensorSchedulerContext};
+function sensorPollingContext(route: SensorAcquisitionRoute, scheduler?: SensorSchedulerContext): SensorPollingRunContext {
+  // This is an SDK delivery candidate identity, never a verified regular slot.
+  // Missing metadata gets a fresh ID; no rounded timestamps or repair polling.
+  const invocationId = scheduler?.jobName && scheduler.scheduleTimeCandidate
+    ? crypto.createHash('sha256').update(JSON.stringify([scheduler.jobName, scheduler.scheduleTimeCandidate])).digest('hex')
+    : crypto.randomUUID();
+  return {route, invocationId, scheduler};
+}
+async function acquireSwitchbotForUser(uid: string, config: {token: string; secret: string; meterDeviceId: string}, context: SensorPollingRunContext) {
+  const attemptId = crypto.createHash('sha256').update(JSON.stringify([context.invocationId, uid, config.meterDeviceId])).digest('hex');
+  return runSensorAcquisition({db, uid, deviceId: config.meterDeviceId, route: context.route,
+    attemptId, invocationId: context.invocationId, scheduler: context.scheduler,
+    request: () => getMeterStatus(config.meterDeviceId, config.token, config.secret),
+    assess: () => saveEnvironmentAssessmentLatest(uid),
+    warn: code => logger.warn('SwitchBot acquisition evidence unavailable', {code}),
+  });
 }
 
 type PollAllResult = { total: number; saved: number; skipped: number; failed: number };
@@ -1486,6 +1283,7 @@ async function deleteCollectionDeep(
 async function deleteDocumentDeep(
   docRef: FirebaseFirestore.DocumentReference,
   stats: DeepDeleteStats,
+  beforeRootDelete?: () => Promise<boolean>,
 ): Promise<void> {
   const subcollections = await docRef.listCollections();
 
@@ -1493,6 +1291,7 @@ async function deleteDocumentDeep(
     await deleteCollectionDeep(subcol, stats);
   }
 
+  if (beforeRootDelete && !await beforeRootDelete()) return;
   await docRef.delete();
 
   stats.deletedDocuments += 1;
@@ -2342,7 +2141,7 @@ async function saveEnvironmentAssessmentHistoryDaily(
   });
 }
 
-async function pollAllUsersOnce(): Promise<PollAllResult> {
+async function pollAllUsersOnce(context: SensorPollingRunContext = sensorPollingContext('manual_operator_all')): Promise<PollAllResult> {
   const usersSnap = await db.collection('switchbot_users').where('hasSwitchbot', '==', true).get();
 
   let saved = 0;
@@ -2373,9 +2172,8 @@ async function pollAllUsersOnce(): Promise<PollAllResult> {
         continue;
       }
 
-      const status = await getMeterStatus(meterDeviceId, token, secret);
-      await saveReading(uid, status);
-      await saveEnvironmentAssessmentLatest(uid);
+      const acquisition = await acquireSwitchbotForUser(uid, {token, secret, meterDeviceId}, context);
+      if (acquisition.evidenceStatus === 'pending') {skipped++; continue;}
       saved++;
     } catch (e: any) {
       failed++;
@@ -2484,26 +2282,26 @@ export const deleteMyAccountAndData = onCall(
     });
 
     try {
-      // 1. users/{uid} 配下をサブコレクションごと削除
-      await deleteDocumentDeep(db.collection('users').doc(uid), stats);
-
-      // 2. switchbot_users/{uid} を削除
-      await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
-
-      // 3. Firebase Auth ユーザー本体を削除
-      if (deleteAuthUser) {
+      // Fence asynchronous journey metadata before enumerating descendants.
+      // Its root marker stays present until Auth can no longer pass validation.
+      await blockAnalyticsEventsForDeletion(db, uid);
+      // Block new sensor evidence before traversing the subtree; late config
+      // events and in-flight acquisitions must not recreate deleted children.
+      await blockSensorCaptureForDeletion(db, uid);
+      await deleteDocumentDeep(db.collection('users').doc(uid), stats, async () => {
+        await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
+        if (!deleteAuthUser) return false; // data-only cleanup retains the deletion fence
         try {
           await admin.auth().deleteUser(uid);
         } catch (e: any) {
           if (e?.code === 'auth/user-not-found') {
-            logger.warn('deleteMyAccountAndData auth user already missing', {
-              uid,
-            });
+            logger.warn('deleteMyAccountAndData auth user already missing', {uid});
           } else {
-            throw e;
+            throw e; // retain the fence on Auth failure so a retry remains safe
           }
         }
-      }
+        return true;
+      });
 
       const result = {
         ok: true,
@@ -2549,9 +2347,9 @@ export const pollMySwitchbotNow = onCall(
         return { ok: false, uid, error: 'missing config (token/secret/deviceId)' };
       }
 
-      const status = await getMeterStatus(meterDeviceId, token, secret);
-      await saveReading(uid, status);
-      await saveEnvironmentAssessmentLatest(uid);
+      const acquisition = await acquireSwitchbotForUser(uid, {token, secret, meterDeviceId}, sensorPollingContext('manual_owner'));
+      const status = acquisition.reading;
+      if (acquisition.evidenceStatus === 'pending') return {ok: false, uid, error: 'acquisition_pending'};
 
       logger.info('pollMySwitchbotNow success', {
         uid,
@@ -2761,8 +2559,9 @@ export const switchbotPoller = onSchedule(
     secrets: [ENVELOPE_KEY_SECRET],
     schedule: 'every 60 minutes',
   },
-  async () => {
-    await pollAllUsersOnce();
+  async (event) => {
+    const scheduler = deriveSchedulerContext(event);
+    await pollAllUsersOnce(sensorPollingContext(scheduler.jobName ? 'scheduled' : 'unknown', scheduler));
   },
 );
 
@@ -2786,3 +2585,15 @@ export {
 export {personalityHealthFeaturesWritten, personalityDistanceRecordWritten} from './health/personalityTriggers';
 
 export {personalityDailyReports} from './health/personalityDaily';
+
+export {saveDailyCareActions, retryDailyCareActionReward} from './careActions/careActions';
+export {refreshCareContinuity} from './stars/continuityRefresh';
+export {continuityWeightRecordWritten} from './stars/continuity';
+export {saveBreedingEnvironment, readBreedingEnvironmentAt} from './environmentHistory/environmentHistory';
+export {saveMainPetProfile} from './petIdentity/petIdentity';
+export {saveDailyCheckin, readDailyCheckinHistoryAt} from './observationHistory/observationHistory';
+
+export {saveWeightRecord, saveDistanceRecord, readMeasurementHistoryAt} from './measurementHistory/measurementHistory';
+export {readMainPetProfileHistoryAt} from './petIdentity/profileHistory';
+
+export {sensorPollingConfigurationWritten} from './sensorQuality/configuration';

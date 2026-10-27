@@ -5,6 +5,8 @@ import {
 } from './healthTypes';
 import { normalizeDateKey } from './dateKey';
 import { evaluateWeightRecords } from './weightAssessment';
+import {buildWeightInsightEvidence} from './weightInsights';
+import {buildCheckinInsightEvidence} from './checkinInsights';
 import {
   buildPersonalBaseline,
   robustZScore,
@@ -19,6 +21,7 @@ export function buildDailyHealthFeatures(params: {
   dateKey: string;
   source: HealthSourceData;
   generatedAt?: Date;
+  checkinWindowEndDateKey?: string;
 }): DailyHealthFeaturesBuildResult {
   const dateKey = normalizeDateKey(params.dateKey);
   const bodyResult = evaluateWeightRecords({
@@ -197,6 +200,8 @@ export function buildDailyHealthFeatures(params: {
       : availableDomains.length / activeDomains.length;
 
   const features: DailyHealthFeatures = {
+    weightInsightEvidence: buildWeightInsightEvidence({records: params.source.weightRecords, referenceDateKey: dateKey}),
+    ...(params.source.dailyCheckinWindow ? {checkinInsightEvidence: buildCheckinInsightEvidence({records: params.source.dailyCheckinWindow, evaluationDateKey: dateKey, windowEndDateKey: params.checkinWindowEndDateKey})} : {}),
     dateKey,
     environment,
     activity,

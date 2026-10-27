@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -42,13 +43,16 @@ void _expectPending() {
   expect(find.text('対象機能'), findsNothing);
 }
 
-Widget _gate(_Fixture fixture, {bool initialTrial = false}) => MaterialApp(
+Widget _gate(_Fixture fixture,
+        {bool initialTrial = false, DateTime Function()? now}) =>
+    MaterialApp(
       home: Scaffold(
         body: PaidFeatureGate(
           billingRepo: fixture.repo,
           featureName: 'テスト機能',
           useInitialTrial: initialTrial,
           canStartInitialTrial: initialTrial,
+          now: now,
           child: _child,
         ),
       ),
@@ -59,9 +63,144 @@ Widget _plan(_Fixture fixture) => MaterialApp(
     );
 
 void main() {
+  test('changes tab uses the shared initial trial gate', () {
+    // Pair the gate behavior below with its actual production-tab binding.
+    final source = File('lib/screens/tabs.dart').readAsStringSync();
+    final feature = source.indexOf("featureName: '変化'");
+    final start = source.lastIndexOf('const PaidFeatureGate(', feature);
+    final end = source.indexOf(
+      'child: GraphFunctionScreen(embeddedInTab: true)',
+      feature,
+    );
+    expect(feature, greaterThanOrEqualTo(0));
+    expect(start, greaterThanOrEqualTo(0));
+    expect(end, greaterThan(feature));
+    final gate = source.substring(start, end);
+    expect(gate, contains('useInitialTrial: true'));
+    expect(gate, isNot(contains('trialFeature:')));
+    expect(gate, isNot(contains('5日間')));
+  });
+
   late _Fixture fixture;
   setUp(() => fixture = _Fixture());
   tearDown(() => fixture.dispose());
+
+  group('fixed-clock 21-day deadline', () {
+    final end = DateTime.utc(2034, 1, 22, 0); // 09:00 JST, not a live trial.
+    Map<String, dynamic> trial() => {
+          ..._activeTrial(),
+          'startedAt':
+              Timestamp.fromDate(end.subtract(const Duration(days: 21))),
+          'endsAt': Timestamp.fromDate(end),
+          // Exhausting the AI count does not shorten record/chart access.
+          'aiRequestUsed': 20,
+        };
+
+    for (final scenario in [
+      (
+        name: 'immediately before',
+        offset: const Duration(milliseconds: -1),
+        allowed: true
+      ),
+      (name: 'exactly at', offset: Duration.zero, allowed: false),
+      (name: 'after', offset: const Duration(milliseconds: 1), allowed: false),
+    ]) {
+      testWidgets(
+          'trial ${scenario.name} expiration uses an exclusive deadline',
+          (tester) async {
+        final now = end.add(scenario.offset);
+        await tester
+            .pumpWidget(_gate(fixture, initialTrial: true, now: () => now));
+        fixture.billing().emit(null);
+        await tester.pump();
+        fixture.trial().emit(trial());
+        await tester.pump();
+        expect(find.text('対象機能'),
+            scenario.allowed ? findsOneWidget : findsNothing);
+        expect(find.text(_startTrial), findsNothing);
+        if (!scenario.allowed) {
+          expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+
+    testWidgets('paid access remains available after the trial deadline',
+        (tester) async {
+      await tester.pumpWidget(_gate(fixture,
+          initialTrial: true, now: () => end.add(const Duration(days: 1))));
+      fixture.billing().emit({
+        ..._paid(),
+        'currentPeriodEnd':
+            Timestamp.fromDate(end.add(const Duration(days: 30))),
+      });
+      await tester.pump();
+      expect(find.text('対象機能'), findsOneWidget);
+      expect(find.textContaining('無料体験は終了しています'), findsNothing);
+      expect(find.text(_startTrial), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+        'open trial gate closes at its deadline without another snapshot',
+        (tester) async {
+      var now = end.subtract(const Duration(milliseconds: 1));
+      await tester
+          .pumpWidget(_gate(fixture, initialTrial: true, now: () => now));
+      fixture.billing().emit(null);
+      await tester.pump();
+      fixture.trial().emit(trial());
+      await tester.pump();
+      expect(find.text('対象機能'), findsOneWidget);
+      final listens = fixture.trial().listenCount;
+
+      now = end;
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.text('対象機能'), findsNothing);
+      expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+      expect(fixture.trial().listenCount, listens);
+      now = end.add(const Duration(minutes: 1));
+      await tester.pump(const Duration(minutes: 1));
+      expect(find.text('対象機能'), findsNothing);
+      expect(find.text(_startTrial), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets('paid entitlement is closed exactly at its server deadline',
+        (tester) async {
+      await tester
+          .pumpWidget(_gate(fixture, initialTrial: true, now: () => end));
+      fixture
+          .billing()
+          .emit({..._paid(), 'currentPeriodEnd': Timestamp.fromDate(end)});
+      await tester.pump();
+      fixture.trial().emit(trial());
+      await tester.pump();
+      expect(find.text('対象機能'), findsNothing);
+      expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
+    testWidgets(
+        'open paid gate closes at its deadline without another snapshot',
+        (tester) async {
+      var now = end.subtract(const Duration(milliseconds: 1));
+      await tester.pumpWidget(_gate(fixture, now: () => now));
+      fixture
+          .billing()
+          .emit({..._paid(), 'currentPeriodEnd': Timestamp.fromDate(end)});
+      await tester.pump();
+      expect(find.text('対象機能'), findsOneWidget);
+      final listens = fixture.billing().listenCount;
+
+      now = end;
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.text('対象機能'), findsNothing);
+      expect(find.text('テスト機能は有料プランの機能です'), findsOneWidget);
+      expect(fixture.billing().listenCount, listens);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  });
 
   test('repository withholds cached missing and cached paid billing', () async {
     final states = <EntitlementSnapshot<BillingStatus>>[];
@@ -113,6 +252,74 @@ void main() {
     expect(find.text(_loading), findsNothing);
     expect(find.textContaining('未契約'), findsNothing);
     expect(find.text('有料プランを利用中です'), findsOneWidget);
+  });
+
+  testWidgets('expired active subscription is not shown as paid access',
+      (tester) async {
+    await tester.pumpWidget(_plan(fixture));
+    fixture.billing().emit({
+      ..._paid(),
+      'currentPeriodEnd': Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(days: 1)),
+      ),
+    });
+    await tester.pump();
+    expect(find.text('有料プランを利用中です'), findsNothing);
+    expect(find.text('有料プランの利用期間が終了しました'), findsOneWidget);
+    expect(find.text('プランを管理する'), findsOneWidget);
+    expect(find.text('月額プランに登録する'), findsNothing);
+  });
+
+  for (final status in ['past_due', 'unpaid']) {
+    testWidgets(
+        '$status keeps existing portal management without a new checkout',
+        (tester) async {
+      await tester.pumpWidget(_plan(fixture));
+      fixture.billing().emit({..._paid(), 'status': status});
+      await tester.pump();
+      expect(find.text('プランを管理する'), findsOneWidget);
+      expect(find.text('月額プランに登録する'), findsNothing);
+      expect(find.text('有料プランを利用中です'), findsNothing);
+    });
+  }
+
+  testWidgets('scheduled cancellation retains access and its management action',
+      (tester) async {
+    await tester.pumpWidget(_plan(fixture));
+    fixture.billing().emit({..._paid(), 'cancelAtPeriodEnd': true});
+    await tester.pump();
+    expect(find.text('解約予約済みです'), findsOneWidget);
+    expect(find.text('プランを管理する'), findsOneWidget);
+    expect(find.text('月額プランに登録する'), findsNothing);
+    expect(find.textContaining('現在の請求期間が終了するまでは'), findsOneWidget);
+  });
+
+  testWidgets(
+      '21-day feature access remains when only the trial AI quota is used',
+      (tester) async {
+    await tester.pumpWidget(_gate(fixture, initialTrial: true));
+    fixture.billing().emit(null);
+    await tester.pump();
+    fixture.trial().emit({..._activeTrial(), 'aiRequestUsed': 20});
+    await tester.pump();
+    expect(find.text('対象機能'), findsOneWidget);
+    expect(find.text(_startTrial), findsNothing);
+  });
+
+  testWidgets('expired initial trial locks feature without starting it again',
+      (tester) async {
+    await tester.pumpWidget(_gate(fixture, initialTrial: true));
+    fixture.billing().emit(null);
+    await tester.pump();
+    fixture.trial().emit({
+      ..._activeTrial(),
+      'endsAt': Timestamp.fromDate(
+        DateTime.now().subtract(const Duration(days: 1)),
+      ),
+    });
+    await tester.pump();
+    expect(find.text('対象機能'), findsNothing);
+    expect(find.text(_startTrial), findsNothing);
   });
 
   testWidgets('initial-trial gate stays loading for cached absence, then paid',

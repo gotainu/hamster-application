@@ -1,3 +1,6 @@
+import type {WeightInsightEvidence} from './weightInsights';
+import type {CheckinInsightEvidence, CheckinRecordInput} from './checkinInsights';
+
 export type HealthAssessmentState =
   | 'unknown'
   | 'good'
@@ -129,6 +132,8 @@ export interface HealthFeatureDataQuality {
 }
 
 export interface DailyHealthFeatures {
+  weightInsightEvidence?: WeightInsightEvidence;
+  checkinInsightEvidence?: CheckinInsightEvidence;
   dateKey: string;
   environment: EnvironmentHealthFeatures;
   activity: ActivityHealthFeatures;
@@ -285,5 +290,6 @@ export interface HealthSourceData {
   distanceWindow: DistanceRecordSource[];
   weightRecords: WeightRecordSource[];
   dailyCheckin: DailyCheckinSource;
+  dailyCheckinWindow?: CheckinRecordInput[];
   nutrition: NutritionRecordSource;
 }

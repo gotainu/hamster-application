@@ -11,6 +11,8 @@ import {
 } from './goldHealthNotification';
 import { syncHealthIncidentLifecycle } from './healthIncidentLifecycle';
 import { syncPersonalizedAnalysis } from './firstPersonalizedReport';
+import {buildCurrentInsightSet, persistCurrentInsightSet} from './weightInsights';
+import {checkinFingerprint} from './checkinInsights';
 
 export interface HealthPipelineResult {
   uid: string;
@@ -28,15 +30,28 @@ export interface HealthPipelineResult {
   updatedLatest: boolean;
 }
 
-export async function rebuildHealthForDate(params: {
-  uid: string;
-  dateKey: string;
-  reason: string;
-  db?: FirebaseFirestore.Firestore;
-}): Promise<HealthPipelineResult> {
+class HealthSourceVersionConflict extends Error {
+  constructor() {super('Health source version changed during calculation; retry the rebuild');}
+}
+type HealthRebuildParameters = {uid: string; dateKey: string; reason: string; db?: FirebaseFirestore.Firestore};
+
+/** A transaction retry alone reuses stale Bronze. Restart the source read when
+ * the paired Silver destination changed, with a bounded retry budget. */
+export async function rebuildHealthForDate(params: HealthRebuildParameters): Promise<HealthPipelineResult> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {return await rebuildHealthForDateAttempt(params, attempt);}
+    catch (error) {if (!(error instanceof HealthSourceVersionConflict) || attempt === 2) throw error;}
+  }
+  throw new HealthSourceVersionConflict();
+}
+async function rebuildHealthForDateAttempt(params: HealthRebuildParameters, attempt: number): Promise<HealthPipelineResult> {
   const dateKey = normalizeDateKey(params.dateKey);
   const db = params.db ?? admin.firestore();
   const generatedAt = new Date();
+  // Capture the destination version before Bronze reads. Millisecond timestamps
+  // alone cannot order two concurrent jobs that started in the same instant.
+  const featureVersionBeforeRead = await db.collection('users').doc(params.uid)
+    .collection('daily_health_features').doc(dateKey).get();
 
   const source = await fetchHealthSourceData({
     db,
@@ -67,10 +82,47 @@ export async function rebuildHealthForDate(params: {
     .collection('health_assessments')
     .doc('latest');
 
+  const insightRef = userRef.collection('individual_insights').doc(dateKey);
+  const currentInsights = buildCurrentInsightSet({features: featureResult.features, generatedAt});
   let updatedLatest = false;
+  let staleCalculation = false;
 
   await db.runTransaction(async (transaction) => {
-    const latestSnapshot = await transaction.get(latestRef);
+    const [latestSnapshot, insightSnapshot, featureSnapshot] = await Promise.all([
+      transaction.get(latestRef), transaction.get(insightRef), transaction.get(featureRef),
+    ]);
+    // generatedAt is captured before reading Bronze. A delayed older job may
+    // not overwrite either Silver or its atomically paired current Insight.
+    const generationMillis = (value: any): number | null => {
+      const date = typeof value?.toDate === 'function' ? value.toDate() : value;
+      const millis = typeof date?.getTime === 'function' ? date.getTime() : null;
+      return Number.isFinite(millis) ? millis : null;
+    };
+    const priorMillis = generationMillis(featureSnapshot.data()?.generatedAt);
+    const priorInsightMillis = generationMillis(insightSnapshot.data()?.generatedAt);
+    const featureVersionChanged = featureSnapshot.exists !== featureVersionBeforeRead.exists ||
+      (!!featureSnapshot.updateTime && !!featureVersionBeforeRead.updateTime &&
+        !featureSnapshot.updateTime.isEqual(featureVersionBeforeRead.updateTime));
+    if ((priorMillis != null && priorMillis > generatedAt.getTime()) ||
+        (priorInsightMillis != null && priorInsightMillis > generatedAt.getTime())) {staleCalculation = true; return;}
+    if (featureVersionChanged || attempt > 0) {
+      // Exclude generation/write metadata but compare every existing feature,
+      // including non-Insight health inputs. Identical fresh data needs no write.
+      const inputFields = Object.keys(featureResult.features).filter(key => key !== 'generatedAt');
+      const stableFeatureValue = (value: any): any => {
+        if (typeof value?.toDate === 'function') return value.toDate().toISOString();
+        if (typeof value?.getTime === 'function' && typeof value?.toISOString === 'function') return value.toISOString();
+        if (Array.isArray(value)) return value.map(stableFeatureValue);
+        if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).map(key => [key, stableFeatureValue(value[key])]));
+        return value;
+      };
+      const featureInputs = (data: Record<string, unknown>) => stableFeatureValue(Object.fromEntries(inputFields.map(key => [key, data[key]])));
+      const sameInputs = featureSnapshot.exists && checkinFingerprint(featureInputs(featureSnapshot.data() ?? {})) ===
+        checkinFingerprint(featureInputs(featureResult.features as unknown as Record<string, unknown>));
+      if (sameInputs) {staleCalculation = true; return;}
+      if (featureVersionChanged) throw new HealthSourceVersionConflict();
+    }
+    await persistCurrentInsightSet({transaction, reference: insightRef, snapshot: insightSnapshot, current: currentInsights});
     const latestData = latestSnapshot.data() ?? {};
     const latestDateKey =
       typeof latestData.dateKey === 'string'
@@ -119,7 +171,7 @@ export async function rebuildHealthForDate(params: {
   });
 
   try {
-    await syncPersonalizedAnalysis({
+    if (!staleCalculation) await syncPersonalizedAnalysis({
       db,
       uid: params.uid,
       dateKey,
