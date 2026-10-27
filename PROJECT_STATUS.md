@@ -4,6 +4,16 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+## 2026-10-27 開発成果・管理正本のGitHub保存（通常push・反映確認）
+
+- 開始時の`main` HEADとGitHub `github/main`はともに`342b293d0e634989b0012a27e27fafb575e11b2d`。`origin`は別のローカル作業コピーで、同remoteのahead 3はGitHub未pushを意味しなかった。GitHub最新をfetchして分岐なしを確認し、正規の`github` remote（`gotainu/hamster-application`）の`main`へ通常pushした。既存upstreamは変更していない。
+- 保存コミット：`84a5013455bb8377c83b03548bb53e9c30041394`（実装・AI同意・個体別Insight／統合レポート・iOS設定・テスト352ファイル）、`d902eb573bf92b9b7917ddd0f6462215d8be4ddc`（運営分析・合成データ研究基盤78ファイル）、`aa5f70faded7fc8ae27d0f54a2a7e2215ad4e3c4`（管理正本・進捗・リリース／研究文書・申告／掲載原稿37ファイル）。計467ファイルを選別して保存。
+- この3コミットの通常pushは成功。push後の`git ls-remote --heads github main`でGitHub側のSHAがローカルHEAD `aa5f70faded7fc8ae27d0f54a2a7e2215ad4e3c4`と一致することを確認した。本節はその確認結果の追記であり、追記後の最終HEADはGit履歴を参照する。
+- タスク管理表の正本は本書「タスク一覧」。`AGENTS.md`・本書の2026-09-06移行記録・`MATOME.md`を照合し、旧Excelの追加／複製／二重更新は行っていない。`MATOME.md`、既存`docs/release/`、`docs/product_quality_rework_plan.md`も保存。Playの「未送信」が残っていた現在地だけを送信済み・送信ID1審査中へ整合。Apple新Case103009817213は回答待ち、Stripe維持方針は変更なし。
+- 全対象を明示的なファイル一覧でステージし、ステージ内容と作業ファイルの一致、秘密情報パターン、配布成果物／ビルド／キャッシュの除外、JSON構文と差分を確認。Markdownの意図した改行空白とCSVのCRLFは保持した。文書中の個人端末識別子・審査用メール候補・不要なSandboxオブジェクト識別子は匿名化。既存の実装・実機検証・全テスト・build・本番deploy・ストア操作は再実施していない。
+- 未コミットの既存2件は元byteを保持：`ios/Runner/GoogleService-Info.plist`（既に追跡済みのAPIキーを含むため、今回のOAuth識別子追加も対象外。必要な`Info.plist`側の`GIDClientID`／URL schemeは保存）、`tools/analytics/output/bigquery-connection-result.json`（実接続由来の生成集計監査で、合成データサンプルとは分けて除外）。ローカル設定・運用証拠を削除せず、467対象以外の追加ファイルは作成していない。
+- 既存Known Goodとdirty差分を保護。実装・テスト・設定の既存byteは変更せず、今回の内容修正は上記の文書整合／匿名化と本結果追記のみ。履歴書換え・reset・clean・stash・force pushは行っていない。
+
 ## 2026-10-27 Apple App Reviewへの決済方式問い合わせ（受付確認・回答待ち）
 
 - 旧Apple Case22954972は10/27に代替配信／決済担当から当該窓口のscope外との回答を受領。これはStripe導線の可否回答ではない。本人承認の指定文面で、公式 https://developer.apple.com/contact/app-store/ から実窓口「App Review → App Review に関するその他のお問い合わせ → Eメール（公式フォーム）」を選び、2026-10-27 11:46:34 JSTにApp Review宛て新問い合わせを送信。受付結果公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認、新Case ID103009817213。回答は未受領で、A／B導線・Stripe維持条件の判断は回答待ち。
