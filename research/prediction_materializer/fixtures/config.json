@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "canonical_dataset_config_v1",
+  "version": "synthetic_materializer_policy_v1",
+  "datasetSchemaVersion": "synthetic_materialized_rows_v1",
+  "featurePolicyVersion": "synthetic_point_in_time_features_v1",
+  "labelPolicyVersions": {
+    "initial": "synthetic_initial_v1",
+    "corrected": "synthetic_corrected_same_observation_v1"
+  },
+  "windowRule": "explicit_open_closed_v1",
+  "timeZone": "Asia/Tokyo",
+  "featureIds": [
+    "weight_last_g",
+    "activity_last_m",
+    "past_condition",
+    "care_cleaning",
+    "care_bedding",
+    "care_walk_minutes",
+    "environment_wheel_cm",
+    "species",
+    "birth_date",
+    "temperature_last_received_c",
+    "humidity_last_received_pct",
+    "sensor_period_count"
+  ],
+  "requiredFeatureIds": [],
+  "allowPartialFeatureIds": [
+    "temperature_last_received_c",
+    "humidity_last_received_pct"
+  ],
+  "points": [
+    {
+      "id": "synthetic_point_alpha_before",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_alpha",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_alpha_after",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_alpha",
+      "t0": "2030-04-02T00:00:00.000000000Z",
+      "t1": "2030-04-03T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-04T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-04T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_beta_cancelled",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_beta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_gamma_missing",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_gamma",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_delta_history_before",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_delta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_epsilon_sensor_unknown",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_epsilon",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "id": "synthetic_point_zeta_held",
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_zeta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-02T00:00:00.000000000Z"
+    }
+  ]
+}

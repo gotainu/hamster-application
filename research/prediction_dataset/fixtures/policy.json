@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "synthetic_dataset_policy_v1",
+  "version": "synthetic_local_policy_v1",
+  "datasetSchemaVersion": "synthetic_training_rows_v1",
+  "featurePolicyVersion": "synthetic_features_point_in_time_v1",
+  "labelPolicyVersions": {
+    "initial": "synthetic_initial_answer_v1",
+    "corrected": "synthetic_same_observation_corrected_by_L_v1"
+  },
+  "windowRule": "jst09_next09_open_closed_v1",
+  "timeZone": "Asia/Tokyo",
+  "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+  "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z",
+  "featureIds": [
+    "weight_last_g",
+    "activity_last_m",
+    "past_condition",
+    "care_cleaning",
+    "care_bedding",
+    "care_walk_minutes",
+    "environment_wheel_cm",
+    "species",
+    "birth_date",
+    "temperature_last_received_c",
+    "humidity_last_received_pct",
+    "sensor_period_count"
+  ],
+  "requiredFeatureIds": [],
+  "allowPartialFeatureIds": [
+    "temperature_last_received_c",
+    "humidity_last_received_pct"
+  ]
+}

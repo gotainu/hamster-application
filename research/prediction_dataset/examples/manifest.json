@@ -1,0 +1,72 @@
+{
+  "synthetic_only": true,
+  "fixtureId": "synthetic_representative_v1",
+  "fixtureHash": "ab3be0a24a8c13a36ba524eb1c0e738acafdb3c90d1e3b92b3e2133111c01d8e",
+  "codeIdentity": "0d2e39e0f9bd20a503dfef338037256e1e890a7d12bb1a0bc1f01f9a1566f090",
+  "datasetSchemaVersion": "synthetic_training_rows_v1",
+  "featurePolicyVersion": "synthetic_features_point_in_time_v1",
+  "featurePolicy": {
+    "featureIds": [
+      "activity_last_m",
+      "birth_date",
+      "care_bedding",
+      "care_cleaning",
+      "care_walk_minutes",
+      "environment_wheel_cm",
+      "humidity_last_received_pct",
+      "past_condition",
+      "sensor_period_count",
+      "species",
+      "temperature_last_received_c",
+      "weight_last_g"
+    ],
+    "requiredFeatureIds": [],
+    "allowPartialFeatureIds": [
+      "humidity_last_received_pct",
+      "temperature_last_received_c"
+    ]
+  },
+  "labelPolicyVersions": {
+    "initial": "synthetic_initial_answer_v1",
+    "corrected": "synthetic_same_observation_corrected_by_L_v1"
+  },
+  "policyVersion": "synthetic_local_policy_v1",
+  "window": {
+    "rule": "jst09_next09_open_closed_v1",
+    "timeZone": "Asia/Tokyo",
+    "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+    "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+  },
+  "catalogVersions": {
+    "observation": "observation_catalog_v1",
+    "care": "care_action_catalog_v2"
+  },
+  "anchorCount": 7,
+  "candidateCount": 2,
+  "stateCounts": {
+    "candidate": 2,
+    "hold": 0,
+    "label_missing": 3,
+    "ineligible": 2
+  },
+  "reasonCounts": {
+    "feature_subject_unknown": 1,
+    "no_eligible_label": 3,
+    "observation_time_not_proven_in_window": 3,
+    "original_receipt_outside_window": 3,
+    "sensor_device_association_unknown": 6,
+    "subject_unconfirmed": 1,
+    "correction_present_by_finalization": 1,
+    "sensor_expected_count_unknown": 1,
+    "sensor_measurement_freshness_unknown": 1,
+    "sensor_whole_period_quality_unconfirmed": 1,
+    "cancelled_by_finalization": 1,
+    "feature_subject_mismatch": 5,
+    "subject_mismatch": 2,
+    "corrected_subject_ineligible": 1
+  },
+  "researchEligibility": "not_assessed",
+  "predictionReady": "not_assessed",
+  "datasetId": "synthetic_dataset_8a21ab6171538f512c20",
+  "contentHash": "8a21ab6171538f512c2076e0f1df71ab9c1a9d78df89e2c87756e1246366aa3c"
+}

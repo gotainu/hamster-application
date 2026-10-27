@@ -1,0 +1,2907 @@
+{
+  "run_id": "synthetic_release_v1",
+  "generated_at": "2026-10-16T09:13:30.059Z",
+  "content_hash": "e811253741a5737ef9625bb1b74bdcfa3d6dfa2167e446948c967703d53b2609",
+  "rows": [
+    {
+      "row_id": "row_0d84e28edd7daf035cc5eadb94444db127fa9d4886cefe88605556596b9f595e",
+      "generator_reasons": [
+        "data_not_complete_through_L"
+      ],
+      "label_evidence": {
+        "originalRevisionId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": []
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_not_available_by_finalization",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "unknown",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "unknown",
+          "reasonCodes": [
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_49eaddb2b7f681a7a94dc799a990f41670afeaefec621c44a1e549fce307f14c",
+      "generator_reasons": [
+        "cancelled_by_finalization"
+      ],
+      "label_evidence": {
+        "originalRevisionId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": [
+          {
+            "id": "synthetic_source_beta_cancel",
+            "revision": 2,
+            "kind": "cancel",
+            "acceptedAt": "2030-04-01T04:00:00.000000000Z",
+            "availableAt": "2030-04-01T04:00:00.000000000Z"
+          }
+        ]
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "unknown",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "unknown",
+          "reasonCodes": [
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_706c27d5203369dcf2773566530f5a9ec790f4fea5b166106af9de47b1b29049",
+      "generator_reasons": [],
+      "label_evidence": {
+        "originalRevisionId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": []
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "unknown",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "unknown",
+          "reasonCodes": [
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_89e11be98f2c7ec7bb6e1508e66359b22db323fbc3a6dc7fdb233ad5d15275d5",
+      "generator_reasons": [],
+      "label_evidence": {
+        "originalRevisionId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": []
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "unknown",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "unknown",
+          "reasonCodes": [
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_9f62049ea898064a6193aa4aa8c0ae34648a23a6d35ec5702c7fdee9ad3a9219",
+      "generator_reasons": [],
+      "label_evidence": {
+        "originalRevisionId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-02T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-02T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-02T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": []
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_formats_unchecked"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_b3a9feded14676c3d022f53caa83c6a5225364188f4e27bb7bee3058339d328f",
+      "generator_reasons": [
+        "correction_present_by_finalization"
+      ],
+      "label_evidence": {
+        "originalRevisionId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+        "originalRevision": 1,
+        "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+        "originalTiming": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        },
+        "appliedAmendments": [
+          {
+            "id": "synthetic_source_alpha_correction",
+            "revision": 2,
+            "kind": "correction",
+            "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+            "availableAt": "2030-04-02T04:00:00.000000000Z"
+          }
+        ]
+      },
+      "candidate_exclusions": [
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_formats_unchecked"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    },
+    {
+      "row_id": "row_c36d1f0d22be607391dddd2562eac0c8b4a8043fa31087a666d6883653777e58",
+      "generator_reasons": [
+        "no_eligible_label",
+        "observation_time_not_proven_in_window",
+        "original_receipt_outside_window",
+        "subject_mismatch"
+      ],
+      "label_evidence": null,
+      "candidate_exclusions": [
+        {
+          "observationId": "source_e81ef419122620b8859d3763febc179a09692d2031bba2c0230c1620495cb4e5",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_6a3378ff9de035e7173926e683b64cff485628c6ae0125c9223190b16f2e3b50",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window",
+            "original_receipt_outside_window",
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_1275d05bd51f2cc64ce2228cf65a79e5054cd48716cb2cd3c0cb1a56ee160427",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_82d282c0235e4642d7f54491e323263883af260aa0ac9b3f502cbb2bbdff5649",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_58d0d5cb90264e413ec5c5f060179ec3e81b850861feb3198cfbdd250de04135",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_975682a5904382272fca534dfc78e1b0a78a0caadc5c6a8139e8f524b652ae4e",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        },
+        {
+          "observationId": "source_76cc2eb0c6ab16133c9992c034e34a4ae0dd2ca125024ee5e6db88d42f035068",
+          "reasonCodes": [
+            "observation_time_not_proven_in_window"
+          ]
+        },
+        {
+          "observationId": "source_b95840daeb48ee56ae33be3262dfd01f9cbcf7e26810ff87ba1927f98edd9641",
+          "reasonCodes": [
+            "subject_mismatch"
+          ]
+        }
+      ],
+      "source_audit": [
+        {
+          "source": "distances",
+          "sourceId": "source_c1b55877b945db993ebdd97e1135cdd1c0ce92847a572a10e8e3afa09e4aca85",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "activity_last_m"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "birth_date"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_bedding"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_cleaning"
+          ]
+        },
+        {
+          "source": "careActions",
+          "sourceId": "source_dbac46b5511a76ad23ba5e7875b4281608a9d6435598325a64637e50dff7592d",
+          "status": "unknown",
+          "reasonCodes": [
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "care_walk_minutes"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_4f92bd4c7e9cd53373f76f6edb3f6aa07cd701bf0509069cc20f80f96512894f",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "environments",
+          "sourceId": "source_fb86c2ecb48af2d761cb90be3ae0222dd53415fd5516ebbf98ecbcb366e0c10d",
+          "status": "unknown",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "environment_wheel_cm"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "humidity_last_received_pct"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_1df02f31c7bded906daec413b038d8b6a6b059eff00f859ccf68f07ddf9b2439",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_883dfc42292ec7c144d97238eae4be6e6520b5dc631f736c57c24fb05e44d51d",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_828ce1d12aebeccb706cfc2a09a0117603fceca2dc37b6f8a4662675dccee580",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_ff4f36d54053c391ae195c645cb768352795ae68473c58bb016575ec9d10bfd2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_8e95389c2a821508b436201b9b2b802162005ef9aca7a8122186bee307d86c37",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_469a66b68894b87a9a20e0b43d26bb2940f671e46d08cedb25e33e2af34f2894",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_b5ba781ad2b6e0b273f7f9dee93da3245bc3a2e3b610991ccfe6312ce75b137c",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_6b912f91fd4ac9716025f1af6e94a7cdcfea39953533695f6958df59102233d7",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_11ac05d1b56ec6022ecf639e0605b3a0f2b356dd98df1096b798c4dcfe77bd67",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_2885daf2a29f4f333ba48c00ef320c1c7fcfb2acbc956cdee556d235a580bfad",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "observations",
+          "sourceId": "source_122550370fa955d287e8cf2725687fc09bdc50efea5c467a9c8be00f838d7396",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "past_condition"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_0057de0b34e846f59b794faba4a4ccac446820e9a9190087789632336ccb7c3a",
+          "status": "unknown",
+          "reasonCodes": [
+            "device_mapping_unknown",
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "sensorQuality",
+          "sourceId": "source_b37a34c88fa51124611866a488ee8165fe94448f84a9b69d062daad69864b243",
+          "status": "unknown",
+          "reasonCodes": [
+            "legacy_formats_unchecked",
+            "source_subject_unconfirmed"
+          ],
+          "featureIds": [
+            "sensor_period_count"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_f1a4b5a5e9c3e2e77379b5306f64aa6f9d2d2a65dce414e61491c8c967f6595f",
+          "status": "not_reconstructable",
+          "reasonCodes": [
+            "profile_history_not_reconstructable"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_0f89c784fcd02f78fb46bc7f0bace0f46091ce8ecf53af2a5aefd0af5ef2f5c4",
+          "status": "excluded",
+          "reasonCodes": [
+            "resolved_history_requested_point_mismatch"
+          ],
+          "featureIds": [
+            "species",
+            "birth_date"
+          ]
+        },
+        {
+          "source": "profiles",
+          "sourceId": "source_08e7d98c5564cb44283400be0f10e10e9c4fd2620740d3ccc9b7439450718664",
+          "status": "normalized",
+          "reasonCodes": [
+            "resolved_state_at_cutoff_not_observation"
+          ],
+          "featureIds": [
+            "species"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_c0805e07754e46ef759a47a44a56447cc7a9fc5395b60022e11997f3610751f1",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_b1761bf213aa19a05b640aab40da46c5b3a6e1b2adcab1a2ae00ce4472a8099b",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "sensorEvidence",
+          "sourceId": "source_def533472eb31ce367266ee64f8c5295ab86ce941fc99cea28825e3d8ddb3b4e",
+          "status": "normalized",
+          "reasonCodes": [
+            "sensor_response_time_not_measurement_time"
+          ],
+          "featureIds": [
+            "temperature_last_received_c"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_f889ba94b35791a01654d046999e944d59a12178c7cbcbc8ee22d43d7550a9cf",
+          "status": "normalized",
+          "reasonCodes": [
+            "legacy_history_before_confirmation_not_reconstructable"
+          ],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_c82d476fc26ff40d259e5e2f19eb19f220ced980a326bfb20e6678a83177c312",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_99868603afcad81087ec2d7641a711504c2d80d56af9f9f6d32e6ec20e013f08",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_743954690dc3d31645551d6cb80f42e1c2e7dafab52d1b1fec55bec7a5fe5445",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        },
+        {
+          "source": "weights",
+          "sourceId": "source_5c519785fd9d93f333a5f6223adf9aea6d92a52651f9dfeee3e1d67a2fca66d2",
+          "status": "normalized",
+          "reasonCodes": [],
+          "featureIds": [
+            "weight_last_g"
+          ]
+        }
+      ]
+    }
+  ]
+}

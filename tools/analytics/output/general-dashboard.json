@@ -1,0 +1,156 @@
+{
+  "metadata": {
+    "schema_version": "journey_dashboard_v1",
+    "metric_policy_version": "journey_metrics_v1",
+    "source_classification": "declared_zero_general_users_unconnected_preview",
+    "synthetic_only": true,
+    "as_of": "2026-10-17T00:00:00.000Z",
+    "watermark": {
+      "server": null,
+      "ga4": null
+    },
+    "config": {
+      "conversion_horizon_days": 28,
+      "landmark_days": 14,
+      "landmark_followup_day": 21
+    },
+    "timezone": "Asia/Tokyo",
+    "audience": "general",
+    "input_hash": "f606ae9cca0e36a0a47ae957b485438a3e516f6d866681897853ca512e9f3310",
+    "config_hash": "e51381f2c69e9c07d443dce9bd3daadf75e8718ede157f4d81dd74fd1857db54",
+    "content_hash": "bf6f04469981d043228dfc94e38b2dc0791bb9e043987f405b6b60ae3a8b4f38",
+    "code_hash": "f77aedaede9276cee193e22b8d2ca86d8fe46c5e85ef6d1687b0276d8d7cf244",
+    "not_prediction_ready": true
+  },
+  "a3": {
+    "activity_ready": 0,
+    "body_ready": 0,
+    "cancel_scheduled": 0,
+    "checkout": 0,
+    "ended": 0,
+    "generated": 0,
+    "generated_rate": null,
+    "paid": 0,
+    "paywall": 0,
+    "ready": 0,
+    "ready_rate": null,
+    "registered_users": 0,
+    "trial_starts": 0,
+    "viewed": 0,
+    "viewed_rate": null
+  },
+  "conversion_cohorts": [],
+  "funnel": [
+    {
+      "eligible_users": 0,
+      "label": "登録",
+      "rate": null,
+      "stage": "registration",
+      "stage_order": 1,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "21日trial",
+      "rate": null,
+      "stage": "trial",
+      "stage_order": 2,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "A1 AI相談成功",
+      "rate": null,
+      "stage": "a1",
+      "stage_order": 3,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "A2 初回記録",
+      "rate": null,
+      "stage": "a2",
+      "stage_order": 4,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "A3 分析ready",
+      "rate": null,
+      "stage": "a3_ready",
+      "stage_order": 5,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "A3 レポート生成",
+      "rate": null,
+      "stage": "a3_generated",
+      "stage_order": 6,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "A3 実際の閲覧",
+      "rate": null,
+      "stage": "a3_viewed",
+      "stage_order": 7,
+      "users": 0
+    },
+    {
+      "eligible_users": 0,
+      "label": "有料契約",
+      "rate": null,
+      "stage": "paid",
+      "stage_order": 8,
+      "users": 0
+    }
+  ],
+  "landmark_segments": [],
+  "retention": [
+    {
+      "day": 1,
+      "eligible_users": 0,
+      "rate": null,
+      "retained_users": 0
+    },
+    {
+      "day": 7,
+      "eligible_users": 0,
+      "rate": null,
+      "retained_users": 0
+    },
+    {
+      "day": 14,
+      "eligible_users": 0,
+      "rate": null,
+      "retained_users": 0
+    },
+    {
+      "day": 21,
+      "eligible_users": 0,
+      "rate": null,
+      "retained_users": 0
+    }
+  ],
+  "diagnostics": {
+    "server_input": 0,
+    "ga4_input": 0,
+    "server_duplicates": 0,
+    "ga4_duplicates": 0,
+    "unclassified_excluded": 0,
+    "test_excluded": 0,
+    "invalid_identity_excluded": 0,
+    "unmatched_report_views": 0,
+    "out_of_order_milestones": 0
+  },
+  "methodology": {
+    "funnel": "Strict ordered milestones; the separate A3 panel shows independent reach.",
+    "a1": "First successful AI consultation is a proxy, not proof of perceived value.",
+    "retention": "JST calendar days since registration; only server-confirmed manual records, successful user AI answers, and exactly matched rendered reports count. Both source watermarks must close the target day.",
+    "conversion": "Paid activation within 28 days from trial start; immature trials excluded. Sandbox activation excluded from general metrics.",
+    "a3_landmark": "Viewed by trial day 14; compare follow-up day 21 only after the same observation horizon. Paid before landmark excluded from subsequent conversion risk set.",
+    "causality": "Observational associations; no causal effect is inferred.",
+    "missing": "Unknown ingestion completeness leaves eligible denominators zero and rates null (N/A). No health/AI/payment content in output."
+  }
+}

@@ -1,0 +1,16 @@
+**
+!tools/
+!tools/analytics/
+!tools/analytics/serve.cjs
+!tools/analytics/render-dashboard.cjs
+!tools/analytics/dashboard-template.html
+!tools/analytics/dashboard_queries.sql
+!tools/analytics/cloud-bigquery.cjs
+!tools/analytics/cloud-iap.cjs
+!tools/analytics/cloud-run.cjs
+!tools/analytics/Dockerfile
+!tools/analytics/output/
+!tools/analytics/output/synthetic-dashboard.json
+!docs/
+!docs/analytics/
+!docs/analytics/trial_journey.sql

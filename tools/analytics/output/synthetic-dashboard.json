@@ -1,0 +1,184 @@
+{
+  "metadata": {
+    "schema_version": "journey_dashboard_v1",
+    "metric_policy_version": "journey_metrics_v1",
+    "source_classification": "synthetic_only",
+    "synthetic_only": true,
+    "as_of": "2026-11-01T03:00:00.000Z",
+    "watermark": {
+      "server": "2026-10-31T15:00:00.000Z",
+      "ga4": "2026-10-31T15:00:00.000Z"
+    },
+    "config": {
+      "conversion_horizon_days": 28,
+      "landmark_days": 14,
+      "landmark_followup_day": 21
+    },
+    "timezone": "Asia/Tokyo",
+    "audience": "general",
+    "input_hash": "84871a2f937c919a17610ba8e6a657bd8f2e494b7c576de1778bddb91cea8dc5",
+    "config_hash": "fae729483efe079b9d4c5fdf6c5fb3b6cf34bc1628d4fd19aeee9327f378e106",
+    "content_hash": "a4222a165cfb1f8a229c46ec89ae91ce675412674c940cf86e2a71326587672d",
+    "code_hash": "f77aedaede9276cee193e22b8d2ca86d8fe46c5e85ef6d1687b0276d8d7cf244",
+    "not_prediction_ready": true
+  },
+  "a3": {
+    "activity_ready": 0,
+    "body_ready": 2,
+    "cancel_scheduled": 1,
+    "checkout": 2,
+    "ended": 1,
+    "generated": 3,
+    "generated_rate": 0.75,
+    "paid": 2,
+    "paywall": 2,
+    "ready": 2,
+    "ready_rate": 0.5,
+    "registered_users": 5,
+    "trial_starts": 4,
+    "viewed": 2,
+    "viewed_rate": 0.5
+  },
+  "conversion_cohorts": [
+    {
+      "cohort": "2026-10",
+      "converted_trials": 2,
+      "eligible_trials": 3,
+      "immature_trials": 1,
+      "rate": 0.6666666666666666,
+      "trial_starts": 4
+    }
+  ],
+  "funnel": [
+    {
+      "eligible_users": 5,
+      "label": "登録",
+      "rate": 1,
+      "stage": "registration",
+      "stage_order": 1,
+      "users": 5
+    },
+    {
+      "eligible_users": 5,
+      "label": "21日trial",
+      "rate": 0.8,
+      "stage": "trial",
+      "stage_order": 2,
+      "users": 4
+    },
+    {
+      "eligible_users": 5,
+      "label": "A1 AI相談成功",
+      "rate": 0.8,
+      "stage": "a1",
+      "stage_order": 3,
+      "users": 4
+    },
+    {
+      "eligible_users": 5,
+      "label": "A2 初回記録",
+      "rate": 0.4,
+      "stage": "a2",
+      "stage_order": 4,
+      "users": 2
+    },
+    {
+      "eligible_users": 5,
+      "label": "A3 分析ready",
+      "rate": 0.4,
+      "stage": "a3_ready",
+      "stage_order": 5,
+      "users": 2
+    },
+    {
+      "eligible_users": 5,
+      "label": "A3 レポート生成",
+      "rate": 0.4,
+      "stage": "a3_generated",
+      "stage_order": 6,
+      "users": 2
+    },
+    {
+      "eligible_users": 5,
+      "label": "A3 実際の閲覧",
+      "rate": 0.4,
+      "stage": "a3_viewed",
+      "stage_order": 7,
+      "users": 2
+    },
+    {
+      "eligible_users": 5,
+      "label": "有料契約",
+      "rate": 0.4,
+      "stage": "paid",
+      "stage_order": 8,
+      "users": 2
+    }
+  ],
+  "landmark_segments": [
+    {
+      "conversion_eligible_trials": 2,
+      "conversion_rate": 0.5,
+      "converted_trials": 1,
+      "eligible_trials": 2,
+      "retained_trials": 0,
+      "retention_rate": 0,
+      "segment": "not_viewed_by_day14"
+    },
+    {
+      "conversion_eligible_trials": 1,
+      "conversion_rate": 1,
+      "converted_trials": 1,
+      "eligible_trials": 1,
+      "retained_trials": 1,
+      "retention_rate": 1,
+      "segment": "viewed_by_day14"
+    }
+  ],
+  "retention": [
+    {
+      "day": 1,
+      "eligible_users": 4,
+      "rate": 0.5,
+      "retained_users": 2
+    },
+    {
+      "day": 7,
+      "eligible_users": 4,
+      "rate": 0.25,
+      "retained_users": 1
+    },
+    {
+      "day": 14,
+      "eligible_users": 4,
+      "rate": 0.5,
+      "retained_users": 2
+    },
+    {
+      "day": 21,
+      "eligible_users": 4,
+      "rate": 0.25,
+      "retained_users": 1
+    }
+  ],
+  "diagnostics": {
+    "server_input": 36,
+    "ga4_input": 9,
+    "server_duplicates": 1,
+    "ga4_duplicates": 1,
+    "unclassified_excluded": 1,
+    "test_excluded": 1,
+    "invalid_identity_excluded": 0,
+    "unmatched_report_views": 1,
+    "out_of_order_milestones": 0
+  },
+  "methodology": {
+    "funnel": "Strict ordered milestones; the separate A3 panel shows independent reach.",
+    "a1": "First successful AI consultation is a proxy, not proof of perceived value.",
+    "retention": "JST calendar days since registration; only server-confirmed manual records, successful user AI answers, and exactly matched rendered reports count. Both source watermarks must close the target day.",
+    "conversion": "Paid activation within 28 days from trial start; immature trials excluded. Sandbox activation excluded from general metrics.",
+    "a3_landmark": "Viewed by trial day 14; compare follow-up day 21 only after the same observation horizon. Paid before landmark excluded from subsequent conversion risk set.",
+    "causality": "Observational associations; no causal effect is inferred.",
+    "missing": "Unknown ingestion completeness leaves eligible denominators zero and rates null (N/A). No health/AI/payment content in output."
+  }
+}

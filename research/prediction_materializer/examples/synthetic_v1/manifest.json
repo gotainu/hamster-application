@@ -1,0 +1,162 @@
+{
+  "schema_version": "prediction_materialization_manifest_v1",
+  "table_schema_version": "prediction_training_table_v1",
+  "dataset_schema_version": "synthetic_materialized_rows_v1",
+  "feature_policy_version": "synthetic_point_in_time_features_v1",
+  "label_policy_version": {
+    "initial": "synthetic_initial_v1",
+    "corrected": "synthetic_corrected_same_observation_v1"
+  },
+  "source_classification": "synthetic",
+  "synthetic_only": true,
+  "source_snapshot_id": "snapshot_4ec751a9aa84ef8b671b72d726ef6646c275c0d8e7686ef55599feb57e9f826a",
+  "source_snapshot_hash": "21e79b3b68c2f096be0923fe538e9b004e438729c6db738168e532dbc7610c65",
+  "source_schema_version": "prediction_source_snapshot_v1",
+  "input_config_hash": "ac5f3aae59d09d9598a03f1b2b66c1987d88a07cd81103cdde4b7afd151c0d2c",
+  "effective_config_hash": "ac5f3aae59d09d9598a03f1b2b66c1987d88a07cd81103cdde4b7afd151c0d2c",
+  "canonical_input_hashes": [
+    {
+      "row_id": "row_0d84e28edd7daf035cc5eadb94444db127fa9d4886cefe88605556596b9f595e",
+      "hash": "5f9ec9046b573df89e54bbf62b5742c0185ad3d428d4f7564b4aca905ee9878b"
+    },
+    {
+      "row_id": "row_49eaddb2b7f681a7a94dc799a990f41670afeaefec621c44a1e549fce307f14c",
+      "hash": "5f9ec9046b573df89e54bbf62b5742c0185ad3d428d4f7564b4aca905ee9878b"
+    },
+    {
+      "row_id": "row_706c27d5203369dcf2773566530f5a9ec790f4fea5b166106af9de47b1b29049",
+      "hash": "5f9ec9046b573df89e54bbf62b5742c0185ad3d428d4f7564b4aca905ee9878b"
+    },
+    {
+      "row_id": "row_89e11be98f2c7ec7bb6e1508e66359b22db323fbc3a6dc7fdb233ad5d15275d5",
+      "hash": "d9605269e3889b4c157c3910eea7562d3fccbdd808b9eb20782107d94ce17a79"
+    },
+    {
+      "row_id": "row_9f62049ea898064a6193aa4aa8c0ae34648a23a6d35ec5702c7fdee9ad3a9219",
+      "hash": "15b7d21e9d640e901c6d35af0d61ea62cb313245a360ec6dff34bd03092b5dc9"
+    },
+    {
+      "row_id": "row_b3a9feded14676c3d022f53caa83c6a5225364188f4e27bb7bee3058339d328f",
+      "hash": "0ea7ce4cfc3b14b8290615f53616bd60574a2cfd12fe6179b30a9ffa6a37021a"
+    },
+    {
+      "row_id": "row_c36d1f0d22be607391dddd2562eac0c8b4a8043fa31087a666d6883653777e58",
+      "hash": "5f9ec9046b573df89e54bbf62b5742c0185ad3d428d4f7564b4aca905ee9878b"
+    }
+  ],
+  "catalog_versions": {
+    "observation": "observation_catalog_v1",
+    "care": "care_action_catalog_v2"
+  },
+  "code_identity": "2fddfe1c341298c3b790b8f6a32cf10146a4f0f9e7001e67ec76d73e933ef47e",
+  "windows": [
+    {
+      "row_id": "row_0d84e28edd7daf035cc5eadb94444db127fa9d4886cefe88605556596b9f595e",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-02T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_49eaddb2b7f681a7a94dc799a990f41670afeaefec621c44a1e549fce307f14c",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_706c27d5203369dcf2773566530f5a9ec790f4fea5b166106af9de47b1b29049",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_89e11be98f2c7ec7bb6e1508e66359b22db323fbc3a6dc7fdb233ad5d15275d5",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_9f62049ea898064a6193aa4aa8c0ae34648a23a6d35ec5702c7fdee9ad3a9219",
+      "t0": "2030-04-02T00:00:00.000000000Z",
+      "t1": "2030-04-03T00:00:00.000000000Z",
+      "l": "2030-04-04T00:00:00.000000000Z",
+      "data_available_through": "2030-04-04T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_b3a9feded14676c3d022f53caa83c6a5225364188f4e27bb7bee3058339d328f",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-03T00:00:00.000000000Z"
+    },
+    {
+      "row_id": "row_c36d1f0d22be607391dddd2562eac0c8b4a8043fa31087a666d6883653777e58",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "l": "2030-04-03T00:00:00.000000000Z",
+      "data_available_through": "2030-04-03T00:00:00.000000000Z"
+    }
+  ],
+  "candidate_row_count": 4,
+  "total_row_count": 7,
+  "state_counts": {
+    "candidate": 4,
+    "hold": 1,
+    "label_missing": 2,
+    "ineligible": 0
+  },
+  "reason_counts": {
+    "data_not_complete_through_L": 1,
+    "cancelled_by_finalization": 1,
+    "correction_present_by_finalization": 1,
+    "no_eligible_label": 1,
+    "observation_time_not_proven_in_window": 1,
+    "original_receipt_outside_window": 1,
+    "subject_mismatch": 1
+  },
+  "feature_columns": {
+    "weight_g": "weight_last_g",
+    "activity_m": "activity_last_m",
+    "past_condition": "past_condition",
+    "cleaning": "care_cleaning",
+    "bedding_replacement": "care_bedding",
+    "walk_minutes": "care_walk_minutes",
+    "environment_wheel_cm": "environment_wheel_cm",
+    "species": "species",
+    "birth_date": "birth_date",
+    "temperature_c": "temperature_last_received_c",
+    "humidity_pct": "humidity_last_received_pct",
+    "sensor_period_count": "sensor_period_count"
+  },
+  "csv_encoding": "typed_json_cells_v1",
+  "identity_policy_version": "local_alias_sha256_v1",
+  "research_eligibility": "not_assessed",
+  "prediction_ready": "not_assessed",
+  "content_hash": "e811253741a5737ef9625bb1b74bdcfa3d6dfa2167e446948c967703d53b2609",
+  "dataset_id": "materialized_e811253741a5737ef962",
+  "artifacts": {
+    "rows.jsonl": {
+      "sha256": "e7a5a1b505e9826740aca5b6164b0a5f9712b1415ab4ee5ded7097840e4bd783",
+      "bytes": 67256
+    },
+    "rows.csv": {
+      "sha256": "bfd3220235d2db3bdd3692ea44422e820cc1c951beb29722c8a1be68b01025a1",
+      "bytes": 70262
+    },
+    "candidate_rows.jsonl": {
+      "sha256": "c28304e09cae33c4e792048cdd8f3247caa836e6c8c4b3c0dc53a74d6a43813c",
+      "bytes": 38153
+    },
+    "excluded_rows.jsonl": {
+      "sha256": "65eff0bdb8c18748d5383260123f2dc3c66de6f7967ecd6de0a6613d39399562",
+      "bytes": 29103
+    },
+    "config.json": {
+      "sha256": "242dbf39476d9218a17003903a3082bd4032834fbbe5c79fdd331c3c3bbe62bb",
+      "bytes": 2817
+    }
+  }
+}

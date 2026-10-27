@@ -1,0 +1,16 @@
+{
+  "schema_version": "journey_dashboard_manifest_v1",
+  "synthetic_only": true,
+  "content_hash": "a4222a165cfb1f8a229c46ec89ae91ce675412674c940cf86e2a71326587672d",
+  "input_hash": "84871a2f937c919a17610ba8e6a657bd8f2e494b7c576de1778bddb91cea8dc5",
+  "config_hash": "fae729483efe079b9d4c5fdf6c5fb3b6cf34bc1628d4fd19aeee9327f378e106",
+  "code_hash": "f77aedaede9276cee193e22b8d2ca86d8fe46c5e85ef6d1687b0276d8d7cf244",
+  "files": [
+    "synthetic-input.json",
+    "synthetic-config.json",
+    "synthetic-dashboard.json",
+    "general-dashboard.json"
+  ],
+  "generated_at": "2026-10-17T11:22:12.448Z",
+  "generation_time_excluded_from_content_hash": true
+}

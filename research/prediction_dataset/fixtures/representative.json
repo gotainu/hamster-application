@@ -1,0 +1,714 @@
+{
+  "schemaVersion": "synthetic_dataset_fixture_v1",
+  "id": "synthetic_representative_v1",
+  "syntheticOnly": true,
+  "catalogVersions": {
+    "observation": "observation_catalog_v1",
+    "care": "care_action_catalog_v2"
+  },
+  "anchors": [
+    {
+      "id": "synthetic_anchor_alpha",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_beta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_beta",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_gamma",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_gamma",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_delta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_delta",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_eta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_theta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_theta",
+      "referenceDateKey": "2030-04-01"
+    },
+    {
+      "id": "synthetic_anchor_unknown_subject",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": null,
+      "referenceDateKey": "2030-04-01"
+    }
+  ],
+  "observations": [
+    {
+      "id": "synthetic_observation_alpha_initial",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "original": {
+        "id": "synthetic_original_alpha_initial",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "condition": "normal",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": [
+        {
+          "id": "synthetic_amendment_alpha_corrected",
+          "revision": 2,
+          "kind": "correction",
+          "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+          "availableAt": "2030-04-02T04:00:00.000000000Z",
+          "condition": "slightlyConcerned"
+        }
+      ]
+    },
+    {
+      "id": "synthetic_observation_alpha_later",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "original": {
+        "id": "synthetic_original_alpha_later",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T05:05:00.000000000Z",
+        "availableAt": "2030-04-01T05:05:00.000000000Z",
+        "condition": "veryConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T05:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_beta_initial",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_beta",
+      "original": {
+        "id": "synthetic_original_beta_initial",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "condition": "normal",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": [
+        {
+          "id": "synthetic_amendment_beta_cancel",
+          "revision": 2,
+          "kind": "cancel",
+          "acceptedAt": "2030-04-01T04:00:00.000000000Z",
+          "availableAt": "2030-04-01T04:00:00.000000000Z"
+        }
+      ]
+    },
+    {
+      "id": "synthetic_observation_beta_later",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_beta",
+      "original": {
+        "id": "synthetic_original_beta_later",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T06:05:00.000000000Z",
+        "availableAt": "2030-04-01T06:05:00.000000000Z",
+        "condition": "veryConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T06:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_delta_unknown_time",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_delta",
+      "original": {
+        "id": "synthetic_original_delta_unknown_time",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "condition": "slightlyConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "date_only",
+          "dateKey": "2030-04-01",
+          "timeZone": "Asia/Tokyo"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_eta_boundary",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "original": {
+        "id": "synthetic_original_eta_boundary",
+        "revision": 1,
+        "acceptedAt": "2030-04-02T00:00:00.000000000Z",
+        "availableAt": "2030-04-02T00:00:00.000000000Z",
+        "condition": "slightlyConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-02T00:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_theta_corrected_subject",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_theta",
+      "original": {
+        "id": "synthetic_original_theta_corrected_subject",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "condition": "normal",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T03:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": [
+        {
+          "id": "synthetic_amendment_theta_identity_unknown",
+          "revision": 2,
+          "kind": "correction",
+          "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+          "availableAt": "2030-04-02T04:00:00.000000000Z",
+          "subjectId": null
+        }
+      ]
+    },
+    {
+      "id": "synthetic_observation_gamma_pre_anchor_late_submission",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_gamma",
+      "original": {
+        "id": "synthetic_original_gamma_pre_anchor_late_submission",
+        "revision": 1,
+        "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "condition": "slightlyConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-03-31T23:30:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_gamma_after_window_receipt",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_gamma",
+      "original": {
+        "id": "synthetic_original_gamma_after_window_receipt",
+        "revision": 1,
+        "acceptedAt": "2030-04-02T01:00:00.000000000Z",
+        "availableAt": "2030-04-02T01:00:00.000000000Z",
+        "condition": "veryConcerned",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-04-01T05:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    },
+    {
+      "id": "synthetic_observation_past_alpha",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "original": {
+        "id": "synthetic_original_past_alpha",
+        "revision": 1,
+        "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+        "availableAt": "2030-03-31T20:05:00.000000000Z",
+        "condition": "normal",
+        "explicit": true,
+        "timing": {
+          "precision": "instant",
+          "at": "2030-03-31T20:00:00.000000000Z",
+          "clock": "user_reported"
+        }
+      },
+      "amendments": []
+    }
+  ],
+  "featureRevisions": [
+    {
+      "revisionId": "synthetic_revision_alpha_weight",
+      "logicalId": "synthetic_feature_alpha_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 42,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_beta_weight",
+      "logicalId": "synthetic_feature_beta_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_beta",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 43,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_gamma_weight",
+      "logicalId": "synthetic_feature_gamma_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_gamma",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 44,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_delta_weight",
+      "logicalId": "synthetic_feature_delta_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_delta",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 45,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_eta_weight",
+      "logicalId": "synthetic_feature_eta_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 46,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_theta_weight",
+      "logicalId": "synthetic_feature_theta_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_theta",
+      "featureId": "weight_last_g",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 47,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_weight_correction_late",
+      "logicalId": "synthetic_feature_alpha_weight",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "weight_last_g",
+      "revision": 2,
+      "operation": "upsert",
+      "acceptedAt": "2030-04-01T05:00:00.000000000Z",
+      "availableAt": "2030-04-01T05:00:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 43,
+      "unit": "g",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+      "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "activity_last_m",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 0,
+      "unit": "m",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_past_condition",
+      "logicalId": "synthetic_feature_alpha_past_condition",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "past_condition",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+      "availableAt": "2030-03-31T20:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T20:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": "normal",
+      "unit": null,
+      "quality": "verified",
+      "answerProvenance": "explicit",
+      "sourceObservationId": "synthetic_observation_past_alpha"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_cleaning_none",
+      "logicalId": "synthetic_feature_alpha_cleaning_none",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "care_cleaning",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "interval",
+        "start": "2030-03-30T15:00:00.000000000Z",
+        "end": "2030-03-31T15:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": false,
+      "unit": null,
+      "quality": "verified",
+      "answerProvenance": "batch_confirmation",
+      "declarationScope": "completed_period"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_bedding_none",
+      "logicalId": "synthetic_feature_alpha_bedding_none",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "care_bedding",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "interval",
+        "start": "2030-03-30T15:00:00.000000000Z",
+        "end": "2030-03-31T15:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": "none",
+      "unit": null,
+      "quality": "verified",
+      "answerProvenance": "item_selection",
+      "declarationScope": "completed_period"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_walk_zero",
+      "logicalId": "synthetic_feature_alpha_walk_zero",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "care_walk_minutes",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "interval",
+        "start": "2030-03-30T15:00:00.000000000Z",
+        "end": "2030-03-31T15:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 0,
+      "unit": "minutes",
+      "quality": "verified",
+      "answerProvenance": "batch_confirmation",
+      "declarationScope": "completed_period"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_wheel",
+      "logicalId": "synthetic_feature_alpha_wheel",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "environment_wheel_cm",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 23,
+      "unit": "cm",
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_species",
+      "logicalId": "synthetic_feature_alpha_species",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "species",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": "ジャンガリアン",
+      "unit": null,
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_birth_date",
+      "logicalId": "synthetic_feature_alpha_birth_date",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "birth_date",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": "2030-01-12",
+      "unit": null,
+      "quality": "verified"
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_partial_temperature",
+      "logicalId": "synthetic_feature_alpha_partial_temperature",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "temperature_last_received_c",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 22.7,
+      "unit": "C",
+      "quality": "partial",
+      "sensorQuality": {
+        "status": "PARTIAL",
+        "observedCount": 1,
+        "wholeCount": null,
+        "expectedCount": null,
+        "ratio": null,
+        "deviceAssociation": "confirmed",
+        "subjectAssociation": "confirmed",
+        "freshness": "unknown"
+      }
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_partial_humidity",
+      "logicalId": "synthetic_feature_alpha_partial_humidity",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "humidity_last_received_pct",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 48,
+      "unit": "%RH",
+      "quality": "partial",
+      "sensorQuality": {
+        "status": "PARTIAL",
+        "observedCount": 1,
+        "wholeCount": null,
+        "expectedCount": null,
+        "ratio": null,
+        "deviceAssociation": "confirmed",
+        "subjectAssociation": "confirmed",
+        "freshness": "unknown"
+      }
+    },
+    {
+      "revisionId": "synthetic_revision_alpha_partial_count",
+      "logicalId": "synthetic_feature_alpha_partial_count",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "featureId": "sensor_period_count",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": null,
+      "unit": "count",
+      "quality": "partial",
+      "sensorQuality": {
+        "status": "PARTIAL",
+        "observedCount": 1,
+        "wholeCount": null,
+        "expectedCount": null,
+        "ratio": null,
+        "deviceAssociation": "confirmed",
+        "subjectAssociation": "confirmed",
+        "freshness": "unknown"
+      }
+    },
+    {
+      "revisionId": "synthetic_revision_eta_device_unknown",
+      "logicalId": "synthetic_feature_eta_device_unknown",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "featureId": "temperature_last_received_c",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+      "availableAt": "2030-03-31T21:05:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 23.4,
+      "unit": "C",
+      "quality": "partial",
+      "sensorQuality": {
+        "status": "PARTIAL",
+        "observedCount": 1,
+        "wholeCount": null,
+        "expectedCount": null,
+        "ratio": null,
+        "deviceAssociation": "unknown",
+        "subjectAssociation": "confirmed",
+        "freshness": "unknown"
+      }
+    },
+    {
+      "revisionId": "synthetic_revision_eta_late_sensor",
+      "logicalId": "synthetic_feature_eta_late_sensor",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "featureId": "humidity_last_received_pct",
+      "revision": 1,
+      "operation": "upsert",
+      "acceptedAt": "2030-04-01T05:00:00.000000000Z",
+      "availableAt": "2030-04-01T05:00:00.000000000Z",
+      "timing": {
+        "precision": "instant",
+        "at": "2030-03-31T21:00:00.000000000Z",
+        "clock": "user_reported"
+      },
+      "value": 51,
+      "unit": "%RH",
+      "quality": "partial",
+      "sensorQuality": {
+        "status": "PARTIAL",
+        "observedCount": 1,
+        "wholeCount": null,
+        "expectedCount": null,
+        "ratio": null,
+        "deviceAssociation": "confirmed",
+        "subjectAssociation": "confirmed",
+        "freshness": "unknown"
+      }
+    }
+  ]
+}

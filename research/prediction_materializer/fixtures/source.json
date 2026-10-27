@@ -1,0 +1,947 @@
+{
+  "schemaVersion": "prediction_source_snapshot_v1",
+  "snapshotId": "synthetic_materializer_sources_v1",
+  "classification": "synthetic",
+  "capturedAt": "2030-04-04T00:00:00.000000000Z",
+  "dataAvailableThrough": "2030-04-04T00:00:00.000000000Z",
+  "catalogVersions": {
+    "observation": "observation_catalog_v1",
+    "care": "care_action_catalog_v2"
+  },
+  "subjects": [
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_alpha",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    },
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_beta",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    },
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_gamma",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    },
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_delta",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    },
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_epsilon",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    },
+    {
+      "ownerId": "synthetic_owner_main",
+      "subjectId": "synthetic_subject_zeta",
+      "identityAcceptedAt": "2030-03-01T00:00:00.000000000Z"
+    }
+  ],
+  "sources": {
+    "profiles": [
+      {
+        "sourceId": "synthetic_source_alpha_profile_before",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-20T20:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "evaluationDateKey": "2030-04-01",
+          "knowledgeCutoff": "2030-04-01T00:00:00.000000000Z",
+          "historyExists": true,
+          "values": {
+            "species": "ジャンガリアン",
+            "birthday": {
+              "dateKey": "2030-01-12",
+              "precision": "date_only",
+              "quality": "known"
+            }
+          },
+          "evidenceRevisionIds": [
+            "synthetic_profile_revision_alpha"
+          ],
+          "quality": {
+            "reasons": []
+          }
+        },
+        "evidence": [
+          {
+            "revisionId": "synthetic_profile_revision_alpha",
+            "revision": 1,
+            "acceptedAt": "2030-03-20T20:05:00.000000000Z",
+            "availableAt": "2030-03-20T20:05:00.000000000Z"
+          }
+        ]
+      },
+      {
+        "sourceId": "synthetic_source_alpha_profile_after",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-20T20:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "evaluationDateKey": "2030-04-02",
+          "knowledgeCutoff": "2030-04-02T00:00:00.000000000Z",
+          "historyExists": true,
+          "values": {
+            "species": "ジャンガリアン",
+            "birthday": {
+              "dateKey": "2030-01-12",
+              "precision": "date_only",
+              "quality": "known"
+            }
+          },
+          "evidenceRevisionIds": [
+            "synthetic_profile_revision_alpha"
+          ],
+          "quality": {
+            "reasons": []
+          }
+        },
+        "evidence": [
+          {
+            "revisionId": "synthetic_profile_revision_alpha",
+            "revision": 1,
+            "acceptedAt": "2030-03-20T20:05:00.000000000Z",
+            "availableAt": "2030-03-20T20:05:00.000000000Z"
+          }
+        ]
+      },
+      {
+        "sourceId": "synthetic_source_delta_profile_without_history",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_delta",
+          "evaluationDateKey": "2030-04-01",
+          "knowledgeCutoff": "2030-04-01T00:00:00.000000000Z",
+          "historyExists": false,
+          "values": {
+            "species": "ジャンガリアン",
+            "birthday": {
+              "dateKey": null,
+              "precision": "unknown",
+              "quality": "unknown"
+            }
+          },
+          "evidenceRevisionIds": [],
+          "quality": {
+            "reasons": [
+              "history_not_available_at_cutoff"
+            ]
+          }
+        },
+        "evidence": []
+      }
+    ],
+    "observations": [
+      {
+        "sourceId": "synthetic_source_alpha_original",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_alpha_1",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_correction",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-02T04:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_alpha_1",
+          "revision": 2,
+          "operation": "correction",
+          "origin": "explicit_observation",
+          "targetRevision": 1,
+          "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "slightlyConcerned",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_future_correction",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-03T03:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_alpha_1",
+          "revision": 3,
+          "operation": "correction",
+          "origin": "explicit_observation",
+          "targetRevision": 2,
+          "acceptedAt": "2030-04-03T03:00:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "veryConcerned",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_day2",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-02T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "dayKey": "2030-04-02",
+          "eventId": "synthetic_observation_alpha_2",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-02T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-02T03:00:00.000000000Z",
+            "dateKey": "2030-04-02",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_beta_original",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_beta",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_beta_1",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_beta_cancel",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T04:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_beta",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_beta_1",
+          "revision": 2,
+          "operation": "cancel",
+          "origin": "explicit_observation",
+          "targetRevision": 1,
+          "acceptedAt": "2030-04-01T04:00:00.000000000Z",
+          "timing": null,
+          "answer": null
+        }
+      },
+      {
+        "sourceId": "synthetic_source_beta_later",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T06:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_beta",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_beta_2",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T06:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T06:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "veryConcerned",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_gamma_date_only",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_gamma",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_gamma_date_only",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "date_only",
+            "observedAt": null,
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "slightlyConcerned",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_delta_valid_label",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_delta",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_delta_1",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_epsilon_valid_label",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_epsilon",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_epsilon_1",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_zeta_hold_label",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T03:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_zeta",
+          "dayKey": "2030-04-01",
+          "eventId": "synthetic_observation_zeta_1",
+          "revision": 1,
+          "operation": "new_observation",
+          "origin": "explicit_observation",
+          "targetRevision": null,
+          "acceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-04-01T03:00:00.000000000Z",
+            "dateKey": "2030-04-01",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "answer": {
+            "condition": "normal",
+            "answerProvenance": {
+              "overall": "explicit_submission"
+            }
+          }
+        }
+      }
+    ],
+    "weights": [
+      {
+        "sourceId": "synthetic_source_alpha_weight_rev1",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "kind": "weight",
+          "recordId": "synthetic_record_alpha_weight",
+          "recordRevision": 1,
+          "dayKey": "2030-03-31",
+          "operation": "create",
+          "origin": "explicit_measurement",
+          "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-31T21:00:00.000000000Z",
+            "dateKey": "2030-03-31",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "weightGrams": 42
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_weight_rev2",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T06:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "kind": "weight",
+          "recordId": "synthetic_record_alpha_weight",
+          "recordRevision": 2,
+          "dayKey": "2030-03-31",
+          "operation": "correction",
+          "origin": "explicit_measurement",
+          "acceptedAt": "2030-04-01T06:00:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-31T21:00:00.000000000Z",
+            "dateKey": "2030-03-31",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "weightGrams": 44
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_late_weight",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T05:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "kind": "weight",
+          "recordId": "synthetic_record_alpha_late_weight",
+          "recordRevision": 1,
+          "dayKey": "2030-03-30",
+          "operation": "create",
+          "origin": "explicit_measurement",
+          "acceptedAt": "2030-04-01T05:00:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-30T21:00:00.000000000Z",
+            "dateKey": "2030-03-30",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "weightGrams": 39
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_delta_legacy_confirmation",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T06:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_delta",
+          "kind": "weight",
+          "recordId": "synthetic_record_delta_legacy",
+          "recordRevision": 1,
+          "dayKey": "2030-03-31",
+          "operation": "confirmed_legacy_snapshot",
+          "origin": "confirmed_legacy_snapshot",
+          "acceptedAt": "2030-04-01T06:00:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-31T21:00:00.000000000Z",
+            "dateKey": "2030-03-31",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "weightGrams": 51
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_epsilon_weight",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_epsilon",
+          "kind": "weight",
+          "recordId": "synthetic_record_epsilon_weight",
+          "recordRevision": 1,
+          "dayKey": "2030-03-31",
+          "operation": "create",
+          "origin": "explicit_measurement",
+          "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-31T21:00:00.000000000Z",
+            "dateKey": "2030-03-31",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "weightGrams": 37
+          }
+        }
+      }
+    ],
+    "distances": [
+      {
+        "sourceId": "synthetic_source_alpha_activity_zero",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "kind": "distance",
+          "recordId": "synthetic_record_alpha_zero",
+          "recordRevision": 1,
+          "dayKey": "2030-03-31",
+          "operation": "create",
+          "origin": "explicit_measurement",
+          "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+          "timing": {
+            "timePrecision": "instant",
+            "observedAt": "2030-03-31T21:00:00.000000000Z",
+            "dateKey": "2030-03-31",
+            "clockSource": "user_reported",
+            "timeZone": "Asia/Tokyo"
+          },
+          "values": {
+            "distance": 0,
+            "rotations": 0,
+            "wheelDiameterCm": 23,
+            "mode": "rotation",
+            "source": "manual"
+          }
+        }
+      }
+    ],
+    "careActions": [
+      {
+        "sourceId": "synthetic_source_alpha_care_zero",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "dayKey": "2030-03-31",
+          "revision": 1,
+          "status": "active",
+          "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+          "actions": {
+            "cageCleaning": {
+              "answer": "not_performed",
+              "answerProvenance": "batch_confirmation",
+              "details": {},
+              "occurredAt": null,
+              "occurredDateKey": "2030-03-31",
+              "timePrecision": "date_only",
+              "nonPerformanceScope": "up_to_acceptance"
+            },
+            "roomWalk": {
+              "answer": "not_performed",
+              "answerProvenance": "batch_confirmation",
+              "details": {
+                "durationMinutes": 0
+              },
+              "occurredAt": null,
+              "occurredDateKey": "2030-03-31",
+              "timePrecision": "date_only",
+              "nonPerformanceScope": "up_to_acceptance"
+            }
+          }
+        },
+        "binding": {
+          "subjectId": "synthetic_subject_alpha",
+          "evidenceId": "synthetic_binding_alpha",
+          "acceptedAt": "2030-03-01T00:00:00.000000000Z",
+          "validFrom": "2030-03-01T00:00:00.000000000Z",
+          "validThrough": null
+        }
+      }
+    ],
+    "environments": [
+      {
+        "sourceId": "synthetic_source_alpha_env_before",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T20:05:00.000000000Z",
+        "data": {
+          "observedAt": "2030-04-01T00:00:00.000000000Z",
+          "knowledgeCutoff": "2030-04-01T00:00:00.000000000Z",
+          "values": {
+            "wheelDiameter": {
+              "value": 23,
+              "unit": "cm",
+              "quality": "known"
+            }
+          },
+          "evidenceRevisionIds": [
+            "synthetic_environment_revision_alpha_1"
+          ],
+          "quality": {
+            "unknownFields": [],
+            "ambiguousFields": [],
+            "reasons": []
+          }
+        },
+        "evidence": [
+          {
+            "revisionId": "synthetic_environment_revision_alpha_1",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z"
+          }
+        ],
+        "binding": {
+          "subjectId": "synthetic_subject_alpha",
+          "evidenceId": "synthetic_binding_alpha",
+          "acceptedAt": "2030-03-01T00:00:00.000000000Z",
+          "validFrom": "2030-03-01T00:00:00.000000000Z",
+          "validThrough": null
+        }
+      },
+      {
+        "sourceId": "synthetic_source_alpha_env_after",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T07:00:00.000000000Z",
+        "data": {
+          "observedAt": "2030-04-02T00:00:00.000000000Z",
+          "knowledgeCutoff": "2030-04-02T00:00:00.000000000Z",
+          "values": {
+            "wheelDiameter": {
+              "value": 28,
+              "unit": "cm",
+              "quality": "known"
+            }
+          },
+          "evidenceRevisionIds": [
+            "synthetic_environment_revision_alpha_2"
+          ],
+          "quality": {
+            "unknownFields": [],
+            "ambiguousFields": [],
+            "reasons": []
+          }
+        },
+        "evidence": [
+          {
+            "revisionId": "synthetic_environment_revision_alpha_2",
+            "revision": 2,
+            "acceptedAt": "2030-04-01T07:00:00.000000000Z",
+            "availableAt": "2030-04-01T07:00:00.000000000Z"
+          }
+        ],
+        "binding": {
+          "subjectId": "synthetic_subject_alpha",
+          "evidenceId": "synthetic_binding_alpha",
+          "acceptedAt": "2030-03-01T00:00:00.000000000Z",
+          "validFrom": "2030-03-01T00:00:00.000000000Z",
+          "validThrough": null
+        }
+      }
+    ],
+    "sensorQuality": [
+      {
+        "sourceId": "synthetic_source_quality_alpha",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T22:00:00.000000000Z",
+        "data": {
+          "generatedAt": "2030-03-31T22:00:00.000000000Z",
+          "quality": {
+            "informationAsOf": "2030-03-31T22:00:00.000000000Z",
+            "window": {
+              "start": "2030-03-31T15:00:00.000000000Z",
+              "end": "2030-04-01T15:00:00.000000000Z",
+              "timeZone": "Asia/Tokyo"
+            },
+            "evaluatedThrough": "2030-03-31T22:00:00.000000000Z",
+            "readings": {
+              "count": null,
+              "countStatus": "unknown",
+              "observed": {
+                "count": 1,
+                "validValueCount": {
+                  "temperature": 1,
+                  "humidity": 1,
+                  "both": 1
+                }
+              }
+            },
+            "opportunities": {
+              "expectedCount": null
+            },
+            "ratios": {
+              "both": {
+                "numerator": 1,
+                "denominator": null,
+                "value": null
+              }
+            },
+            "completeness": {
+              "attempts": "complete",
+              "readings": "partial",
+              "states": "partial",
+              "reasons": [
+                "legacy_formats_unchecked"
+              ]
+            },
+            "binding": {
+              "subjectIds": [
+                "synthetic_subject_alpha"
+              ],
+              "status": "registered_config"
+            },
+            "freshness": {
+              "status": "unknown"
+            }
+          }
+        },
+        "deviceAssociation": "confirmed"
+      },
+      {
+        "sourceId": "synthetic_source_quality_epsilon",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T22:00:00.000000000Z",
+        "data": {
+          "generatedAt": "2030-03-31T22:00:00.000000000Z",
+          "quality": {
+            "informationAsOf": "2030-03-31T22:00:00.000000000Z",
+            "window": {
+              "start": "2030-03-31T15:00:00.000000000Z",
+              "end": "2030-04-01T15:00:00.000000000Z",
+              "timeZone": "Asia/Tokyo"
+            },
+            "evaluatedThrough": "2030-03-31T22:00:00.000000000Z",
+            "readings": {
+              "count": null,
+              "countStatus": "unknown",
+              "observed": {
+                "count": 1,
+                "validValueCount": {
+                  "temperature": 1,
+                  "humidity": 1,
+                  "both": 1
+                }
+              }
+            },
+            "opportunities": {
+              "expectedCount": null
+            },
+            "ratios": {
+              "both": {
+                "numerator": 1,
+                "denominator": null,
+                "value": null
+              }
+            },
+            "completeness": {
+              "attempts": "complete",
+              "readings": "partial",
+              "states": "partial",
+              "reasons": [
+                "legacy_formats_unchecked",
+                "device_mapping_unknown"
+              ]
+            },
+            "binding": {
+              "subjectIds": [],
+              "status": "unknown"
+            },
+            "freshness": {
+              "status": "unknown"
+            }
+          }
+        },
+        "deviceAssociation": "unknown"
+      }
+    ],
+    "sensorEvidence": [
+      {
+        "sourceId": "synthetic_source_sensor_alpha",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "attemptId": "synthetic_attempt_alpha",
+          "revision": 1,
+          "deviceAssociation": "confirmed",
+          "terminal": {
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "status": "reading_saved",
+            "responseReceivedAt": "2030-03-31T21:04:59.000000000Z",
+            "freshness": "unknown",
+            "validity": {
+              "temperature": "valid",
+              "humidity": "valid"
+            }
+          },
+          "reading": {
+            "ts": "2030-03-31T21:05:00.000000000Z",
+            "temperature": 22.7,
+            "humidity": 48
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_sensor_epsilon",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-03-31T21:05:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_epsilon",
+          "attemptId": "synthetic_attempt_epsilon",
+          "revision": 1,
+          "deviceAssociation": "unknown",
+          "terminal": {
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "status": "reading_saved",
+            "responseReceivedAt": "2030-03-31T21:04:59.000000000Z",
+            "freshness": "unknown",
+            "validity": {
+              "temperature": "valid",
+              "humidity": "valid"
+            }
+          },
+          "reading": {
+            "ts": "2030-03-31T21:05:00.000000000Z",
+            "temperature": 22.7,
+            "humidity": 48
+          }
+        }
+      },
+      {
+        "sourceId": "synthetic_source_sensor_alpha_late",
+        "ownerId": "synthetic_owner_main",
+        "availableAt": "2030-04-01T05:00:00.000000000Z",
+        "data": {
+          "subjectId": "synthetic_subject_alpha",
+          "attemptId": "synthetic_attempt_alpha_late",
+          "revision": 1,
+          "deviceAssociation": "confirmed",
+          "terminal": {
+            "acceptedAt": "2030-04-01T05:00:00.000000000Z",
+            "status": "reading_saved",
+            "responseReceivedAt": "2030-03-31T21:04:59.000000000Z",
+            "freshness": "unknown",
+            "validity": {
+              "temperature": "valid",
+              "humidity": "valid"
+            }
+          },
+          "reading": {
+            "ts": "2030-03-31T21:05:00.000000000Z",
+            "temperature": 22.7,
+            "humidity": 48
+          }
+        }
+      }
+    ]
+  },
+  "sourceCompleteness": {
+    "profiles": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "observations": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "weights": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "distances": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "careActions": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "environments": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "sensorQuality": {
+      "status": "complete",
+      "reasonCodes": []
+    },
+    "sensorEvidence": {
+      "status": "complete",
+      "reasonCodes": []
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "project_id": "hamster-breeding-app",
+  "location": "asia-northeast1",
+  "cohort_days": 179,
+  "server_complete_through": null,
+  "ga4_complete_through": null,
+  "conversion_horizon_days": 28,
+  "landmark_days": 14,
+  "landmark_followup_day": 21,
+  "max_bytes_billed": 100000000,
+  "refresh_seconds": 900,
+  "stale_after_seconds": 1800,
+  "source_classification": "production_metadata_export",
+  "excluded_user_ids": ["REPLACE_WITH_CONFIRMED_TEST_UIDS_IN_PRIVATE_CONFIG"]
+}

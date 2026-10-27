@@ -1,0 +1,14 @@
+"use strict";
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const {loadTypeScript, loadedSourceFiles} = require("../tools/load-typescript.cjs");
+const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/representative.json"), "utf8"));
+const policy = JSON.parse(fs.readFileSync(path.join(__dirname, "../fixtures/policy.json"), "utf8"));
+const {generateDataset} = loadTypeScript(path.join(__dirname, "../src/generate.ts"));
+const result = generateDataset(fixture, policy, "synthetic_offline_probe_code");
+assert.equal(result.manifest.synthetic_only, true);
+assert.equal(result.manifest.anchorCount, fixture.anchors.length);
+assert.equal(result.manifest.predictionReady, "not_assessed");
+assert.ok(loadedSourceFiles().every(filename => !/node_modules|index\.ts$/.test(filename)));
+process.stdout.write(JSON.stringify({hash: result.manifest.contentHash, rows: result.auditRows, catalogs: result.manifest.catalogVersions}));

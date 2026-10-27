@@ -1,0 +1,12 @@
+{
+  "schema_version": "journey_dashboard_v1",
+  "as_of": "2026-11-01T03:00:00.000Z",
+  "server_complete_through": "2026-10-31T15:00:00.000Z",
+  "ga4_complete_through": "2026-10-31T15:00:00.000Z",
+  "audience": "general",
+  "conversion_horizon_days": 28,
+  "landmark_days": 14,
+  "landmark_followup_day": 21,
+  "timezone": "Asia/Tokyo",
+  "source_classification": "synthetic_only"
+}

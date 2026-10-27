@@ -1,0 +1,3718 @@
+{
+  "auditRows": [
+    {
+      "id": "synthetic_anchor_unknown_subject",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": null,
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_unknown",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "excluded",
+          "value": null,
+          "unit": "g",
+          "reasonCodes": [
+            "feature_subject_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_weight",
+            "logicalId": "synthetic_feature_alpha_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": false
+      },
+      "labels": {
+        "selectedObservationId": null,
+        "initial": null,
+        "corrected": null,
+        "hasCorrection": false,
+        "cancelled": false,
+        "status": "missing",
+        "reasonCodes": [
+          "no_eligible_label",
+          "observation_time_not_proven_in_window",
+          "original_receipt_outside_window",
+          "subject_unconfirmed"
+        ],
+        "ordering": "none",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_unconfirmed"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_unconfirmed"
+            ]
+          }
+        ]
+      },
+      "status": "ineligible",
+      "reasonCodes": [
+        "no_eligible_label",
+        "observation_time_not_proven_in_window",
+        "original_receipt_outside_window",
+        "subject_unconfirmed"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_alpha",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "usable",
+          "value": 0,
+          "unit": "m",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "usable",
+          "value": "2030-01-12",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "usable",
+          "value": "none",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "usable",
+          "value": false,
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "usable",
+          "value": 0,
+          "unit": "minutes",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "usable",
+          "value": 23,
+          "unit": "cm",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "partial",
+          "value": 48,
+          "unit": "%RH",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "usable",
+          "value": "normal",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "partial",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "usable",
+          "value": "ジャンガリアン",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "partial",
+          "value": 22.7,
+          "unit": "C",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 42,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_weight",
+            "logicalId": "synthetic_feature_alpha_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": true,
+        "birth_date": true,
+        "care_bedding": true,
+        "care_cleaning": true,
+        "care_walk_minutes": true,
+        "environment_wheel_cm": true,
+        "humidity_last_received_pct": true,
+        "past_condition": true,
+        "sensor_period_count": false,
+        "species": true,
+        "temperature_last_received_c": true,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_alpha_initial",
+        "initial": "normal",
+        "corrected": "slightlyConcerned",
+        "hasCorrection": true,
+        "cancelled": false,
+        "status": "selected",
+        "reasonCodes": [
+          "correction_present_by_finalization"
+        ],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_alpha_initial",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-01T03:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": [
+            {
+              "id": "synthetic_amendment_alpha_corrected",
+              "revision": 2,
+              "kind": "correction",
+              "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+              "availableAt": "2030-04-02T04:00:00.000000000Z"
+            }
+          ]
+        }
+      },
+      "status": "candidate",
+      "reasonCodes": [
+        "correction_present_by_finalization"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_beta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_beta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 43,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_beta_weight",
+            "logicalId": "synthetic_feature_beta_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_beta_initial",
+        "initial": null,
+        "corrected": null,
+        "hasCorrection": false,
+        "cancelled": true,
+        "status": "missing",
+        "reasonCodes": [
+          "cancelled_by_finalization"
+        ],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_beta_initial",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-01T03:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": [
+            {
+              "id": "synthetic_amendment_beta_cancel",
+              "revision": 2,
+              "kind": "cancel",
+              "acceptedAt": "2030-04-01T04:00:00.000000000Z",
+              "availableAt": "2030-04-01T04:00:00.000000000Z"
+            }
+          ]
+        }
+      },
+      "status": "label_missing",
+      "reasonCodes": [
+        "cancelled_by_finalization"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_delta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_delta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 45,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_delta_weight",
+            "logicalId": "synthetic_feature_delta_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": null,
+        "initial": null,
+        "corrected": null,
+        "hasCorrection": false,
+        "cancelled": false,
+        "status": "missing",
+        "reasonCodes": [
+          "no_eligible_label",
+          "observation_time_not_proven_in_window",
+          "original_receipt_outside_window",
+          "subject_mismatch"
+        ],
+        "ordering": "none",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ]
+      },
+      "status": "label_missing",
+      "reasonCodes": [
+        "no_eligible_label",
+        "observation_time_not_proven_in_window",
+        "original_receipt_outside_window",
+        "subject_mismatch"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_eta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 46,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_eta_weight",
+            "logicalId": "synthetic_feature_eta_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_eta_boundary",
+        "initial": "slightlyConcerned",
+        "corrected": "slightlyConcerned",
+        "hasCorrection": false,
+        "cancelled": false,
+        "status": "selected",
+        "reasonCodes": [],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_eta_boundary",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-02T00:00:00.000000000Z",
+          "originalAvailableAt": "2030-04-02T00:00:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-02T00:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": []
+        }
+      },
+      "status": "candidate",
+      "reasonCodes": [],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_gamma",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_gamma",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 44,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_gamma_weight",
+            "logicalId": "synthetic_feature_gamma_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": null,
+        "initial": null,
+        "corrected": null,
+        "hasCorrection": false,
+        "cancelled": false,
+        "status": "missing",
+        "reasonCodes": [
+          "no_eligible_label",
+          "observation_time_not_proven_in_window",
+          "original_receipt_outside_window",
+          "subject_mismatch"
+        ],
+        "ordering": "none",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ]
+      },
+      "status": "label_missing",
+      "reasonCodes": [
+        "no_eligible_label",
+        "observation_time_not_proven_in_window",
+        "original_receipt_outside_window",
+        "subject_mismatch"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_theta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_theta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 47,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_theta_weight",
+            "logicalId": "synthetic_feature_theta_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_theta_corrected_subject",
+        "initial": null,
+        "corrected": null,
+        "hasCorrection": true,
+        "cancelled": false,
+        "status": "ineligible",
+        "reasonCodes": [
+          "corrected_subject_ineligible"
+        ],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_theta_corrected_subject",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-01T03:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": [
+            {
+              "id": "synthetic_amendment_theta_identity_unknown",
+              "revision": 2,
+              "kind": "correction",
+              "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+              "availableAt": "2030-04-02T04:00:00.000000000Z"
+            }
+          ]
+        }
+      },
+      "status": "ineligible",
+      "reasonCodes": [
+        "corrected_subject_ineligible"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    }
+  ],
+  "candidateRows": [
+    {
+      "id": "synthetic_anchor_alpha",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_alpha",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "usable",
+          "value": 0,
+          "unit": "m",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "usable",
+          "value": "2030-01-12",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "usable",
+          "value": "none",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "usable",
+          "value": false,
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "usable",
+          "value": 0,
+          "unit": "minutes",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "declarationScope": "completed_period"
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "usable",
+          "value": 23,
+          "unit": "cm",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "partial",
+          "value": 48,
+          "unit": "%RH",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "usable",
+          "value": "normal",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "partial",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "usable",
+          "value": "ジャンガリアン",
+          "unit": null,
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "partial",
+          "value": 22.7,
+          "unit": "C",
+          "reasonCodes": [
+            "sensor_expected_count_unknown",
+            "sensor_measurement_freshness_unknown",
+            "sensor_whole_period_quality_unconfirmed"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 42,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_weight",
+            "logicalId": "synthetic_feature_alpha_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": true,
+        "birth_date": true,
+        "care_bedding": true,
+        "care_cleaning": true,
+        "care_walk_minutes": true,
+        "environment_wheel_cm": true,
+        "humidity_last_received_pct": true,
+        "past_condition": true,
+        "sensor_period_count": false,
+        "species": true,
+        "temperature_last_received_c": true,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_alpha_initial",
+        "initial": "normal",
+        "corrected": "slightlyConcerned",
+        "hasCorrection": true,
+        "cancelled": false,
+        "status": "selected",
+        "reasonCodes": [
+          "correction_present_by_finalization"
+        ],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_eta_boundary",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_alpha_initial",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-01T03:05:00.000000000Z",
+          "originalAvailableAt": "2030-04-01T03:05:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-01T03:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": [
+            {
+              "id": "synthetic_amendment_alpha_corrected",
+              "revision": 2,
+              "kind": "correction",
+              "acceptedAt": "2030-04-02T04:00:00.000000000Z",
+              "availableAt": "2030-04-02T04:00:00.000000000Z"
+            }
+          ]
+        }
+      },
+      "status": "candidate",
+      "reasonCodes": [
+        "correction_present_by_finalization"
+      ],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    },
+    {
+      "id": "synthetic_anchor_eta",
+      "ownerId": "synthetic_owner_a",
+      "subjectId": "synthetic_subject_eta",
+      "t0": "2030-04-01T00:00:00.000000000Z",
+      "t1": "2030-04-02T00:00:00.000000000Z",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "features": [
+        {
+          "featureId": "activity_last_m",
+          "status": "excluded",
+          "value": null,
+          "unit": "m",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_activity_measured_zero",
+            "logicalId": "synthetic_feature_alpha_activity_measured_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "birth_date",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_birth_date",
+            "logicalId": "synthetic_feature_alpha_birth_date",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_bedding",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_bedding_none",
+            "logicalId": "synthetic_feature_alpha_bedding_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_cleaning",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_cleaning_none",
+            "logicalId": "synthetic_feature_alpha_cleaning_none",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "care_walk_minutes",
+          "status": "excluded",
+          "value": null,
+          "unit": "minutes",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_walk_zero",
+            "logicalId": "synthetic_feature_alpha_walk_zero",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "interval",
+              "start": "2030-03-30T15:00:00.000000000Z",
+              "end": "2030-03-31T15:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "environment_wheel_cm",
+          "status": "excluded",
+          "value": null,
+          "unit": "cm",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_wheel",
+            "logicalId": "synthetic_feature_alpha_wheel",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "humidity_last_received_pct",
+          "status": "excluded",
+          "value": null,
+          "unit": "%RH",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_humidity",
+            "logicalId": "synthetic_feature_alpha_partial_humidity",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "past_condition",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_past_condition",
+            "logicalId": "synthetic_feature_alpha_past_condition",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T20:05:00.000000000Z",
+            "availableAt": "2030-03-31T20:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T20:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "sensor_period_count",
+          "status": "excluded",
+          "value": null,
+          "unit": "count",
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_count",
+            "logicalId": "synthetic_feature_alpha_partial_count",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "species",
+          "status": "excluded",
+          "value": null,
+          "unit": null,
+          "reasonCodes": [
+            "feature_subject_mismatch"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_species",
+            "logicalId": "synthetic_feature_alpha_species",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        },
+        {
+          "featureId": "temperature_last_received_c",
+          "status": "excluded",
+          "value": null,
+          "unit": "C",
+          "reasonCodes": [
+            "feature_subject_mismatch",
+            "sensor_device_association_unknown"
+          ],
+          "provenance": {
+            "revisionId": "synthetic_revision_alpha_partial_temperature",
+            "logicalId": "synthetic_feature_alpha_partial_temperature",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          },
+          "sensorQuality": {
+            "status": "PARTIAL",
+            "observedCount": 1,
+            "wholeCount": null,
+            "expectedCount": null,
+            "ratio": null,
+            "deviceAssociation": "confirmed",
+            "subjectAssociation": "confirmed",
+            "freshness": "unknown"
+          }
+        },
+        {
+          "featureId": "weight_last_g",
+          "status": "usable",
+          "value": 46,
+          "unit": "g",
+          "reasonCodes": [],
+          "provenance": {
+            "revisionId": "synthetic_revision_eta_weight",
+            "logicalId": "synthetic_feature_eta_weight",
+            "revision": 1,
+            "acceptedAt": "2030-03-31T21:05:00.000000000Z",
+            "availableAt": "2030-03-31T21:05:00.000000000Z",
+            "timing": {
+              "precision": "instant",
+              "at": "2030-03-31T21:00:00.000000000Z",
+              "clock": "user_reported"
+            }
+          }
+        }
+      ],
+      "featureEligibility": {
+        "activity_last_m": false,
+        "birth_date": false,
+        "care_bedding": false,
+        "care_cleaning": false,
+        "care_walk_minutes": false,
+        "environment_wheel_cm": false,
+        "humidity_last_received_pct": false,
+        "past_condition": false,
+        "sensor_period_count": false,
+        "species": false,
+        "temperature_last_received_c": false,
+        "weight_last_g": true
+      },
+      "labels": {
+        "selectedObservationId": "synthetic_observation_eta_boundary",
+        "initial": "slightlyConcerned",
+        "corrected": "slightlyConcerned",
+        "hasCorrection": false,
+        "cancelled": false,
+        "status": "selected",
+        "reasonCodes": [],
+        "ordering": "receipt",
+        "candidateExclusions": [
+          {
+            "observationId": "synthetic_observation_alpha_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_alpha_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_initial",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_beta_later",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_delta_unknown_time",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_after_window_receipt",
+            "reasonCodes": [
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_gamma_pre_anchor_late_submission",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_past_alpha",
+            "reasonCodes": [
+              "observation_time_not_proven_in_window",
+              "original_receipt_outside_window",
+              "subject_mismatch"
+            ]
+          },
+          {
+            "observationId": "synthetic_observation_theta_corrected_subject",
+            "reasonCodes": [
+              "subject_mismatch"
+            ]
+          }
+        ],
+        "provenance": {
+          "originalRevisionId": "synthetic_original_eta_boundary",
+          "originalRevision": 1,
+          "originalAcceptedAt": "2030-04-02T00:00:00.000000000Z",
+          "originalAvailableAt": "2030-04-02T00:00:00.000000000Z",
+          "originalTiming": {
+            "precision": "instant",
+            "at": "2030-04-02T00:00:00.000000000Z",
+            "clock": "user_reported"
+          },
+          "appliedAmendments": []
+        }
+      },
+      "status": "candidate",
+      "reasonCodes": [],
+      "versions": {
+        "dataset": "synthetic_training_rows_v1",
+        "feature": "synthetic_features_point_in_time_v1",
+        "initialLabel": "synthetic_initial_answer_v1",
+        "correctedLabel": "synthetic_same_observation_corrected_by_L_v1"
+      },
+      "researchEligibility": "not_assessed",
+      "predictionReady": "not_assessed"
+    }
+  ],
+  "labelDifferences": [
+    {
+      "rowId": "synthetic_anchor_alpha",
+      "observationId": "synthetic_observation_alpha_initial",
+      "initial": "normal",
+      "corrected": "slightlyConcerned"
+    }
+  ],
+  "manifest": {
+    "synthetic_only": true,
+    "fixtureId": "synthetic_representative_v1",
+    "fixtureHash": "ab3be0a24a8c13a36ba524eb1c0e738acafdb3c90d1e3b92b3e2133111c01d8e",
+    "codeIdentity": "0d2e39e0f9bd20a503dfef338037256e1e890a7d12bb1a0bc1f01f9a1566f090",
+    "datasetSchemaVersion": "synthetic_training_rows_v1",
+    "featurePolicyVersion": "synthetic_features_point_in_time_v1",
+    "featurePolicy": {
+      "featureIds": [
+        "activity_last_m",
+        "birth_date",
+        "care_bedding",
+        "care_cleaning",
+        "care_walk_minutes",
+        "environment_wheel_cm",
+        "humidity_last_received_pct",
+        "past_condition",
+        "sensor_period_count",
+        "species",
+        "temperature_last_received_c",
+        "weight_last_g"
+      ],
+      "requiredFeatureIds": [],
+      "allowPartialFeatureIds": [
+        "humidity_last_received_pct",
+        "temperature_last_received_c"
+      ]
+    },
+    "labelPolicyVersions": {
+      "initial": "synthetic_initial_answer_v1",
+      "corrected": "synthetic_same_observation_corrected_by_L_v1"
+    },
+    "policyVersion": "synthetic_local_policy_v1",
+    "window": {
+      "rule": "jst09_next09_open_closed_v1",
+      "timeZone": "Asia/Tokyo",
+      "labelFinalizedAt": "2030-04-03T00:00:00.000000000Z",
+      "dataAvailableThrough": "2030-04-03T00:00:00.000000000Z"
+    },
+    "catalogVersions": {
+      "observation": "observation_catalog_v1",
+      "care": "care_action_catalog_v2"
+    },
+    "anchorCount": 7,
+    "candidateCount": 2,
+    "stateCounts": {
+      "candidate": 2,
+      "hold": 0,
+      "label_missing": 3,
+      "ineligible": 2
+    },
+    "reasonCounts": {
+      "feature_subject_unknown": 1,
+      "no_eligible_label": 3,
+      "observation_time_not_proven_in_window": 3,
+      "original_receipt_outside_window": 3,
+      "sensor_device_association_unknown": 6,
+      "subject_unconfirmed": 1,
+      "correction_present_by_finalization": 1,
+      "sensor_expected_count_unknown": 1,
+      "sensor_measurement_freshness_unknown": 1,
+      "sensor_whole_period_quality_unconfirmed": 1,
+      "cancelled_by_finalization": 1,
+      "feature_subject_mismatch": 5,
+      "subject_mismatch": 2,
+      "corrected_subject_ineligible": 1
+    },
+    "researchEligibility": "not_assessed",
+    "predictionReady": "not_assessed",
+    "datasetId": "synthetic_dataset_8a21ab6171538f512c20",
+    "contentHash": "8a21ab6171538f512c2076e0f1df71ab9c1a9d78df89e2c87756e1246366aa3c"
+  }
+}

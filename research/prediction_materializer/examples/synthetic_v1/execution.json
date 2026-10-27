@@ -1,0 +1,84 @@
+{
+  "code": {
+    "sha256": "2fddfe1c341298c3b790b8f6a32cf10146a4f0f9e7001e67ec76d73e933ef47e",
+    "sources": [
+      {
+        "path": "functions/src/careActions/careActionCatalog.generated.ts",
+        "sha256": "f73cfb1e8011eadb70b976b2d1e1813b30ed0d23ce19c6b01a909dfa13088a14"
+      },
+      {
+        "path": "functions/src/careActions/careActionCatalog.ts",
+        "sha256": "6905440f6090ab60b80ac0cdb15a33960129c79396bbc8937da02e249d845e61"
+      },
+      {
+        "path": "functions/src/health/dateKey.ts",
+        "sha256": "86172692d8ed23db6ba72fb06fc535e8750259d15497693d8bb3a8d86b66cd99"
+      },
+      {
+        "path": "functions/src/health/observationCatalog.generated.ts",
+        "sha256": "db2b13f4a65222238b4fcd774f991581a5aae6848a6a567e571efeb65c4eea32"
+      },
+      {
+        "path": "functions/src/health/observationCatalog.ts",
+        "sha256": "ca0d383518bc1b371903f95402be7e4d3342bc337311c3016b854bea6bbf2e88"
+      },
+      {
+        "path": "research/prediction_dataset/src/canonical.ts",
+        "sha256": "c8e5b5c6dccc29139a6bf9004594d67cdac68ae2d52a25eaa1c8ee3b00c3729a"
+      },
+      {
+        "path": "research/prediction_dataset/src/features.ts",
+        "sha256": "e0ef6a795104885b0a06a1e62a3717af36e2c5786cb4a6a07ad1c73f9ea57f01"
+      },
+      {
+        "path": "research/prediction_dataset/src/generate.ts",
+        "sha256": "2b147cfc18402b0cfa6b96bb84682de2fe89cfcec87c4be2d2335755f8ce30a3"
+      },
+      {
+        "path": "research/prediction_dataset/src/labels.ts",
+        "sha256": "5ed8ff4432bbc45ab640583af3966963cebd5f7790f9e94311f74c278e2c7f43"
+      },
+      {
+        "path": "research/prediction_dataset/src/time.ts",
+        "sha256": "bec4ade17c89421c5c302595455c922997f53596971ddca983fbd2d3e252e043"
+      },
+      {
+        "path": "research/prediction_dataset/tools/load-typescript.cjs",
+        "sha256": "f077657cbd9e2b253d31a632dc3164ba1e857c2a1dcd73c114f862db92bf409c"
+      },
+      {
+        "path": "research/prediction_materializer/runner.cjs",
+        "sha256": "98eccb012271839d32999bd557d47bc1a0ebfeb9b604629a4f22382c670d8004"
+      },
+      {
+        "path": "research/prediction_materializer/src/adapters.ts",
+        "sha256": "26450c7a0b02e066cd0468eba30d52838aabe181fb9d0d60ee9c57ae79bc319b"
+      },
+      {
+        "path": "research/prediction_materializer/src/materialize.ts",
+        "sha256": "3065d2fe64fe901fdd2264bc32dfa85a208a9404a01883512dbec1b6a0654c7f"
+      },
+      {
+        "path": "research/prediction_materializer/src/sourceTypes.ts",
+        "sha256": "0305d6cc3bd93dfc571f147f252b977fdcc98eb52ef5399d473ac99458808dd2"
+      },
+      {
+        "path": "research/prediction_materializer/src/table.ts",
+        "sha256": "ebbd1d756cb3c17e908f7676189cde3118f611300d8badc3b5c36a348bdd9cd5"
+      },
+      {
+        "path": "research/prediction_materializer/src/types.ts",
+        "sha256": "8ed73e941451a95323b51e6bccbe54039303e3011e44cb8cef7b44351daae439"
+      },
+      {
+        "path": "research/prediction_materializer/writer.cjs",
+        "sha256": "59b0fec04e43160506c01bf631614911ecee8cae65f9fd7d77015223260e9124"
+      }
+    ],
+    "node": "22.23.1",
+    "typescript": "5.9.3"
+  },
+  "source_file_sha256": "1f90108e8969936608926f7b12d71421b6e7b3df4667f553a60254f1e66d720f",
+  "config_file_sha256": "d2903775c04673f01cfa81e8eef2df021865397721b221b1998dee53073aa76e",
+  "content_hash": "e811253741a5737ef9625bb1b74bdcfa3d6dfa2167e446948c967703d53b2609"
+}

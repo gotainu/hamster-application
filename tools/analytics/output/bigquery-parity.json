@@ -1,0 +1,43 @@
+{
+  "status": "PASS",
+  "engine": "BigQuery Standard SQL",
+  "source": "synthetic CTE only; no cloud tables",
+  "compared": [
+    "funnel",
+    "retention",
+    "conversion_cohorts",
+    "a3",
+    "landmark_segments"
+  ],
+  "funnel": [
+    5,
+    4,
+    4,
+    2,
+    2,
+    2,
+    2,
+    2
+  ],
+  "retention": [
+    0.5,
+    0.25,
+    0.5,
+    0.25
+  ],
+  "conversion": [
+    {
+      "cohort": "2026-10",
+      "trial_starts": 4,
+      "eligible_trials": 3,
+      "converted_trials": 2,
+      "immature_trials": 1,
+      "rate": 0.6666666666666666
+    }
+  ],
+  "failures_before_pass": [
+    "reserved STRUCT field alias AT",
+    "maximum bytes below minimum 10MiB TEMP read",
+    "synthetic raw GA4 mapping report_revision vs analysis_revision"
+  ]
+}
