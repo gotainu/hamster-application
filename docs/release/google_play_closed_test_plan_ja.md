@@ -1,14 +1,43 @@
 # Hamster Care Google Playクローズドテスト計画
 
-更新日: 2026-09-07
+2026-10-27最新：Alphaの同意対応1.0.1／code2、日本1国・既存internal-testers本人1名を維持。審査用アカウントの通常契約・権限同期、Android有料gate、アクセス申告の保存・再読取はPASS。本人承認の14変更を11:09 JSTに送信し、送信ID1は審査中。審査通過・Alpha実配信は未確認で、12人／14日の製品版条件の達成とは区別する。既存Play code1→code2更新・本人Home／ログイン／記録保持、iPhone／DeviceCheck PASSは維持し再実施しない。
+
+更新日: 2026-10-27
 
 ## 運用方針
 
-- 必須条件: 12名以上が14日間連続でオプトイン
+10/27提出前保存の履歴（下記の未登録・未送信状態は後続で解消済み）：14件の具体一覧と承認後の配信範囲は[既存登録手順](google_play_submission_runbook_ja.md#未送信14変更の送信範囲2026-10-27)を参照。保存済みアカウントが現Firebase未登録のため、Googleの審査員用アクセスを用意するまで送信しない。通常テスターの21日／20件体験と、審査員が無料試用に頼らず全機能へ入る要件を分ける。BETA-01追加・手動有料扱い・履歴resetは今回の解決策にしない。Alphaのfeedback URLだけ追加し、対象リストの本人1名と既存内部配信／参加状態は維持した。
+
+以下の10/26実施・13件表示は当日の履歴であり、現在件数は14件。
+
+2026-10-26現在：最新両版の通常AI各1件は本人確認済みを維持し、今回の同意対応候補でAI・認証・動画を再試行しない。同意対応code2を既存内部トラック`4700142116971858603`へリリース`2 (1.0.1) consent internal test`として公開し、「内部テスターに公開」「10月26日9:19」「未審査」を確認。既存`internal-testers`は本人1名のままで、新しい招待は0。内部公開はクローズドテスト開始とは区別する。
+
+Alphaはライブラリの同じAABを再利用し、`2 (1.0.1) consent Alpha draft`を未公開保存・プレビュー保存した。公開の概要でcode2行と「審査にまだ送信されていない変更」「13件の変更を審査に送信」を最終確認。送信ボタンは押さず、一般審査送信・クローズド配布は0。日本のみターゲット設定を維持する。
+
+履歴（10/25再開時点）：クローズド準備4/5完了、Alpha1.0.0／code1作成・プレビュー、日本のみ、テスター選択、13変更未送信を確認。直近のオプトイン確認値は0人で12人／14日条件未達、本番アクセス申請は無効だった。10/26の内部公開だけで人数や期間の達成へ読み替えず、招待の過去実績・個別T01〜T15の対応は推測しない。
+
+- 必須条件: 12名以上が14日間連続でオプトイン（Play Console上の現行要件・実数・期間を申請前に確認する）
 - 招待目標: 15名以上（途中離脱の予備を含む）
+- 初回公開は日本限定、App Store / Google Play同時公開を目標とする
+- 体験の確認は本人の正規開始から21日間・AI最大20リクエストの通常権限で行う。分析上のテスター除外と、特別な有料権限付与やUIDによる制限回避を混同しない
+- 本人決定により`BETA-01`専用権限は初版へ追加しない。旧専用beta実装後の再開条件は初版条件から解除。通常の21日体験・20件と有限共有予算で検証し、開始済み／終了済みアカウントの期限・履歴をリセットしない。AI相談各1件の本人完了報告を未実施へ戻さない
 - テスターの氏名やGoogleアカウントは、このリポジトリへ記録しない
 - 下表では個人情報の代わりに`T01`〜`T15`の識別子だけを使う
 - オプトインURL、メールアドレス、個別の連絡先はPlay Consoleまたは安全な連絡手段で管理する
+
+### 10/26の成果物と現行端末の扱い
+
+- 配布したAABは正本「Android提出物」の`hamcare-1.0.1-code2-consent-signed.aab`、SHA256 `9ac74bc4e15497728c77c5736344964fb07d268aefdb972d0006e3d3e860b237`。min24／target36・非Debug、既存upload署名を使用し、Alphaへは同じライブラリ項目を再利用した。
+- ConsoleのAPI／ABI差分に関する1,079非対応デバイスの警告は、内部リリースを妨げるエラーではなかった。承認済みAndroid7.0／API24以降を維持し、SDK／native／鍵変更・再ビルドは行っていない。
+- SM-S911Nの旧1.0.1／code2 Debug版とPlayアプリ署名の差は確定した。Play現在DA77／量子対応beta履歴AC19・92A9／upload7e9bのいずれも現端末の52abと異なり、Debug→Playへの署名移行は未解決。公開証明書の完全SHAと役割は[登録手順「更新互換性と鍵履歴」](google_play_submission_runbook_ja.md#現行開発端末との更新互換性と鍵履歴)を参照。前回の自動ダウンロードはChromeのERR_BLOCKED_BY_CLIENTで停止した履歴があるが、今回は通常native ChromeのConsole署名Universal Downloadでcode1／code2を取得成功。両方DA77署名を確認し、新設定・保護解除・回避0。内部アプリ共有の別署名APKは使わず、Play Storeクライアント取得とは区別する。
+- 固定consent AABからソース再コンパイルせずAPKを生成し、同じ既存52abで署名して削除なし上書きSuccess・通常起動PASS。ローカルAPK SHA256 `514c000cb00e61c692685654d41f1a652c78cbc558ad720e7e9e68518c78db84`、Release／非Debug manifest・min24／target36、2 DEX／81 native・AOT・資産一致と署名／16KiB整列を確認。UID10405と初回導入日時を保持し、更新は10/26 10:45:26。再ログイン不要のHome・既存記録と設定の撤回項目表示を求めた依頼に、本人が「表示されました」と一括回答し、依頼範囲を本人確認PASSとした。同意の確定・保存済同意の実撤回・新しい実AI送信は未実施。根拠は既存stagingの`audit/android-local-consent-owner-confirmed-20261026.json`へ記録する。Play経由の導入PASSや、通常権限を変更した成功と混同しない。
+- 既存内部track／release2公開は9:19のまま、登録済みcode2 artifact ID`4860244546361357551`を再uploadしていない。正式code1／code2 APKは既存stagingへ保存し、完全SHA・署名は`audit/play-signed-apk-acquisition-20261026.json`と[登録手順](google_play_submission_runbook_ja.md#正式play署名apkの取得独立環境での旧版更新確認2026-10-26)へ記録。新しい配信開始・招待・審査・rebuildは0。
+- 既存AVD2台の52abアプリを維持し、既存Pixel7／API34 image等を再利用する専用一時userdataの独立VMを用意。元AVD30ファイルのSHA／stat一致を確認した。新環境はpackageなし／Googleアカウント0から正式Play署名code1を直接新規導入・起動PASS。UID10190、初回導入10/26 20:05:49、1.0.0／code1・APK SHA一致。これは新規導入であり、旧版更新やPlay Store配送PASSではない。
+- 本人が専用VMのGoogle Playへサインイン済み。現Console内部テスターとのアカウントhash一致・1アカウントを読み取り確認し、旧HamCareの通常ログインも本人完了報告を受領。更新直前20:17:02はcode1、UID10190・初回導入20:05:49を維持。その後、本人がGoogle Play掲載画面から既存内部code2へ更新。更新日時20:57:21、1.0.1／code2、installer／initiatingはcom.android.vending。UID10190と初回20:05:49を維持し、導入base＋3split全4APKはDA77署名検証PASS、arm64 AOTを含む75 runtime／資産が固定同意AABと一致。本人が「再ログインせずHome・既存記録が表示される」と回答し、Play経由旧版更新・通常起動／保持をPASS確認した。Playアカウント追加は専用一時userdataだけで、普段使い端末／既存AVDへの追加なし。実参加リンクはConsole／既存監査JSONで管理し、個人情報・tokenは文書へ転記しない。
+- 結果の区分：Console署名APKによるcode1直接新規導入PASS／Play Storeクライアントのcode1→code2旧版更新PASS／code2同版再導入は未実施。Consoleのcode2 Universal APKを直接上書きする代替は不要となり実施0。metadata保持と本人UI回答を別の根拠として記録し、Play配送はinstaller／initiatingの実値でも照合した。新しいcode3・追加配信・再buildは0で、今回分の追加本人操作は不要。
+- 元端末の52abローカル版とデータを維持し、別署名Play版への自動データ移管を保証しない。同一端末の別Androidユーザー／Work Profileを署名回避策として推奨しない。本人の別Android実機は未実施の代替案として残し、新しい招待・データ消去・別package・Play鍵変更は行わない。
+- ローカル52ab上書きの証拠は既存stagingの`audit/android-local-consent-replace-20261026.json`／`local-consent-apk-from-final-aab-20261026.json`／`local-consent-apk-integrity-20261026.json`へ保持。今回のcode1新規導入・更新前証拠は`audit/play-code1-isolated-before-update-20261026.json`、Play更新と本人保持PASSは`audit/Play-store-code1-code2-update-final-20261026.json`、実APKruntime照合は`audit/Play-store-installed-runtime-matches-20261026.json`。以前の未更新時点は`audit/play-internal-update-readiness-20261026.json`、Alpha13未送信の履歴と、ローカル版の本人保持PASSは残す。
+- 通常文字AI同意の既存限定26件を再実行していない。内部公開、一般審査、実機UI確認、下表のテスター参加・フィードバックをそれぞれ別の結果として扱う。
 
 ## 日程
 

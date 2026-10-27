@@ -101,3 +101,18 @@ Analytics の到達成否は権限判定や課金判定に一切使わない。
 
 GA4 exportが未到着の間は`awaiting_ga4_daily_export`として扱い、0件・未到達に埋め替えない。
 実機Analytics受信、GA4→BigQuery到着、server側metadata取込、最後のjoinは別々に検証する。
+
+## 2026-10-17の接続確認とローカル拡張
+
+上記「GA4日次export未着」は10/04時点の記録。限定したread-only確認で、
+GA4日次13テーブル・server raw47件、UIDの共通アカウント2件、
+生成キーと全一致する実表示15機会／1アカウントを確認した。
+既存のテスト利用による接続証拠であり、一般ユーザーの到達数や
+今回追加した登録・日々の能動利用・課金イベントの稼働確認ではない。
+一般ユーザーはローンチ前0人という事業前提を維持する。
+
+今回のローカル拡張、live/test/unknown分類、集計とLooker接続手順は
+[trial_journey_schema.md](trial_journey_schema.md)を参照する。
+BQ3列の追加・対象FunctionsとFlutterの反映は未実施。
+既存test-only ingestから一般向けへ切り替えるには、明示的な環境設定・
+テストUID一覧・到着確認が必要。過去の不明な行を一般ユーザーへ移行しない。

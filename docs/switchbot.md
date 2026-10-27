@@ -1,3 +1,5 @@
+> 2026-10-16確認：以下は従来の実装説明で、15分表記は現行設定と異なる。現行`switchbotPoller`と本番Schedulerは**every 60 minutes／UTC**、runtimeはnodejs22。`ts`はAPI応答後の保存直前プロセス時計で、機器測定時刻ではない。現行経路と時刻・取得品質の根拠は[センサー取得品質契約 v1](sensor_coverage_contract_v1.md)を優先する。以下の旧説明を根拠に設定変更・過去の分母推定を行わない。
+
 
 ---
 

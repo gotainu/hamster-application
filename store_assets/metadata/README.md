@@ -1,6 +1,8 @@
 # ストア掲載メタデータ
 
-更新日: 2026-09-06
+原稿の内容は既存 `docs/release/store_listing_ja.md` を正とし、両ストアdescription.txtを保存済み説明へ同期した。21日・最大20件・体験終了後の有料範囲を含む。10/25にApp Store ConnectとGoogle Playの説明保存を確認。Android初版の最低OSは本人決定でAndroid7.0／API24以降（現AAB manifestと一致）。審査送信・アプリ公開は別工程。
+
+更新日: 2026-10-25
 
 日本向け初回提出でApp Store ConnectとGoogle Play Consoleへ入力する原稿です。審査用アカウントのパスワードは、このフォルダへ保存せず各ストアの審査欄へ直接入力します。
 

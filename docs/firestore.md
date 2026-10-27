@@ -377,6 +377,8 @@ Path: `users/{uid}/notification_delivery_counters/{weekKey}`
 
 ## SwitchBot integration
 
+> 2026-10-16確認：本節の15分という旧説明に対し、現行コード／本番Schedulerは**60分・UTC**。rawの`ts`は保存直前の取得処理時計で、機器測定時刻ではない。[センサー取得品質契約 v1](sensor_coverage_contract_v1.md)に現行writer・createdAt・集計の限界を記録。以下の旧記載から過去の予定取得数や実測coverageを推定しない。
+
 SwitchBot は以下の3系統でデータを持つ:
 
 1. `users/{uid}/integrations/*`
