@@ -93,6 +93,17 @@ attach直後は両方ともthread 1のSIGSTOP（signal 17）、StopID 1で、既
 
 証拠は既存staging `ios-device-runtime-20261019/audit/` の `devicecheck-native-staged-20261026-result.json`、`devicecheck-sdk-stage-blocked-20261026.json`、`devicecheck-root-staged-20261026-result.json`、`devicecheck-existing-logs-after-launch-20261026.json`、`devicecheck-sdk-before-jit-comparison-20261026.json`。数値・boolean・停止理由・照合件数だけを保存し、生token・秘密鍵・相談本文は保存／出力していない。00:18の保存JSONはfollowup前のrunning状態であり、その後の安全detachはblocked記録、00:22の安全detachはroot-staged記録を参照する。 最終attach拒否は `devicecheck-final-foreground-20261026-result.json`、親が確認したLLDB拒否・終了状態の安全要約は `devicecheck-final-attach-denial-summary-20261026.json`、その後の同PID存続は `devicecheck-after-attach-denial-process-20261026.json`、00:49のlock／画面点灯・process参考情報は `devicecheck-lock-process-readonly-20261026.json` を参照する。
 
+## 次期アバター更新版build3：画像完成後の手順
+
+- 既存1.0.1／build2のTestFlight更新・同意表示／取消・保持・Release DeviceCheckのPASSを維持。次期は`1.0.1／build3`。画像受領前の今は元`pubspec.yaml`の`1.0.1+2`、workspace／署名／iPhoneのReleaseを保持する。画像統合時だけ`1.0.1+3`へ更新し、生成物のCFBundleShortVersionString=1.0.1／CFBundleVersion=3を確認する。
+- 本人サインイン後の10/31 TestFlight一覧とAll StatusesのBuild Uploadsを読み取り、Version1.0.1のbuild2のみ（Upload Complete／10/26 9:50）で、build3は未登録・処理中表示なしと確認した。次番号はbuild3と確定。番号は他作業によって消費され得るため、アップロード直前もBuild Uploads／同versionを確認する。
+- `assets/avatars/README.md`の受入確認後、恒久Flutter3.47.7・Xcode`/Applications/Xcode_27.1.app`・通常`lib/main.dart`・既存lockを再利用する。`DEVELOPER_DIR=/Applications/Xcode_27.1.app/Contents/Developer`を工程単位で指定し、既存SDKやxcode-selectを変更しない。
+- 前回の既存staging `ios-device-runtime-20261019/audit/consent-ios-generation-result-20261025.json`／`consent-ios-archive-command-20261025.json`の環境・引数を再利用する。画像と番号の差分を同期した隔離workspaceで、固定依存の生成／Podsを準備し、Runner／Release／generic iOS・独立DerivedData／SourcePackages・依存の自動更新なしで新Archiveを作る。番号指定だけ3へ変更し、検証用entrypointへ切り替えない。Archive前に隔離workspaceの`ios/Flutter/Generated.xcconfig`を再生成し、`FLUTTER_BUILD_NAME=1.0.1`／`FLUTTER_BUILD_NUMBER=3`／`FLUTTER_TARGET=lib/main.dart`を照合する（生成設定へbuild2を残したままArchiveしない）。
+- 新Archiveは必要（旧build2 IPAへ画像を後入れしない）。同Team3SA77V3SM7／com.gotainu.hamsterと既存Apple Distribution／App Store Profileを維持し、前回成功のautomatic exportを使用する。Xcode-managed Profileに不適合だったmanual exportへ戻さず、不要なallowProvisioningUpdates／資格発行・権限変更を行わない。codesign strict、get-task-allow=false、production App Check／APNs、ZIPと追加PNG格納、Archiveとのコード・資産一致を限定確認する。
+- 成果物はbuild3と画像更新を示す別名で保存し、build2／既存Archive／監査を上書きしない。ローカル生成後は、対象IPA／既存TestFlight本人向け配布の承認を得てからTransporterへ1回だけ送る。現コードの暗号利用が変わらなければ前回の輸出回答を参照し、確約・新規申告が必要な最終操作はその時点の承認条件に従う。
+- ASC App ID6826783734の既存内部グループ「本人実機確認」・本人1名・手動配布を維持し、処理済みbuild3を追加する。外部beta／新招待／App Store一般審査へ広げない。TestFlightから2→3を削除なし更新し、Home・ログイン／既存記録保持と追加アバターのプレビュー／表示のみ確認する。AI・認証・DeviceCheckを再試験せず、体験期限／履歴・残枠を保持する。普段使いReleaseをDebug版で上書きしない。
+- Apple Case103009817213は回答待ち。アバター更新準備をIAP適合確定や購入導線変更の根拠にしない。今回は新Archive／IPA生成・upload・配布を実行しない。
+
 ## 次の最小作業
 
 現在の次作業は正本 `REL-03` の残件だけとする。指定IPAのTransporterデリバリは10/26 9:50成功、App Store Connect処理後の輸出申告は本人承認を得て「標準暗号（OS外TLSを含む）／独自暗号なし／フランス配布なし」で保存済み。TestFlightは本人のみの内部グループ1テスター／1ビルドがTestingで、upload・内部配布待ちへ戻さない。証拠は `/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/audit/asc-owner-internal-build2-testing.png`。一般公開の審査送信・公開は今回の内部配布と区別する。

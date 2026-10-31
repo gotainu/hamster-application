@@ -1,8 +1,8 @@
 # Hamster Care Google Play登録手順
 
-2026-10-27最新：既存Alpha release2「2 (1.0.1) consent Alpha draft」・同意対応code2だけ、日本・既存本人1名と共通掲載／申告の14変更を、本人の明示承認後2026-10-27 11:09 JSTに審査送信。送信後Consoleは「審査中の変更（送信ID1：審査中）」、審査中14件／未送信0件。審査結果未確定（審査中・審査通過は未確認）／Alpha配信未確認（審査通過後の配信待ち）と分ける。カードなし0円通常契約・通常paid／active同期・Android有料gate・Console審査アクセス保存／再読取PASSを維持。管理対象公開オフなので承認後はAlpha対象への配信を伴うがProduction自動昇格ではない。再upload・再build・新招待・一般公開・実AI0。
+2026-10-31最新：送信ID1・14変更は2026-10-27 11:09 JSTに送信し、同日11:19 JSTに「公開」と本人確認済み。今回も既存送信詳細／リリース一覧でAlpha1.0.1／code2の公開を読取確認した。日本のみ・既存internal-testersを維持し、Production一般公開・必要人数／期間の達成とは区別する。既存の審査アクセス・通常権限・実機／署名更新／DeviceCheck PASSは維持。次期アバター更新は画像制作待ちで、登録2版（code1／code2）を全App Bundle一覧で確認し、次番号を1.0.1／code3とする。今回upload・build・配信0。
 
-更新日: 2026-10-27
+更新日: 2026-10-31
 
 Google Play Consoleで初回登録するときの入力原本です。画面の文言が変わった場合は、同じ意味の項目を選びます。パスワード、確認コード、秘密鍵はこのファイルへ記録しません。
 
@@ -162,6 +162,25 @@ UID・初回導入日時の保持は端末metadata、既存アカウントのロ
 証拠は既存Android staging/audit/play-alpha-preparation-20261027/、同audit/review-account-preparation-20261027/と、今回の既存Android staging/audit/play-alpha-submission-20261027/。審査アクセス準備PASS・送信前14件の承認／最終照合・送信操作／送信後Console状態を分離して保持。14変更送信済みを、審査合格・Alpha実配信・12人／14日達成・Production公開とは混同しない。Apple決済判断保留は維持。新しい管理Markdownは作らない。
 
 送信ID1の実受付：Google Play Consoleの送信アクティビティと送信詳細で、2026-10-27 11:09・14件・既存Alpha1.0.1/code2・ステータス「審査中」を確認。操作記録は11:09:09 JST。未送信の欄は消え、承認対象で送信できなかった項目は0。初回の公開の概要にはGoogleのクイックチェック案内も表示されたが、審査合格とは扱わない。
+
+## 次期アバター更新版code3：画像完成後の手順
+
+この節は次回の実行手順であり、今回の成果物・アップロード・配信実績ではない。
+
+- 番号：`1.0.1／code3`。10/31にConsole「すべての App Bundle」で全2件（1.0.0/code1、1.0.1/code2）・次ページ無効を読取確認し、code3は未登録。既存`pubspec.yaml`は`1.0.1+2`のまま保持し、画像統合時に`1.0.1+3`へ1回だけ更新する。未使用確認は確認時点のものであり、実upload直前にも未使用を確認する。
+- ソース：GitHub mainの今回の受入準備に、本人提供PNG・必要な実在assets登録・manifest・番号だけを追加。既存のAI同意・権限・記録・課金・lockを保持する。画像仕様／限定確認は[既存assets README](../../assets/avatars/README.md)に従う。
+- ビルド環境：恒久Flutter`/Users/gota/tools/flutter-3.47.7-hamcare-ios`と既存JDK17。前回成功の隔離workspaceのGradle8.14／AGP8.11.1／Kotlin2.2.20／min24を再利用する。元projectのGradle8.12／AGP8.10.1／Kotlin2.1.0／min23を今回更新せず、元へそのまま直接buildできるとの保証に置き換えない。固定lock・依存を既存手順で揃えた隔離workspaceでのみ次の番号指定へ変更する。
+
+```sh
+/Users/gota/tools/flutter-3.47.7-hamcare-ios/bin/flutter build appbundle --release --no-pub --target=lib/main.dart --build-name=1.0.1 --build-number=3
+```
+
+前回の正確な環境・追加native条件・署名工程は既存stagingの`android-ordinary-update-20261025/audit/build-consent/build-command.json`と署名／整合性記録を基準とする。鍵やパスワードをコード・文書へ移さない。既存Upload鍵の署名（7e9b…）とPlay配信署名（da77…）の役割を維持し、新鍵・Debug署名を提出用へ代用しない。
+
+1. 受領画像の検査／fixture表示だけを限定確認して新AABを生成。com.gotainu.hamster、1.0.1/code3、min24／target36、非Debug、署名・Bundletool・ZIP整合と差分PNGの格納を確認し、code2成果物を上書きしない。
+2. 実配信を実行する段階で、対象AABと既存Alpha／日本／既存テスター／実リリースノートの範囲について本人承認を得る。同じAABを1回だけuploadし、必要な内部確認にも同じ登録bundleをライブラリ再利用する。掲載・Data Safety等の無関係な変更を一括送信しない。
+3. 現Alpha code2を消さず更新リリースの下書きへcode3を選択し、追加した種類・毛色だけをリリースノートへ記載・保存する。審査送信前に公開の概要の差分・日本・既存tester範囲を確認する。管理対象公開オフでは審査後にAlphaへ配信されるため、下書き保存／upload／審査送信／公開を別記録する。Productionへ昇格しない。
+4. 既存Play署名の独立検証環境でStore経由code2→code3を上書きし、版／導入元／署名とHome・ログイン・既存記録保持、追加アバターの表示だけ確認する。普段使い52ab署名ローカル版をアンインストール／消去して移行しない。今回までのcode1→code2 PASSを再試行せず、次回の2→3とは区別する。追加AI送信・体験再開始・利用枠リセット・実同意／撤回は含めない。
 
 ## 6. テスターと14日間要件
 
