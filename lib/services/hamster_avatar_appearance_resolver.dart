@@ -28,6 +28,7 @@ class HamsterAvatarAppearanceResolver {
     'ロボロフスキー': [
       'ノーマルブラウン系',
       'ホワイトフェイス・淡色系',
+      'パイド',
     ],
     'キャンベル': [
       'ノーマルグレー系',
@@ -190,11 +191,15 @@ class HamsterAvatarAppearanceResolver {
         return HamsterAvatarColorVariant.normal;
 
       case HamsterAvatarBodyType.roborovski:
+        // 「ホワイトパイド」等をwhiteFaceへ吸収しない。
+        // 保存済みの曖昧なホワイト系は、従来どおりwhiteFaceに留める。
+        if (_containsAny(value, ['パイド', 'pied', 'piebald'])) {
+          return HamsterAvatarColorVariant.pied;
+        }
         if (_containsAny(value, [
           'ホワイト',
           '白顔',
           '淡色',
-          'パイド',
           'アルビノ',
           'white',
         ])) {
@@ -226,9 +231,14 @@ class HamsterAvatarAppearanceResolver {
     }
 
     if (value == 'ロボロフスキー') {
-      return variant == HamsterAvatarColorVariant.whiteFace
-          ? 'ホワイトフェイス・淡色系'
-          : 'ノーマルブラウン系';
+      switch (variant) {
+        case HamsterAvatarColorVariant.pied:
+          return 'パイド';
+        case HamsterAvatarColorVariant.whiteFace:
+          return 'ホワイトフェイス・淡色系';
+        default:
+          return 'ノーマルブラウン系';
+      }
     }
 
     if (value == 'キャンベル') {

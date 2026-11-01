@@ -14,6 +14,7 @@ enum HamsterAvatarColorVariant {
   sapphire,
   pearl,
   whiteFace,
+  pied,
 }
 
 enum HamsterAvatarCondition {
@@ -75,6 +76,8 @@ extension HamsterAvatarColorVariantAssetKey on HamsterAvatarColorVariant {
         return 'pearl';
       case HamsterAvatarColorVariant.whiteFace:
         return 'white_face';
+      case HamsterAvatarColorVariant.pied:
+        return 'pied';
     }
   }
 }
