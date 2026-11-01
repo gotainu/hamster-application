@@ -1,12 +1,12 @@
 # Hamster Care Google Play登録手順
 
-## 2026-11-01 Alpha code3審査送信（送信ID2・1変更）
+## 2026-11-01 Alpha code3審査送信・18:47 JST公開（送信ID2・1変更）
 
-指定のhamcare-1.0.1-code3-avatar-signed.aab（前回SHA d541d07f…b54f37、再生成／再署名なし）を既存Alphaへupload・release3「3 (1.0.1) avatars88 Alpha」で保存。登録code3／1.0.1／min24／target36・署名エラー0、日本のみ・既存internal-testers1名・管理対象公開オフを確認。追加する1変更だけを2026-11-01 18:19 JSTに審査送信し、送信ID2・審査中を確認した。製品版／内部トラック／テスター範囲／署名鍵は変更しない。送信の成功をcode3配信済みとは扱わない。
+指定のhamcare-1.0.1-code3-avatar-signed.aab（前回SHA d541d07f…b54f37、再生成／再署名なし）を既存Alphaへupload・release3「3 (1.0.1) avatars88 Alpha」で保存。登録code3／1.0.1／min24／target36・署名エラー0、日本のみ・既存internal-testers1名・管理対象公開オフを確認。追加する1変更だけを2026-11-01 18:19 JSTに審査送信し、送信ID2・当初審査中を確認後、同日18:47 JSTに「公開」と公式送信詳細で確認した。製品版／内部トラック／テスター範囲／署名鍵は変更しない。今回code3は既存Alphaへテスト配信可能と確認済み。送信受付・審査通過／Alpha公開・実端末更新を区別し、製品版一般公開とは扱わない。
 
 リリースノート：プロフィールなどで表示するアバターを88枚に拡充しました。ロボロフスキーのパイドに対応し、種類・毛色・状態に応じた画像を追加しました。
 
-端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。既存API34 Google Play ARM64を再利用し、別永続領域の専用AVD HamCare_Play_20261101を作成・起動済み（追加SDK取得0、既存AVD不変、HamCare未導入）。Macロック解除と既存テスターのGoogle Playサインインは本人操作待ち。新環境へのcode2初回導入とcode2→3更新の確認を分離し、旧VMの復元PASSとはしない。審査後、正式Play配送から2→3を更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。既存API34 Google Play ARM64を再利用し、別永続領域の専用AVD HamCare_Play_20261101を作成・起動済み（追加SDK取得0、既存AVD不変、HamCare未導入）。Macロック解除と既存テスターのGoogle Playサインインは本人操作待ち。新環境へ基準code2をConsole取得のPlay署名Universal APKから導入する場合は「直接導入」とし、Playストア新規取得とは記録しない。そのcode2初回導入とcode2→3正式Play更新の確認を分離し、旧VMの復元PASSとはしない。配信済みcode3を正式Play配送から2→3更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
 
 ## 2026-11-01 Android code3アバター更新候補（配信前の履歴）
 
