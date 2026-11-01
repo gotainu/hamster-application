@@ -6,7 +6,7 @@
 
 既存「本人実機確認」Internal Groupは1Tester、設定Manual for Xcode Builds。外部テスターや別グループの追加なしでbuild3を追加し、1Tester／2Builds、build3と旧build2の両方Testingを確認。App Store製品版審査へ送信しない。Apple Case103009817213の回答待ち／決済判断保留も維持。
 
-本人がiPhoneをTestFlightから1.0.1(3)へ削除なし更新し、再ログインなしのHome・既存プロフィール・飼育記録保持をPASS報告。検証用プロフィールでロボロフスキー／パイドを保存→再表示し、白黒アバターと毛色の保持も本人PASS。全8状態の強制切替とwhite_faceの新実機確認は未実施としてローカル12PASSと区別。AI／Auth／DeviceCheckを再実施しない。証拠は既存staging/audit/avatar-build3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+本人がiPhoneをTestFlightから1.0.1(3)へ削除なし更新し、再ログインなしのHome・既存プロフィール・飼育記録保持をPASS報告。検証用プロフィールでロボロフスキー／パイドを保存→再表示し、白黒アバターと毛色の保持も本人PASS。同じ検証用プロフィールの編集でwhite_faceの代替表示も正常と本人PASS（保存せず元パイド維持）。全8状態の強制切替は未実施としてローカル12PASSと区別。AI／Auth／DeviceCheckを再実施しない。証拠は既存staging/audit/avatar-build3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
 
 ## 2026-11-01 iOS build3アバター更新候補（配信前の履歴）
 
