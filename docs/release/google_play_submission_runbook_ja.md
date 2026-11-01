@@ -6,7 +6,7 @@
 
 リリースノート：プロフィールなどで表示するアバターを88枚に拡充しました。ロボロフスキーのパイドに対応し、種類・毛色・状態に応じた画像を追加しました。
 
-端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。審査後、正式Play配送から2→3を更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。既存API34 Google Play ARM64を再利用し、別永続領域の専用AVD HamCare_Play_20261101を作成・起動済み（追加SDK取得0、既存AVD不変、HamCare未導入）。Macロック解除と既存テスターのGoogle Playサインインは本人操作待ち。新環境へのcode2初回導入とcode2→3更新の確認を分離し、旧VMの復元PASSとはしない。審査後、正式Play配送から2→3を更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
 
 ## 2026-11-01 Android code3アバター更新候補（配信前の履歴）
 
