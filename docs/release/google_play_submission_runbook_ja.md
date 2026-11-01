@@ -1,6 +1,20 @@
 # Hamster Care Google Play登録手順
 
-2026-10-31最新：送信ID1・14変更は2026-10-27 11:09 JSTに送信し、同日11:19 JSTに「公開」と本人確認済み。今回も既存送信詳細／リリース一覧でAlpha1.0.1／code2の公開を読取確認した。日本のみ・既存internal-testersを維持し、Production一般公開・必要人数／期間の達成とは区別する。既存の審査アクセス・通常権限・実機／署名更新／DeviceCheck PASSは維持。次期アバター更新は画像制作待ちで、登録2版（code1／code2）を全App Bundle一覧で確認し、次番号を1.0.1／code3とする。今回upload・build・配信0。
+## 2026-11-01 Alpha code3審査送信（送信ID2・1変更）
+
+指定のhamcare-1.0.1-code3-avatar-signed.aab（前回SHA d541d07f…b54f37、再生成／再署名なし）を既存Alphaへupload・release3「3 (1.0.1) avatars88 Alpha」で保存。登録code3／1.0.1／min24／target36・署名エラー0、日本のみ・既存internal-testers1名・管理対象公開オフを確認。追加する1変更だけを2026-11-01 18:19 JSTに審査送信し、送信ID2・審査中を確認した。製品版／内部トラック／テスター範囲／署名鍵は変更しない。送信の成功をcode3配信済みとは扱わない。
+
+リリースノート：プロフィールなどで表示するアバターを88枚に拡充しました。ロボロフスキーのパイドに対応し、種類・毛色・状態に応じた画像を追加しました。
+
+端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。審査後、正式Play配送から2→3を更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+
+## 2026-11-01 Android code3アバター更新候補（配信前の履歴）
+
+標準88枚を統合し、新2色16画像の限定12件・112表示セルと保存再読込・既存プロフィール／white_face欠損fallbackをPASS確認。既存72枚・通常権限・履歴・SDK／署名／固定lockは維持。11/1 15:46 JSTの現在のStore全履歴で番号3が未登録と確認し、pubspecは1.0.1+3へ更新済み。既存成功手順の隔離コピーでローカル候補の生成・署名・整合検証PASS。提出候補は `/Users/gota/hamcare-deploy-staging/android-ordinary-update-20261025/artifacts/hamcare-1.0.1-code3-avatar-signed.aab`。既存Upload署名7e9b…／code2一致、Bundletool／jarsigner／ZIP CRC、min24／target36、非Debug、権限差分0と、元88PNG＝成果物内88PNGの全SHA一致を確認。実際の端末2→3更新は未実施。
+
+今回はupload・審査送信・新配信・端末更新を実施しない。既存Alpha code2／TestFlight build2と完了済み確認は維持。次のupload直前に番号3の競合を再確認し、対象成果物・既存トラック／本人グループ・配信範囲の承認を受ける。画像版2→3の実機保持確認はその後に限定実施し、旧code1→code2 PASSをやり直さない。Apple Case103009817213の回答待ち・決済方針保留も維持する。
+
+2026-10-31時点の履歴：送信ID1・14変更は2026-10-27 11:09 JSTに送信し、同日11:19 JSTに「公開」と本人確認済み。今回も既存送信詳細／リリース一覧でAlpha1.0.1／code2の公開を読取確認した。日本のみ・既存internal-testersを維持し、Production一般公開・必要人数／期間の達成とは区別する。既存の審査アクセス・通常権限・実機／署名更新／DeviceCheck PASSは維持。次期アバター更新は画像制作待ちで、登録2版（code1／code2）を全App Bundle一覧で確認し、次番号を1.0.1／code3とする。今回upload・build・配信0。
 
 更新日: 2026-10-31
 
@@ -163,9 +177,11 @@ UID・初回導入日時の保持は端末metadata、既存アカウントのロ
 
 送信ID1の実受付：Google Play Consoleの送信アクティビティと送信詳細で、2026-10-27 11:09・14件・既存Alpha1.0.1/code2・ステータス「審査中」を確認。操作記録は11:09:09 JST。未送信の欄は消え、承認対象で送信できなかった項目は0。初回の公開の概要にはGoogleのクイックチェック案内も表示されたが、審査合格とは扱わない。
 
-## 次期アバター更新版code3：画像完成後の手順
+## 次期アバター更新版code3：既存成功手順と今後の配布操作
 
-この節は次回の実行手順であり、今回の成果物・アップロード・配信実績ではない。
+11/1は上記のcode3ローカルAAB生成まで完了。以下の画像受領前手順中の旧版数＋2／未生成という記述は当時の準備経緯で、現在は＋3・候補完成を正とする。upload以降は未実施。
+
+以下は画像受領前に確定した手順を保存したもの。11/1の実行結果は先頭節を正とし、まだ行っていないupload／配信の操作とは区別する。
 
 - 番号：`1.0.1／code3`。10/31にConsole「すべての App Bundle」で全2件（1.0.0/code1、1.0.1/code2）・次ページ無効を読取確認し、code3は未登録。既存`pubspec.yaml`は`1.0.1+2`のまま保持し、画像統合時に`1.0.1+3`へ1回だけ更新する。未使用確認は確認時点のものであり、実upload直前にも未使用を確認する。
 - ソース：GitHub mainの今回の受入準備に、本人提供PNG・必要な実在assets登録・manifest・番号だけを追加。既存のAI同意・権限・記録・課金・lockを保持する。画像仕様／限定確認は[既存assets README](../../assets/avatars/README.md)に従う。

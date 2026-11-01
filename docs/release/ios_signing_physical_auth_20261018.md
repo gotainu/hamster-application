@@ -1,6 +1,20 @@
 # HamCare iOS署名・実機認証準備（2026-10-18）
 
-2026-10-26現在：下記10/25生成の指定同意対応IPAを再生成せず使用し、Transporterで9:50のデリバリ成功、App Store Connectで処理後のTestFlight内部配布PASS。輸出申告は本人承認後に「標準暗号（OS外TLSを含む）／独自暗号なし／フランス配布なし」で保存済み。本人のみの内部グループ1テスター／1ビルドがTesting。本人がTestFlightからインストールし、Home表示・ログイン・既存飼育記録の保持をPASS確認。同意説明表示・「送信しない」取消後の入力保持・設定の同意撤回項目表示は本人PASS。設定確認ダイアログの開閉／取消は未確認、実同意承諾・保存済同意の実撤回・同意対応版での新実AIは未実施。Release DeviceCheckはTestFlight更新時刻に対応する交換HTTP200×1・対象iOS AppIDのFirestore VALID412・現登録true／旧falseを照合し、サーバー計測による実動作PASS。端末SDK callback／token／個別有効期限は直接未観測。根拠は正本と既存auditの `asc-owner-internal-build2-testing.png`。以下の生成工程・当時未実施事項は履歴として保持する。
+## 2026-11-01 TestFlight build3内部配信（本人1名・Testing）
+
+指定のhamcare-1.0.1-build3-avatars88-appstore-20261101.ipa（前回SHA841aeee9…2076f、再生成／再署名なし）を既存Transporterから送信。Transporter表示11/1 17:44デリバリ成功、ASC既存App6826783734で1.0.1(3)処理完了を確認した。前版と同じ標準暗号（OS外TLSを含む）・独自暗号なし・フランス配布なしを保存し、Missing Complianceを解消。新契約・署名・権限変更なし。
+
+既存「本人実機確認」Internal Groupは1Tester、設定Manual for Xcode Builds。外部テスターや別グループの追加なしでbuild3を追加し、1Tester／2Builds、build3と旧build2の両方Testingを確認。App Store製品版審査へ送信しない。Apple Case103009817213の回答待ち／決済判断保留も維持。
+
+本人がiPhoneをTestFlightから1.0.1(3)へ削除なし更新し、再ログインなしのHome・既存プロフィール・飼育記録保持をPASS報告。検証用プロフィールでロボロフスキー／パイドを保存→再表示し、白黒アバターと毛色の保持も本人PASS。全8状態の強制切替とwhite_faceの新実機確認は未実施としてローカル12PASSと区別。AI／Auth／DeviceCheckを再実施しない。証拠は既存staging/audit/avatar-build3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+
+## 2026-11-01 iOS build3アバター更新候補（配信前の履歴）
+
+標準88枚を統合し、新2色16画像の限定12件・112表示セルと保存再読込・既存プロフィール／white_face欠損fallbackをPASS確認。既存72枚・通常権限・履歴・SDK／署名／固定lockは維持。11/1 15:46 JSTの現在のStore全履歴で番号3が未登録と確認し、pubspecは1.0.1+3へ更新済み。既存成功手順の隔離コピーでローカル候補の生成・署名・整合検証PASS。提出候補は `/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/artifacts/hamcare-1.0.1-build3-avatars88-appstore-20261101.ipa`。既存Distribution／App Store Profile／Bundle／Team、codesign deep strict／ZIP CRC、get-task-allow=false、Archiveとのコード／資産一致と、元88PNG＝成果物内88PNGの全SHA一致を確認。実際の端末2→3更新は未実施。
+
+今回はupload・審査送信・新配信・端末更新を実施しない。既存Alpha code2／TestFlight build2と完了済み確認は維持。次のupload直前に番号3の競合を再確認し、対象成果物・既存トラック／本人グループ・配信範囲の承認を受ける。画像版2→3の実機保持確認はその後に限定実施し、旧code1→code2 PASSをやり直さない。Apple Case103009817213の回答待ち・決済方針保留も維持する。
+
+2026-10-26時点の履歴：下記10/25生成の指定同意対応IPAを再生成せず使用し、Transporterで9:50のデリバリ成功、App Store Connectで処理後のTestFlight内部配布PASS。輸出申告は本人承認後に「標準暗号（OS外TLSを含む）／独自暗号なし／フランス配布なし」で保存済み。本人のみの内部グループ1テスター／1ビルドがTesting。本人がTestFlightからインストールし、Home表示・ログイン・既存飼育記録の保持をPASS確認。同意説明表示・「送信しない」取消後の入力保持・設定の同意撤回項目表示は本人PASS。設定確認ダイアログの開閉／取消は未確認、実同意承諾・保存済同意の実撤回・同意対応版での新実AIは未実施。Release DeviceCheckはTestFlight更新時刻に対応する交換HTTP200×1・対象iOS AppIDのFirestore VALID412・現登録true／旧falseを照合し、サーバー計測による実動作PASS。端末SDK callback／token／個別有効期限は直接未観測。根拠は正本と既存auditの `asc-owner-internal-build2-testing.png`。以下の生成工程・当時未実施事項は履歴として保持する。
 
 2026-10-25同意対応候補の生成工程（履歴）：通常文字AI同意を局所実装し限定26件PASS後、通常lib/main.dartをXcode27.1／恒久Flutter3.47.7・固定lockで新Release Archiveへビルドし、既存Distribution証明書／App Store ProfileでIPA export PASS。同工程で生成した提出対象は`/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/artifacts/hamcare-1.0.1-build2-consent-appstore-20261025.ipa`（107,026,058bytes、SHA256 `67a7305d7934adfa0565e1ca6375bd101a16b80dbb274019e4c268483ad8695e`）。Archive ZIPは`/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/artifacts/Runner-consent-development-archive-20261025.zip`（SHA256 `90ced1a78a539f204e22d29c613ffb60f61a001f8e988d7d90c52c24c529c202`）。codesign strict／ZIP／get-task-allow=false／Apple Default／APNs production／Archiveとのコード・資産一致を確認。前回の同意前IPA／Archiveは以下に履歴として保持する。この生成工程での新資格発行、端末上書き、upload・審査送信・実AIは0。10/25のDeviceCheck限定確認は既存ログ0件、SDK呼出し前のSIGSTOPで中断・resume指定detach済み。10/26の段階別再開結果は下記の診断履歴に記録し、その時点では実attestation未確認だった。後続のTestFlight版サーバー計測によるPASSは下記の限定結果を参照する。App Check強制設定・認証系を変更していない。
 
@@ -93,7 +107,9 @@ attach直後は両方ともthread 1のSIGSTOP（signal 17）、StopID 1で、既
 
 証拠は既存staging `ios-device-runtime-20261019/audit/` の `devicecheck-native-staged-20261026-result.json`、`devicecheck-sdk-stage-blocked-20261026.json`、`devicecheck-root-staged-20261026-result.json`、`devicecheck-existing-logs-after-launch-20261026.json`、`devicecheck-sdk-before-jit-comparison-20261026.json`。数値・boolean・停止理由・照合件数だけを保存し、生token・秘密鍵・相談本文は保存／出力していない。00:18の保存JSONはfollowup前のrunning状態であり、その後の安全detachはblocked記録、00:22の安全detachはroot-staged記録を参照する。 最終attach拒否は `devicecheck-final-foreground-20261026-result.json`、親が確認したLLDB拒否・終了状態の安全要約は `devicecheck-final-attach-denial-summary-20261026.json`、その後の同PID存続は `devicecheck-after-attach-denial-process-20261026.json`、00:49のlock／画面点灯・process参考情報は `devicecheck-lock-process-readonly-20261026.json` を参照する。
 
-## 次期アバター更新版build3：画像完成後の手順
+## 次期アバター更新版build3：既存成功手順と今後の配布操作
+
+11/1は上記のbuild3 Archive／IPA生成まで完了。以下の画像受領前手順中の旧版数＋2／未生成という記述は当時の準備経緯で、現在は＋3・候補完成を正とする。upload以降は未実施。
 
 - 既存1.0.1／build2のTestFlight更新・同意表示／取消・保持・Release DeviceCheckのPASSを維持。次期は`1.0.1／build3`。画像受領前の今は元`pubspec.yaml`の`1.0.1+2`、workspace／署名／iPhoneのReleaseを保持する。画像統合時だけ`1.0.1+3`へ更新し、生成物のCFBundleShortVersionString=1.0.1／CFBundleVersion=3を確認する。
 - 本人サインイン後の10/31 TestFlight一覧とAll StatusesのBuild Uploadsを読み取り、Version1.0.1のbuild2のみ（Upload Complete／10/26 9:50）で、build3は未登録・処理中表示なしと確認した。次番号はbuild3と確定。番号は他作業によって消費され得るため、アップロード直前もBuild Uploads／同versionを確認する。
@@ -102,7 +118,7 @@ attach直後は両方ともthread 1のSIGSTOP（signal 17）、StopID 1で、既
 - 新Archiveは必要（旧build2 IPAへ画像を後入れしない）。同Team3SA77V3SM7／com.gotainu.hamsterと既存Apple Distribution／App Store Profileを維持し、前回成功のautomatic exportを使用する。Xcode-managed Profileに不適合だったmanual exportへ戻さず、不要なallowProvisioningUpdates／資格発行・権限変更を行わない。codesign strict、get-task-allow=false、production App Check／APNs、ZIPと追加PNG格納、Archiveとのコード・資産一致を限定確認する。
 - 成果物はbuild3と画像更新を示す別名で保存し、build2／既存Archive／監査を上書きしない。ローカル生成後は、対象IPA／既存TestFlight本人向け配布の承認を得てからTransporterへ1回だけ送る。現コードの暗号利用が変わらなければ前回の輸出回答を参照し、確約・新規申告が必要な最終操作はその時点の承認条件に従う。
 - ASC App ID6826783734の既存内部グループ「本人実機確認」・本人1名・手動配布を維持し、処理済みbuild3を追加する。外部beta／新招待／App Store一般審査へ広げない。TestFlightから2→3を削除なし更新し、Home・ログイン／既存記録保持と追加アバターのプレビュー／表示のみ確認する。AI・認証・DeviceCheckを再試験せず、体験期限／履歴・残枠を保持する。普段使いReleaseをDebug版で上書きしない。
-- Apple Case103009817213は回答待ち。アバター更新準備をIAP適合確定や購入導線変更の根拠にしない。今回は新Archive／IPA生成・upload・配布を実行しない。
+- Apple Case103009817213は回答待ち。アバター更新準備をIAP適合確定や購入導線変更の根拠にしない。画像受領前の準備時点では新Archive／IPA生成・upload・配布は未実行だった。11/1にローカルArchive／IPA生成だけ完了し、upload・配布は未実施。
 
 ## 次の最小作業
 

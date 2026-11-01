@@ -1,8 +1,121 @@
 # Hamster Care プロジェクト状況
 
-最終更新: 2026-10-31
+最終更新: 2026-11-01
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
+
+<!-- hamcare-test-distribution3-20261101:start -->
+## 2026-11-01 code3／build3の承認済みテスト配信（REL-02／REL-03／AVT-06）
+
+- **今回の承認・再利用**：既存Alphaのcode3審査送信と、既存TestFlight本人向け内部グループのbuild3配信を本人承認。指定済み署名AAB／Distribution IPAのSHAは前回候補と一致。88PNG含有・内容一致と限定12件PASSを引き継ぎ、再ビルド・再署名・既存E2E／AI／Auth／課金／DeviceCheckの再実行は0。
+- **Google Play upload／保存**：既存Alpha（track4700032976627342279）に指定署名済AAB code3を1回upload。Consoleで3(1.0.1)／API24以上／target36を確認し、新release3「3 (1.0.1) avatars88 Alpha」を保存。前回の署名整合結果・登録Upload証明書との一致を引継ぎ、Console受理時の署名エラー0。日本のみ1国、既存internal-testersリスト1名、管理対象公開オフを読取確認し変更しない。内部トラック・製品版・署名鍵・テスター範囲は変更0。
+- **Google審査送信**：公開の概要の未送信はAlpha code3「完全公開を開始」の1変更だけと照合し、2026-11-01 18:19 JSTに送信（送信ID2）。送信詳細でも1変更／既存Alpha／release3／審査中を確認。これは審査受付で、審査通過・code3のテスト配信開始は未確認。審査後は承認済みの日本・既存Alphaテスターだけへ自動反映され得る。旧送信ID1・14変更とcode2公開の履歴は維持。
+- **Apple upload／処理／内部配信**：指定IPAを既存Transporterからデリバリし、Transporter表示は11/1 17:44成功。ASC既存アプリ6826783734で1.0.1(3)の処理完了を確認。前版と同じ暗号申告（OS外標準暗号あり・独自暗号なし・フランス配布なし）を保存し、Missing Complianceを解消。既存「本人実機確認」Internal Groupの1Tester・自動追加なし（Manual for Xcode Builds）を読取確認後、build3を追加。18:24 JST確認時点で1Tester／2Builds、build3と既存build2はともにTesting。本人のTestFlightから更新可能。外部招待・App Store一般審査は0。
+- **端末更新は分離**：現在ADB端末0、iPhoneは既存ペアリングだけでUSB接続なし。本人がiPhoneをTestFlightで1.0.1(3)へ更新し、再ログインなしのHome・既存プロフィール・飼育記録保持をPASS報告。さらに変更許可のある検証用プロフィールでロボロフスキー／パイドを保存→再表示し、毛色と白黒アバターの保持も本人PASS。前回専用Play VMの一時userdataは現存せず、既存2AVDはローカル52ab側なので変更しない。本人は実Android端末にPlay版未導入と回答。旧専用VMでのcode1→code2 PASSは当時の結果として維持し、今回の実端末2→3更新へ読み替えない。普段使いアプリの削除・データ消去・直接APK導入で置換しない。Android2→3更新／保持と新画像表示は未確認。iOSの全8状態切替・white_faceの実機表示は未確認で、既存ローカル12PASSとは分離する。
+- **Git保存範囲**：今回のPied必要コード／関連test、標準88PNG、pubspec・checker・制作台帳／README、限定testソースと小さい検証結果を選択commit。原画・旧候補・巨大比較PNG・配布成果物・未採用説明PNGと、既存ローカル設定2件は除外保持。PROJECT_STATUSの既存タスク表と2提出手順書も今回実状態へ更新。commit／通常pushの最終結果は後続節へ記録する。
+- **証拠**：既存stagingのandroid-ordinary-update-20261025/audit/avatar-code3-distribution-20261101/およびios-device-runtime-20261019/audit/avatar-build3-distribution-20261101/のdistribution-result.jsonとConsole／TestFlight画面。非公開の画面・アカウント情報はGitへ追加しない。新しい独立管理表は作成しない。
+- **残る公開条件**：Alpha code3のGoogle審査、2→3更新の本人確認と新アバターの限定実機確認、既存21日体験でのクローズド参加者確保・必要期間を維持。Apple Case103009817213の回答と決済導線方針は保留。製品版公開・追加機能開発・テスター募集投稿は今回行わない。
+<!-- hamcare-test-distribution3-20261101:end -->
+
+<!-- hamcare-avatar-final-rc3:start -->
+## 2026-11-01 アバター88枚の最終統合・code3／build3ローカル候補（配信前の履歴・AVT-06／REL-02／REL-03）
+
+- **採用・制作の実態**：本人がblack／白黒piedの各8状態を採用対象とした。保存済み実体はstable2枚だけで残14状態は未制作と判明し、本人から「未制作14枚も制作して統合する」の追加明示回答を得て制作した。stable2枚の本人目視承認と、新14枚の制作統合承認・自動目視PASS（個別画像の本人目視は未実施）を別フィールドで保持する。既存72枚と承認stableはbyte不変。
+- **14枚の生成**：内蔵imagegenで1枚ずつ、外見A＝同じ承認stable、ポーズB＝採用ダルメシアン同状態、品質C＝承認Djun normal同状態を明示。原画即時保存→既存整形→512px実透過→技術／目視検査→記録の順で14/14 PASS。前の状態を次の外見参照にしない。新規試行14・再生成0。黒いシリアンの体型と白黒パイドのロボ体型を維持し、旧茶色案・不採用候補・原画は保存する。
+- **本番統合**：syrian/dark8＋roborovski/pied8を無加工コピーし、標準11外見×8状態＝88枚。pied stableはready/stable_bw_v2.png（SHA647f4018…bdf40）だけを本番pied/stable.pngへ採用し、旧茶色ready/stable.pngは不採用履歴のまま保持。pubspecへ実在2末端フォルダを追加、版を1.0.1+3へ更新。アプリ機能コード・プロフィール形式・識別子・円形枠・状態判定は今回変更0、以前の独立pied実装を維持する。
+- **限定確認**：checkerは96予定／88配置／white_face8保留・errors0。新16の採用元＝report＝配置先SHA、512×512 RGBA実透過PASS。保護747ファイルは欠損0・想定外差分0（許可したpubspecだけ変更）、既存72PNG・raw／ready・native／SDK／lock／ローカル設定は不変。恒久Flutter3.47.7の新2色限定12件PASS、実bundle16枚decode、48／72明暗・Home190／詳細132／編集142の112表示セルで意図しないstable代替0・例外0。通常Repoモックsave→reloadの色保持2/2・既存プロフィール互換PASS。実機の新画像確認と2→3更新は今回未実施。
+- **保留の扱い**：white_faceは未制作8枚だが、既存petsアイコンへのfallbackを確認し今回の阻害にしない。他の種類で代用しない。analysis_preparingは意味確定待ち、説明素材2件は標準88枚へ数えない。円形アイコンの既存顔中心トリミングは今回変更しない。
+- **番号と候補ビルド**：11/1 15:46 JSTにPlay全AppBundleはcode1／code2の2件、ASC Version1.0.1／All StatusesのBuild Uploadsもbuild2 Completeのみと読取確認し、3未登録。恒久Flutter3.47.7／Xcode27.1・既存署名／固定lockを使い隔離コピーでAndroid code3／iOS build3を生成・検証完了。原本native設定とcode2成果物を維持する。両候補の最終生成・検証は下記のとおりPASS。
+- **Android code3 PASS**：署名済AAB `/Users/gota/hamcare-deploy-staging/android-ordinary-update-20261025/artifacts/hamcare-1.0.1-code3-avatar-signed.aab`、173,681,642bytes、SHA256 `d541d07fd248102925221eb910ecfa86dffc5a126df0fd090e1c881ea6b54f37`。通常main、com.gotainu.hamster／1.0.1／code3、min24／target36、非Debug、既存Upload署名7e9b…とcode2一致。jarsigner／Bundletool1.18.0／ZIP CRC、全88PNGの原本SHA一致、権限差分0を確認。隔離環境のGradle8.14／AGP8.11.1／Kotlin2.2.20を既存成功レシピから再現し、元Android設定は変更しない。将来版予告は非阻害。
+- **iOS build3 PASS**：Distribution署名IPA `/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/artifacts/hamcare-1.0.1-build3-avatars88-appstore-20261101.ipa`、136,840,837bytes、SHA256 `841aeee93dbccdab87d2f092a71ab435dbb8a73de2613947a83b88f90e92076f`。通常main／1.0.1(3)／iOS15、既存Team3SA77V3SM7／com.gotainu.hamster／Distribution証明書・App Store Profileを維持。codesign deep strict／ZIP CRC、get-task-allow=false／APNs production、ArchiveとIPAの実行コード・Flutter資産（署名差分を除く）・AssetManifest一致、88PNG全SHA一致、登録26パス実在を確認。ArchiveZIP `/Users/gota/hamcare-deploy-staging/ios-device-runtime-20261019/artifacts/Runner-avatars88-build3-development-archive-20261101.zip`、SHA256 `7c27b0c8c44a41fe26521581960f14ae6f55c7e6f3656d47461dcf471763aa95`。初回は隔離コピーへの既存ストアアイコン1件のコピー漏れで停止し、ログから特定して無加工コピーだけで解消、再試行成功。原本コード修正0、失敗ログも保持。
+- **更新方式と残件**：既存アプリID／Team／Upload署名・Profile・データ形式を維持し、2→3の通常更新候補。AABのUpload署名とPlay配布署名の役割を混同しない。実際のPlay／TestFlight経由2→3更新・Home／ログイン／既存記録保持と追加画像の実機表示は未実施で、別途upload／テスト更新承認後に最小確認する。新候補のupload前のローカル阻害0。番号はupload直前に再照合する。Apple決済判断待ちとクローズド人数／期間・製品版公開は別残件。
+- **証拠・一覧**：既存制作領域output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/のplacement-result.json／limited-verification-summary.json／store-version-check.json。比較は同revision/index.html#final-two-looksと両色final_index.html。全プロンプト・参照・SHA・原画・最終ready・個別reportを保持。新しい独立管理表は作らない。
+- **実行範囲**：追加AI／認証／課金／DeviceCheckの再試験0、体験や利用枠のreset0、端末更新0、Storeのupload／保存／配信／審査送信0、commit／push0。既存Alpha code2公開・TestFlight build2確認・Play署名更新・DeviceCheck PASSは維持。Apple Case103009817213は回答待ちで決済方針は保留。候補完成とStore配信・実機更新を区別する。
+<!-- hamcare-avatar-final-rc3:end -->
+
+<!-- hamcare-avatar-pied-bw:start -->
+## 2026-11-01 ブラックstable正式採用・パイドstableの白黒毛色修正（制作・採用前の履歴・AVT-06）
+
+- **ブラック正式承認**：本人がsyrian/darkの既存stableについて顔立ち・体型・毛色とも合格とし、本人承認済み・採用対象へ更新。ready/stable.png SHA de76928f0c60ffae8af4f600e76a1cd3b92a63af61e27d9d69326841106746bcは不変。canonical／最終試行report・visual_review・CSVへ承認を反映。再生成・加工0、本番配置は未実施。残7状態は今後の制作対象として維持するが、今回は生成しない。
+- **パイドの本人判定を分離**：旧茶色案の体型・顔立ち・画風は本人合格、毛色は茶系ではなく白黒へ修正要求。旧原画・master・ready/stable.png・初回試行reportを保持。旧案の履歴はreports/stable_brown_v1.jsonにも保存し、体型等の合格と毛色修正を記録した。
+- **実際の編集・保存**：内蔵imagegenへ旧piedの個別原画だけを編集対象として指定し、毛色と必要最小限の斑表現だけを白地＋黒〜濃い中性チャコールへ変更する指示でstable1枚を作成。シリアン／ダルメシアン参照を流用しない。新原画raw/stable_bw_v2.png、1024px masters/stable_bw_v2.png、512px実透過ready/stable_bw_v2.png、prompt／個別reportを同じroborovski/pied内へ別名保存。識別子pied／状態stableと将来の本番パスは変えない。
+- **現在の候補正本**：roborovski/pied/reports/stable.jsonは白黒v2のrecordを指し、outputs.readyはready/stable_bw_v2.png。旧ready/stable.pngは茶色の履歴であり、承認後の状態展開へ誤って使わない。新白黒版のSHAは647f40182c1385303b02eaac2304b5e6d0b4a0640e10c89f8dbc3092a8bfdf40。owner_approved=false／owner_coat_review=pending、本人確認待ち。旧案の外見合格を新版の最終採用へ自動転記しない。
+- **限定検査**：既存PNG検査・全decode・RGBA・512×512・実alpha0..255はPASS。原画と512px白暗を開き、茶／ベージュ／オレンジ毛の残りは目視上なし、黒部に毛の濃淡あり、耳鼻足のピンクを維持。顔・低いロボ体型・落ち着いた姿勢・構図を旧案と比較。見えるbbox端の差は最大1px、alpha silhouette IoU約0.986で、全体の大きさと配置は概ね一致。これは自動限定確認で、本人毛色承認とは区別する。
+- **確認入口**：既存output/hamcare-avatar/revisions/pose-v2-20261031/index.html#two-stable-coat-reviewを更新。白／暗・384／192／72／48pxで旧茶色案と新白黒版を同じ列に比較。既存の前回比較画像は保持。ブラックは承認済みと表示し、再承認を求めない。
+- **次と保護**：白黒v2 stableが本人承認されたら、その同じ承認原画を外見Aとしてダルメシアン同状態B・承認済みnormal同状態Cと共に7状態へ展開。ブラックの残7状態も維持し、最終追加は各8、計16枚の計画。今回の状態差分0・本番配置0、既存72枚・プロフィール／ID・pied実装／既存12件PASS・円形枠・権限／課金・署名／SDK／pubspec／lockは維持。white_face／analysis_preparingは別保留。ビルド・配信・commit／pushなし。
+<!-- hamcare-avatar-pied-bw:end -->
+
+<!-- hamcare-avatar-two-stables:start -->
+## 2026-11-01 ブラック／パイドstable外見候補2枚（旧茶色案提示時点の履歴・AVT-06）
+
+- **既存の完成状態を維持**：アプリ配置済み標準72枚、修正版50枚の本人承認、登録・限定13件PASSは完了済み。再確認・再制作を求めず、通常権限・プロフィール・署名／SDK・pubspec・円形表示枠を変更しない。
+- **syrian/dark**：既存の全体黒／チャコールstable候補を再利用。制作未着手ではなく、制作・形式／自動目視確認済みで本人の毛色確認待ち。既存golden stableと原画・reportの対応を再照合。512px PNG SHA256 de76928f0c60ffae8af4f600e76a1cd3b92a63af61e27d9d69326841106746bc不変。別blackキー／選択肢追加0、再生成0、本番未配置。全体黒の濃さ、胸腹にも黒を使う案かを本人が確認する。
+- **roborovski/pied**：今回は本人が代表模様案の制作を許可したため、特定個体の写真不足では停止せず内蔵imagegenでstable1枚を作成。既存normal stableだけを顔・低い体型・画風の参照に使い、白地と砂茶／灰褐色の斑が分かれる案とした。white_face改名・ダルメシアン流用なし。原画保存→従来の全キャンバス縮小→512px RGBA実透過／PNG・CRC・全decode・明暗目視を確認し、本人外見確認待ちで保存。coat_reference_verified=false、design_proposal=trueで、白斑の位置・面積を確定済みとは扱わない。独立pied実装・既存12件PASSは保持し、コード変更／再試験なし。
+- **候補・比較の場所**：両方ともoutput/hamcare-avatar/revisions/pose-v2-20261031/<body>/<color>/raw・ready・reportsに保持。今回の2色だけを既存index.html#two-stable-coat-reviewへ追加し、既存Syrian golden／Robo normal stableとの白／暗・256／144／72／48px比較を用意。生成指示はroborovski/pied/prompts/stable.txt。既存72枚や承認済みポーズの再承認は不要。
+- **次工程はstable採用後だけ**：両stableの顔立ち・毛色・模様が本人承認された後、各色の同じstableを外見A、採用済みダルメシアン同状態をポーズB、承認済みDjun normal同状態を品質Cにして7状態ずつ、1枚生成→保存→検査→記録で展開する。最終予定は各8状態・計16枚（stable2＋状態差分14）。今回の状態差分0・本番配置0。将来16枚を採用配置した場合は標準72→88枚で、今回88枚になったとは記録しない。
+- **別の保留**：roborovski/white_faceは白い範囲の資料待ち、analysis_preparingは意味確定待ちのまま。dark／piedは「stable候補2枚の本人外見確認待ち」であり、「資料待ちのため制作未着手」へ戻さない。下記の旧記載は当時の履歴。
+- **今回の範囲**：本番assets・アプリ／円形枠・署名・依存・ビルド・端末・upload・配信・commit／pushは変更なし。既存制作台帳16行のstatusと本書AVT-06を更新し、独立管理表は追加しない。
+<!-- hamcare-avatar-two-stables:end -->
+
+<!-- hamcare-avatar-pose-expansion-progress:start -->
+<!-- hamcare-avatar-approved-placement:start -->
+## 2026-11-01 承認済み修正版50枚の採用・アセット配置（AVT-06）
+
+- **本人承認**：今回の43枚（Djun sapphire／pearl／cream各7、robo normal7、syrian cream／white各7、golden alert1）を全て合格・採用承認。既承認Djun normal7枚と合わせ、修正版50枚を本人承認済み・採用対象としてcanonical report／同じ最終試行report／visual_review／既存CSVへ反映した。自動PASS・本人承認・配置を別フィールドで保持し、旧差戻し／再生成前reportや原画は採用へ昇格しない。
+- **最終PNG選定・配置**：比較一覧の最終readyとreportのSHAを照合。robo environment_discomfortは再生成1回後の最終readyを採用し、初回は不採用履歴のまま保持。50枚の512px RGBAをassets/avatarsへ無加工コピーした。既存採用シリアン15枚はbyte不変。候補領域にのみあった現在のstable7枚は、本人の維持・配置指示に基づき既存report対応の512pxを無加工コピーし、原画・候補stableは不変。再生成0・旧画像置換0・新規配置57枚。
+- **総数・登録**：標準アバターは9外見×8状態＝72枚（既存15＋修正版50＋stable7）。pubspec.yamlへ実在7末端フォルダだけを追加。種類／毛色／状態キー、Resolver、プロフィール保存、権限／課金／記録、版数・SDK・署名・lockは維持。候補PNG・比較画像・rawは本番アセット登録しない。
+- **限定検査**：既存checkerで9外見の全8状態を必須確認しPASS（台帳96／配置72／保留24、errors0）。新規57枚はコピー元と配置先のSHA一致、PNG構造・CRC・512×512・RGBA・実アルファを確認。既存15枚の形式差は変更せず保持。恒久Flutter3.47.7の限定13件PASS。72実PNGを実bundleからdecodeし、9外見のプロフィール色ラベル再読込・全8状態のResolverを確認。既存HamsterAvatarViewを使う計729セルで指定状態自身を表示、意図しないstable代替0・例外／overflow0。48／72／150px、Home190・詳細132・編集142枠154のBoxFit.containで全身の切れなし。実機は今回未確認。
+- **円形アイコンの既存表示**：Drawer66px内88px＋Y5、相談70px内96.6px＋Y5は以前からの顔中心拡大・円形トリミング。実Widget画像で足元／ひげ端／補助表現等の一部が切られることを確認し、全身無欠損PASSとはしない。顔や毛色の識別はできるが、全状態の全身を円枠内へ表示するには表示枠側の別調整が必要。今回は承認画像・既存UIコードを変更せず、既存表示を維持した。
+- **保留**：syrian/dark、roborovski/pied、roborovski/white_faceは各8状態、計24予定を未配置のまま保持。配置対象外の最新状態はdark stableが本人正式承認済み・採用対象／残7状態は今後、piedは顔・体型・画風の旧案合格を維持した白黒v2 stableの本人毛色確認待ち（独立実装と既存12件PASSを維持）、white_faceは白い範囲の資料待ち。今回この3外見の未配置は維持する。analysis_preparing11案は意味未確定の別枠。台帳外ダルメシアン説明候補1件は説明素材の分類を維持し、標準72枚へ数えない。
+- **証拠・保護**：既存制作領域output/hamcare-avatar/revisions/pose-v2-20261031/_tools/integration/のsource-audit.json／placement-result.json／checker-result.json、既存reportのproduction_asset_path／production_sha256。変更前の管理・検査記録は同領域prior_recordsへ保持。古い「未承認・未配置」は下記の当時の履歴として残す。
+- **同内容の再依頼の照合（2026-11-01）**：修正版50枚と維持stable7枚の採用元・配置先・report SHA／本人承認／配置状態・既存CSV・pubspec末端登録が現在も一致。既存シリアン15枚を含む標準72枚を確認し、新規コピー0・置換0・追加登録修正0。既存13件PASS／729表示セル・fallback0の証拠を再利用し、画像生成や表示テストの再実行はしない。直近のブラックstable正式承認と白黒パイドv2の本人毛色確認待ちは維持し、過去の「両方資料待ち」へ戻さない。証拠は既存placement-audit.jsonのidempotent_recheck_20261101。
+- **現在**：50枚の本人承認反映・57枚の追加配置と登録、実PNGと既存部品の限定参照／表示確認まで完了。登録・参照のビルド阻害0。既存円形枠のトリミングと実機未確認は上記のとおり分離。次期AAB／IPA・端末更新・upload・配信・commit／pushは今回行わない。完了済み認証／AI／DeviceCheckの再試験なし。
+<!-- hamcare-avatar-approved-placement:end -->
+
+## 2026-10-31 本人承認7枚を基準にした43状態のポーズ展開（承認・配置前の履歴）
+
+- **承認の引継ぎ**：修正版ジャンガリアンnormalの非stable7枚は、既存reportの`owner_approved=true`／`owner_pose_review=approved`で本人ポーズ承認済み。`production_placement=not_placed`を維持し、本番配置0。前回の「7枚の本人確認待ち」は下記の経緯として残し、再び未承認へ戻さない。
+- **今回の確定対象43枚**：既存台帳と作業前記録から、Djun sapphire／pearl／cream各7、robo normal7、未採用syrian cream／white各7、golden alert1を順に展開。既存採用シリアン15枚・提供stable2枚・既存毛色stable・承認済みnormal7枚を再生成／上書きしない。
+- **保存・検査現在値**：新規生成43/43対象（試行計44回）、PNG／実透過等の技術PASS 43、ポーズ自動目視PASS 43、要確認0、目視／ポーズ記録待ち0、原画保存済み・記録待ち0、未着手0。残る実行・確認対象0。今回の新候補は本人承認0・本番配置0で、自動PASSを本人承認へ読み替えない。
+- 保存先は`output/hamcare-avatar/revisions/pose-v2-20261031/<body>/<color>/`。原画は生成直後`raw/`へ保存し、`masters/`・512px透過`ready/`、明暗preview、参照／prompt／SHA／試行回数／技術・目視結果／本人承認状態を`reports/<state>.json`・`visual_review.json`へ保持。毎回対応stableと承認済みポーズ基準を明示し、実際の入力は個別reportとpromptを正とする。新しい管理表は作らず既存CSVの対応statusを使用する。
+- 総覧はoutput/hamcare-avatar/revisions/pose-v2-20261031/index.html。
+- 毛色別の比較入口`<body>/<color>/index.html`、白／暗`comparison_*.png`・実48px／72pxの小表示比較から個別PNG・raw・report・promptをたどる。現在の比較済みフォルダ：djungarian/sapphire／djungarian/pearl／djungarian/cream／roborovski/normal／syrian/cream／syrian/white／syrian/golden。B・旧候補・新候補を区別し、旧画像と旧記録を保持する。
+- **説明用ファイル分類**：`assets/avatars/syrian/dalmatian/analysis_preparing_v1.png`を実画像で開き、頬袋を大きく描いた白黒説明候補、現AppTheme未参照・標準8状態外と確認。RGB／アルファなしの元画像で、透過ready品質や本番採用をPASSとしない。checkerの`ILLUSTRATIONS`へこの正確な1パスだけ追加し、既存golden説明画像と分けて分類。PNG SHA256 `f53e62434014a74cfb229911d47627c37a1d039626cd82678f32251dba5ca2a2`不変。分類後の既存checker1回は96予定／15実在／81pending・errors0・PASS。説明素材の分類による解消で、pied画像の完成や再テストを意味しない。証拠は`/Users/gota/Documents/Codex/2026-08-22/referenced-chatgpt-conversation-this-is-an/work/hamster_project/output/hamcare-avatar/revisions/pose-v2-20261031/_tools/expansion/illustration-classification/classification-result.json`。
+- **今回の生成補足**：ロボロフスキーnormalのenvironment_discomfortは、初回の細い連続背線を修正するため同じA/B/Cから1回だけ再生成。初回＋修正版の原画・PNG・reportを保持し、修正版を比較一覧へ表示する。今回43対象・計44試行。最終検査証拠は既存revisionの_tools/expansion/final-audit.json。
+- **保持する保留**：darkは黒系stable候補の本人毛色確認待ち・状態差分未展開。piedは独立ローカル実装と既存12件PASSを保持し、白斑資料／stable待ちで未制作。white_faceは未制作、analysis_preparingは意味確認待ち。これらを43対象へ混入させず、パイド関連テストも再実行しない。
+- **保護確認**：作業前からのPNG 726ファイルとアプリ／テスト／設定 643ファイルのSHAが不変。今回許可した既存コード差分はcheckerの1パス分類のみ。アバター状態切替・識別子・プロフィール・課金／権限・SDK／署名／版数・既存dirty設定を変えず、ビルド・upload・配信・commit／pushは行わない。既存Alpha公開、TestFlight／DeviceCheckの成功、Apple Case103009817213回答待ちは維持。
+- **現在**：43対象の制作・検査工程完了。本人確認待ち。次：`43対象の生成・検査終了。新候補の本人ポーズ確認待ち`。中断後は保存済みraw・report・CSVから再開し、重複生成しない。各対象は初回＋必要な再生成1回まで。
+<!-- hamcare-avatar-pose-expansion-progress:end -->
+
+## 2026-10-31 ポーズ本人差戻し・ジャンガリアンnormal再制作／パイド独立対応
+
+- **現在地（`AVT-06`）**：前回55候補のうちstable5枚は維持、stable以外50対象は「形式検査済みでもポーズ品質は本人差戻し」。原画・前回512px・コンタクトシートは全て保持し、旧report／visual_reviewの退避を`output/hamcare-avatar/revisions/pose-v2-20261031/prior_records/`へ保存して、現記録に本人差戻しを追記した。自動目視PASSの履歴を本人の採用承認とは扱わない。提供stable2枚・既存採用シリアン15枚もbyte不変。
+- **今回の画像**：内蔵imagegenでジャンガリアンnormalの非stable7状態を1枚ずつ生成→原画保存→512px実透過／PNG構造・CRC・alpha・全デコード→原画と明暗背景の目視→記録の順で完了。全7枚で外見A＝同じ本人提供normal stable、ポーズB＝採用済みダルメシアンの同状態画像を明示入力。直前状態の連鎖参照0。技術検査7件PASS・自動目視記録済みだが、ポーズ品質の最終合否は未判定（本人確認待ち）。候補は本番未配置。
+- ダルメシアン8状態は個別に実画像を開き、方向・胴・重心・四肢・表情・必要な補助表現を[既存アバターREADME](assets/avatars/README.md#ダルメシアン実画像のポーズ読取と再制作2026-10-31)へ記録。目／前足だけの微差という旧制限を撤回し、alertは左3/4、environment_discomfortは背面から肩越し、activity_highは左向き横長の跳躍、condition_concernedは頭を下げた低い伏せへ変更。種類・毛色・画風はAを維持し、Bの斑点やシリアン体型は移さない。既存整形の全状態共通足元固定は使わず、同一の全キャンバス縮小で姿勢ごとの輪郭／高さを保持した。固定足元・円形位置等の旧layout規則は新指示により技術合否から分離し、適用しなかった項目もreportへ残した。
+- **比較**：[新旧比較入口](output/hamcare-avatar/revisions/pose-v2-20261031/djungarian/normal/index.html)。同状態を列にしてダルメシアン／旧候補／新候補を3行で白・暗背景へ合成し、実48px／72pxも別画像で確認。全7列に欠損なし、個別原画・512px・report・全生成promptへのリンクあり。状態名を隠したシルエットも目視し、背面・跳躍・伏せ・左3/4の違いを確認した。本人のポーズ承認は今回未受領。
+- **ブラック**：現行resolverの「ブラック・濃色系／black」→`dark`、assetDirectory=`syrian/dark`を照合。新blackキー・選択肢は不要。既存golden stableを外見／画風／体型基準に黒系stable候補1枚を生成し、原画・512px・明暗preview・reportを`output/hamcare-avatar/revisions/pose-v2-20261031/syrian/dark/`へ保存。形式・自動外見確認済みだが、具体的な黒白分布の参照資料はなく`coat_reference_verified=false`／本人毛色確認待ち。全体黒／チャコール案を確認済み実毛色とは扱わず、7状態へ展開しない。
+- **パイド**：旧roborovski判定が「パイド」をwhiteFaceへ吸収する事実を確認し、ローカルで`pied` enum末尾／assetKey、毛色選択肢、white判定より先の`パイド／pied／piebald`判定、編集時ラベルを独立追加。旧normal／white_face・他種判定は維持。保存は既存color文字列の通常Repo経路を利用し、新DBフィールド・一括移行・本番書込なし。曖昧な旧白系からpiedは推測しない。主CSVへroborovski/piedの8状態を追加し、一般88行＋ダルメシアン8行＝12外見96状態へ更新。checkerの許容キーにもpiedを追加。実画像は白斑の位置・面積・地色・顔／耳／背中の色の残し方が分かる対応写真／原画待ちで未制作。white_faceの改名代用0。
+- **関連検証**：恒久Flutter3.47.7を使用し、`flutter test --no-pub test/hamster_avatar_pied_test.dart test/measurement_profile_quality_test.dart`はexit0・12件PASS。最終経路アサーション版で新規8件だけ再実行exit0・8件PASS（ツール実行記録20098/193ad3、90147/95fb09）。選択／判定順、通常Repoモックで保存→再読込→ラベル／外見再表示、旧white_face維持、pied欠損状態→同pied stable→petsアイコンのWidget経路を確認。実プロフィールへの保存・実機E2Eは行っていない。画像未配置のためpubspec leaf登録はせず、既存fallbackを使用する。
+- **台帳検査の切り分け**：読み取り専用`tool/check_avatar_assets.py`は96予定・本番15実在／81pendingを認識し、piedキー／8行の不整合は0。ただし作業前から未追跡の`assets/avatars/syrian/dalmatian/analysis_preparing_v1.png`が標準台帳外と検出され全体結果はFAIL。この1件は今回生成・pied実装の失敗ではなく既存ファイル分類の問題で、無断削除・新状態化・黙った検査除外は行わない。個別新PNG8枚の形式検査と、pied関連12件PASSとは分離して記録する。
+- **次**：7枚の本人確認後、Djun sapphire／pearl／cream各7、robo normal7、未採用syrian cream／white各7とgolden alert1（計43状態）へ新ポーズ参照方式を展開する。既存採用シリアン15枚は対象外。darkはstable毛色確認後、piedは毛色資料とstable確認後に進める。white_faceとanalysis_preparingは今回の制作範囲へ追加しない。
+- 本番assets配置・アプリ版数／署名／SDK／lock／課金／権限／記録・既存dirty設定の変更、AI送信、ビルド成果物作成・upload・配信・commit／pushは0。Play Alpha code2公開済み、TestFlight・DeviceCheck成功、Apple Case103009817213回答待ちは保持する。
+
+<!-- hamcare-avatar-sequential-progress:start -->
+## 2026-10-31 基準stableからの逐次候補制作（前回履歴・本人差戻し前の自動確認）
+
+- 最新依頼に基づき、受け入れ準備から実際の内蔵imagegen候補制作へ移行。1回1外見・1状態・1枚、同時生成なし。毎回対応stableを入力し、他状態を連鎖参照しない。既存画像を再生成・上書きせず、原画保存→512px候補→形式／透過・目視検査→既存台帳status更新の順で記録する。
+- 標準制作台帳は既存11外見×8状態＝88件。配置済み再利用15件／本人提供stableの保存・整形再利用2件／今回生成55対象（試行計57回）。生成対象の自動・目視検査PASS 55件、要確認0件、目視待ち0件、原画保存済み・記録待ち0件、標準対象の未着手16件（外見資料待ち16件／実行可能な未着手0件）。PASSも本人採用承認・本番配置の完了を意味しない。
+- roborovski/normal stable原本：`/Users/gota/Downloads/例_ロボロフスキーハムスターのノーマルのstable.png`、SHA256 `67899f4d0ad73e86e3333e81dbbe410c61f23c8e950c81cdea9faa138952352c`。原本を保持して再利用。
+- djungarian/normal stable原本：`/Users/gota/Downloads/例_ジャンガリアンハムスターのノーマルのstable.png`、SHA256 `fa514d218265675907f568e949ea13eaf4d8ee3bac46353276ba329e1c41bf21`。原本を保持して再利用。
+- 制作領域は既存キットが定める`output/hamcare-avatar/<body_type>/<color_variant>/`。`raw/`へ原画を直ちに保存し、`masters/`へ1024px、`ready/`へ512px透過PNG、`reports/<state>.json`・`visual_review.json`へ参照／出力先・SHA・技術／目視結果・初回＋再生成回数・本人未承認を保持する。新しい独立タスク管理表は作らず、既存CSVの対応statusだけを更新する。
+- 白／暗背景の状態名付き`contact_sheet_white.png`／`contact_sheet_dark.png`と、個別原画・PNG・検査記録へのリンク付き`index.html`を毛色単位で作成。現在の一覧：roborovski/normal／djungarian/normal／syrian/golden／syrian/cream／syrian/white／djungarian/sapphire／djungarian/pearl／djungarian/cream／syrian/dalmatian。個別PNGへ背景や状態名は書き込まない。
+- 全外見の確認入口は`output/hamcare-avatar/index.html`、縮小一覧は`overview_white.png`／`overview_dark.png`。既存採用15件は読取参照で一覧へ載せるが、過去の台座・小物等を今回仕様への新規適合PASSとは扱わない。本人提供ジャンガリアンstableの原本台座も保持し、新規差分へ追加しない。
+- 外見資料保留は標準88件の内数16状態：`syrian/dark`8状態は具体的な模様・白胸／白腹の指定根拠不足、`roborovski/white_face`8状態は顔の白化範囲・耳周辺・背中との境界が未確定。基準画像の品質不合格とは別の保留で、模様を推測してstableや状態差分を量産しない。確定できる他外見の制作は続ける。
+- Downloadsの既存制作キットは参照資料として利用するが、同梱99件案の`analysis_preparing`11件は意味・表示条件未確定として標準88件とは別に保留する。既存の説明画像`analysis_preparing_v1.png`や未追跡ダルメシアン版を勝手に対応付け・再生成しない。共有キャンベル専用画像・新しいキーを追加しない。
+- 前回終了時点：確定対象生成完了・外見資料待ち。その後、stable以外50対象はポーズ品質を本人差戻し（現在地は上の再制作節）。この節の88件／55自動PASSは当時の履歴で、現行pied追加後の96件や本人ポーズ承認を意味しない。
+- 次の未完了対象：`確定外見の実行可能対象は制作済み。syrian/dark・roborovski/white_faceの外見資料16状態分と本人採用承認を待つ。`。再開時は原画・report・CSVを照合し、保存済み画像を重複生成しない。再生成は同じstableから各対象1回まで。新しい毛色stableは検査PASS後のみ本人未承認の暫定基準として展開する。
+- 既存PNG・アプリコード・SDK／署名・バージョン／lock・プロフィール／記録／通常権限・ローカル設定は保護。候補の本番assets配置、ビルド・upload・配布、コミット／pushは行わない。既存Play Alpha公開／TestFlight／DeviceCheckの完了状態とApple Case103009817213回答待ちは維持する。
+<!-- hamcare-avatar-sequential-progress:end -->
 
 ## 2026-10-31 アバター受け入れ準備・次期テスト版（画像制作待ち）
 
@@ -771,7 +884,7 @@
 ## 現在地
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
-- 最優先タスク: `AVT-06`の本人画像制作待ち。受入仕様・検査ツール・code3/build3の既存手順は準備済みで、画像完成後に統合・限定表示確認・新ビルド生成へ進む。`REL-02`はAlpha code2公開済みを維持し、通常21日体験によるクローズド参加者確保／必要期間と、Apple Case103009817213の回答が残る。今回配信・追加招待・実AI・既存成功試験の再実施はしない。
+- 最優先タスク: 初回公開を優先。88枚統合とcode3/build3生成・署名・限定12件PASSは完了。本人承認により11/1 18:19 JSTにAlpha code3の1変更を送信、送信ID2・審査中。TestFlight build3は既存本人1名の内部グループでTesting。iPhoneのTestFlight2→3更新・ログイン／プロフィール／記録保持と白黒パイド保存再表示は本人PASS。Android実端末はPlay版未導入、旧専用VM不在のため今回の2→3確認は未実施。審査完了や未確認実機PASSを先取りしない。クローズド人数／期間、Apple Case103009817213回答待ち・決済判断保留は維持。
 - ブランチ: `main`
 - ブランド基準コミット: `f972be0 feat: refresh hamster brand mark`
 - 完了範囲: iOSの恒久ビルド環境・元workspaceの手動⌘R・実機起動・Releaseホーム起動／ログイン保持、通常版のAppleサインインとGoogle実認証・再起動保持、通常権限での21日体験開始と旧版・最新両版の文字AI回答（本人報告）、Android同署名上書き／Home・ログイン・既存記録保持。
@@ -787,7 +900,7 @@
 5. `RAG-02`／`REL-03`：既存回答の動画タイトル／画像表示、外部動画を開いてHamCareへ戻る操作はiOS／Android両方で本人PASS。最新両版AI各1件も完了済みで、RAG／動画確認は再実施しない。Release DeviceCheckも上記2のサーバー計測でPASS。個体SDK callbackの直接未観測を新AI送信で補おうとしない。
 6. `REL-02`：旧Apple Case22954972は10/27に代替配信／決済担当から当該窓口のscope外との回答を受領。これはStripe導線の可否回答ではない。本人承認の指定文面で、公式 https://developer.apple.com/contact/app-store/ から実窓口「App Review → App Review に関するその他のお問い合わせ → Eメール（公式フォーム）」を選び、2026-10-27 11:46:34 JSTにApp Review宛て新問い合わせを送信。受付結果公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認、新Case ID103009817213。回答は未受領で、A／B導線・Stripe維持条件の判断は回答待ち。 独断でIAP／Billing実装・購入導線変更・同文問い合わせ再送・App Store審査提出を行わない。
 7. `DES-01`：対象3項目の初版範囲は確定。既存RAGを採用し、AI-02反復検索・BETA-01専用権限を初版へ追加しない。旧要求・未実装差分は履歴／将来検討として残すが、今回の公開阻害条件に戻さない。通常体験の期限・利用履歴・有限予算を変更しない。
-8. `AVT-06`は本人の新画像完成後、既存READMEの受入仕様で統合しAndroid code3／iOS build3を生成・限定確認する。今は番号と手順の準備まで。公開後対応の`ANL-01`一般イベント確認、非阻害 `OPS-03`／`OPS-04`、iPadは別工程。その他の既存公開対象確認は[提出直前の実機確認](docs/release/privacy_disclosure_checklist_ja.md#提出直前の実機確認)の未確認範囲だけとし、全体再監査・全テスト再実行へ広げない。
+8. `AVT-06`：標準88枚統合・新16限定12件PASSとcode3/build3候補生成は完了。既存Alpha code3は送信ID2・審査中、TestFlight build3は本人1名でTesting。配布可能後の2→3更新／保持と新アバターの表示・パイド保存再表示を必要最小限で確認する。iPhoneはTestFlight更新とデータ保持・パイド保存再表示を本人PASS。Android実端末にPlay版なし、独立検証環境の準備が必要。旧72枚／署名／権限／履歴と既存成功試験は維持。white_face fallbackはローカルPASSで非阻害、analysis_preparing／円形枠改修は対象外。
 
 ## 検証済みの状態
 
@@ -883,10 +996,10 @@
 | `ONB-01` | 実装中・E2E確認待ち | 実操作型オリエンテーション | 導入・初回記録・統合レポートの実装と10/17 fixture完走、実機の確認可能導線はPASS。10/24に通常体験開始・文字AI回答も本人確認。最新両成果物のAI各1件は本人完了報告を受領。新規状態からの全導線実機通過は別途未確認 |
 | `TRL-01` | 本番反映・通常アカウント実機確認済み | 主要機能の無料体験 | 通常21日・最大20件・個人費用枠と承認済み有限共有枠を維持。正規開始・旧版回答、最新iOS Release／Android更新版の本人AI各1件も完了。記録未反映を修正したもので追加AIなし、新使用量の実値照合は別で再送条件にしない |
 | `GAM-01` | 本番反映済み・E2E最終確認待ち | 星の累計と50個達成 | サーバー管理の獲得台帳・現在の保有数・生涯獲得数・50個解放、祝福画面、累計が存在する時だけ出るドロワー項目を実装。開始日は2026-09-17（日本時間）、既存記録は遡及付与しない。将来の失効は保有数だけを変え、生涯獲得数と解放済みコンテンツは保持できる構造。4 FunctionsとFirestoreルールを本番Firebaseへ反映。累計有効版をエミュレーターへ再導入済みで、ログイン後に今日の起動星・ドロワー導線のE2E確認が残る。特別コンテンツは未制作 |
-| `REL-02` | 進行中・Play Alpha公開済み／Apple回答待ち | 日本限定・Stripe決済のままストア初回提出 | 同意実装・最終成果物・既存配布／更新・通常権限と審査アクセス準備PASSを維持。本人承認の既存Alpha 1.0.1／code2・日本のみ・既存internal-testers本人1名と共通掲載／申告の14変更を2026-10-27 11:09 JSTに審査送信（送信ID1、10/27確認時点の未送信0件）。送信ID1は同日11:19 JST「公開」と本人確認済み（今回Console読取照合）、クローズドテスト参加者確保・必要な12人／14日期間は未完了、正式な製品版公開も未完了。旧Case22954972は担当範囲外との回答を受領。本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信し、受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済導線の可否回答待ち。次期Android1.0.1/code3・iOS1.0.1/build3は未登録確認済み、本人画像完成後に生成・別途配布承認。通常21日体験をテスターへ利用し、今回新配信なし |
-| `REL-03` | 進行中・E2E最終確認待ち | 提出候補版のE2E確認とクラッシュ監視 | 既存AI各1件・認証保持・動画PASSと同意限定26件は再実施しない。両ストア内部配布済み。iOSの本人TestFlight更新・Home／ログイン／記録保持はPASS、同意Dialog表示・取消・入力保持と設定の撤回項目表示も本人PASS。実同意承諾／実AI再送は未実施。Androidの同一署名ローカルRelease上書き／起動はPASS、本人のHome・ログイン・記録保持と設定項目表示もPASS。独立VMのPlay code1→code2更新・導入元／署名／UID保持と本人Home・ログイン／記録保持もPASS。普段使い52ab端末の移行は未実施。DeviceCheckは更新時刻の交換成功＋対象AppID VALID等を照合したサーバー計測でPASS（個体callback直接未観測）。既存アプリ・通常権限・履歴保持。上記の必要確認は完了として維持し、未確認の残範囲だけを別管理する。既存PASSは再試験しない。次期画像版の表示・2→3更新／保持確認は画像統合・配布後に限定実施し、今はビルド配信待ち |
+| `REL-02` | 進行中・Play Alpha公開済み／Apple回答待ち | 日本限定・Stripe決済のままストア初回提出 | 同意実装・最終成果物・既存配布／更新・通常権限と審査アクセス準備PASSを維持。本人承認の既存Alpha 1.0.1／code2・日本のみ・既存internal-testers本人1名と共通掲載／申告の14変更を2026-10-27 11:09 JSTに審査送信（送信ID1、10/27確認時点の未送信0件）。送信ID1は同日11:19 JST「公開」と本人確認済み（今回Console読取照合）、クローズドテスト参加者確保・必要な12人／14日期間は未完了、正式な製品版公開も未完了。旧Case22954972は担当範囲外との回答を受領。本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信し、受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済導線の可否回答待ち。次期Android1.0.1/code3・iOS1.0.1/build3は11/1に未登録確認、88画像統合後の署名済AAB／配布IPA生成・格納検証PASS。本人承認後11/1 18:19 JSTにAlpha code3の1変更を送信（送信ID2・審査中）、TestFlight build3は本人1名でTesting。製品版変更なし。通常21日体験をテスターへ利用し、今回の新テスト配信はbuild3のみ確認済み、Alpha code3は審査待ち |
+| `REL-03` | 進行中・E2E最終確認待ち | 提出候補版のE2E確認とクラッシュ監視 | 既存AI各1件・認証保持・動画PASSと同意限定26件は再実施しない。両ストア内部配布済み。iOSの本人TestFlight更新・Home／ログイン／記録保持はPASS、同意Dialog表示・取消・入力保持と設定の撤回項目表示も本人PASS。実同意承諾／実AI再送は未実施。Androidの同一署名ローカルRelease上書き／起動はPASS、本人のHome・ログイン・記録保持と設定項目表示もPASS。独立VMのPlay code1→code2更新・導入元／署名／UID保持と本人Home・ログイン／記録保持もPASS。普段使い52ab端末の移行は未実施。DeviceCheckは更新時刻の交換成功＋対象AppID VALID等を照合したサーバー計測でPASS（個体callback直接未観測）。既存アプリ・通常権限・履歴保持。上記の必要確認は完了として維持し、未確認の残範囲だけを別管理する。既存PASSは再試験しない。新2色のローカル表示12件PASS、build3はTestFlight Testing、code3はAlpha審査中。iOSのTestFlight2→3更新・保持／検証用パイド保存再表示は本人PASS。Androidは旧専用VM不在・実端末Play版未導入で2→3未確認。全8状態／white_faceの新実機確認は未実施。候補再ビルドや旧成功E2E再実行なし |
 | `VAL-01` | 未着手 | 有料ベータで継続利用を検証 | ストア配布経路の準備後 |
-| `AVT-06` | 受け入れ準備完了・本人画像制作待ち | 残りのアバター素材 | 既存キー・透過PNG／8状態の仕様、CSV整合、読取専用検査、code3/build3の既存配布工程を準備済み。画像未提供のため生成・仮置換・新build／uploadなし。本人提供後にPNG配置・実在末端assets登録・限定表示確認・次期版生成。Firestore／既存識別子は維持 |
+| `AVT-06` | 88枚統合済み・新16限定12件PASS | 残りのアバター素材 | 元72枚不変、black／白黒pied stable2は本人目視承認、残14は未制作を照合し本人の制作統合承認後に生成・自動検査PASS。最終16PNGを配置し2leaf登録、通常Repo保存再読込・8状態・white_face fallbackを限定確認。新14の個別本人目視／新実機表示は未実施と区別。white_face8とanalysisは別保留。code3/build3候補生成／署名／88PNG格納検証PASS、指定AAB／IPA upload済み。code3はAlpha審査中、build3は本人TestFlight Testing。iOSは白黒パイド保存再表示が本人PASS。Androidと全8状態の新実機確認は未実施。 |
 | `OPS-03` | 未着手・非阻害 | 依存パッケージ監査 | リリースを止めない読み取り確認から開始 |
 | `OPS-04` | 未着手・非阻害 | Cloud Functionsビルドイメージ整理 | 2026-09-17のFunctions反映後、不要なビルドイメージの自動削除で警告あり。課金状況を確認後に安全に削除 |
 
