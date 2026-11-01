@@ -1,0 +1,79 @@
+{
+  "recorded_at": "2026-11-01T07:11:22.944058+00:00",
+  "scope": "New black/pied 16 assets only; previous 72 preservation via SHA; no device/Auth/AI/billing/DeviceCheck testing",
+  "tests_passed": 12,
+  "tests_failed": 0,
+  "bundle_assets_decoded": 16,
+  "widget_cases": 7,
+  "widget_cells": 112,
+  "unexpected_stable_fallback": 0,
+  "framework_errors": 0,
+  "profile_map": {
+    "syrian/dark": {
+      "label_roundtrip": "PASS",
+      "resolver_8_states": "PASS"
+    },
+    "roborovski/pied": {
+      "label_roundtrip": "PASS",
+      "resolver_8_states": "PASS"
+    }
+  },
+  "normal_repo_save_reload": "2/2 PASS; local mock only; no production writes",
+  "legacy_profile_compatibility": "PASS; color strings and existing identity retained",
+  "white_face_fallback": "PASS; existing pets icon; no pied substitution",
+  "catalog": {
+    "result": "PASS",
+    "catalog_assets": 96,
+    "present_assets": 88,
+    "pending_assets": 8,
+    "required_variants": [
+      "syrian/dark",
+      "roborovski/pied"
+    ]
+  },
+  "protected_content": {
+    "protected_before_count": 747,
+    "protected_missing": [],
+    "protected_changed": [
+      "pubspec.yaml"
+    ],
+    "unexpected_protected_changes": [],
+    "pass": true
+  },
+  "visual_review": {
+    "reviewer": "Codex actual image viewing",
+    "result": "PASS",
+    "owner_individual_new_pose_review": "not_performed",
+    "owner_creation_and_integration_authorization": true,
+    "viewed_files": [
+      "output/hamcare-avatar/revisions/pose-v2-20261031/syrian/dark/final_comparison_white.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/syrian/dark/final_comparison_small_dark.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/roborovski/pied/final_comparison_white.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/roborovski/pied/final_comparison_small_dark.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_home190_light.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/gallery_72_dark.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_edit142_frame154_light.png",
+      "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_detail132_dark.png"
+    ],
+    "observations": [
+      "White/black pied keeps low rounded Roborovski identity; no brown coat introduced. Black Syrian keeps broad face and charcoal coat.",
+      "Both new appearances show upright delight, concerned paws, angled alert, tilted insufficient-data, backward/side discomfort, horizontal activity and low crouch poses.",
+      "White/dark and 48/72px review retains readable identities and posture differences; no extra limbs, silhouette clipping or background rectangles observed.",
+      "Current Home190/detail132/edit142 full-source widgets contain the intended PNG and show no missing assets or unintended stable substitution.",
+      "Existing zoomed circle cropping, production writes and physical-device display are not part of this check."
+    ]
+  },
+  "screenshots": [
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/gallery_48_light.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/gallery_48_dark.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/gallery_72_light.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/gallery_72_dark.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_home190_light.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_detail132_dark.png",
+    "output/hamcare-avatar/revisions/pose-v2-20261031/_tools/final_integration_20261101/checks/actual_edit142_frame154_light.png"
+  ],
+  "limitations": [
+    "Local Flutter fixture/widget/normal repository mock verification; no physical-device or actual-profile writes.",
+    "AAB/IPA packaging verification is a separate build step."
+  ]
+}

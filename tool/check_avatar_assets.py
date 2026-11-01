@@ -22,13 +22,18 @@ STATES = (
 COLORS = {
     "syrian": {"golden", "cream", "white", "dark", "dalmatian"},
     "djungarian": {"normal", "sapphire", "pearl", "cream"},
-    "roborovski": {"normal", "white_face"},
+    "roborovski": {"normal", "white_face", "pied"},
 }
 CATALOGS = (
     "assets/avatars/avatar_asset_manifest.csv",
     "assets/avatars/dalmatian_asset_manifest.csv",
 )
-ILLUSTRATIONS = {"assets/avatars/syrian/golden/analysis_preparing_v1.png"}
+# Exact, documented explanatory mascot files; never avatar condition states.
+# The dalmatian candidate is not used by AppTheme and is not approved for runtime.
+ILLUSTRATIONS = {
+    "assets/avatars/syrian/golden/analysis_preparing_v1.png",
+    "assets/avatars/syrian/dalmatian/analysis_preparing_v1.png",
+}
 
 
 def asset_directories(pubspec):
