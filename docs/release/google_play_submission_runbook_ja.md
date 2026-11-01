@@ -6,7 +6,13 @@
 
 リリースノート：プロフィールなどで表示するアバターを88枚に拡充しました。ロボロフスキーのパイドに対応し、種類・毛色・状態に応じた画像を追加しました。
 
-端末更新は未実施。旧Play署名専用VMの一時userdataは現存せず、現在のローカル52abアプリを削除して移行しない。本人は実Android端末にPlay版未導入と回答。過去のPlay署名code1→code2 PASSは旧専用VMの結果として維持し、今回実端末の保持PASSにはしない。既存API34 Google Play ARM64を再利用し、別永続領域の専用AVD HamCare_Play_20261101を作成・起動済み（追加SDK取得0、既存AVD不変。新AVDに限り基準code2を直接導入済み）。本人がMacロック解除と既存テスターのGoogle Playサインインを完了。基準code2のまま正規起動し、既存HamCareアカウントで更新前のHome／プロフィール／記録表示確認は本人操作待ち。基準code2は今回Console取得のPlay署名Universal APKを新専用AVDへ新規直接導入したもので、Playストア新規取得とは記録しない。基準code2は正規起動済み、通常ログイン／記録操作と2→3更新は未実施。そのcode2初回導入とcode2→3正式Play更新の確認を分離し、旧VMの復元PASSとはしない。配信済みcode3を正式Play配送から2→3更新し、Home／ログイン／既存プロフィールと飼育記録・追加画像だけを確認する。旧code1→code2 PASS・AI／Auth／DeviceCheck PASSは維持。証拠は既存staging/audit/avatar-code3-distribution-20261101/。以下の未upload記載は候補作成時点の履歴。
+### 11/1 Android新専用AVDの正式Play更新・現code3本人確認
+
+旧Play署名専用VMの一時userdataは現存せず、普段使いローカル52abアプリと既存2AVDは削除・変更しない。本人の実AndroidにもPlay版未導入であり、今回の結果を普段使い実端末の更新保持PASSへ読み替えない。既存API34 Google Play ARM64を再利用し、新しい永続専用AVD HamCare_Play_20261101を準備（追加SDK0、既存AVD114ファイル不変）。基準code2はConsole取得のPlay署名Universal APKを新規直接導入したもので、Playクライアントからの新規取得・旧VM復元ではない。
+
+本人のPlayサインイン後、最小観測では既にcode3だった。installer／initiatingともcom.android.vending、導入4APK全てDA77署名、code2基準とLinux UID／firstInstallTime／dataDir一致。固定code3 AABとarm64 AOTを含むnative3件・標準88PNGのSHA全一致、mismatch0を確認。正式Play配送による2→3更新とデータ領域継続はPASS。手動／自動の操作主体は未確定で、agentによるcode3直接APK導入・downgrade・アンインストール・データ消去は行っていない。
+
+本人は現code3で通常ログイン・Home／既存プロフィール／飼育記録表示、変更許可のある検証用プロフィールのロボロフスキー／パイド保存→再表示、白黒アバターと毛色保持をPASS確認。code2ログイン済み基準と更新時刻の前後が未確定のため、更新をまたぐ再ログイン不要や実データ保持の厳密PASSとは区別し、現code3の通常利用・既存データ閲覧PASSとして記録する。全8状態切替とAndroid white_faceは新端末未確認、既存ローカル12PASSは維持し、追加の強制状態試験・本人操作は今回は不要。AI／課金／Auth方式／DeviceCheckの再試験なし。証拠は既存staging/android-play-verification-20261101/audit/code3-play-runtime-verification-20261101.json（20:15 JST）と本人回答。旧code1→code2 PASSは当時の別結果として保持する。以下の未upload記載は候補作成時点の履歴。
 
 ## 2026-11-01 Android code3アバター更新候補（配信前の履歴）
 
