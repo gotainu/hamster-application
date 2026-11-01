@@ -4,6 +4,15 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-github-avatar3-20261101:start -->
+## 2026-11-01 code3／build3関連成果のGitHub main反映
+
+- 既存mainとgithub/mainの分岐なしをfetchで確認し、通常pushを実施。`815a8da`（Pied選択・旧プロフィール互換／関連test）、`0be653f`（採用アバター標準88枚・pubspec＋3／台帳／限定確認）、`bce646e`（既存タスク表と提出手順へAlpha code3審査中・TestFlight build3内部配信／本人確認の結果）の3コミットを反映した。初回push後、リモートmainの`bce646e5d64873545ed396b82e6370912965de43`とローカルHEADの一致を確認。最後の保存記録コミットはGit履歴を参照する。
+- 新規追跡は本番PNG73枚（既存15枚と合わせ標準88枚）と必要なコード・関連テスト・小さい匿名検証結果・制作台帳・既存管理文書に限定。追加テキストの秘密情報／個人メール候補0、追加PNGの私的メタデータ0。旧原画・不採用候補・巨大な比較画像・署名AAB／IPA・非公開Store画面はGitへ加えない。
+- 既存ローカル設定のios/Runner/GoogleService-Info.plist、tools/analytics/output/bigquery-connection-result.json、未採用ダルメシアン説明画像と未追跡の制作領域は、そのままローカルに保持。削除・reset／clean／stash・強制push・branch／upstream変更なし。これらの除外ファイルがあるため、作業ツリー全体をcleanとは記録しない。
+- Git保存を配信／審査通過の証拠と混同しない。Alpha code3は送信ID2の審査中、TestFlight build3は既存本人1名Testing・本人更新保持／Pied再表示PASS、Android2→3は未確認という下記の実状態を維持する。
+<!-- hamcare-github-avatar3-20261101:end -->
+
 <!-- hamcare-test-distribution3-20261101:start -->
 ## 2026-11-01 code3／build3の承認済みテスト配信（REL-02／REL-03／AVT-06）
 
@@ -12,7 +21,7 @@
 - **Google審査送信**：公開の概要の未送信はAlpha code3「完全公開を開始」の1変更だけと照合し、2026-11-01 18:19 JSTに送信（送信ID2）。送信詳細でも1変更／既存Alpha／release3／審査中を確認。これは審査受付で、審査通過・code3のテスト配信開始は未確認。審査後は承認済みの日本・既存Alphaテスターだけへ自動反映され得る。旧送信ID1・14変更とcode2公開の履歴は維持。
 - **Apple upload／処理／内部配信**：指定IPAを既存Transporterからデリバリし、Transporter表示は11/1 17:44成功。ASC既存アプリ6826783734で1.0.1(3)の処理完了を確認。前版と同じ暗号申告（OS外標準暗号あり・独自暗号なし・フランス配布なし）を保存し、Missing Complianceを解消。既存「本人実機確認」Internal Groupの1Tester・自動追加なし（Manual for Xcode Builds）を読取確認後、build3を追加。18:24 JST確認時点で1Tester／2Builds、build3と既存build2はともにTesting。本人のTestFlightから更新可能。外部招待・App Store一般審査は0。
 - **端末更新は分離**：現在ADB端末0、iPhoneは既存ペアリングだけでUSB接続なし。本人がiPhoneをTestFlightで1.0.1(3)へ更新し、再ログインなしのHome・既存プロフィール・飼育記録保持をPASS報告。さらに変更許可のある検証用プロフィールでロボロフスキー／パイドを保存→再表示し、毛色と白黒アバターの保持も本人PASS。前回専用Play VMの一時userdataは現存せず、既存2AVDはローカル52ab側なので変更しない。本人は実Android端末にPlay版未導入と回答。旧専用VMでのcode1→code2 PASSは当時の結果として維持し、今回の実端末2→3更新へ読み替えない。普段使いアプリの削除・データ消去・直接APK導入で置換しない。Android2→3更新／保持と新画像表示は未確認。iOSの全8状態切替・white_faceの実機表示は未確認で、既存ローカル12PASSとは分離する。
-- **Git保存範囲**：今回のPied必要コード／関連test、標準88PNG、pubspec・checker・制作台帳／README、限定testソースと小さい検証結果を選択commit。原画・旧候補・巨大比較PNG・配布成果物・未採用説明PNGと、既存ローカル設定2件は除外保持。PROJECT_STATUSの既存タスク表と2提出手順書も今回実状態へ更新。commit／通常pushの最終結果は後続節へ記録する。
+- **Git保存範囲**：今回のPied必要コード／関連test、標準88PNG、pubspec・checker・制作台帳／README、限定testソースと小さい検証結果を選択commit。原画・旧候補・巨大比較PNG・配布成果物・未採用説明PNGと、既存ローカル設定2件は除外保持。PROJECT_STATUSの既存タスク表と2提出手順書も今回実状態へ更新。commit／通常pushは上のGitHub反映節のとおり完了し、リモート一致を確認した。
 - **証拠**：既存stagingのandroid-ordinary-update-20261025/audit/avatar-code3-distribution-20261101/およびios-device-runtime-20261019/audit/avatar-build3-distribution-20261101/のdistribution-result.jsonとConsole／TestFlight画面。非公開の画面・アカウント情報はGitへ追加しない。新しい独立管理表は作成しない。
 - **残る公開条件**：Alpha code3のGoogle審査、2→3更新の本人確認と新アバターの限定実機確認、既存21日体験でのクローズド参加者確保・必要期間を維持。Apple Case103009817213の回答と決済導線方針は保留。製品版公開・追加機能開発・テスター募集投稿は今回行わない。
 <!-- hamcare-test-distribution3-20261101:end -->
