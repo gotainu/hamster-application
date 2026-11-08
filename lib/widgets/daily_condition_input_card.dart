@@ -22,6 +22,7 @@ import '../theme/app_theme.dart';
 class DailyConditionInputCard extends StatefulWidget {
   final DailyCheckinStore? repo;
   final DateTime? date;
+  final DateTime Function()? now;
   final VoidCallback? onSaved;
   final List<ObservationCatalogItem> catalog;
   final CareActionStore? careRepo;
@@ -33,6 +34,7 @@ class DailyConditionInputCard extends StatefulWidget {
     super.key,
     this.repo,
     this.date,
+    this.now,
     this.onSaved,
     this.catalog = observationCatalog,
     this.careRepo,
@@ -48,9 +50,10 @@ class DailyConditionInputCard extends StatefulWidget {
 
 class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   late final DailyCheckinStore _repo;
-  late final DateTime _date;
+  late DateTime _date;
+  late final bool _openedForCurrentDay;
   late final CareActionStore _careRepo;
-  late final CareActionInputViewModel _care;
+  late CareActionInputViewModel _care;
   bool _healthDirty = false;
   ObservationInputViewModel? _observation;
   bool _healthLoadFailed = false;
@@ -66,6 +69,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   bool _isEditing = true;
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isCheckingDate = false;
   bool _memoExpanded = false;
   String? _message;
 
@@ -96,7 +100,9 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   void initState() {
     super.initState();
     _repo = widget.repo ?? DailyCheckinRepo();
-    _date = widget.date ?? DateTime.now();
+    final today = _now();
+    _date = _repo.normalizeLocalDay(widget.date ?? today);
+    _openedForCurrentDay = _sameDay(_date, today);
     if (_repo is DailyObservationStore) {
       _observation = ObservationInputViewModel(
           date: _repo.normalizeLocalDay(_date),
@@ -230,6 +236,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   bool get _canSaveHealthOnly =>
       !_isLoading &&
       !_isSaving &&
+      !_isCheckingDate &&
       _healthDirty &&
       _hasHealthInput &&
       _healthConfirmed &&
@@ -238,6 +245,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   bool get _canSave =>
       !_isLoading &&
       !_isSaving &&
+      !_isCheckingDate &&
       (_canSaveHealthOnly || (!_careLoadFailed && _care.canSave)) &&
       (!_healthDirty || !_hasHealthInput || _canSaveHealthOnly);
 
@@ -305,11 +313,128 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     });
   }
 
+  DateTime _now() => (widget.now?.call() ?? DateTime.now()).toLocal();
+
+  static bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// New input follows today's date only after confirmation. Existing edits
+  /// and durable pending mutations keep their original day/identity.
+  Future<bool> _handleDateRollover({required bool newHealthInput}) async {
+    setState(() => _isCheckingDate = true);
+    try {
+      final approved = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('日付が変わりました'),
+          content:
+              const Text('入力内容を保持したまま、今日の日付へ切り替えます。\n切替後に内容を確認し、もう一度保存してください。'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('キャンセル')),
+            FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('今日へ切り替える')),
+          ],
+        ),
+      );
+      if (!mounted || approved != true) return true;
+      if ((_healthDirty &&
+              _observation?.operation == ObservationOperation.correction) ||
+          (_care.confirmedSaved && _care.dirty) ||
+          _observation?.state.pending != null ||
+          _care.pending != null ||
+          _rewardRetry != null) {
+        setState(() => _message =
+            '保存済み記録の編集または同期待ちの記録が含まれています。入力は残っています。元の日付の記録を確認してから開き直してください。');
+        return true;
+      }
+      final nextDate = _repo.normalizeLocalDay(_now());
+      final nextDayKey = _repo.dateKeyLocal(nextDate);
+      ObservationLoadResult? nextObservation;
+      if (_repo is DailyObservationStore) {
+        nextObservation =
+            await (_repo as DailyObservationStore).loadObservation(nextDate);
+      } else if (await _repo.fetchByDate(nextDate) != null) {
+        if (mounted) {
+          setState(
+              () => _message = '今日の記録が既にあります。入力は残っています。今日の記録を確認してから開き直してください。');
+        }
+        return true;
+      }
+      final nextCare = await _careRepo.load(nextDayKey);
+      if (!mounted) return true;
+      final originalSubject = _observation?.state.subjectId;
+      if (nextObservation?.serverConfirmed == false ||
+          nextObservation?.hasProfile == false ||
+          !nextCare.serverConfirmed ||
+          (originalSubject != null &&
+              nextObservation?.subjectId != originalSubject)) {
+        setState(() =>
+            _message = '今日の保存先を確認できません。入力は残っています。接続とうちの子を確認して、もう一度保存してください。');
+        return true;
+      }
+      if (nextObservation?.current != null ||
+          nextObservation?.pending != null ||
+          nextCare.record?.status == 'active' ||
+          nextCare.pending != null) {
+        setState(() => _message =
+            '今日の記録または同期待ちの記録が既にあります。入力は残っています。今日の記録を確認してから開き直してください。');
+        return true;
+      }
+      final nextCareModel = CareActionInputViewModel(
+          dayKey: nextDayKey, catalog: widget.careCatalog)
+        ..load(nextCare);
+      // An unchanged saved care record belongs to the old day. Only carry
+      // unsaved care input; never duplicate an old day's answers into today.
+      if (!_care.confirmedSaved) {
+        for (final entry in _care.actions.entries) {
+          if (!_care.isUnconfirmed(entry.key)) {
+            nextCareModel.select(entry.key, entry.value.answer);
+            nextCareModel.actions[entry.key] = entry.value;
+          }
+        }
+      }
+      nextCareModel.detailError = _care.detailError;
+      setState(() {
+        _date = nextDate;
+        _savedCheckin = null;
+        if (!newHealthInput) {
+          _condition = null;
+          _selectedTags.clear();
+          _memoCtrl.clear();
+          _memoExpanded = false;
+        }
+        _healthDirty = newHealthInput && _hasHealthInput;
+        _isEditing = true;
+        if (nextObservation != null) {
+          _observation = ObservationInputViewModel(
+              date: nextDate, dayKey: nextDayKey, allowPartial: true)
+            ..load(nextObservation);
+        }
+        _care = nextCareModel;
+        _healthLoadFailed = false;
+        _careLoadFailed = false;
+        _careMessage = null;
+        _message = '今日の日付へ切り替えました。入力内容を確認して、もう一度保存してください。';
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _message = '今日の保存先を確認できません。入力は残っています。もう一度保存してください。');
+      }
+    } finally {
+      if (mounted) setState(() => _isCheckingDate = false);
+    }
+    // Switching dates never submits the draft on the same button press.
+    return true;
+  }
+
   Future<void> _save(
       {bool retryCare = false,
       bool cancelCare = false,
       bool healthOnly = false}) async {
-    if (_isSaving || _isLoading) return;
+    if (_isSaving || _isLoading || _isCheckingDate) return;
     final condition = _condition;
     final saveHealth = !retryCare && !cancelCare && _canSaveHealthOnly;
     final saveCare = !healthOnly &&
@@ -317,6 +442,20 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         (_care.canSave || retryCare || cancelCare);
     if (!saveHealth && !saveCare) return;
     FocusScope.of(context).unfocus();
+    final newHealthInput = saveHealth &&
+        (_observation == null
+            ? _savedCheckin == null
+            : _observation!.operation == ObservationOperation.newObservation);
+    final newCareInput = saveCare && !_care.confirmedSaved;
+    if (!retryCare &&
+        !cancelCare &&
+        _openedForCurrentDay &&
+        (newHealthInput || newCareInput) &&
+        !_sameDay(_date, _now()) &&
+        await _handleDateRollover(newHealthInput: newHealthInput)) {
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _isSaving = true;
       _message = null;
@@ -818,86 +957,104 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   Widget build(BuildContext context) {
     const radius = BorderRadius.all(Radius.circular(26));
 
-    return ClipRRect(
-      borderRadius: radius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.quickRecordObjectSurface(context),
-            borderRadius: radius,
-            border:
-                Border.all(color: AppTheme.quickRecordObjectBorder(context)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: Image.asset(
-                      _brandAsset,
-                      width: 44,
-                      height: 44,
-                      fit: BoxFit.cover,
-                      filterQuality: FilterQuality.medium,
+    return AbsorbPointer(
+      key: const ValueKey('daily-condition-date-check-block'),
+      absorbing: _isCheckingDate,
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.quickRecordObjectSurface(context),
+              borderRadius: radius,
+              border:
+                  Border.all(color: AppTheme.quickRecordObjectBorder(context)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.asset(
+                        _brandAsset,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.medium,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '今日の様子は？',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '今日の様子は？',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
                           ),
+                          Text(
+                            '記録日：${_date.year}年${_date.month}月${_date.day}日',
+                            key: const ValueKey('daily-condition-target-date'),
+                            style: AppTheme.dataCaptionStyle(context),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              if (_isLoading)
-                const LinearProgressIndicator()
-              else
-                AnimatedSwitcher(
-                  duration: MediaQuery.disableAnimationsOf(context)
-                      ? Duration.zero
-                      : const Duration(milliseconds: 260),
-                  child: (_savedCheckin != null ||
-                              _care.confirmedSaved ||
-                              _care.pending != null) &&
-                          !_isEditing
-                      ? _buildSavedSummary(context)
-                      : _buildEditor(context),
+                  ],
                 ),
-              if (_message != null && !_isEditing) Text(_message!),
-              if (_careMessage != null) ...[
-                const SizedBox(height: 8),
-                Semantics(
-                    liveRegion: true,
-                    child: AnimatedSwitcher(
-                        duration: MediaQuery.disableAnimationsOf(context)
-                            ? Duration.zero
-                            : const Duration(milliseconds: 180),
-                        child: Text(_careMessage!,
-                            key: ValueKey(_careMessage),
-                            style: Theme.of(context).textTheme.bodySmall))),
+                const SizedBox(height: 14),
+                if (_isLoading)
+                  const LinearProgressIndicator()
+                else
+                  AnimatedSwitcher(
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 260),
+                    child: (_savedCheckin != null ||
+                                _care.confirmedSaved ||
+                                _care.pending != null) &&
+                            !_isEditing
+                        ? _buildSavedSummary(context)
+                        : _buildEditor(context),
+                  ),
+                if (_message != null && !_isEditing) Text(_message!),
+                if (_careMessage != null) ...[
+                  const SizedBox(height: 8),
+                  Semantics(
+                      liveRegion: true,
+                      child: AnimatedSwitcher(
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          child: Text(_careMessage!,
+                              key: ValueKey(_careMessage),
+                              style: Theme.of(context).textTheme.bodySmall))),
+                ],
+                if (_rewardRetry != null)
+                  TextButton(
+                      onPressed: _isSaving ? null : _retryReward,
+                      child: const Text('報酬だけ再確認する')),
+                if (_care.pending != null)
+                  TextButton(
+                      onPressed:
+                          _isSaving ? null : () => _save(retryCare: true),
+                      child: const Text('ケア記録を再送する')),
+                if (_careLoadFailed)
+                  TextButton(
+                      onPressed: _isSaving ? null : _load,
+                      child: const Text('ケア記録を再読み込み')),
               ],
-              if (_rewardRetry != null)
-                TextButton(
-                    onPressed: _isSaving ? null : _retryReward,
-                    child: const Text('報酬だけ再確認する')),
-              if (_care.pending != null)
-                TextButton(
-                    onPressed: _isSaving ? null : () => _save(retryCare: true),
-                    child: const Text('ケア記録を再送する')),
-              if (_careLoadFailed)
-                TextButton(
-                    onPressed: _isSaving ? null : _load,
-                    child: const Text('ケア記録を再読み込み')),
-            ],
+            ),
           ),
         ),
       ),
