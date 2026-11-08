@@ -11,6 +11,8 @@ import '../services/ai_chat_history_repo.dart';
 import '../services/ai_text_consent_store.dart';
 import '../services/billing_status_repo.dart';
 import '../services/notification_settings_service.dart';
+import '../services/owner_profile_repo.dart';
+import '../models/owner_profile.dart';
 import '../widgets/hamster_feedback_popup.dart';
 import 'switchbot_setup.dart';
 import 'subscription_plan_screen.dart';
@@ -39,6 +41,8 @@ class _SettingScreenState extends State<SettingScreen> {
   final AiTextConsentStore _aiTextConsentStore = AiTextConsentStore();
 
   PackageInfo? _packageInfo;
+  late final Stream<User?> _accountUsers =
+      FirebaseAuth.instance.authStateChanges();
 
   bool _isOpeningContact = false;
   bool _isRevokingAiTextConsent = false;
@@ -741,8 +745,6 @@ class _SettingScreenState extends State<SettingScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = MyApp.of(context).themeMode == ThemeMode.dark;
-    final currentUser = FirebaseAuth.instance.currentUser;
-    final emailOrUid = currentUser?.email ?? currentUser?.uid ?? '未ログイン';
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
@@ -786,18 +788,16 @@ class _SettingScreenState extends State<SettingScreen> {
                         size: 42,
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        'アカウント',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        emailOrUid,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.secondaryText(context),
-                            ),
+                      StreamBuilder<User?>(
+                        stream: _accountUsers,
+                        initialData: FirebaseAuth.instance.currentUser,
+                        builder: (context, snapshot) {
+                          final user = snapshot.data;
+                          return _OwnerAccountLabel(
+                            key: ValueKey(user?.uid),
+                            user: user,
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -1199,6 +1199,48 @@ class _SettingScreenState extends State<SettingScreen> {
       ),
     );
   }
+}
+
+// Reopening Settings reloads the owner profile. Changing UID creates fresh
+// state, so a previous account's completed or pending read cannot be reused.
+class _OwnerAccountLabel extends StatefulWidget {
+  const _OwnerAccountLabel({super.key, required this.user});
+
+  final User? user;
+
+  @override
+  State<_OwnerAccountLabel> createState() => _OwnerAccountLabelState();
+}
+
+class _OwnerAccountLabelState extends State<_OwnerAccountLabel> {
+  late final Future<OwnerProfile?> _profile = OwnerProfileRepo().fetch();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<OwnerProfile?>(
+        future: _profile,
+        builder: (context, snapshot) {
+          final nickname = snapshot.hasError ? null : snapshot.data?.displayName;
+          final user = widget.user;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                nickname ?? 'アカウント',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                user?.email ?? user?.uid ?? '未ログイン',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.secondaryText(context),
+                    ),
+              ),
+            ],
+          );
+        },
+      );
 }
 
 class _PolicySectionData {

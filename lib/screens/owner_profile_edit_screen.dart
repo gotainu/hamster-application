@@ -83,6 +83,7 @@ class _OwnerProfileEditScreenState extends State<OwnerProfileEditScreen> {
 
   final _repo = OwnerProfileRepo();
   final _municipalityController = TextEditingController();
+  final _displayNameController = TextEditingController();
   String? _prefecture;
   String _ageRange = '回答しない';
   int? _careYears;
@@ -104,6 +105,7 @@ class _OwnerProfileEditScreenState extends State<OwnerProfileEditScreen> {
     final profile = await _repo.fetch();
     if (!mounted) return;
     setState(() {
+      _displayNameController.text = profile?.displayName ?? '';
       _prefecture = profile?.prefecture;
       _municipalityController.text = profile?.municipality ?? '';
       _ageRange = profile?.ageRange ?? '回答しない';
@@ -116,6 +118,7 @@ class _OwnerProfileEditScreenState extends State<OwnerProfileEditScreen> {
     setState(() => _saving = true);
     try {
       await _repo.save(OwnerProfile(
+        displayName: _displayNameController.text,
         prefecture: _prefecture,
         municipality: _municipalityController.text,
         ageRange: _ageRange == '回答しない' ? null : _ageRange,
@@ -139,6 +142,7 @@ class _OwnerProfileEditScreenState extends State<OwnerProfileEditScreen> {
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _municipalityController.dispose();
     super.dispose();
   }
@@ -185,6 +189,20 @@ class _OwnerProfileEditScreenState extends State<OwnerProfileEditScreen> {
                             color: AppTheme.secondaryText(context),
                             height: 1.5,
                           ),
+                    ),
+                    const SizedBox(height: 20),
+                    _ProfileSection(
+                      icon: Icons.person_outline_rounded,
+                      title: 'あなたの呼び名',
+                      subtitle: 'アプリ設定のアカウント欄に表示します',
+                      child: TextField(
+                        controller: _displayNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: const InputDecoration(
+                          labelText: 'ニックネーム（任意）',
+                          prefixIcon: Icon(Icons.person_outline_rounded),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     PrefectureMapPreview(
