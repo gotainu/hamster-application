@@ -143,14 +143,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(store.saved?.condition, DailyCondition.normal);
-    expect(
-      store.saved?.observationLevels.values,
-      everyElement(DailyObservationLevel.normal),
-    );
+    expect(store.saved?.observationLevels, isEmpty,
+        reason: 'An overall answer does not answer each observation item');
     expect(find.text('記録しました'), findsOneWidget);
   });
 
-  testWidgets('concern path requires a location and stores its severity',
+  testWidgets('concern path allows overall-only and stores selected severity',
       (tester) async {
     final store = _FakeDailyCheckinStore();
     await tester.pumpWidget(_testApp(store));
@@ -163,7 +161,7 @@ void main() {
     final buttonFinder = find.byWidgetPredicate(
       (widget) => widget is FilledButton,
     );
-    expect(tester.widget<FilledButton>(buttonFinder).onPressed, isNull);
+    expect(tester.widget<FilledButton>(buttonFinder).onPressed, isNotNull);
 
     await tester.ensureVisible(find.text('呼吸'));
     await tester.tap(find.text('呼吸'));

@@ -74,8 +74,10 @@ class ObservationMutation {
     this.concernTags = const [],
     this.memo = '',
     required this.catalogVersion,
+    this.inputUiVersion = 'daily_checkin_history_v1',
   });
   final String mutationId, dayKey, catalogVersion;
+  final String inputUiVersion;
   final String? subjectId;
   final DateTime date;
   final int expectedRevision;
@@ -101,13 +103,18 @@ class ObservationMutation {
           'targetEventId': targetEventId,
         if (targetRevision != null) 'targetRevision': targetRevision,
         if (operation != ObservationOperation.cancel) ...{
-          'condition': condition,
-          'concernTags': concernTags,
-          'memo': memo,
+          if (inputUiVersion != 'daily_checkin_partial_v1' || condition != null)
+            'condition': condition,
+          if (inputUiVersion != 'daily_checkin_partial_v1' ||
+              concernTags.isNotEmpty)
+            'concernTags': concernTags,
+          if (inputUiVersion != 'daily_checkin_partial_v1' ||
+              memo.trim().isNotEmpty)
+            'memo': memo,
         },
         if (operation != ObservationOperation.cancel)
           'observationCatalogVersion': catalogVersion,
-        'inputUiVersion': 'daily_checkin_history_v1',
+        'inputUiVersion': inputUiVersion,
       };
   factory ObservationMutation.fromMap(Map<String, dynamic> map) =>
       ObservationMutation(
@@ -128,7 +135,9 @@ class ObservationMutation {
           concernTags:
               (map['concernTags'] as List?)?.cast<String>() ?? const [],
           memo: map['memo'] as String? ?? '',
-          catalogVersion: map['observationCatalogVersion'] as String? ?? '');
+          catalogVersion: map['observationCatalogVersion'] as String? ?? '',
+          inputUiVersion:
+              map['inputUiVersion'] as String? ?? 'daily_checkin_history_v1');
 }
 
 class ObservationSaveResult {

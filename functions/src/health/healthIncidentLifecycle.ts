@@ -19,6 +19,7 @@ const IGNORED_FLAGS = new Set([
   'activityComparisonMissing',
   'conditionMissing',
   'conditionUnknown',
+  'conditionOverallUnanswered',
   'weightMissing',
   'weightComparisonMissing',
   'weightStale',
@@ -178,6 +179,13 @@ export async function syncHealthIncidentLifecycle(params: {
     for (const activeDoc of activeSnapshot.docs) {
       if (currentIds.has(activeDoc.id)) continue;
       const previous = activeDoc.data() ?? {};
+      const condition = params.assessment.domains.condition;
+      if (previous.domain === 'condition' &&
+          (condition.state === 'unknown' || condition.state === 'insufficientData' ||
+            condition.flags.includes('conditionOverallUnanswered'))) {
+        // Missing overall evidence cannot resolve a previously observed concern.
+        continue;
+      }
       const stateVersion = typeof previous.stateVersion === 'number'
         ? previous.stateVersion + 1
         : 1;

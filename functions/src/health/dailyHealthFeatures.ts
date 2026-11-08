@@ -139,8 +139,12 @@ export function buildDailyHealthFeatures(params: {
     recordDate: targetDistance?.date ?? null,
   };
 
+  const checkin = params.source.dailyCheckin;
+  const hasConditionAnswer = ['normal', 'slightlyConcerned', 'veryConcerned'].includes(checkin.condition ?? '') ||
+    checkin.concernTags.length > 0 || Object.values(checkin.observationLevels).some(level => level === 'changed' || level === 'concerning');
   const condition = {
-    recorded: params.source.dailyCheckin.exists,
+    // A memo-only projection is saved, but is not a health observation.
+    recorded: checkin.exists && hasConditionAnswer,
     condition: params.source.dailyCheckin.condition,
     concernTags: params.source.dailyCheckin.concernTags,
     observationLevels:

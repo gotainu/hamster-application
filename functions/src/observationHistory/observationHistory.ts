@@ -8,6 +8,8 @@ import {commitIdentityIntroduction, dateOf, explicitInstant, invalid, isObject, 
 
 export const OBSERVATION_HISTORY_SCHEMA_VERSION = 1;
 export const OBSERVATION_HISTORY_INPUT_VERSION = 'daily_checkin_history_v1';
+export const OBSERVATION_PARTIAL_INPUT_VERSION = 'daily_checkin_partial_v1';
+type ObservationInputVersion = typeof OBSERVATION_HISTORY_INPUT_VERSION | typeof OBSERVATION_PARTIAL_INPUT_VERSION;
 export const OBSERVATION_HISTORY_TRANSACTION_LIMIT = 2000;
 export interface ObservationTiming {
   timePrecision: 'unknown' | 'date_only' | 'instant';
@@ -19,20 +21,20 @@ export interface ObservationTiming {
 }
 export interface ObservationAnswer {
   schemaVersion: 2;
-  condition: 'normal' | 'slightlyConcerned' | 'veryConcerned';
+  condition: 'normal' | 'slightlyConcerned' | 'veryConcerned' | null;
   concernTags: string[];
   observationLevels: Record<string, 'normal' | 'changed' | 'concerning'>;
   memo: string;
   observationCatalogVersion: string;
-  observationResponseMode: 'overall_with_selected_tags';
-  answerProvenance: {overall: 'explicit_submission'; selectedTags: 'explicit_selection'; normalLevels: 'automatic_normal'};
+  observationResponseMode: 'overall_with_selected_tags' | 'partial_overall_with_selected_tags';
+  answerProvenance: {overall: 'explicit_submission' | 'unanswered'; selectedTags: 'explicit_selection'; normalLevels: 'automatic_normal' | 'not_generated'};
 }
 export interface ObservationMutation {
   dayKey: string; date: Date; subjectId: string | null; expectedRevision: number; mutationId: string;
   operation: 'new_observation' | 'correction' | 'cancel';
   targetEventId: string | null; targetRevision: number | null;
   timing: ObservationTiming | null; answer: ObservationAnswer | null;
-  inputUiVersion: typeof OBSERVATION_HISTORY_INPUT_VERSION;
+  inputUiVersion: ObservationInputVersion;
 }
 export interface ObservationRevision {
   schemaVersion: number; ownerUid: string; petId: typeof MAIN_PET_SLOT; subjectId: string; dayKey: string;
@@ -83,7 +85,7 @@ function timing(value: unknown, dayKey: string, now: Date): ObservationTiming {
   if (!observed || observed.getTime() > now.getTime() || formatDateKey(observed) !== dayKey || (value.dateKey != null && value.dateKey !== dayKey)) invalid('観察時刻が不正です。');
   return {timePrecision: 'instant', dateKey: dayKey, observedAt: observed.toISOString(), confirmation: value.confirmation as ObservationTiming['confirmation'], clockSource: 'user_reported', timeZone: 'Asia/Tokyo'};
 }
-/** Automatic per-item normal is generated as before, and explicitly marked as non-answer evidence. */
+/** Legacy requests retain automatic normals; partial requests never synthesize unanswered items. */
 export function normalizeObservationMutation(value: unknown, now: Date): ObservationMutation {
   if (!isObject(value)) invalid('保存内容が不正です。');
   onlyFields(value, ['dayKey', 'date', 'subjectId', 'expectedRevision', 'mutationId', 'operation', 'targetEventId', 'targetRevision', 'timing', 'condition', 'concernTags', 'memo', 'observationCatalogVersion', 'inputUiVersion']);
@@ -91,7 +93,9 @@ export function normalizeObservationMutation(value: unknown, now: Date): Observa
   const date = explicitInstant(value.date);
   if (!date || formatDateKey(date) !== value.dayKey) invalid('表示用の日付が不正です。');
   const expectedRevision = revisionNumber(value.expectedRevision), mutationId = mutationKey(value.mutationId), subjectId = subjectKey(value.subjectId, true);
-  if (!['new_observation', 'correction', 'cancel'].includes(String(value.operation)) || value.inputUiVersion !== OBSERVATION_HISTORY_INPUT_VERSION) invalid('保存操作が不正です。');
+  if (!['new_observation', 'correction', 'cancel'].includes(String(value.operation)) || ![OBSERVATION_HISTORY_INPUT_VERSION, OBSERVATION_PARTIAL_INPUT_VERSION].includes(String(value.inputUiVersion))) invalid('保存操作が不正です。');
+  const inputUiVersion = value.inputUiVersion as ObservationInputVersion;
+  const partial = inputUiVersion === OBSERVATION_PARTIAL_INPUT_VERSION;
   const operation = value.operation as ObservationMutation['operation'];
   const targetEventId = value.targetEventId == null ? null : subjectKey(value.targetEventId);
   const targetRevision = value.targetRevision == null ? null : revisionNumber(value.targetRevision);
@@ -99,20 +103,24 @@ export function normalizeObservationMutation(value: unknown, now: Date): Observa
   if (operation !== 'new_observation' && targetRevision === null) invalid('訂正・取消の対象revisionが必要です。');
   if (operation === 'cancel') {
     if (value.condition != null || value.concernTags != null || value.memo != null || value.timing != null) invalid('取消に新しい回答は不要です。');
-    return {dayKey: value.dayKey, date, expectedRevision, subjectId, mutationId, operation, targetEventId, targetRevision, timing: null, answer: null, inputUiVersion: OBSERVATION_HISTORY_INPUT_VERSION};
+    return {dayKey: value.dayKey, date, expectedRevision, subjectId, mutationId, operation, targetEventId, targetRevision, timing: null, answer: null, inputUiVersion};
   }
-  if (!['normal', 'slightlyConcerned', 'veryConcerned'].includes(String(value.condition)) || !Array.isArray(value.concernTags) || value.concernTags.some(id => typeof id !== 'string' || !resolveObservationId(id))) invalid('観察回答が不正です。');
+  const rawTags = partial && value.concernTags === undefined ? [] : value.concernTags;
+  if (!(partial && value.condition == null) && !['normal', 'slightlyConcerned', 'veryConcerned'].includes(String(value.condition))) invalid('観察回答が不正です。');
+  if (!Array.isArray(rawTags) || rawTags.some(id => typeof id !== 'string' || !resolveObservationId(id))) invalid('観察回答が不正です。');
   if (value.observationCatalogVersion !== OBSERVATION_CATALOG_VERSION) invalid('観察項目が更新されています。最新版で確認してください。');
-  const condition = value.condition as ObservationAnswer['condition'];
-  const concernTags = [...new Set((value.concernTags as string[]).map(id => resolveObservationId(id)!))].sort((a, b) => (observationCatalog.find(item => item.id === a)!.order - observationCatalog.find(item => item.id === b)!.order));
+  const condition = partial && value.condition == null ? null : value.condition as ObservationAnswer['condition'];
+  const concernTags = [...new Set((rawTags as string[]).map(id => resolveObservationId(id)!))].sort((a, b) => (observationCatalog.find(item => item.id === a)!.order - observationCatalog.find(item => item.id === b)!.order));
   if (condition === 'normal' && concernTags.length) invalid('いつも通りの回答に気になる項目は指定できません。');
   const memo = value.memo ?? '';
   if (typeof memo !== 'string' || memo.length > 10000) invalid('メモが長すぎます。');
-  const observationLevels: ObservationAnswer['observationLevels'] = Object.fromEntries(activeObservationItems().filter(item => item.defaultNormal).map(item => [item.id, 'normal']));
+  if (partial && condition == null && concernTags.length === 0 && memo.trim().length === 0) invalid('観察内容を一つ以上入力してください。');
+  const observationLevels: ObservationAnswer['observationLevels'] = partial ? {} : Object.fromEntries(activeObservationItems().filter(item => item.defaultNormal).map(item => [item.id, 'normal']));
   for (const id of concernTags) observationLevels[id] = condition === 'veryConcerned' ? 'concerning' : 'changed';
   return {dayKey: value.dayKey, date, expectedRevision, subjectId, mutationId, operation, targetEventId, targetRevision, timing: timing(value.timing, value.dayKey, now),
-    answer: {schemaVersion: 2, condition, concernTags, observationLevels, memo: memo.trim(), observationCatalogVersion: OBSERVATION_CATALOG_VERSION, observationResponseMode: 'overall_with_selected_tags',
-      answerProvenance: {overall: 'explicit_submission', selectedTags: 'explicit_selection', normalLevels: 'automatic_normal'}}, inputUiVersion: OBSERVATION_HISTORY_INPUT_VERSION};
+    answer: {schemaVersion: 2, condition, concernTags, observationLevels, memo: memo.trim(), observationCatalogVersion: OBSERVATION_CATALOG_VERSION,
+      observationResponseMode: partial ? 'partial_overall_with_selected_tags' : 'overall_with_selected_tags',
+      answerProvenance: {overall: condition == null ? 'unanswered' : 'explicit_submission', selectedTags: 'explicit_selection', normalLevels: partial ? 'not_generated' : 'automatic_normal'}}, inputUiVersion};
 }
 export function resolveObservationHistory(params: {
   revisions: readonly ObservationRevision[]; knowledgeCutoff?: Date; historyStartedAt?: unknown; hadLegacyProjection?: boolean;

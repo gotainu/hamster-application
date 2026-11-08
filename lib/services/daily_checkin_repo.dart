@@ -29,16 +29,18 @@ final dailyObservationIds = List<String>.unmodifiable(
 );
 
 Map<String, DailyObservationLevel> buildDailyObservationLevels({
-  required DailyCondition condition,
+  required DailyCondition? condition,
   required Iterable<String> concernTags,
   List<ObservationCatalogItem> catalog = observationCatalog,
+  bool partial = false,
 }) {
   final result = <String, DailyObservationLevel>{
     for (final item in activeObservationItems(catalog: catalog))
-      if (item.defaultNormal) item.id: DailyObservationLevel.normal,
+      if (!partial && condition != null && item.defaultNormal)
+        item.id: DailyObservationLevel.normal,
   };
 
-  if (condition == DailyCondition.normal) return result;
+  if (!partial && condition == DailyCondition.normal) return result;
 
   final concernLevel = condition == DailyCondition.veryConcerned
       ? DailyObservationLevel.concerning
@@ -54,7 +56,7 @@ Map<String, DailyObservationLevel> buildDailyObservationLevels({
 class DailyCheckin {
   final String dayKey;
   final DateTime date;
-  final DailyCondition condition;
+  final DailyCondition? condition;
   final List<String> concernTags;
   final Map<String, DailyObservationLevel> observationLevels;
   final String memo;
@@ -82,15 +84,23 @@ class DailyCheckin {
     this.timing,
   });
 
-  bool get hasConcern => condition != DailyCondition.normal;
+  bool get hasConcern =>
+      (condition != null && condition != DailyCondition.normal) ||
+      concernTags.isNotEmpty ||
+      observationLevels.values.any((level) =>
+          level == DailyObservationLevel.changed ||
+          level == DailyObservationLevel.concerning);
 
   factory DailyCheckin.fromJson(Json json, {required String fallbackDayKey}) {
     final conditionText = json['condition'];
 
-    final condition = DailyCondition.values.firstWhere(
-      (e) => e.name == conditionText,
-      orElse: () => DailyCondition.normal,
-    );
+    DailyCondition? condition;
+    for (final value in DailyCondition.values) {
+      if (value.name == conditionText) {
+        condition = value;
+        break;
+      }
+    }
 
     final tagsRaw = json['concernTags'];
     final tags = tagsRaw is List
@@ -491,7 +501,8 @@ class DailyCheckinRepo implements DailyCheckinStore, DailyObservationStore {
   }
 
   /// The old interface remains for existing readers and test stores. Production
-  /// callers must supply explicit intent and timing through saveObservation.
+  /// callers must supply explicit intent through saveObservation. New partial
+  /// input may leave observation timing unknown.
   @override
   Future<void> saveDailyCheckin(
       {required DateTime date,

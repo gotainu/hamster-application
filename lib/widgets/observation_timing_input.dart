@@ -9,10 +9,12 @@ class ObservationTimingInput extends StatelessWidget {
       required this.model,
       required this.onChanged,
       this.enabled = true,
+      this.showTiming = true,
       this.now});
   final ObservationInputViewModel model;
   final VoidCallback onChanged;
   final bool enabled;
+  final bool showTiming;
   final DateTime Function()? now;
   @override
   Widget build(BuildContext context) {
@@ -47,69 +49,71 @@ class ObservationTimingInput extends StatelessWidget {
                     }
                   : null),
         ]),
-      Text('観察したタイミング', style: Theme.of(context).textTheme.bodySmall),
-      Wrap(spacing: 8, runSpacing: 4, children: [
-        if (isToday)
+      if (showTiming) ...[
+        Text('観察したタイミング', style: Theme.of(context).textTheme.bodySmall),
+        Wrap(spacing: 8, runSpacing: 4, children: [
+          if (isToday)
+            _choice(context,
+                label: const Text('いまの様子'),
+                key: const ValueKey('observation-time-now'),
+                selected: timing?.confirmation == 'now_confirmed',
+                onSelected: enabled
+                    ? (_) {
+                        model.confirmNow(clock());
+                        onChanged();
+                      }
+                    : null),
+          Semantics(
+              label: model.dateAccessibilityLabel,
+              child: _choice(context,
+                  label: Text(model.confirmedDateLabel),
+                  key: const ValueKey('observation-time-date'),
+                  selected:
+                      timing?.precision == ObservationTimePrecision.dateOnly,
+                  onSelected: enabled
+                      ? (_) {
+                          model.confirmDate();
+                          onChanged();
+                        }
+                      : null)),
           _choice(context,
-              label: const Text('いまの様子'),
-              key: const ValueKey('observation-time-now'),
-              selected: timing?.confirmation == 'now_confirmed',
+              label: const Text('時期不明'),
+              key: const ValueKey('observation-time-unknown'),
+              selected: timing?.precision == ObservationTimePrecision.unknown,
               onSelected: enabled
                   ? (_) {
-                      model.confirmNow(clock());
+                      model.confirmUnknown();
                       onChanged();
                     }
                   : null),
-        Semantics(
-            label: model.dateAccessibilityLabel,
-            child: _choice(context,
-                label: Text(model.confirmedDateLabel),
-                key: const ValueKey('observation-time-date'),
-                selected:
-                    timing?.precision == ObservationTimePrecision.dateOnly,
-                onSelected: enabled
-                    ? (_) {
-                        model.confirmDate();
-                        onChanged();
-                      }
-                    : null)),
-        _choice(context,
-            label: const Text('時期不明'),
-            key: const ValueKey('observation-time-unknown'),
-            selected: timing?.precision == ObservationTimePrecision.unknown,
-            onSelected: enabled
-                ? (_) {
-                    model.confirmUnknown();
-                    onChanged();
-                  }
-                : null),
-        ActionChip(
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerHighest,
-            labelStyle: Theme.of(context)
-                .textTheme
-                .labelLarge
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
-            label: Text(timing?.confirmation == 'time_confirmed'
-                ? '${timing!.observedAt!.toLocal().hour.toString().padLeft(2, '0')}:${timing.observedAt!.toLocal().minute.toString().padLeft(2, '0')}'
-                : '時刻を指定'),
-            key: const ValueKey('observation-time-select'),
-            onPressed: enabled
-                ? () async {
-                    final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.fromDateTime(clock()));
-                    if (picked == null) return;
-                    model.confirmTime(DateTime(
-                        model.date.year,
-                        model.date.month,
-                        model.date.day,
-                        picked.hour,
-                        picked.minute));
-                    onChanged();
-                  }
-                : null),
-      ]),
+          ActionChip(
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              labelStyle: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: Theme.of(context).colorScheme.onSurface),
+              label: Text(timing?.confirmation == 'time_confirmed'
+                  ? '${timing!.observedAt!.toLocal().hour.toString().padLeft(2, '0')}:${timing.observedAt!.toLocal().minute.toString().padLeft(2, '0')}'
+                  : '時刻を指定'),
+              key: const ValueKey('observation-time-select'),
+              onPressed: enabled
+                  ? () async {
+                      final picked = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(clock()));
+                      if (picked == null) return;
+                      model.confirmTime(DateTime(
+                          model.date.year,
+                          model.date.month,
+                          model.date.day,
+                          picked.hour,
+                          picked.minute));
+                      onChanged();
+                    }
+                  : null),
+        ]),
+      ],
     ]);
   }
 

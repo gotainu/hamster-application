@@ -22,8 +22,8 @@ void main() {
       'visual defaults are not evidence; batch save explicitly confirms defaults',
       () {
     final vm = CareActionInputViewModel(dayKey: '2026-10-12');
-    expect(vm.cleaningChoice('cageCleaning'), 'none');
-    expect(vm.minutes('roomWalk'), 0);
+    expect(vm.cleaningChoice('cageCleaning'), isNull);
+    expect(vm.minutes('roomWalk'), isNull);
     expect(vm.hasExplicitAnswer, isFalse);
     vm.confirmDefaults();
     expect(vm.mutation().inputUiVersion, 'care_actions_input_v2');
@@ -131,17 +131,16 @@ void main() {
     expect(vm.mutation().toMap(), wire);
     expect(vm.minutes('roomWalk'), 150);
   });
-  testWidgets('main save confirms defaults without creating a health normal',
+  testWidgets('empty form does not confirm defaults or create records',
       (tester) async {
     final health = CareHealthTestStore(), care = CareTestStore();
     await tester.pumpWidget(careInputTestApp(health, care));
     await tester.pumpAndSettle();
-    await save(tester);
+    final button = find.widgetWithText(FilledButton, 'この内容で記録');
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+    expect(find.text('1項目以上記録してください'), findsOneWidget);
     expect(health.saves, 0);
-    expect(
-        care.saved.single.actions.values
-            .every((a) => a.answerProvenance == 'batch_confirmation'),
-        isTrue);
+    expect(care.saved, isEmpty);
   });
   testWidgets(
       'health-only action never writes care even after local draft changes',
@@ -191,6 +190,9 @@ void main() {
           isFalse);
     }
     expect(care.saved, isEmpty);
+    await tester.ensureVisible(find
+        .byKey(const ValueKey('care-cageCleaning-beddingReplacement-none')));
+    await tester.pumpAndSettle();
     await tester.tap(find
         .byKey(const ValueKey('care-cageCleaning-beddingReplacement-none')));
     await save(tester);
@@ -259,10 +261,14 @@ void main() {
     await tester.tapAt(Offset(bounds.right - 1, bounds.center.dy));
     await tester.pumpAndSettle();
     expect(find.text('150 分'), findsOneWidget);
-    // No changed gesture value means no mutation. A normal save may confirm another untouched item.
-    await save(tester);
-    expect(care.saved.single.actions['roomWalk']!.details,
-        {'durationMinutes': 150});
+    // No changed gesture value means no mutation and no untouched defaults.
+    expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'この内容で記録'))
+            .onPressed,
+        isNull);
+    expect(care.saved, isEmpty);
+    expect(find.text('150 分'), findsOneWidget);
   });
   testWidgets(
       'legacy detail/time remain unknown and survive another action change',
@@ -294,7 +300,7 @@ void main() {
     expect(care.saved.single.actions['roomWalk']!.details, isEmpty);
     expect(care.saved.single.actions['roomWalk']!.answerProvenance, isNull);
   });
-  testWidgets('clear response is saved as unanswered instead of batch default',
+  testWidgets('clearing the only response leaves an unsavable empty draft',
       (tester) async {
     final care = CareTestStore();
     await tester.pumpWidget(careInputTestApp(CareHealthTestStore(), care));
@@ -303,17 +309,22 @@ void main() {
         .tap(find.byKey(const ValueKey('care-cageCleaning-partial_cleaning')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('care-clear-cageCleaning')));
-    await save(tester);
-    expect(care.saved.single.actions['cageCleaning']!.answer,
-        CareActionAnswer.unanswered);
-    expect(care.saved.single.actions['cageCleaning']!.answerProvenance,
-        'unanswered');
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'この内容で記録'))
+            .onPressed,
+        isNull);
+    expect(care.saved, isEmpty);
   });
   testWidgets(
       'direct input zero is explicit and invalid totals are not accepted',
       (tester) async {
     final care = CareTestStore();
     await tester.pumpWidget(careInputTestApp(CareHealthTestStore(), care));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+        find.byKey(const ValueKey('care-duration-value-roomWalk')));
     await tester.pumpAndSettle();
     await tester
         .tap(find.byKey(const ValueKey('care-duration-value-roomWalk')));
@@ -337,6 +348,9 @@ void main() {
       (tester) async {
     final care = _BlockingCareStore();
     await tester.pumpWidget(careInputTestApp(CareHealthTestStore(), care));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('care-cageCleaning-spot_removal')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('この内容で記録'));
     await tester.tap(find.text('この内容で記録'));

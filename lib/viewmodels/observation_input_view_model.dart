@@ -5,9 +5,14 @@ import '../services/daily_checkin_repo.dart';
 
 /// Confirmation and intent are separate from the answer's value.
 class ObservationInputViewModel {
-  ObservationInputViewModel({required this.date, required this.dayKey});
+  ObservationInputViewModel({
+    required this.date,
+    required this.dayKey,
+    this.allowPartial = false,
+  });
   final DateTime date;
   final String dayKey;
+  final bool allowPartial;
   ObservationLoadResult state = const ObservationLoadResult();
   ObservationOperation? operation;
   ObservationTiming? timing;
@@ -20,7 +25,7 @@ class ObservationInputViewModel {
       state.hasProfile &&
       state.pending == null &&
       operation != null &&
-      timing != null;
+      (allowPartial || timing != null);
   void load(ObservationLoadResult value) {
     state = value;
     operation =
@@ -40,12 +45,20 @@ class ObservationInputViewModel {
   void confirmDate() => timing = ObservationTiming.dateOnly(dayKey);
   void confirmUnknown() => timing = const ObservationTiming.unknown();
   ObservationMutation mutation(
-      {required DailyCondition condition,
+      {required DailyCondition? condition,
       required List<String> tags,
       required String memo,
       bool cancel = false}) {
     if (!cancel && !canSave) {
       throw StateError('observation_confirmation_required');
+    }
+    final normalizedTags = normalizeObservationIds(tags);
+    final trimmedMemo = memo.trim();
+    if (!cancel &&
+        (allowPartial
+            ? condition == null && normalizedTags.isEmpty && trimmedMemo.isEmpty
+            : condition == null)) {
+      throw StateError('observation_answer_required');
     }
     final current = state.current;
     return ObservationMutation(
@@ -62,9 +75,12 @@ class ObservationInputViewModel {
             ? current?.eventRevision ?? 0
             : null,
         timing: timing ?? const ObservationTiming.unknown(),
-        condition: condition.name,
-        concernTags: normalizeObservationIds(tags),
-        memo: memo.trim(),
-        catalogVersion: observationCatalogVersion);
+        condition: condition?.name,
+        concernTags: normalizedTags,
+        memo: trimmedMemo,
+        catalogVersion: observationCatalogVersion,
+        inputUiVersion: allowPartial
+            ? 'daily_checkin_partial_v1'
+            : 'daily_checkin_history_v1');
   }
 }

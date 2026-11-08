@@ -721,7 +721,11 @@ function buildConditionAssessment(
     ...condition.concernTags,
     ...structuredChanges.map(([tag]) => tag),
   ]));
-  const flags = changedTags.map((tag) => `condition_${tag}`);
+  const flags = [
+    ...changedTags.map((tag) => `condition_${tag}`),
+    // Keep explicit concerns, while distinguishing an unanswered overall state.
+    ...(condition.condition == null ? ['conditionOverallUnanswered'] : []),
+  ];
   const concerningTags = structuredChanges
     .filter(([, level]) => level === 'concerning')
     .map(([tag]) => tag);
@@ -796,7 +800,7 @@ function buildConditionAssessment(
   return {
     state: 'unknown',
     score: null,
-    flags: ['conditionUnknown'],
+    flags: ['conditionUnknown', ...(condition.condition == null ? ['conditionOverallUnanswered'] : [])],
     summary: '様子チェックの状態を判定できませんでした。',
     recommendedActions: [],
     sourceUpdatedAt: condition.recordDate,

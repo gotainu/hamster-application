@@ -100,7 +100,8 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     if (_repo is DailyObservationStore) {
       _observation = ObservationInputViewModel(
           date: _repo.normalizeLocalDay(_date),
-          dayKey: _repo.dateKeyLocal(_date));
+          dayKey: _repo.dateKeyLocal(_date),
+          allowPartial: true);
     }
     _careRepo = widget.careRepo ?? DailyCareActionsRepo();
     _care = CareActionInputViewModel(
@@ -168,7 +169,12 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
           _isEditing = true;
           _message = '今日の様子は同期待ちです。まだ保存確定ではありません。';
           if (pending.operation != ObservationOperation.cancel) {
-            _condition = DailyCondition.values.byName(pending.condition!);
+            _condition = switch (pending.condition) {
+              'normal' => DailyCondition.normal,
+              'slightlyConcerned' => DailyCondition.slightlyConcerned,
+              'veryConcerned' => DailyCondition.veryConcerned,
+              _ => null,
+            };
             _selectedTags
               ..clear()
               ..addAll(pending.concernTags);
@@ -213,61 +219,55 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     }
   }
 
-  bool get _showConcernFields =>
-      _condition == DailyCondition.slightlyConcerned ||
-      _condition == DailyCondition.veryConcerned;
+  bool get _hasHealthInput =>
+      _condition != null ||
+      _selectedTags.isNotEmpty ||
+      _memoCtrl.text.trim().isNotEmpty;
 
   bool get _healthConfirmed =>
       !_healthLoadFailed && (_observation == null || _observation!.canSave);
-
-  bool get _canSave =>
-      !_isLoading &&
-      !_isSaving &&
-      ((_healthDirty &&
-              _condition != null &&
-              (!_showConcernFields || _selectedTags.isNotEmpty)) ||
-          (!_careLoadFailed && _care.canConfirmAndSave)) &&
-      (!_healthDirty ||
-          (!_showConcernFields || _selectedTags.isNotEmpty) &&
-              _healthConfirmed);
 
   bool get _canSaveHealthOnly =>
       !_isLoading &&
       !_isSaving &&
       _healthDirty &&
+      _hasHealthInput &&
       _healthConfirmed &&
-      _condition != null &&
-      (!_showConcernFields || _selectedTags.isNotEmpty);
+      (_condition != null || _observation != null);
+
+  bool get _canSave =>
+      !_isLoading &&
+      !_isSaving &&
+      (_canSaveHealthOnly || (!_careLoadFailed && _care.canSave)) &&
+      (!_healthDirty || !_hasHealthInput || _canSaveHealthOnly);
 
   bool get _showSafetyGuidance =>
       _condition == DailyCondition.veryConcerned ||
       _selectedTags.contains('breathing');
 
-  String _conditionLabel(DailyCondition condition) => switch (condition) {
+  String _conditionLabel(DailyCondition? condition) => switch (condition) {
         DailyCondition.normal => 'いつも通り',
         DailyCondition.slightlyConcerned => '少し違う',
         DailyCondition.veryConcerned => '心配',
+        null => '総合状態は未入力',
       };
 
-  Color _conditionColor(BuildContext context, DailyCondition condition) {
+  Color _conditionColor(BuildContext context, DailyCondition? condition) {
     return switch (condition) {
       DailyCondition.normal => AppTheme.envGood,
       DailyCondition.slightlyConcerned =>
         AppTheme.environmentAccentForContext(context, '注意'),
       DailyCondition.veryConcerned => AppTheme.envDanger,
+      null => AppTheme.quickRecordGlow(context),
     };
   }
 
   void _selectCondition(DailyCondition condition) {
     setState(() {
-      _condition = condition;
+      _condition = _condition == condition ? null : condition;
       _message = null;
 
-      if (condition == DailyCondition.normal) {
-        _selectedTags.clear();
-        _memoCtrl.clear();
-        _memoExpanded = false;
-      }
+      if (_condition == DailyCondition.normal) _selectedTags.clear();
       _updateHealthDirty();
     });
   }
@@ -275,7 +275,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   void _updateHealthDirty() {
     final saved = _savedCheckin;
     if (saved == null) {
-      _healthDirty = _condition != null;
+      _healthDirty = _hasHealthInput;
       return;
     }
     final savedTags =
@@ -285,8 +285,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         _selectedTags.length != savedTags.length ||
         !_selectedTags.every(savedTags.contains) ||
         _memoCtrl.text.trim() != saved.memo.trim() ||
-        (_observation?.operation == ObservationOperation.newObservation &&
-            _observation?.timing != null) ||
+        _observation?.operation == ObservationOperation.newObservation ||
         (_observation?.operation == ObservationOperation.correction &&
             _observation?.timing != null &&
             jsonEncode(_observation!.timing!.toMap()) !=
@@ -299,6 +298,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         _selectedTags.remove(id);
       } else {
         _selectedTags.add(id);
+        if (_condition == DailyCondition.normal) _condition = null;
       }
       _updateHealthDirty();
       _message = null;
@@ -311,24 +311,11 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
       bool healthOnly = false}) async {
     if (_isSaving || _isLoading) return;
     final condition = _condition;
-    final saveHealth =
-        !retryCare && !cancelCare && _healthDirty && condition != null;
-    if (!healthOnly &&
-        !retryCare &&
-        !cancelCare &&
-        !_careLoadFailed &&
-        (!_healthDirty || !_showConcernFields || _selectedTags.isNotEmpty)) {
-      _care.confirmDefaults();
-    }
+    final saveHealth = !retryCare && !cancelCare && _canSaveHealthOnly;
     final saveCare = !healthOnly &&
         !_careLoadFailed &&
         (_care.canSave || retryCare || cancelCare);
-    if ((!saveHealth && !saveCare) ||
-        (saveHealth &&
-            (!_healthConfirmed ||
-                (_showConcernFields && _selectedTags.isEmpty)))) {
-      return;
-    }
+    if (!saveHealth && !saveCare) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _isSaving = true;
@@ -338,12 +325,13 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     var healthSaved = false;
     var careSaved = false;
     if (saveHealth) {
-      final tags = _showConcernFields
-          ? _selectedTags.toList(growable: false)
-          : const <String>[];
+      final tags = _selectedTags.toList(growable: false);
       final levels = buildDailyObservationLevels(
-          condition: condition, concernTags: tags, catalog: widget.catalog);
-      final memo = _showConcernFields ? _memoCtrl.text.trim() : '';
+          condition: condition,
+          concernTags: tags,
+          catalog: widget.catalog,
+          partial: true);
+      final memo = _memoCtrl.text.trim();
       try {
         ObservationSaveResult? historyResult;
         if (_repo is DailyObservationStore) {
@@ -366,7 +354,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
         } else {
           await _repo.saveDailyCheckin(
               date: _date,
-              condition: condition,
+              condition: condition!,
               concernTags: tags,
               observationLevels: levels,
               memo: memo);
@@ -486,7 +474,7 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
     final model = _observation!;
     final mutation = cancel
         ? model.mutation(
-            condition: _condition!,
+            condition: _condition,
             tags: _selectedTags.toList(),
             memo: _memoCtrl.text,
             cancel: true)
@@ -546,13 +534,13 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
   }
 
   Future<void> _recordHealthProgress(
-      DailyCondition condition, List<String> tags, String memo) async {
+      DailyCondition? condition, List<String> tags, String memo) async {
     try {
       await OnboardingStateRepo().recordFirstMonitoringData('daily_checkin');
     } catch (_) {}
     try {
       await AppAnalytics.logDailyInputComplete(
-          condition: condition.name,
+          condition: condition?.name ?? 'unanswered',
           concernTagCount: tags.length,
           hasMemo: memo.isNotEmpty);
     } catch (_) {}
@@ -666,98 +654,92 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
                       child: choices[index]))
           ]);
         }),
-        if (_observation != null && _condition != null) ...[
+        if (_observation != null) ...[
           const SizedBox(height: 8),
           ObservationTimingInput(
               model: _observation!,
+              showTiming: false,
               enabled: !_isSaving && !_healthLoadFailed,
               onChanged: () => setState(_updateHealthDirty)),
         ],
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 240),
-          child: !_showConcernFields
-              ? const SizedBox.shrink(key: ValueKey('no-concern-fields'))
-              : Padding(
-                  key: const ValueKey('concern-fields'),
-                  padding: const EdgeInsets.only(top: 18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '気になるところ',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                            ),
+          child: Padding(
+            key: const ValueKey('concern-fields'),
+            padding: const EdgeInsets.only(top: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '気になるところ',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
                       ),
-                      const SizedBox(height: 10),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final itemWidth = (constraints.maxWidth - 8) / 2;
-                          return Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: _observations.map((observation) {
-                              return SizedBox(
-                                width: itemWidth,
-                                child: _ObservationTile(
-                                  observation: observation,
-                                  selected:
-                                      _selectedTags.contains(observation.id),
-                                  onTap: () => _toggleTag(observation.id),
-                                ),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                      if (_showSafetyGuidance) ...[
-                        const SizedBox(height: 10),
-                        const _SafetyGuidance(),
-                      ],
-                      const SizedBox(height: 6),
-                      TextButton.icon(
-                        onPressed: () =>
-                            setState(() => _memoExpanded = !_memoExpanded),
-                        icon: Icon(
-                          _memoExpanded
-                              ? Icons.remove_rounded
-                              : Icons.add_rounded,
-                        ),
-                        label: Text(_memoExpanded ? 'メモを閉じる' : 'メモ（任意）'),
-                      ),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        child: !_memoExpanded
-                            ? const SizedBox.shrink(
-                                key: ValueKey('memo-closed'),
-                              )
-                            : Padding(
-                                key: const ValueKey('memo-open'),
-                                padding: const EdgeInsets.only(top: 2),
-                                child: TextField(
-                                  controller: _memoCtrl,
-                                  onChanged: (_) =>
-                                      setState(_updateHealthDirty),
-                                  minLines: 2,
-                                  maxLines: 4,
-                                  maxLength: 240,
-                                  decoration: InputDecoration(
-                                    hintText: 'メモ',
-                                    filled: true,
-                                    fillColor:
-                                        AppTheme.quickRecordObjectSurface(
-                                      context,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ],
-                  ),
                 ),
+                const SizedBox(height: 10),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final itemWidth = (constraints.maxWidth - 8) / 2;
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _observations.map((observation) {
+                        return SizedBox(
+                          width: itemWidth,
+                          child: _ObservationTile(
+                            observation: observation,
+                            selected: _selectedTags.contains(observation.id),
+                            onTap: () => _toggleTag(observation.id),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+                if (_showSafetyGuidance) ...[
+                  const SizedBox(height: 10),
+                  const _SafetyGuidance(),
+                ],
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: () =>
+                      setState(() => _memoExpanded = !_memoExpanded),
+                  icon: Icon(
+                    _memoExpanded ? Icons.remove_rounded : Icons.add_rounded,
+                  ),
+                  label: Text(_memoExpanded ? 'メモを閉じる' : 'メモ（任意）'),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  child: !_memoExpanded
+                      ? const SizedBox.shrink(
+                          key: ValueKey('memo-closed'),
+                        )
+                      : Padding(
+                          key: const ValueKey('memo-open'),
+                          padding: const EdgeInsets.only(top: 2),
+                          child: TextField(
+                            controller: _memoCtrl,
+                            onChanged: (_) => setState(_updateHealthDirty),
+                            minLines: 2,
+                            maxLines: 4,
+                            maxLength: 240,
+                            decoration: InputDecoration(
+                              hintText: 'メモ',
+                              filled: true,
+                              fillColor: AppTheme.quickRecordObjectSurface(
+                                context,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 18),
         CareActionInputFields(
@@ -803,6 +785,8 @@ class _DailyConditionInputCardState extends State<DailyConditionInputCard> {
           Text(_care.draftSummary,
               key: const ValueKey('care-confirmation-summary'),
               style: AppTheme.dataCaptionStyle(context)),
+        if (!_hasHealthInput && !_care.hasExplicitAnswer)
+          const Text('1項目以上記録してください'),
         const SizedBox(height: AppTheme.careContentGap),
         ConstrainedBox(
           constraints:

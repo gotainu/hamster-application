@@ -2,7 +2,7 @@ import 'package:uuid/uuid.dart';
 import '../models/care_action_catalog.dart';
 import '../models/daily_care_actions.dart';
 
-/// A local draft. Visual zero/none defaults are not answers until confirmed.
+/// A local draft. Untouched care items remain unanswered.
 /// Voice input can use these same selections without changing the save contract.
 class CareActionInputViewModel {
   static const int sliderMaxMinutes = 120;
@@ -24,11 +24,9 @@ class CareActionInputViewModel {
   String? detailError;
   bool get hasExplicitAnswer =>
       actions.values.any((a) => a.answer != CareActionAnswer.unanswered);
-  bool get canSave => dirty && pending == null && detailError == null;
-  bool get canConfirmAndSave =>
-      (dirty || _unconfirmedDefaults.isNotEmpty) &&
-      pending == null &&
-      detailError == null;
+  bool get canSave =>
+      dirty && hasExplicitAnswer && pending == null && detailError == null;
+  bool get canConfirmAndSave => canSave;
   bool isUnconfirmed(String id) => _unconfirmedDefaults.contains(id);
 
   void load(CareActionLoadResult result) {
@@ -65,10 +63,9 @@ class CareActionInputViewModel {
   }
 
   String? cleaningChoice(String id) {
-    if (isUnconfirmed(id) ||
-        actions[id]?.answer == CareActionAnswer.notPerformed) {
-      return 'none';
-    }
+    final answer = actions[id]?.answer;
+    if (isUnconfirmed(id) || answer == CareActionAnswer.unanswered) return null;
+    if (answer == CareActionAnswer.notPerformed) return 'none';
     final key = definition(id, 'cleaning_type')?.key;
     return key == null ? null : actions[id]?.details[key] as String?;
   }
@@ -99,10 +96,9 @@ class CareActionInputViewModel {
   }
 
   int? minutes(String id) {
-    if (isUnconfirmed(id) ||
-        actions[id]?.answer == CareActionAnswer.notPerformed) {
-      return 0;
-    }
+    final answer = actions[id]?.answer;
+    if (isUnconfirmed(id) || answer == CareActionAnswer.unanswered) return null;
+    if (answer == CareActionAnswer.notPerformed) return 0;
     final key = definition(id, 'daily_total')?.key;
     final value = key == null ? null : actions[id]?.details[key];
     return value is int ? value : null;
@@ -164,7 +160,7 @@ class CareActionInputViewModel {
     dirty = true;
   }
 
-  /// Only the explicit normal save may turn untouched visual defaults into facts.
+  /// Legacy explicit batch confirmation; partial input never invokes this.
   void confirmDefaults() {
     if (pending != null || detailError != null) return;
     for (final item in activeCareActionItems(catalog: catalog)) {
@@ -211,21 +207,27 @@ class CareActionInputViewModel {
         return '${item.label} ${answer.answer.label}';
       }).join('・');
 
-  CareActionMutation mutation({bool cancel = false}) =>
-      pending ??
-      CareActionMutation(
-          dayKey: dayKey,
-          expectedRevision: revision,
-          mutationId: const Uuid().v4(),
-          operation: cancel ? 'cancel' : 'save',
-          inputUiVersion: 'care_actions_input_v2',
-          actions: cancel
-              ? const {}
-              : Map.unmodifiable({
-                  for (final item in activeCareActionItems(catalog: catalog))
-                    item.id: actions[item.id] ??
-                        const CareActionResponse(answerProvenance: 'unanswered')
-                }));
+  CareActionMutation mutation({bool cancel = false}) {
+    if (pending != null) return pending!;
+    if (!cancel && !hasExplicitAnswer) {
+      throw StateError('care_action_answer_required');
+    }
+    return CareActionMutation(
+        dayKey: dayKey,
+        expectedRevision: revision,
+        mutationId: const Uuid().v4(),
+        operation: cancel ? 'cancel' : 'save',
+        inputUiVersion: 'care_actions_input_v2',
+        actions: cancel
+            ? const {}
+            : Map.unmodifiable({
+                for (final item in activeCareActionItems(catalog: catalog))
+                  if (actions[item.id]?.answer != null &&
+                      actions[item.id]!.answer != CareActionAnswer.unanswered)
+                    item.id: actions[item.id]!
+              }));
+  }
+
   void apply(CareActionSaveResult result) {
     if (!result.confirmed) {
       pending = result.mutation;

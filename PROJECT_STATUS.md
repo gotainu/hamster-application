@@ -4,6 +4,18 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-pre-optin-task5-20261108:start -->
+## 2026-11-08 オプトイン前の微修正・タスク5完了（今日の様子の部分保存／全件承認待ち）
+
+- **開始と保護**：本人のタスク5着手指示を受領。`codex/pre-optin-polish-20261108`、開始HEAD `db3d9e227856aa855c35b9ffc5248b505bd3f1d1`、開始status・既存3,074ファイルのSHAをローカル監査へ保存。既存フォーム文書差分・iOSローカル設定・未追跡素材を保持し、今回のコミットから除外する。配布記録／pubspecのAndroid `1.0.1／code3`・TestFlight `1.0.1／build3`は維持し、Console再確認・SDK／依存更新・新ビルドは0。
+- **原因と保存契約の限定修正**：旧フォームは総合状態と観察タイミングを必須とし、保存時に未操作のケアを「なし／0分」へ確定、サーバーは未選択の観察項目へnormalを自動補完していた。新入力だけ`daily_checkin_partial_v1`で識別し、総合状態／気になる項目／メモ／ケアを独立して保存可能にする。完全空・空白メモのみはUI／VM／サーバーで拒否。新規の観察時期は既存unknown表現で日時を捏造せず、時期の選択欄は非表示。旧履歴の訂正／新観察の区別と保存済みタイミングは保持する。
+- **未回答と後方互換**：総合状態欠落はnull、選択タグだけ既存のchanged／concerningの意味を持たせ、他項目をnormalへ埋めない。メモはtrimし空文字を回答に数えない。未操作ケアは未回答表示・新リクエストでは省略し、明示的に選んだ「なし／0分」と区別する（サーバー内部の既存unanswered表現は維持）。旧`history_v1`の完全入力／履歴／timing／未送信リクエスト・pending再送の内容とfingerprintを維持し、既存データの移行・一括更新・履歴消去は0。nullの総合状態をnormalやhasConcernへ誤変換せず、明示concernタグ／levelsはconcernとして保持する。
+- **Silver／Gold・通知の境界**：既存Evaluatorはnull／insufficientDataに対応済みのため、重み・閾値・スコア設計は変更しない。メモだけのRawは保存するがSilverの健康回答ありに数えず、Goldは未入力／score:null。項目だけの明示concernは従来の評価経路で扱い、全体未回答フラグを付与する。既存のcondition通知を欠損や未回答だけで「解消」へ進めない局所guardを追加し、この不足フラグ自体を新規incidentにしない。他domainの通知判定・実通知送信・過去のGold再計算は0。Homeは従来のGold読込を維持し、AI文脈の既存整形は未入力を未入力と表すためコード変更不要。
+- **限定検証**：Flutterは重複を除く関連75件PASS（新model／VM／Repo15＋既存identity／care Repo23＋部分保存の実Widget13＋既存入力／care24）。総合3状態だけ・掃除だけ・散歩だけ・食欲／排泄だけ・メモだけ・複数の一部・全空・0／normal非補完・旧完全入力／timing・pending再送・ケア／健康の独立保存を合成Storeで確認。Functionsは新16＋既存30＝46件PASS、Raw履歴／projectionのメモリ内整合・Silver／Goldの欠損評価・新旧再送・欠損時の新規／解消通知抑止・旧評価値の同値を確認し、`tsc --noEmit`PASS。既存RAG formatterをAST抽出した4件で未入力をnormalとしてAIへ渡さないことを確認（実AI要求0・外部RAGソース変更0）。
+- **目視と解析**：実カードを既存Theme／実アセットで390px明色・320px暗色に描画して画像を開き、観察タイミング欄なし、未回答表示、項目選択、スクロール・保存までの操作を限定確認。実機／ネイティブIMEは未確認。既存UIテストの画面外tapだけはスクロール前提に修正し、期待値を弱めない。最終`flutter analyze --no-pub`は既存57件（warning39／info18・error0）で終了1、前タスクの診断とmessage／path／code照合で追加0。変更Flutter6ソースの解析は指摘0、`git diff --check`PASS。Nodeは壊れた旧Homebrew実体を更新せず、既存nvm Node22.23.1を明示して実行した。Functions生成lib・既存SDK／lock／署名は不変。
+- **コミット・反映待ち**：本タスクのFlutter6ソース・Functions4ソース・関連5テスト・本節のみを、指定メッセージで専用ブランチへ1コミット。モデル／入力／評価欠損の直接範囲だけで、課金・認証・App Check／DeviceCheck・アバター・利用権限・飼育実データ・本番Functions／Firestore／通知／AIは変更0。新入力版はサーバー側受理対応を必要とするため、将来の承認済み反映時はFunctions対応を先に適用してからアプリ更新する。今回はデプロイ／main merge・push／code4・build4／アップロード／テスター案内を行わず、本人のタスク5完了承認と、全5件の差分レビュー等への別指示を待って停止する。
+<!-- hamcare-pre-optin-task5-20261108:end -->
+
 <!-- hamcare-pre-optin-task4-20261108:start -->
 ## 2026-11-08 オプトイン前の微修正・タスク4完了（任意ニックネーム／停止）
 
