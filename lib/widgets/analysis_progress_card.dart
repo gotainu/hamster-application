@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
+import '../models/hamster_avatar.dart';
+import '../models/pet_profile.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
+import '../services/hamster_avatar_condition_resolver.dart';
 import '../services/personalized_analysis_repo.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/analysis_progress_view_model.dart';
 import 'status_card.dart';
+import 'hamster_avatar_view.dart';
 
 /// A calm progress surface for server-owned body/activity readiness.
 /// Report navigation is owned by the caller and always opens the unified report.
@@ -15,6 +21,7 @@ class AnalysisProgressCard extends StatelessWidget {
     this.onViewAnalysis,
     this.readinessStream,
     this.illustrationAsset,
+    this.petProfile,
   });
 
   // Kept for existing callers; onboarding state never determines readiness.
@@ -26,6 +33,7 @@ class AnalysisProgressCard extends StatelessWidget {
   final VoidCallback? onViewAnalysis;
   final Stream<List<Map<String, dynamic>>>? readinessStream;
   final String? illustrationAsset;
+  final PetProfile? petProfile;
 
   @override
   Widget build(BuildContext context) =>
@@ -60,7 +68,8 @@ class AnalysisProgressCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _PreparationHeader(view: view, asset: asset),
+                _PreparationHeader(
+                    view: view, asset: asset, petProfile: petProfile),
                 const SizedBox(height: AppTheme.analysisPreparationMetricGap),
                 for (final metric in view.metrics) ...[
                   _MetricProgress(metric: metric),
@@ -103,9 +112,39 @@ class AnalysisProgressCard extends StatelessWidget {
 }
 
 class _PreparationHeader extends StatelessWidget {
-  const _PreparationHeader({required this.view, required this.asset});
+  const _PreparationHeader(
+      {required this.view, required this.asset, required this.petProfile});
   final AnalysisProgressViewModel view;
   final String? asset;
+  final PetProfile? petProfile;
+
+  Widget _illustration(double size) {
+    const key = ValueKey('analysis-preparation-illustration');
+    final profile = petProfile;
+    if (profile == null || !profile.hasAvatarIdentity) {
+      return Image.asset(asset!,
+          key: key, width: size, height: size, fit: BoxFit.contain);
+    }
+    final resolved = const HamsterAvatarAssetResolver().resolve(
+      appearance: const HamsterAvatarAppearanceResolver().resolve(profile),
+      // This card represents missing analysis data, not a health assessment.
+      conditionResult: const HamsterAvatarConditionResolver()
+          .resolve(assessment: null, petName: profile.name),
+    );
+    return HamsterAvatarView(
+      key: key,
+      size: size,
+      showBackdrop: false,
+      presentation: HamsterAvatarPresentation(
+        appearance: resolved.appearance,
+        condition: resolved.condition,
+        cause: resolved.cause,
+        assetCandidates: [...resolved.assetCandidates, asset!],
+        message: resolved.message,
+        animateBreathing: resolved.animateBreathing,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,17 +163,9 @@ class _PreparationHeader extends StatelessWidget {
           constraints.maxWidth < AppTheme.analysisPreparationCompactWidth ||
               MediaQuery.textScalerOf(context).scale(1) > 1.4;
       final picture = ExcludeSemantics(
-        child: Image.asset(
-          asset!,
-          key: const ValueKey('analysis-preparation-illustration'),
-          width: stacked
-              ? AppTheme.analysisPreparationCompactIllustrationSize
-              : AppTheme.analysisPreparationIllustrationSize,
-          height: stacked
-              ? AppTheme.analysisPreparationCompactIllustrationSize
-              : AppTheme.analysisPreparationIllustrationSize,
-          fit: BoxFit.contain,
-        ),
+        child: _illustration(stacked
+            ? AppTheme.analysisPreparationCompactIllustrationSize
+            : AppTheme.analysisPreparationIllustrationSize),
       );
       if (stacked) {
         return Column(

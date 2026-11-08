@@ -21,11 +21,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/personality_report.dart';
+import 'package:hamster_project/models/hamster_avatar.dart';
 import 'package:hamster_project/screens/home.dart';
 import 'package:hamster_project/widgets/personality_report_entry.dart';
 import 'package:hamster_project/screens/personality_report_screen.dart';
 import 'package:hamster_project/screens/personality_report_history_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
+import 'package:hamster_project/widgets/analysis_progress_card.dart';
+import 'package:hamster_project/widgets/hamster_avatar_view.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/metric_comparison_bar.dart';
 
@@ -475,6 +478,66 @@ void main() {
     await db.changes.close();
   });
 
+  testWidgets('analysis preparation follows the current Home pet stream',
+      (tester) async {
+    const profilePath = 'users/$_uid/pet_profiles/main_pet';
+    for (final metric in ['body', 'activity']) {
+      db.documents['users/$_uid/analysis_readiness/$metric'] = {
+        'currentStatus': 'learning',
+        'validRecordCount': 3,
+        'requiredRecordCount': 7,
+        'observationSpanDays': 8,
+        'requiredObservationSpanDays': 14,
+      };
+    }
+    db.documents[profilePath] = {
+      'name': '最初の子',
+      'species': 'シリアン',
+      'color': 'ブラック・濃色系',
+      'subjectId': 'synthetic-pet-a',
+    };
+    await _home(tester, _Observer());
+    final card = find.byType(AnalysisProgressCard);
+    await tester.ensureVisible(card);
+    await _frames(tester);
+    Finder avatar() => find.descendant(
+        of: card, matching: find.byType(HamsterAvatarView));
+    expect(tester.widget<AnalysisProgressCard>(card).petProfile?.subjectId,
+        'synthetic-pet-a');
+    expect(tester.widget<HamsterAvatarView>(avatar())
+        .presentation.assetCandidates.first,
+        'assets/avatars/syrian/dark/insufficient_data.png');
+    for (final color in ['パイド', 'ノーマルブラウン系']) {
+      db.documents[profilePath] = {
+        'name': '次の子',
+        'species': 'ロボロフスキー',
+        'color': color,
+        'subjectId': 'synthetic-pet-b',
+      };
+      db.changes.add(null);
+      await _frames(tester);
+      expect(tester.widget<AnalysisProgressCard>(card).petProfile?.subjectId,
+          'synthetic-pet-b');
+      final presentation =
+          tester.widget<HamsterAvatarView>(avatar()).presentation;
+      final variant = color == 'パイド' ? 'pied' : 'normal';
+      expect(presentation.assetCandidates.first,
+          'assets/avatars/roborovski/$variant/insufficient_data.png');
+      expect(presentation.condition, HamsterAvatarCondition.insufficientData);
+    }
+    db.documents.remove(profilePath);
+    db.changes.add(null);
+    await _frames(tester);
+    expect(tester.widget<AnalysisProgressCard>(card).petProfile, isNull);
+    expect(avatar(), findsNothing);
+    final fallback = find.descendant(of: card, matching: find.byType(Image));
+    expect((tester.widget<Image>(fallback).image as AssetImage).assetName,
+        AppTheme.analysisPreparationIllustrationAsset);
+    expect(db.writes, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _frames(tester);
+  });
   test('B-equivalent Gold retains unrounded measurements and both readiness',
       () {
     final report = PersonalityReport.fromMap(_gold());

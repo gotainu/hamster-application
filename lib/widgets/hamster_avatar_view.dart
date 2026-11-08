@@ -149,6 +149,7 @@ class _HamsterAvatarViewState extends State<HamsterAvatarView>
                 ),
                 child: Image.asset(
                   path,
+                  key: ValueKey(path),
                   fit: BoxFit.contain,
                   filterQuality: FilterQuality.high,
                   errorBuilder: (context, error, stackTrace) {

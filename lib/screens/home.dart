@@ -286,6 +286,7 @@ class HomeScreenState extends State<HomeScreen> {
                               onOpen: _openPersonalityReport),
                           const SizedBox(height: 14),
                           AnalysisProgressCard(
+                            petProfile: petProfile,
                             onViewAnalysis: _openLatestReport,
                             onOpenRecord: () =>
                                 widget.onOpenQuickRecord?.call(),

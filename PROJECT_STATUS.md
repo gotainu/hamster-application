@@ -4,6 +4,17 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-pre-optin-task2-20261108:start -->
+## 2026-11-08 オプトイン前の微修正・タスク2完了（分析準備アバター／タスク3未着手）
+
+- **承認・開始状態**：本人のタスク1完了承認と「タスク2だけ進める」を受領。`codex/pre-optin-polish-20261108`、開始HEAD `6e9df65e4e9b42cbd609f3ca2cabe5eb6065ffe6`を引継ぎ、同名ブランチの再作成・上書きは0。開始statusと既存3,072ファイルのSHAをローカル監査へ記録。既存フォーム文書差分、iOSローカル設定、未追跡素材は保持・今回コミットから除外する。配布記録と`pubspec.yaml`のAndroid `1.0.1／code3`・TestFlight `1.0.1／build3`を維持し、Console再照会・新ビルドは行わない。
+- **原因と最小修正**：Homeはすでに`PetProfileRepo.watchMainPet()`の現在プロフィールを購読していたが、分析準備カードへ渡さずThemeの固定画像を表示していた。既存`main_pet` snapshotをカードへ1引数で渡し、既存Appearance／Condition／Asset ResolverとHamsterAvatarViewを再利用する。準備中のConditionは既存resolverのassessment不足分岐で`insufficient_data`とし、健康評価やサーバーの準備完了判定を変更しない。
+- **画像の順序と互換性**：同じ種類・毛色の`insufficient_data`→同外見`stable`→現行Themeの汎用画像。種類・毛色が未登録の既存プロフィールは推測して書き換えず汎用表示、全候補欠損時は既存petsアイコンまで安全に表示する。候補欠損の実テストで、旧Imageエラーを次候補の読込中にも再利用してstableを飛ばすことを再現したため、共有ViewのImageへ`ValueKey(path)`を1行追加して解消した。Resolver・モデル・画像88枚・Theme／枠108／88px・BoxFit・進捗文言・既存CTAは維持。
+- **限定テスト27件PASS**：カード既存／追加25件（シリアンdark・ジャンガリアンsapphire・ロボnormal／白黒piedの実PNG decode、プロフィール／毛色情報欠落、欠損fallback順、同一Widgetの外見変更、準備完了表示・既存ボタン等）＋Homeの現在ペット／毛色更新と解除に追従するオフライン1件＋共有Viewの既存終端fallback1件。全て合成データとメモリ内backendのみで、本番アクセス・飼育記録／権限変更・実AI送信は0。
+- **目視・解析**：実Card＋既存PNGを合成readinessで6ケース描画し、シリアンdark／ジャンガリアンsapphire／ロボnormal／pied／毛色なし／未制作white_faceを実際に開いて確認。描画6件PASS、画像の切れ・表示例外なし。実機確認ではない。既存SDK Flutter3.47.7の`flutter analyze --no-pub`は既存57件（warning39／info18・error0）で終了1だが、全所在ファイルの開始SHA一致を確認。変更5ファイルの解析は指摘0、`git diff --check`はPASS。旧Golden／固定font期待値は変更・再実行しない。
+- **停止範囲**：タスク2だけを専用ブランチへ1コミット。PROJECT_STATUSの既存フォーム関連差分は部分ステージで除外し、mainへのmerge／push・code4／build4作成・アップロード・配信は0。クイック記録・認証／課金／AI／App Check／DeviceCheck／署名／SDK／lock／既存アセットを変更しない。タスク3は未着手で、本人の完了承認と次の着手指示まで停止する。
+<!-- hamcare-pre-optin-task2-20261108:end -->
+
 <!-- hamcare-pre-optin-task1-20261108:start -->
 ## 2026-11-08 オプトイン前の微修正・タスク1完了（ドロワー見出し／次タスクは停止）
 

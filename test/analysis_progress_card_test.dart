@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hamster_project/models/pet_profile.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/viewmodels/analysis_progress_view_model.dart';
 import 'package:hamster_project/widgets/analysis_progress_card.dart';
+import 'package:hamster_project/widgets/hamster_avatar_view.dart';
 
 List<Map<String, dynamic>> progressStates({
   bool bodyReady = false,
@@ -38,6 +41,8 @@ Future<void> showProgress(
   VoidCallback? onView,
   VoidCallback? onRecord,
   Stream<List<Map<String, dynamic>>>? stream,
+  PetProfile? petProfile,
+  AssetBundle? assetBundle,
 }) async {
   tester.view.physicalSize = Size(width, 1200);
   tester.view.devicePixelRatio = 1;
@@ -50,14 +55,18 @@ Future<void> showProgress(
           MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
       child: child!,
     ),
-    home: Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: AnalysisProgressCard(
-          readinessStream: stream ?? Stream.value(states),
-          onOpenRecord: onRecord ?? () {},
-          onOpenSwitchbot: () => fail('A sensor is not a baseline requirement'),
-          onViewAnalysis: onView,
+    home: DefaultAssetBundle(
+      bundle: assetBundle ?? rootBundle,
+      child: Scaffold(
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: AnalysisProgressCard(
+            readinessStream: stream ?? Stream.value(states),
+            petProfile: petProfile,
+            onOpenRecord: onRecord ?? () {},
+            onOpenSwitchbot: () => fail('A sensor is not a baseline requirement'),
+            onViewAnalysis: onView,
+          ),
         ),
       ),
     ),
@@ -65,7 +74,206 @@ Future<void> showProgress(
   await tester.pump();
 }
 
+// A selective failure wrapper around the real registered PNGs. The decoded
+// image assertions below cannot pass using a path-only or placeholder fake.
+class _PreparationAvatarBundle extends CachingAssetBundle {
+  _PreparationAvatarBundle({this.missing = const <String>{}});
+  final Set<String> missing;
+  final requested = <String>[];
+
+  @override
+  Future<ByteData> load(String key) async {
+    if (key.startsWith('assets/avatars/') && key.endsWith('.png')) {
+      requested.add(key);
+      if (missing.contains(key)) {
+        throw FlutterError('Missing preparation avatar fixture: $key');
+      }
+    }
+    return rootBundle.load(key);
+  }
+}
+
+PetProfile _preparationPet({
+  String species = 'ロボロフスキー',
+  String? color = 'パイド',
+}) =>
+    PetProfile(
+      name: '確認用',
+      birthday: null,
+      species: species,
+      color: color,
+      imageUrl: null,
+    );
+
+Finder _preparationIllustration() =>
+    find.byKey(const ValueKey('analysis-preparation-illustration'));
+
+Future<void> _pumpPreparationImages(WidgetTester tester) async {
+  // Failed candidates advance in a post-frame callback; decoding actual PNGs
+  // also completes asynchronously outside the test's fake clock.
+  for (var frame = 0; frame < 12; frame++) {
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)));
+    await tester.pump(const Duration(milliseconds: 16));
+  }
+}
+
+void _expectPreparationImage(WidgetTester tester, String asset) {
+  final root = _preparationIllustration();
+  expect(root, findsOneWidget);
+  final rootWidget = tester.widget(root);
+  final image = rootWidget is Image
+      ? rootWidget
+      : tester.widget<Image>(find.descendant(
+          of: root,
+          matching: find.byType(Image),
+        ));
+  expect((image.image as AssetImage).assetName, asset);
+  final decoded = tester.widget<RawImage>(find.descendant(
+    of: root,
+    matching: find.byType(RawImage),
+  ));
+  expect(decoded.image, isNotNull, reason: 'The real PNG must be decoded');
+  expect(decoded.image!.width, greaterThan(0));
+  expect(decoded.image!.height, greaterThan(0));
+  expect(tester.takeException(), isNull);
+}
+
 void main() {
+  for (final appearance in [
+    (species: 'シリアン', color: 'ブラック・濃色系', directory: 'syrian/dark'),
+    (species: 'ジャンガリアン', color: 'ブルーサファイア系', directory: 'djungarian/sapphire'),
+    (species: 'ロボロフスキー', color: 'ノーマルブラウン系', directory: 'roborovski/normal'),
+    (species: 'ロボロフスキー', color: 'パイド', directory: 'roborovski/pied'),
+  ]) {
+    testWidgets('preparation loads the current ${appearance.directory} artwork',
+        (tester) async {
+      final bundle = _PreparationAvatarBundle();
+      await showProgress(tester, progressStates(),
+          petProfile: _preparationPet(
+              species: appearance.species, color: appearance.color),
+          assetBundle: bundle);
+      await _pumpPreparationImages(tester);
+      final path =
+          'assets/avatars/${appearance.directory}/insufficient_data.png';
+      _expectPreparationImage(tester, path);
+      expect(bundle.requested, [path]);
+      final avatar = tester.widget<HamsterAvatarView>(
+          find.byType(HamsterAvatarView));
+      expect(avatar.showBackdrop, isFalse);
+      expect(avatar.presentation.animateBreathing, isFalse);
+      expect(avatar.size, AppTheme.analysisPreparationIllustrationSize);
+    });
+  }
+
+  for (final missingProfile in [
+    (label: 'no profile', profile: null),
+    (label: 'no color', profile: _preparationPet(color: null)),
+    (label: 'blank color', profile: _preparationPet(color: '  ')),
+    (label: 'blank species', profile: _preparationPet(species: '')),
+  ]) {
+    testWidgets('preparation retains generic artwork for ${missingProfile.label}',
+        (tester) async {
+      final bundle = _PreparationAvatarBundle();
+      await showProgress(tester, progressStates(),
+          petProfile: missingProfile.profile, assetBundle: bundle);
+      await _pumpPreparationImages(tester);
+      _expectPreparationImage(
+          tester, AppTheme.analysisPreparationIllustrationAsset);
+      expect(find.byType(HamsterAvatarView), findsNothing);
+      expect(bundle.requested, [AppTheme.analysisPreparationIllustrationAsset]);
+    });
+  }
+
+  testWidgets('missing preparation state falls back to the same appearance stable',
+      (tester) async {
+    const state = 'assets/avatars/roborovski/pied/insufficient_data.png';
+    const stable = 'assets/avatars/roborovski/pied/stable.png';
+    final bundle = _PreparationAvatarBundle(missing: {state});
+    await showProgress(tester, progressStates(),
+        petProfile: _preparationPet(), assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    expect(bundle.requested, [state, stable]);
+    _expectPreparationImage(tester, stable);
+    expect(bundle.requested.any((path) => path.contains('white_face')), isFalse);
+  });
+
+  testWidgets('missing preparation state and stable fall back to existing generic',
+      (tester) async {
+    const state = 'assets/avatars/syrian/dark/insufficient_data.png';
+    const stable = 'assets/avatars/syrian/dark/stable.png';
+    final bundle = _PreparationAvatarBundle(missing: {state, stable});
+    await showProgress(tester, progressStates(),
+        petProfile: _preparationPet(
+            species: 'シリアン', color: 'ブラック・濃色系'),
+        assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    _expectPreparationImage(
+        tester, AppTheme.analysisPreparationIllustrationAsset);
+    expect(bundle.requested,
+        [state, stable, AppTheme.analysisPreparationIllustrationAsset]);
+  });
+
+  testWidgets('all missing preparation images retain the existing safe icon',
+      (tester) async {
+    const state = 'assets/avatars/roborovski/pied/insufficient_data.png';
+    const stable = 'assets/avatars/roborovski/pied/stable.png';
+    final bundle = _PreparationAvatarBundle(missing: {
+      state,
+      stable,
+      AppTheme.analysisPreparationIllustrationAsset,
+    });
+    await showProgress(tester, progressStates(),
+        petProfile: _preparationPet(), assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    expect(find.byIcon(Icons.pets_rounded), findsOneWidget);
+    expect(bundle.requested,
+        [state, stable, AppTheme.analysisPreparationIllustrationAsset]);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('current appearance change resets an already-fallen-back avatar',
+      (tester) async {
+    const oldState = 'assets/avatars/syrian/dark/insufficient_data.png';
+    const oldStable = 'assets/avatars/syrian/dark/stable.png';
+    const nextState = 'assets/avatars/roborovski/pied/insufficient_data.png';
+    final bundle = _PreparationAvatarBundle(missing: {oldState, oldStable});
+    await showProgress(tester, progressStates(),
+        petProfile: _preparationPet(
+            species: 'シリアン', color: 'ブラック・濃色系'),
+        assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    _expectPreparationImage(
+        tester, AppTheme.analysisPreparationIllustrationAsset);
+    final originalState = tester.state(find.byType(HamsterAvatarView));
+    await showProgress(tester, progressStates(),
+        petProfile: _preparationPet(), assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    expect(tester.state(find.byType(HamsterAvatarView)), same(originalState));
+    _expectPreparationImage(tester, nextState);
+    expect(bundle.requested, [
+      oldState,
+      oldStable,
+      AppTheme.analysisPreparationIllustrationAsset,
+      nextState,
+    ]);
+  });
+
+  testWidgets('ready metrics still omit artwork for a complete pet profile',
+      (tester) async {
+    final bundle = _PreparationAvatarBundle();
+    await showProgress(tester,
+        progressStates(bodyReady: true, activityReady: true),
+        petProfile: _preparationPet(), assetBundle: bundle);
+    await _pumpPreparationImages(tester);
+    expect(_preparationIllustration(), findsNothing);
+    expect(find.byType(HamsterAvatarView), findsNothing);
+    // While the readiness stream is waiting, the preparation header may load.
+    // Once ready, neither that header nor its image remains on screen.
+    expect(tester.takeException(), isNull);
+  });
+
+
   test('ViewModel formats only server counts and never determines readiness',
       () {
     final view = AnalysisProgressViewModel.fromServer(progressStates(
