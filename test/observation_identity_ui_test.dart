@@ -87,12 +87,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(health.mutations, isEmpty);
     expect(find.text('観察したタイミング'), findsNothing);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull);
     await tapVisible(tester, find.text('この内容で記録'));
     expect(health.mutations, isEmpty);
+    expect(care.saved, isEmpty, reason: 'completely empty input cannot save');
+    await tapVisible(
+        tester, find.byKey(const ValueKey('care-cageCleaning-none')));
+    await tapVisible(tester, find.text('この内容で記録'));
+    expect(health.mutations, isEmpty);
+    expect(health.saves, 0);
     expect(care.saved.length, 1);
+    expect(care.saved.single.actions.keys, ['cageCleaning']);
+    expect(care.saved.single.toMap()['actions']['cageCleaning']['answer'],
+        'not_performed');
   });
   testWidgets(
-      'health needs explicit timing; date-only answer keeps current schema2 rendering',
+      'one overall answer saves without timing and leaves other items unanswered',
       (tester) async {
     final health = ObservationUiStore(), care = CareTestStore();
     var callback = 0;
@@ -105,14 +116,28 @@ void main() {
         tester
             .widget<TextButton>(find.byKey(const ValueKey('health-only-save')))
             .onPressed,
-        isNull);
-    await tapVisible(
-        tester, find.byKey(const ValueKey('observation-time-date')));
+        isNotNull);
+    expect(find.text('観察したタイミング'), findsNothing);
+    for (final key in [
+      'observation-time-now',
+      'observation-time-date',
+      'observation-time-unknown',
+      'observation-time-select',
+    ]) {
+      expect(find.byKey(ValueKey(key)), findsNothing);
+    }
     await tapVisible(tester, find.text('様子だけ記録'));
     expect(health.mutations.length, 1);
     expect(health.saves, 0, reason: 'no old direct write path');
-    expect(health.mutations.single.timing.precision,
-        ObservationTimePrecision.dateOnly);
+    final mutation = health.mutations.single;
+    expect(mutation.condition, 'normal');
+    expect(mutation.inputUiVersion, 'daily_checkin_partial_v1');
+    expect(mutation.timing.toMap(),
+        {'precision': 'unknown', 'confirmation': 'unknown'});
+    expect(mutation.concernTags, isEmpty);
+    expect(mutation.memo, isEmpty);
+    expect(mutation.toMap().containsKey('concernTags'), isFalse);
+    expect(mutation.toMap().containsKey('memo'), isFalse);
     expect(
         health.mutations.single.operation, ObservationOperation.newObservation);
     expect(callback, 1);
@@ -152,16 +177,21 @@ void main() {
     await tapVisible(tester, find.text('様子だけ記録'));
     expect(health.mutations.single.operation, ObservationOperation.correction);
     expect(health.mutations.single.targetEventId, 'event_one');
+    expect(health.mutations.single.timing.toMap(),
+        const ObservationTiming.dateOnly('2026-10-12').toMap());
+    expect(health.mutations.single.condition, 'slightlyConcerned');
+    expect(health.mutations.single.concernTags, ['appetite']);
     await tester.tap(find.text('編集'));
     await tester.pumpAndSettle();
     await tapVisible(
         tester, find.byKey(const ValueKey('observation-intent-new')));
-    await tapVisible(
-        tester, find.byKey(const ValueKey('observation-time-unknown')));
+    expect(find.byKey(const ValueKey('observation-time-unknown')), findsNothing);
     await tapVisible(tester, find.text('様子だけ記録'));
     expect(
         health.mutations.last.operation, ObservationOperation.newObservation);
     expect(health.mutations.last.targetEventId, isNull);
+    expect(health.mutations.last.timing.toMap(),
+        const ObservationTiming.unknown().toMap());
   });
   testWidgets(
       'pending answer never reports saved or invokes progress; retry retains same mutation',
@@ -173,15 +203,19 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('いつも通り'));
     await tester.pumpAndSettle();
-    await tapVisible(
-        tester, find.byKey(const ValueKey('observation-time-unknown')));
+    expect(find.byKey(const ValueKey('observation-time-unknown')), findsNothing);
     await tapVisible(tester, find.text('様子だけ記録'));
     expect(callback, 0);
+    expect(find.text('記録しました'), findsNothing);
     expect(find.textContaining('まだ保存確定'), findsOneWidget);
-    final mutation = health.mutations.single.mutationId;
+    final mutation = health.mutations.single;
+    expect(mutation.timing.toMap(),
+        const ObservationTiming.unknown().toMap());
     health.offline = false;
     await tapVisible(tester, find.text('今日の様子を再送する'));
-    expect(health.mutations.last.mutationId, mutation);
+    expect(health.mutations.last.mutationId, mutation.mutationId);
+    expect(health.mutations.last.toMap(), mutation.toMap(),
+        reason: 'retry must keep the exact pending request, not rebuild it');
     expect(callback, 1);
   });
   testWidgets(
@@ -251,7 +285,25 @@ void main() {
     await tapVisible(tester, find.text('今日の様子を再送する'));
     expect(find.text('記録しました'), findsNothing);
     expect(find.text('編集'), findsNothing);
-    expect(find.text('気になるところ'), findsNothing);
+    expect(find.text('気になるところ'), findsOneWidget);
+    expect(health.mutations.single.toMap(), mutation.toMap(),
+        reason: 'old date-only pending request remains replayable unchanged');
+    for (final label in ['いつも通り', '少し違う', '心配', '食欲']) {
+      final choice = find.byWidgetPredicate((widget) =>
+          widget is Semantics && widget.properties.label == label);
+      expect(tester.widget<Semantics>(choice).properties.selected, isFalse);
+    }
+    await tapVisible(tester, find.text('メモ（任意）'));
+    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
+        isEmpty);
+    expect(tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNull);
+    expect(
+        tester
+            .widget<TextButton>(find.byKey(const ValueKey('health-only-save')))
+            .onPressed,
+        isNull);
+    expect(care.saved, isEmpty);
   });
   testWidgets(
       'cancellation fallback restores tags/memo and target event revision',

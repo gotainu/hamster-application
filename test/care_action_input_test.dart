@@ -90,15 +90,21 @@ void main() {
             .widget<ChoiceChip>(
                 find.byKey(const ValueKey('care-cageCleaning-none')))
             .selected,
-        isTrue);
-    expect(find.text('0 分'), findsOneWidget);
-    expect(find.text('掃除なし・散歩0分'), findsOneWidget);
+        isFalse);
+    expect(find.text('0 分'), findsNothing);
+    expect(find.text('掃除未回答・散歩未回答'), findsOneWidget);
+    expect(find.text('未回答'), findsNWidgets(2));
     expect(
         tester
             .widget<FilledButton>(
                 find.byWidgetPredicate((w) => w is FilledButton))
             .onPressed,
-        isNotNull);
+        isNull);
+    expect(
+        tester
+            .widget<TextButton>(find.byKey(const ValueKey('health-only-save')))
+            .onPressed,
+        isNull);
     expect(health.saves, 0);
     expect(care.saved, isEmpty);
   });
@@ -118,8 +124,9 @@ void main() {
     expect(cs, 1);
     expect(care.saved.single.actions['cageCleaning']!.answer,
         CareActionAnswer.notPerformed);
-    expect(care.saved.single.actions['roomWalk']!.answer,
-        CareActionAnswer.notPerformed);
+    expect(care.saved.single.actions.keys, ['cageCleaning']);
+    expect(care.saved.single.actions.containsKey('roomWalk'), isFalse,
+        reason: 'untouched walking input must not become false or zero');
     expect(find.text('ケア記録を保存しました。'), findsOneWidget);
   });
   testWidgets(

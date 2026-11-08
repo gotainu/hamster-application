@@ -4,6 +4,16 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-pre-optin-audit-fix-b-20261108:start -->
+## 2026-11-08 統合監査の残件B完了・C事実確認中（未配布／再監査へ）
+
+- **旧UIテスト7件の更新**：care_action_input_testの2件とobservation_identity_ui_testの5件だけを、新しい部分保存契約へ合わせた。全空保存不可、未操作ケアの省略、単独の総合状態で保存可能、観察タイミング入力不要とunknown表現、未選択項目のnormal／false／0非補完を確認する。旧date-only履歴の訂正、訂正と新規観察の明示区別、pendingの完全同一リクエスト再送、取消／replay後の旧メモ・選択解除を保持・強化。削除／skip／本体変更は0。
+- **限定検証**：指定2ファイル全24件PASS・skip0、2テストファイルの解析指摘0、git diff --check PASS。Aのコミット3abfbd710d9cを先行し、本節とテスト2ファイルだけを別コミットにする。この後、修正後の全Flutter／main解析比較・サーバー全テスト等を統合再監査し、既存環境失敗と差分由来失敗を区別して別途報告する。単独PASSを全体PASSへ読み替えない。
+- **P1の本番事実**：11/8 18:53 JSTに本番daily_checkins全23件・observation_days全2件・関連する全観察revision4件／event3件／receipt4件の入力版と必要メタデータを読取照合。新daily_checkin_partial_v1／部分回答マーカー／明示condition:nullは0。配備済みsaveDailyCheckinは10/13更新の旧history_v1で、新部分writer未配備。本文・メール・UID・tokenは本節へ記録せず、本番書込み0。Playダッシュボードの現在opt-inは0、Alpha code3有効を読取確認した。
+- **P1判定は未確定**：既存記録ではAlpha許可登録本人1名・TestFlight内部本人1名／外部テストなし。今回のPlay許可リスト行が表示されず、TestFlightも再サインイン待ちのため、古い人数を最新確認値と扱わない。本人以外への案内／旧版提供の有無、応募者の未登録、全所有端末の更新・旧版停止可否を本人確認中。Samsung実機、保存Android AVD3台、iPhone17e、保存iOS Simulator4台等は旧reader潜在対象。全条件が揃うまで「一斉切替可能」「完全後方互換」「P1解消」とは記録しない。
+- **範囲**：既存5コミット・main・開始時の3ファイルdirty差分と未追跡素材を保持。main merge／push、server deploy、code4／build4、Store upload、端末更新、応募者案内は0。今回の本番情報・ローカル端末一覧・詳細監査は非公開一時領域へ保持し、新しい管理表は作らない。
+<!-- hamcare-pre-optin-audit-fix-b-20261108:end -->
+
 <!-- hamcare-pre-optin-audit-fix-a-20261108:start -->
 ## 2026-11-08 統合監査の残件A完了（日付跨ぎの確認・未反映）
 
