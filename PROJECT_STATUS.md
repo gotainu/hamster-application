@@ -4,6 +4,17 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-pre-optin-task3-20261108:start -->
+## 2026-11-08 オプトイン前の微修正・タスク3完了（クイック記録3アバター／停止）
+
+- **承認・開始状態**：本人のタスク2完了承認とタスク3着手指示を受領。`codex/pre-optin-polish-20261108`、開始HEAD `e14c388c719f37edbaf5c830e1e592027ddf13f2`を引継ぎ、ブランチ再作成・上書きは0。開始statusと既存3,072ファイルのSHAをローカル監査へ保存。既存フォーム文書差分、iOSローカル設定、未追跡制作素材は保持し、今回コミットへ混ぜない。配布記録と`pubspec.yaml`のAndroid `1.0.1／code3`・TestFlight `1.0.1／build3`を維持し、Console再照会・新ビルドは行わない。
+- **最小修正**：QuickRecordSheet内で既存`PetProfileRepo.watchMainPet()`のstreamを一度作成し、従来のPaidFeatureGate配下のカテゴリ一覧だけで現在ペットを購読する。3画像は既存Appearance／Asset Resolver・HamsterAvatarViewを再利用し、走った記録=`activity_high`、今日の様子=`happy`、体重=`stable`。装飾用の静止画像であり、健康／活動状態の判定は追加しない。Widgetへアバターのファイルパスを直接記載せず、プロフィール・識別子・共有Resolver／モデル／Theme／画像は変更0。
+- **枠・フォールバック**：既存52px角丸枠・枠線・色・レイアウトを維持。枠線1pxと内部余白3pxを除いた44pxでBoxFit.containを使い、耳・足が切れないよう表示する。指定状態が欠損した場合は同じ外見のstable、その先は既存petsアイコン。外見情報不足／読取エラーは元の各Icon／ブランドマークへ戻し、異なる種類・毛色で代用しない。
+- **限定16件PASS**：シリアンdark・ジャンガリアンsapphire・ロボnormal／白黒piedの各3実PNG decode・状態対応、開いたままのmain_pet種類／毛色／subject更新、未登録／legacy／空毛色、状態欠損→同色stable、未制作white_face／全欠損時の安全表示、既存3入力画面→戻る、openAllRecords返値、既存有料gateを確認。既存オフラインbackendを再利用し、RPC要求0と合成documentsの前後一致を各ケースで検証。保存・購入・体験開始・同意操作・本番データ変更は0。
+- **目視・解析**：同じテストで任意保存した実Widgetの4画面（320／390px、明暗、4外見）を実際に開き、文字・アバター・余白・切れなしを確認。実機試験ではない。既存Flutter3.47.7の`flutter analyze --no-pub`は既存57件（warning39／info18・error0）で終了1、全所在ファイルの開始SHA一致を照合。変更2ファイルの解析は指摘0、`git diff --check`はPASS。旧Golden・タスク1／2の完了済み確認は再実行しない。
+- **完了・停止**：クイック記録本体・専用限定テスト・本節だけを専用ブランチへ指定メッセージで1コミット。タップ・閉じる／戻る・入力／保存／報酬・有料gate・Tabs入口・認証／課金／AI／DeviceCheck／App Check／署名／SDK／lock／アセットを維持。mainへのmerge／push・code4／build4作成・アップロード・配信は0。タスク3完了報告後、本人の次の明示指示まで停止する。
+<!-- hamcare-pre-optin-task3-20261108:end -->
+
 <!-- hamcare-pre-optin-task2-20261108:start -->
 ## 2026-11-08 オプトイン前の微修正・タスク2完了（分析準備アバター／タスク3未着手）
 

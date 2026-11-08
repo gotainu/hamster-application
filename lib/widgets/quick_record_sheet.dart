@@ -6,8 +6,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/daily_record_completion.dart';
+import '../models/hamster_avatar.dart';
+import '../models/pet_profile.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
+import '../services/pet_profile_repo.dart';
 import '../theme/app_theme.dart';
 import 'daily_condition_input_card.dart';
+import 'hamster_avatar_view.dart';
 import 'paid_feature_gate.dart';
 import 'quick_record_reward.dart';
 import 'weight_input_card.dart';
@@ -33,6 +39,7 @@ class QuickRecordSheet extends StatefulWidget {
 }
 
 class _QuickRecordSheetState extends State<QuickRecordSheet> {
+  late final Stream<PetProfile?> _petStream = PetProfileRepo().watchMainPet();
   _QuickRecordCategory? _selectedCategory;
   QuickRecordRewardData? _reward;
 
@@ -170,6 +177,7 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
                                       child: _selectedCategory == null
                                           ? _CategorySelection(
                                               key: const ValueKey('categories'),
+                                              petStream: _petStream,
                                               onSelect: _selectCategory,
                                               onOpenAllRecords: _openAllRecords,
                                             )
@@ -253,53 +261,67 @@ class _SheetHeader extends StatelessWidget {
 class _CategorySelection extends StatelessWidget {
   const _CategorySelection({
     super.key,
+    required this.petStream,
     required this.onSelect,
     required this.onOpenAllRecords,
   });
 
+  final Stream<PetProfile?> petStream;
   final ValueChanged<_QuickRecordCategory> onSelect;
   final VoidCallback onOpenAllRecords;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _QuickRecordCategoryTile(
-            icon: Icons.directions_run_rounded,
-            title: '走った記録',
-            accent: AppTheme.accent,
-            onTap: () => onSelect(_QuickRecordCategory.wheel),
+    return StreamBuilder<PetProfile?>(
+      stream: petStream,
+      builder: (context, snapshot) {
+        final petProfile = snapshot.hasError ? null : snapshot.data;
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _QuickRecordCategoryTile(
+                icon: Icons.directions_run_rounded,
+                title: '走った記録',
+                petProfile: petProfile,
+                avatarCondition: HamsterAvatarCondition.activityHigh,
+                accent: AppTheme.accent,
+                onTap: () => onSelect(_QuickRecordCategory.wheel),
+              ),
+              const SizedBox(height: 12),
+              _QuickRecordCategoryTile(
+                icon: Icons.pets_rounded,
+                title: '今日の様子',
+                petProfile: petProfile,
+                avatarCondition: HamsterAvatarCondition.happy,
+                accent: AppTheme.envGood,
+                useBrandMark: true,
+                onTap: () => onSelect(_QuickRecordCategory.condition),
+              ),
+              const SizedBox(height: 12),
+              _QuickRecordCategoryTile(
+                icon: Icons.monitor_weight_outlined,
+                title: '体重',
+                petProfile: petProfile,
+                avatarCondition: HamsterAvatarCondition.stable,
+                accent: AppTheme.envCaution,
+                onTap: () => onSelect(_QuickRecordCategory.weight),
+              ),
+              const SizedBox(height: 22),
+              OutlinedButton.icon(
+                onPressed: onOpenAllRecords,
+                icon: const Icon(Icons.edit_note_rounded),
+                label: const Text('すべての記録を開く'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  shape: const StadiumBorder(),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          _QuickRecordCategoryTile(
-            icon: Icons.pets_rounded,
-            title: '今日の様子',
-            accent: AppTheme.envGood,
-            useBrandMark: true,
-            onTap: () => onSelect(_QuickRecordCategory.condition),
-          ),
-          const SizedBox(height: 12),
-          _QuickRecordCategoryTile(
-            icon: Icons.monitor_weight_outlined,
-            title: '体重',
-            accent: AppTheme.envCaution,
-            onTap: () => onSelect(_QuickRecordCategory.weight),
-          ),
-          const SizedBox(height: 22),
-          OutlinedButton.icon(
-            onPressed: onOpenAllRecords,
-            icon: const Icon(Icons.edit_note_rounded),
-            label: const Text('すべての記録を開く'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              shape: const StadiumBorder(),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -310,6 +332,8 @@ class _QuickRecordCategoryTile extends StatelessWidget {
     required this.title,
     required this.accent,
     required this.onTap,
+    required this.petProfile,
+    required this.avatarCondition,
     this.useBrandMark = false,
   });
 
@@ -318,6 +342,31 @@ class _QuickRecordCategoryTile extends StatelessWidget {
   final Color accent;
   final VoidCallback onTap;
   final bool useBrandMark;
+  final PetProfile? petProfile;
+  final HamsterAvatarCondition avatarCondition;
+
+  Widget _avatar() {
+    final presentation = const HamsterAvatarAssetResolver().resolve(
+      appearance: const HamsterAvatarAppearanceResolver().resolve(petProfile),
+      conditionResult: HamsterAvatarConditionResult(
+        condition: avatarCondition,
+        cause: HamsterAvatarCause.none,
+        message: '',
+        animateBreathing: false,
+      ),
+    );
+    return ExcludeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: HamsterAvatarView(
+          key: ValueKey('quick-record-avatar-${avatarCondition.assetKey}'),
+          presentation: presentation,
+          size: 44,
+          showBackdrop: false,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -353,12 +402,14 @@ class _QuickRecordCategoryTile extends StatelessWidget {
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: useBrandMark
-                    ? Image.asset(
-                        'store_assets/icons/google_play_icon_512.png',
-                        fit: BoxFit.cover,
-                      )
-                    : Icon(icon, color: accent, size: 26),
+                child: petProfile?.hasAvatarIdentity == true
+                    ? _avatar()
+                    : useBrandMark
+                        ? Image.asset(
+                            'store_assets/icons/google_play_icon_512.png',
+                            fit: BoxFit.cover,
+                          )
+                        : Icon(icon, color: accent, size: 26),
               ),
               const SizedBox(width: 15),
               Expanded(
