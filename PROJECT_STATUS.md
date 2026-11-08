@@ -4,6 +4,19 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-pre-optin-audit-c-final-20261108:start -->
+## 2026-11-08 統合再監査の残件C確定（一斉切替で対応可能・実行前）
+
+- **最新の配信対象**：11/8 19:30〜19:34 JSTにConsoleを読み取り。Play既存Alphaは1.0.1／code3有効、internal-testers選択は本人1名だけ。ダッシュボードの実opt-inは0人。TestFlightの全テスターは本人のInternal1名だけ、本人実機確認グループにbuild2／build3があり、本人端末は1.0.1(3) Installed。外部グループ・外部テスターは0、外部テストは未開始。Playリスト確認ダイアログは何も編集せず閉じ、保存ボタン無効を確認。配信設定変更・招待・送信は0。
+- **本人の事実確認**：約15名の応募者を含め、本人以外へAlpha参加リンク／TestFlight招待／旧版を提供していないとの回答を受領。応募者は現Alpha許可リストにも含まれず、opt-in前。本人所有の全環境をcode4／build4へ更新し旧版で開かないよう管理でき、ほかの端末・共有環境はないとの回答も受領。更新できるという確認であり、実更新済みとは記録しない。
+- **本番データの最終照合**：11/8 19:32:58 JST開始のread-only再照合でも、daily_checkins全23件、observation_days全2件、観察revision4件／event3件／receipt4件の新partial_v1・部分回答／未回答マーカー・明示condition:nullは0。件数と全投影走査が一致し打切り0。旧writer未配備変更なしの既存確認を維持し、本文・メール・UID・tokenを本書へ保存せず、本番書込み0。
+- **P1判定**：旧版利用者は開発者本人だけ、外部応募者はopt-in前、本番に新部分記録0、全所有環境を更新・管理可能という4条件が揃ったため、**「外部公開前の計画的一斉切替で対応可能」**。旧readerが未回答をnormalとして読むコード上の非互換は残り、完全な後方互換・実切替済み・P1コード修正完了とは扱わない。
+- **必須の実行ゲート**：外部案内を止め、旧code2等も含む全所有reader環境を対象にする。将来の別指示で健康consumer群とpersonalityDailyReportsを先に、saveDailyCheckinを最後に反映。部分記録生成前だけに現行legacy入力互換を確認し、その後は旧版を停止。全所有環境の新reader更新・データ保持と旧版停止を実確認してから、最初の新部分保存を行う。確認後に外部案内へ進む。Play署名版／ローカル署名版は各既存署名を維持し、署名差を削除・data clearで解消しない。部分記録生成後は旧reader／旧consumerへの一括rollbackをせず、新欠損保護を保持する。
+- **対象環境**：Samsung SM-S911N、保存Android AVD3台（HamCare_Play_20261101／HamCare_Prelaunch_A_20261004／Pixel_7_API_34）、iPhone17e、保存iOS Simulator4台。今回は起動・インストール版照合・更新を行わず、未使用環境にも旧版を起動させない管理を含める。
+- **修正・再監査の確定結果**：Aは3abfbd710d9c、Bはc58628e15289の2コミットを維持。A新16件とB指定2ファイル全24件PASS。最終HEADの全Flutter800PASS／mainと共通25FAIL・HEAD追加失敗0、Functions824PASS／既存fixture4FAIL、TypeScript build／noEmitとRules内部52件PASS、analyzeはmain／HEADとも57件・追加0、git diff --check PASS。全体PASSとは表記せず、既存環境／fixture失敗を分離する。今回、完了済みテストの再実行は0。
+- **現在の判断と保護**：今回差分由来の失敗・新規要修正は0で、上の切替ゲートを条件に監査上mainへマージ可能と判定する。ただし実行承認は別で、main merge／push、server deploy、code4／build4、Store upload、端末更新、tester案内は今回行わない。既存5＋新2コミットは変更せず、今回の確認結果は本節を未ステージ・未コミットで追記する。既存フォーム文書差分・iOSローカル設定・未追跡素材を保持し、新しい独立管理表は作らない。
+<!-- hamcare-pre-optin-audit-c-final-20261108:end -->
+
 <!-- hamcare-pre-optin-audit-fix-b-20261108:start -->
 ## 2026-11-08 統合監査の残件B完了・C事実確認中（未配布／再監査へ）
 
