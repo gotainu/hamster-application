@@ -1,5 +1,25 @@
 # Hamster Care Google Play登録手順
 
+<!-- hamcare-rc4-owner-cutover-20261108:start -->
+## 2026-11-08 本人限定code4審査送信（一斉切替は進行中・未配信）
+
+本節はRC4工程の現時点記録。以下のcode3以前の配信・確認結果は履歴として維持し、code4の成果物・アップロード・審査・配信・端末更新とは区別する。
+
+- **番号・完成成果物**：Play登録履歴で次の `1.0.1／code4` が未使用と確認後、固定RC・既存署名／Application ID・lockを維持して署名済みAABを生成。成果物は `/Users/gota/hamcare-deploy-staging/pre-optin-rc4-20261108/artifacts/hamcare-1.0.1-code4-pre-optin-signed.aab`（172,244,527 bytes、SHA-256 `f3344659dee8cbcbae51702d0f8d12d2a1c343c59b19ca5376525a7aad675ace`）。署名、88枚PNG、manifest、固定RCコード／lockとの整合を確認しPASS。不要な再ビルド・再署名は行わない。
+- **アップロード・審査**：本人承認の対象範囲を送信直前に照合し、既存Alphaのrelease4／code4だけ1変更を2026-11-08 21:31 JSTに審査送信。送信ID3、21:47 JST頃の再読でもConsoleは審査中（自動クイックチェック中）。日本のみ・既存本人1名を維持し、他トラック差分0。アップロード／送信完了と審査通過・Alpha配信・端末更新は区別し、後3者は未確認。
+- **正式更新の確認経路**：既存の `HamCare_Play_20261101` は保存userdataを保持したPlay配布署名1.0.1／code3（installer／initiating=com.android.vending）のまま。Chrome初回利用条件へ本人が同意した後、公式Alpha URLでBecome a tester→You are a testerを確認し、Webアカウントの本人一致を真偽値で確認。internal URLはAccept invite表示で未受諾、Store表示はInternal Early Access→Early Accessへ変化した。内部テスト退出操作そのものは実行しておらず、退出完了とは断定しない。code4は送信ID3で審査中のため未配信・未更新。Samsung実機のローカルcode2とは署名非互換で、別のAndroid実機もないため、正式Play更新の実機PASSは未達。
+- **候補の固定と作業環境**：承認済みタスク1〜5・日付跨ぎ修正・UIテスト更新を維持し、P1の計画的一斉切替条件だけを独立コミットしたリリース候補は `f5f09c2b65536022f0d75e140de757610b691ef2`。`/private/tmp/hamcare-pre-optin-rc-20261108` をこのSHAから作成し、開始時clean・HEAD一致を確認。元のdirty作業ツリーはビルド／デプロイ元にせず、固定SDK・既存署名・ID・lockと安全なローカル設定注入を再利用する。既存フォーム文書差分・iOSローカル設定・未追跡素材は保持する。
+- **サーバー反映済み範囲**：対象consumer7件（healthWeightRecordWritten／healthDistanceRecordWritten／healthDailyCheckinWritten／healthEnvironmentHistoryWritten／healthEnvironmentLatestWritten／rebuildMyHealthArchitecture／personalityDailyReports）を先に反映。旧iPhone build3と既存Play専用AVD code3の通常完全入力について、保存・再読込・Silver／Gold・Home・既存AI文脈・関連ログを確認しPASS。その後、入力受付saveDailyCheckinを旧 `savedailycheckin-00001-zuv` から新 `savedailycheckin-00002-gim` へ限定反映し、traffic100%を確認。writer反映後も旧Play専用AVDの完全入力で互換ゲートPASS。全Functionsの一括反映、数値専用経路等の追加、実AI送信は行わない。
+- **新部分保存は未開始**：本番の新部分保存0件を維持。Play code4審査中・AVD未更新のため、部分保存8ケースは未実施。コード上の旧reader完全後方互換を得たという意味ではなく、全本人所有環境を新版更新／旧版停止として実確認した後に初めて部分保存する。完全入力の互換PASSやiPhone限定UI確認を、部分保存の実機PASSへ転記しない。
+- **旧環境の実状態**：Samsung SM-S911Nの現アプリはローカル署名1.0.1／code2で、Play配布署名と非互換。削除・データ消去・Play版による直接置換を行わず、本人がアプリを閉じ、21:06 JSTにpidofで主プロセス0を確認した（package stopped=falseのため強制停止済みとは扱わない）。他の保存Android AVD2台は非稼働、保存Simulatorは全Shutdown。Play専用AVDはcode3のまま、iPhoneはTestFlight build4へ正式更新・保持確認済み。この段階も全環境の一斉切替完了とはしない。
+- **本人限定・公開境界**：Play Alphaは日本のみ・既存リスト本人1名、TestFlightは既存の本人向け内部1名を維持。外部応募者約15名は未登録・未招待・参加案内／メール未送信。製品版変更・一般公開・App Store製品版審査は0。Apple Case103009817213の回答待ち／決済判断保留を維持する。
+- **証拠と残る条件**：既存の非公開staging `pre-optin-rc4-20261108/audit/` のserver/deploy-results、server/test-user-metadata、device-inventory-before-code4.json、old-readers-closed-readonly-check.jsonを参照。メール・UID・資格情報・私的本文は本書へ転記しない。Android実機は正式Play code3→code4更新条件を満たしておらずPASS未達。Play専用AVDの結果を実機PASSと混同せず、指定された全実機確認PASSまでmainへのmerge／pushは保留する。
+
+残る自動確認は送信ID3の審査・Alpha配信状態と、配信後に利用可能な既存Play専用AVDの正式code3→code4更新・保持。Android実機PASSとは区別する。本人の追加手動確認は求めず、現時点で実施できない部分保存8ケースは未実施として残す。一斉切替完了条件を満たすまで部分保存とmainへのmerge／pushは保留する。
+- **審査待ち間の旧AVD停止**：11/8 22:09 JSTに専用AVDの旧HamCare code3だけをforce-stopし、主process0／package stopped=trueを確認。userdata・既存ログイン／記録・Playアプリは削除／変更せず保持。配信後の正式更新確認まで旧アプリを起動しない。Samsungの本人終了・他AVD／Simulator停止と区別して記録し、正式Android更新や部分保存PASSを意味しない。
+- **停止前の入力版照合**：11/8 22:04:56 JST開始の承認済みmetadata再照合で、新partial／未回答marker／condition:nullは全対象0、全走査件数一致。本文・UID・メール保存0、データ変更0。
+<!-- hamcare-rc4-owner-cutover-20261108:end -->
+
 ## 2026-11-02 クローズド募集準備・フォーム公開と現行人数（Console設定変更なし）
 
 既存Alphaの1.0.1／code3は有効、11/1 18:47 JST公開、日本のみ1国、internal-testers登録1名を確認。11/2のダッシュボードは「現在、0人のテスターがオプトイン」「12人以上／14日」と表示し、製品版アクセス申請ボタンは無効だった。登録1名と実opt-in0名は別値。過去10/25の値を現在値へ転用したものではない。正式Alpha参加URLと同packageのStore詳細を実画面で確認し、参加URLは従来の個別案内管理を維持する。

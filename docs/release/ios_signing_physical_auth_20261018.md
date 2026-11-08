@@ -1,5 +1,26 @@
 # HamCare iOS署名・実機認証準備（2026-10-18）
 
+<!-- hamcare-rc4-owner-cutover-20261108:start -->
+## 2026-11-08 本人限定build4内部Testing・本人端末更新済み（一斉切替は進行中）
+
+本節はRC4工程の現時点記録。以下のbuild3以前の署名・配信・認証・DeviceCheck確認は履歴として維持し、build4の新しい完了証拠へ読み替えない。
+
+- **番号・完成成果物**：App Store ConnectのVersion1.0.1／Build Uploadsでbuild4未使用を確認後、恒久Flutter3.47.7／Xcode27.1・通常lib/main.dart・既存Team／Bundle ID／Distribution／Profile・固定lockでArchiveとApp Store配布署名IPAを生成。成果物は `/Users/gota/hamcare-deploy-staging/pre-optin-rc4-20261108/artifacts/hamcare-1.0.1-build4-pre-optin-appstore.ipa`（135,394,372 bytes、SHA-256 `0fd38f47cca2db05db924130d22d33c2aa6198eeb4708f098192a7fbec5711e0`）。署名、88枚PNG、manifest、固定RCコード／lockとの整合を確認しPASS。旧成果物を保持する。
+- **アップロード・内部テスト**：指定IPAをTransporterで送信し、2026-11-08 21:28 JSTにDelivery Completeを確認。App Store Connectの処理完了後、本人の追加承認に従って従来と同値の輸出申告を保存し、既存の本人向けInternalグループへbuild4と確認メモを保存。Internal1名／3 Buildsの一覧で `1.0.1（4）Testing` を目視確認（非公開証拠 `/private/tmp/hamcare-build4-internal-testing.jpg`）。外部テスター0を維持し、App Store製品版審査には未提出。本人がTestFlightから1.0.1（4）へ正式更新し、再ログインなしのHome表示・既存プロフィール・飼育記録保持を確認しPASS。今回の限定UI結果は次項と区別し、新部分保存の実機確認は未実施として残す。
+- **iPhone正式更新・保持**：iPhone17eのTestFlight build3→build4更新は本人操作・回答でPASS。再ログインなしのHome・既存プロフィール・記録保持を確認した。Debug／ローカル署名版による上書き・削除・データ消去は行わない。consumer反映後の旧版通常完全入力PASSと、新版更新保持PASSを区別する。
+- **iPhone限定UI結果**：本人がbuild4のタスク1ドロワー名・タスク2分析準備カード・タスク3クイック記録について「3点問題なし」と回答し、表示確認PASS。タスク4は前後空白を付けた「RC4確認」を保存し、設定内表示とアプリ終了後の再起動保持を本人確認しPASS。追加のニックネーム変更・解除は本人が不要と指定し未実施。Firestore格納値のtrimは直接実測しておらず、既存unit／UIテストの証拠と区別する。タスク5の部分保存8ケースは未実施。
+- **候補の固定と作業環境**：承認済みタスク1〜5・日付跨ぎ修正・UIテスト更新を維持し、P1の計画的一斉切替条件だけを独立コミットしたリリース候補は `f5f09c2b65536022f0d75e140de757610b691ef2`。`/private/tmp/hamcare-pre-optin-rc-20261108` をこのSHAから作成し、開始時clean・HEAD一致を確認。元のdirty作業ツリーはビルド／デプロイ元にせず、固定SDK・既存署名・ID・lockと安全なローカル設定注入を再利用する。既存フォーム文書差分・iOSローカル設定・未追跡素材は保持する。
+- **サーバー反映済み範囲**：対象consumer7件（healthWeightRecordWritten／healthDistanceRecordWritten／healthDailyCheckinWritten／healthEnvironmentHistoryWritten／healthEnvironmentLatestWritten／rebuildMyHealthArchitecture／personalityDailyReports）を先に反映。旧iPhone build3と既存Play専用AVD code3の通常完全入力について、保存・再読込・Silver／Gold・Home・既存AI文脈・関連ログを確認しPASS。その後、入力受付saveDailyCheckinを旧 `savedailycheckin-00001-zuv` から新 `savedailycheckin-00002-gim` へ限定反映し、traffic100%を確認。writer反映後も旧Play専用AVDの完全入力で互換ゲートPASS。全Functionsの一括反映、数値専用経路等の追加、実AI送信は行わない。
+- **新部分保存は未開始**：本番の新部分保存0件を維持。Play code4審査中・AVD未更新のため、部分保存8ケースは未実施。コード上の旧reader完全後方互換を得たという意味ではなく、全本人所有環境を新版更新／旧版停止として実確認した後に初めて部分保存する。完全入力の互換PASSやiPhone限定UI確認を、部分保存の実機PASSへ転記しない。
+- **旧環境の実状態**：Samsung SM-S911Nの現アプリはローカル署名1.0.1／code2で、Play配布署名と非互換。削除・データ消去・Play版による直接置換を行わず、本人がアプリを閉じ、21:06 JSTにpidofで主プロセス0を確認した（package stopped=falseのため強制停止済みとは扱わない）。他の保存Android AVD2台は非稼働、保存Simulatorは全Shutdown。Play専用AVDはcode3のまま、iPhoneはTestFlight build4へ正式更新・保持確認済み。この段階も全環境の一斉切替完了とはしない。
+- **本人限定・公開境界**：Play Alphaは日本のみ・既存リスト本人1名、TestFlightは既存の本人向け内部1名を維持。外部応募者約15名は未登録・未招待・参加案内／メール未送信。製品版変更・一般公開・App Store製品版審査は0。Apple Case103009817213の回答待ち／決済判断保留を維持する。
+- **証拠と残る条件**：既存の非公開staging `pre-optin-rc4-20261108/audit/` のserver/deploy-results、server/test-user-metadata、device-inventory-before-code4.json、old-readers-closed-readonly-check.jsonを参照。メール・UID・資格情報・私的本文は本書へ転記しない。Android実機は正式Play code3→code4更新条件を満たしておらずPASS未達。Play専用AVDの結果を実機PASSと混同せず、指定された全実機確認PASSまでmainへのmerge／pushは保留する。
+
+本人が不要と指定した追加手動確認は依頼しない。残る部分保存8ケースはPlay code4の審査・配信／AVD更新と全所有環境の旧reader停止が前提で、現時点では未実施。一斉切替完了・全実機PASSを先取りせず、App Store製品版審査・外部テスターへの拡大・mainへのmerge／pushは保留する。
+- **審査待ち間の旧AVD停止**：11/8 22:09 JSTに専用AVDの旧HamCare code3だけをforce-stopし、主process0／package stopped=trueを確認。userdata・既存ログイン／記録・Playアプリは削除／変更せず保持。配信後の正式更新確認まで旧アプリを起動しない。Samsungの本人終了・他AVD／Simulator停止と区別して記録し、正式Android更新や部分保存PASSを意味しない。
+- **停止前の入力版照合**：11/8 22:04:56 JST開始の承認済みmetadata再照合で、新partial／未回答marker／condition:nullは全対象0、全走査件数一致。本文・UID・メール保存0、データ変更0。
+<!-- hamcare-rc4-owner-cutover-20261108:end -->
+
 ## 2026-11-01 TestFlight build3内部配信（本人1名・Testing）
 
 指定のhamcare-1.0.1-build3-avatars88-appstore-20261101.ipa（前回SHA841aeee9…2076f、再生成／再署名なし）を既存Transporterから送信。Transporter表示11/1 17:44デリバリ成功、ASC既存App6826783734で1.0.1(3)処理完了を確認した。前版と同じ標準暗号（OS外TLSを含む）・独自暗号なし・フランス配布なしを保存し、Missing Complianceを解消。新契約・署名・権限変更なし。
