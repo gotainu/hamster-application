@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_firestore_platform_interface/cloud_firestore_platform_interface.dart'
@@ -15,6 +16,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_core_platform_interface/firebase_core_platform_interface.dart'
     as cp;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/personality_report.dart';
@@ -23,6 +26,7 @@ import 'package:hamster_project/widgets/personality_report_entry.dart';
 import 'package:hamster_project/screens/personality_report_screen.dart';
 import 'package:hamster_project/screens/personality_report_history_screen.dart';
 import 'package:hamster_project/widgets/main_drawer.dart';
+import 'package:hamster_project/theme/app_theme.dart';
 import 'package:hamster_project/widgets/metric_comparison_bar.dart';
 
 const _uid = 'release-candidate-synthetic-owner';
@@ -724,9 +728,104 @@ void main() {
     expect(_canonical(db.documents[_firstPath]), firstBefore);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+  for (final dark in [false, true]) {
+    for (final width in [320.0, 390.0]) {
+      testWidgets('drawer Japanese header fits at ${width}px ($dark)',
+          (tester) async {
+        // Current macOS font is used for layout only, not the historical Goldens.
+        const font = 'HamCareDrawerLayoutJapanese';
+        await tester.runAsync(() async {
+          final fontBytes = await File(
+                  '/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc')
+              .readAsBytes();
+          await (FontLoader(font)
+                ..addFont(Future.value(ByteData.sublistView(fontBytes))))
+              .load();
+          final iconBytes = await File(
+                  Platform.environment['HAMCARE_GOLDEN_ICON_FONT'] ??
+                      '/Users/gota/tools/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf')
+              .readAsBytes();
+          await (FontLoader('MaterialIcons')
+                ..addFont(Future.value(ByteData.sublistView(iconBytes))))
+              .load();
+        });
+        db.documents['users/$_uid/pet_profiles/main_pet'] = {'name': 'いぶき'};
+        final completion = ValueNotifier<DailyRecordCompletion?>(null);
+        addTearDown(completion.dispose);
+        tester.view.physicalSize = Size(width, 852);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final baseTheme = dark ? AppTheme.darkTheme : AppTheme.lightTheme;
+        final scaffoldKey = GlobalKey<ScaffoldState>();
+        final captureKey = GlobalKey();
+        await tester.pumpWidget(MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: baseTheme.copyWith(
+            textTheme: baseTheme.textTheme.apply(fontFamily: font),
+          ),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(1.3)),
+            child: child!,
+          ),
+          home: RepaintBoundary(
+            key: captureKey,
+            child: Scaffold(
+              key: scaffoldKey,
+              drawer: MainDrawer(
+                recordCompletionListenable: completion,
+                onSelectScreen: (_) {},
+              ),
+              body: const Text('HamCare'),
+            ),
+          ),
+        ));
+        scaffoldKey.currentState!.openDrawer();
+        await _frames(tester);
+        final title = find.text('ハムケア');
+        expect(title.hitTestable(), findsOneWidget);
+        expect(find.text('Hamster Project'), findsNothing);
+        expect(find.text('いぶきの記録と管理'), findsOneWidget);
+        for (final label in [title, find.text('いぶきの記録と管理')]) {
+          final paragraph = tester.renderObject<RenderParagraph>(label);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final bounds = tester.getRect(label);
+          final drawerBounds = tester.getRect(find.byType(MainDrawer));
+          expect(bounds.left, greaterThanOrEqualTo(drawerBounds.left));
+          expect(bounds.right, lessThanOrEqualTo(drawerBounds.right));
+          expect(bounds.top, greaterThanOrEqualTo(drawerBounds.top));
+          expect(bounds.bottom, lessThanOrEqualTo(drawerBounds.bottom));
+        }
+        expect(find.text('HamCare', skipOffstage: false), findsOneWidget);
+        expect(db.writes, isEmpty);
+        expect(tester.takeException(), isNull);
+        final captureDir = Platform.environment['HAMCARE_DRAWER_CAPTURE_DIR'];
+        if (captureDir != null) {
+          await tester.runAsync(() async {
+            final boundary = tester.renderObject<RenderRepaintBoundary>(
+                find.byKey(captureKey));
+            final image = await boundary.toImage();
+            final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+            final file = File(
+                '$captureDir/drawer_${dark ? 'dark' : 'light'}_${width.toInt()}.png');
+            await file.parent.create(recursive: true);
+            await file.writeAsBytes(bytes!.buffer.asUint8List());
+            image.dispose();
+          });
+        }
+        scaffoldKey.currentState!.closeDrawer();
+        await _frames(tester);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await _frames(tester);
+      }, skip: !Platform.isMacOS);
+    }
+  }
   testWidgets(
-      'actual MainDrawer report history callback leaves all other entries available',
+      'actual MainDrawer preserves the pet subtitle and all navigation callbacks',
       (tester) async {
+    // Synthetic in-memory profile only; no real pet or account is accessed.
+    db.documents['users/$_uid/pet_profiles/main_pet'] = {'name': 'いぶき'};
     final completion = ValueNotifier<DailyRecordCompletion?>(null);
     addTearDown(completion.dispose);
     String? selected;
@@ -736,12 +835,30 @@ void main() {
                 recordCompletionListenable: completion,
                 onSelectScreen: (value) => selected = value))));
     await _frames(tester);
-    await tester.ensureVisible(find.text('うちの子レポート'));
-    await tester.tap(find.text('うちの子レポート'));
-    expect(selected, 'report_history');
-    expect(find.text('記録する'), findsOneWidget);
-    expect(find.text('ペットのプロフィール'), findsOneWidget);
-    expect(find.text('アプリの設定'), findsOneWidget);
+    expect(find.text('ハムケア'), findsOneWidget);
+    expect(find.text('Hamster Project'), findsNothing);
+    expect(find.text('いぶきの記録と管理'), findsOneWidget);
+    final title = tester.widget<Text>(find.text('ハムケア'));
+    expect(title.style?.fontSize, 21);
+    expect(title.style?.fontWeight, FontWeight.w900);
+    expect(title.style?.letterSpacing, 0.1);
+    expect(title.maxLines, 1);
+    expect(title.overflow, TextOverflow.ellipsis);
+    for (final entry in {
+      '記録する': 'record',
+      '記録カレンダー': 'record_calendar',
+      'うちの子レポート': 'report_history',
+      'ペットのプロフィール': 'pets_profile',
+      '飼い主プロフィール': 'owner_profile',
+      'アプリの設定': 'settings',
+    }.entries) {
+      await tester.ensureVisible(find.text(entry.key));
+      await _frames(tester);
+      await tester.tap(find.text(entry.key));
+      expect(selected, entry.value);
+    }
+    expect(db.writes, isEmpty);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets(
