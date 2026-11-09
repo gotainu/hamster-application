@@ -1,12 +1,14 @@
-# Hamster Care ストア掲載情報（日本）
+# Ham Care ストア掲載情報（日本）
 
-更新日: 2026-10-27
+更新日: 2026-11-09
+
+11/9 表示名統一：本人指定によりGoogle Play／App Storeのアプリ名原稿を、ともに `Ham Care` へ更新し、既存metadataのtitle／name txtを同期。両Consoleの日本語名を `Ham Care` で保存した表示を確認済み。Google Playは本人の確定操作後も、読込完了後のConsoleで未送信2変更のまま、送信受付・審査送信・公開反映は未確認で原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみとする。App Store ConnectはSaved、build5は本人承認の輸出申告保存後に既存本人実機確認1Tester／4BuildsでTesting・90日を確認済み。名称保存・内部テスト配布と一般公開を区別する。配信・審査状態は`PROJECT_STATUS.md`と各ストア提出記録の実結果を参照する。説明本文・サブタイトル・キーワード・画像・App ID／Bundle ID・署名・料金／決済方式は本変更の対象外として保持する。
 
 10/27 Play下書き確認：保存済みアプリ名／Google Play向け短文／詳細本文を既存metadata txtと照合し、本文691文字は完全一致。短文の末尾句点だけが既存txtに不足していたため、Consoleは変更せずtxtを同期した。アイコン`google_play_icon_512.png`、feature graphic`google_play_feature_graphic_1024x500.png`、電話用`01_today.jpg`・`03_changes.jpg`・`02_record.jpg`・`04_consultation.jpg`の4枚を保存済み確認。掲載ステータスは審査送信準備済みで、追加画像のupload／本文再保存は不要。下の「スクリーンショット候補」5・6は候補の履歴で、保存済み4枚の不足とは扱わない。今回iOSの掲載内容は操作していない。
 
 ## 共通情報
 
-- アプリ名: `Hamster Care｜ハムスター健康管理`
+- アプリ名: `Ham Care`
 - カテゴリ候補: ライフスタイル
 - サポートURL: https://hamster-breeding-app.web.app/support/
 - プライバシーポリシーURL: https://hamster-breeding-app.web.app/privacy/

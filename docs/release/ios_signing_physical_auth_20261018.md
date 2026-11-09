@@ -1,5 +1,15 @@
 # HamCare iOS署名・実機認証準備（2026-10-18）
 
+<!-- hamcare-ui-polish-release5-20261109:start -->
+## 2026-11-09 1.0.1／build5（既存本人内部グループTesting・90日）
+
+- **対象と保護**：固定ソースは `402737048c36b0e592475c764fe05a25abf0454b`。既存専用ブランチと成功済みFlutter／Xcode／署名手順を再利用し、dirty／未追跡素材はビルドへ混入させない。アプリID・Bundle ID・署名鍵・依存lock・88アバターを維持。旧code3／build3以前の互換P1は本人の要件変更による非ブロッキングで閉じたまま、部分保存はcode4／build4以降の正規仕様。新たな旧版互換実装、サーバー配備、main merge／push、外部テスター追加・招待・連絡、製品版公開は行わない。Apple Case103009817213の回答待ち／決済判断保留を維持する。
+- **修正・限定証拠**：「Ham Care」表記とログイン同様の手書き書体、Home／クイック記録のアバター拡大・背景統一、選択中ペットのhappy完了アバターと黄色いぼかし、体重時期未選択→不明、レポート準備中の選択中ペットアバターを含む。直接関連114件PASS／既存ListTile診断2件FAIL、新規失敗0、ぼかし描画17件PASS、analyze既存57件・新規0を引き継ぐ。今回のストア名原稿の完全一致を含むrelease identity追加確認は6件PASS。完了済みAI／認証／課金／DeviceCheck等の再試験、実AI送信・体験リセットは0。
+- **iOS成果物と内部配信**：`1.0.1／build5`、`hamcare-1.0.1-build5-ui-polish-appstore.ipa`（135,534,552bytes、SHA-256 `9e00e9a12c7f706e3b9199367dc9c0a4ef831527d528189c4065cebe1e019cd8`）を既存Distribution署名／App Store Profileで生成・検証PASS。codesign strict／ZIP、get-task-allow=false、88PNG／Caveatの含有・整合を確認済み。同IPAはTransporterで **2026-11-09 11:09 JSTにDelivery完了**、ASC処理完了後のMissing Complianceを確認。本人が従来同値の「Apple OS以外にも標準暗号を使用／独自暗号なし／フランス配布なし」の最終保存を明示承認した後にSaveし、既存 **本人実機確認グループの1 Tester／4 Buildsで1.0.1(5) Testing・90日** を確認した。外部テスター追加・App Store製品版審査提出は0。**端末4→5更新・ログイン／既存データ保持の本人確認は未実施**。
+- **表示名と次の操作**：App Store ConnectとGoogle Playの日本語名はいずれも本人指定の `Ham Care` で保存表示を確認済み。既存本人1名向けTestFlightグループのbuild5 Testingを確認したため、iPhoneはTestFlightから削除なしの4→5更新が可能。実際の端末更新・再ログイン不要・既存プロフィール／記録保持は本人報告を受領してから記録する。一般App Store審査・外部テスター追加は行わない。
+- **保存先と状態の区別**：成果物と非公開監査は `/Users/gota/hamcare-deploy-staging/pre-optin-release5-20261109/`。AAB／IPAの生成、アップロード、審査送信、テスト配信可能、端末更新・ログイン／データ保持の本人確認を分ける。以下のRC4およびローカルDebug確認は前版・各確認時点の履歴であり、release5の配信済みや実機PASSへ転記しない。
+<!-- hamcare-ui-polish-release5-20261109:end -->
+
 <!-- hamcare-rc4-owner-cutover-20261108:start -->
 ## 2026-11-09 build4内部Testing・iPhone正式更新PASS／旧版互換P1非ブロッキング
 

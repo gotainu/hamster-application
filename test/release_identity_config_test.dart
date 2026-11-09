@@ -179,6 +179,8 @@ void main() {
         'store_assets/metadata/app_store/ja/keywords.txt',
       );
 
+      expect(googleTitle, 'Ham Care');
+      expect(appStoreName, 'Ham Care');
       expect(googleTitle.runes.length, lessThanOrEqualTo(30));
       expect(googleShortDescription.runes.length, lessThanOrEqualTo(80));
       expect(googleFullDescription.runes.length, lessThanOrEqualTo(4000));
