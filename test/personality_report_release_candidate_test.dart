@@ -793,7 +793,7 @@ void main() {
   });
   for (final dark in [false, true]) {
     for (final width in [320.0, 390.0]) {
-      testWidgets('drawer Japanese header fits at ${width}px ($dark)',
+      testWidgets('drawer brand header fits at ${width}px ($dark)',
           (tester) async {
         // Current macOS font is used for layout only, not the historical Goldens.
         const font = 'HamCareDrawerLayoutJapanese';
@@ -846,7 +846,7 @@ void main() {
         ));
         scaffoldKey.currentState!.openDrawer();
         await _frames(tester);
-        final title = find.text('ハムケア');
+        final title = find.text('Ham Care');
         expect(title.hitTestable(), findsOneWidget);
         expect(find.text('Hamster Project'), findsNothing);
         expect(find.text('いぶきの記録と管理'), findsOneWidget);
@@ -898,10 +898,10 @@ void main() {
                 recordCompletionListenable: completion,
                 onSelectScreen: (value) => selected = value))));
     await _frames(tester);
-    expect(find.text('ハムケア'), findsOneWidget);
+    expect(find.text('Ham Care'), findsOneWidget);
     expect(find.text('Hamster Project'), findsNothing);
     expect(find.text('いぶきの記録と管理'), findsOneWidget);
-    final title = tester.widget<Text>(find.text('ハムケア'));
+    final title = tester.widget<Text>(find.text('Ham Care'));
     expect(title.style?.fontSize, 21);
     expect(title.style?.fontWeight, FontWeight.w900);
     expect(title.style?.letterSpacing, 0.1);

@@ -356,12 +356,15 @@ class _QuickRecordCategoryTile extends StatelessWidget {
       ),
     );
     return ExcludeSemantics(
-      child: Padding(
-        padding: const EdgeInsets.all(3),
+      child: OverflowBox(
+        minWidth: 58,
+        maxWidth: 58,
+        minHeight: 58,
+        maxHeight: 58,
         child: HamsterAvatarView(
           key: ValueKey('quick-record-avatar-${avatarCondition.assetKey}'),
           presentation: presentation,
-          size: 44,
+          size: 58,
           showBackdrop: false,
         ),
       ),

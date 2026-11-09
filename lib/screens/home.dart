@@ -451,7 +451,7 @@ class _HealthAssessmentHero extends StatelessWidget {
               child: HamsterAvatarHero(
                 profile: profile,
                 assessment: assessment,
-                avatarSize: 190,
+                avatarSize: 224,
                 showMessage: false,
                 showDebugLabel: false,
                 showBackdrop: false,

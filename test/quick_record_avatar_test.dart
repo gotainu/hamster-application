@@ -110,8 +110,8 @@ void _expectDecodedAvatar(
   expect(view.presentation.animateBreathing, isFalse);
   expect(view.presentation.condition, condition);
   expect(view.presentation.cause, HamsterAvatarCause.none);
-  expect(view.size, 44);
-  expect(tester.getSize(avatar), const Size(44, 44));
+  expect(view.size, 58);
+  expect(tester.getSize(avatar), const Size(58, 58));
   final image = tester
       .widget<Image>(find.descendant(of: avatar, matching: find.byType(Image)));
   expect((image.image as AssetImage).assetName, path);

@@ -57,7 +57,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('release app identity', () {
-    test('Android uses the Hamster Care display name', () {
+    test('Android uses the Ham Care display name', () {
       final manifest =
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
       final strings = File('android/app/src/main/res/values/strings.xml')
@@ -66,7 +66,7 @@ void main() {
       expect(manifest, contains('android:label="@string/app_name"'));
       expect(manifest, isNot(contains('<manifest package=')));
       expect(
-          strings, contains('<string name="app_name">Hamster Care</string>'));
+          strings, contains('<string name="app_name">Ham Care</string>'));
     });
 
     test('Android release targets API 36 without broad media or ad IDs', () {
@@ -92,7 +92,7 @@ void main() {
       expect(manifest, contains('tools:node="remove"'));
     });
 
-    test('iOS uses the Hamster Care display and bundle names', () {
+    test('iOS uses the Ham Care display and bundle names', () {
       final infoPlist = File('ios/Runner/Info.plist').readAsStringSync();
       final project =
           File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
@@ -100,12 +100,12 @@ void main() {
       expect(
         infoPlist,
         contains(
-          '<key>CFBundleDisplayName</key>\n\t<string>Hamster Care</string>',
+          '<key>CFBundleDisplayName</key>\n\t<string>Ham Care</string>',
         ),
       );
       expect(
         infoPlist,
-        contains('<key>CFBundleName</key>\n\t<string>Hamster Care</string>'),
+        contains('<key>CFBundleName</key>\n\t<string>Ham Care</string>'),
       );
       expect(project, isNot(contains('TARGETED_DEVICE_FAMILY = "1,2";')));
       expect(

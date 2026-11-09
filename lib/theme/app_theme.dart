@@ -830,8 +830,8 @@ class AppTheme {
   static const String analysisPreparationIllustrationAsset =
       'assets/avatars/syrian/golden/analysis_preparing_v1.png';
   static const analysisPreparationReadyPadding = EdgeInsets.all(8);
-  static const double analysisPreparationIllustrationSize = 108;
-  static const double analysisPreparationCompactIllustrationSize = 88;
+  static const double analysisPreparationIllustrationSize = 128;
+  static const double analysisPreparationCompactIllustrationSize = 104;
   static const double analysisPreparationMetricGap = 18;
   static const double analysisPreparationTrackHeight = 5;
   static const double analysisPreparationCompactWidth = 260;
