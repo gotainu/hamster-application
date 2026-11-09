@@ -76,7 +76,6 @@ class _WeightInputCardState extends State<WeightInputCard> {
         !_loading &&
         !_saving &&
         _pending == null &&
-        _timing != null &&
         (_savedRecord?.subjectId != null ||
             _savedRecord == null ||
             _legacyConfirmed) &&
@@ -199,7 +198,7 @@ class _WeightInputCardState extends State<WeightInputCard> {
         weightGrams: weight,
         memo: _memoController.text,
         expectedRecord: _savedRecord,
-        timing: _timing,
+        timing: _timing ?? unknownMeasurementTiming,
         legacyConfirmed: _legacyConfirmed,
         originalDayKey: _originalDayKey,
       );
@@ -527,7 +526,11 @@ class _WeightInputCardState extends State<WeightInputCard> {
                 key: const ValueKey('weight-timing'),
                 isExpanded: true,
                 value: MeasurementInputViewModel.timingChoice(_timing),
-                decoration: const InputDecoration(labelText: '測定時期の確認'),
+                decoration: const InputDecoration(
+                  labelText: '測定時期の確認（任意）',
+                  helperText: '未選択の場合は「不明」として保存します。',
+                  helperMaxLines: 2,
+                ),
                 items: [
                   if (MeasurementInputViewModel.timingChoice(_timing) ==
                       'instant')

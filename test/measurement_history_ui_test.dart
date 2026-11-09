@@ -86,7 +86,7 @@ void main() {
   });
 
   testWidgets(
-      'weight legacy edit requires explicit subject and timing confirmation',
+      'weight legacy edit still requires subject confirmation without timing selection',
       (tester) async {
     await showMeasurementUi(
         tester,
@@ -99,11 +99,92 @@ void main() {
     FilledButton button() => tester.widget<FilledButton>(
         find.byWidgetPredicate((widget) => widget is FilledButton));
     expect(button().onPressed, isNull);
-    await chooseTiming(tester, 'weight-timing', '測定時期は不明');
-    expect(button().onPressed, isNull);
     await tester.tap(find.byType(CheckboxListTile));
     await tester.pumpAndSettle();
     expect(button().onPressed, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('weight saves unselected timing as unknown without inventing a date',
+      (tester) async {
+    final requests = <Map<String, dynamic>>[];
+    WeightRecord? confirmed;
+    await showMeasurementUi(
+        tester,
+        WeightInputCard(
+            repo: WeightHistoryUiRepo(
+                client: testMeasurementClient(submit: (r) async {
+              requests.add(r);
+              return measurementReply(r);
+            })),
+            initialDate: DateTime(2026, 10, 12),
+            onSaved: (record) => confirmed = record));
+    final button = find.widgetWithText(FilledButton, '体重を保存');
+    expect(tester.widget<FilledButton>(button).onPressed, isNull);
+    await tester.enterText(find.byType(TextField).first, '122');
+    await tester.pumpAndSettle();
+    expect(tester.widget<FilledButton>(button).onPressed, isNotNull);
+    expect(find.text('測定時期の確認（任意）'), findsOneWidget);
+    await tester.ensureVisible(button);
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    expect(requests, hasLength(1));
+    expect(requests.single['timing'], unknownMeasurementTiming);
+    expect(requests.single['dayKey'], '2026-10-12');
+    expect(requests.single['date'],
+        DateTime(2026, 10, 12).toUtc().toIso8601String());
+    expect(confirmed?.timing, unknownMeasurementTiming);
+    expect(confirmed?.weightGrams, 122);
+    expect(find.text('122g'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('optional timing does not enable an empty or invalid weight',
+      (tester) async {
+    final requests = <Map<String, dynamic>>[];
+    await showMeasurementUi(
+        tester,
+        WeightInputCard(
+            repo: WeightHistoryUiRepo(
+                client: testMeasurementClient(submit: (r) async {
+              requests.add(r);
+              return measurementReply(r);
+            })),
+            initialDate: DateTime(2026, 10, 12)));
+    for (final text in ['', '0', '1001']) {
+      await tester.enterText(find.byType(TextField).first, text);
+      await tester.pumpAndSettle();
+      expect(
+          tester
+              .widget<FilledButton>(find.widgetWithText(FilledButton, '体重を保存'))
+              .onPressed,
+          isNull,
+          reason: 'Invalid weight must remain unsaveable: $text');
+    }
+    expect(requests, isEmpty);
+  });
+  testWidgets('weight edit preserves a saved explicit measurement timing',
+      (tester) async {
+    Map<String, dynamic>? sent;
+    final original = historyWeight();
+    await showMeasurementUi(
+        tester,
+        WeightInputCard(
+            repo: WeightHistoryUiRepo(
+                record: original,
+                client: testMeasurementClient(submit: (r) async {
+                  sent = r;
+                  return measurementReply(r);
+                })),
+            initialDate: DateTime(2026, 10, 12)));
+    await tester.tap(find.text('編集'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, '121');
+    await tester.ensureVisible(find.text('体重を保存'));
+    await tester.tap(find.text('体重を保存'));
+    await tester.pumpAndSettle();
+    expect(sent!['timing'], original.timing);
+    expect(sent!['timing'], isNot(unknownMeasurementTiming));
+    expect(sent!['subjectId'], original.subjectId);
+    expect(sent!['expectedRevision'], original.revision);
     expect(tester.takeException(), isNull);
   });
   testWidgets(
@@ -156,7 +237,7 @@ void main() {
     await showMeasurementUi(tester,
         WeightInputCard(repo: repo, initialDate: DateTime(2026, 10, 12)));
     await tester.enterText(find.byType(TextField).first, '122');
-    await chooseTiming(tester, 'weight-timing', '測定時期は不明');
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('体重を保存'));
     await tester.tap(find.text('体重を保存'));
     await tester.pumpAndSettle();
@@ -167,6 +248,7 @@ void main() {
     await tester.ensureVisible(find.text('同じ内容を再送'));
     await tester.tap(find.text('同じ内容を再送'));
     await tester.pumpAndSettle();
+    expect(requests[0]['timing'], unknownMeasurementTiming);
     expect(requests[0], requests[1]);
     expect(store.values, isEmpty);
     expect(find.text('122g'), findsOneWidget);

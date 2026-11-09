@@ -26,6 +26,13 @@
 - **表示調整完了（ソースのみ）**：端末のAndroid／iOSアプリ表示名・Flutter title・ドロワー名を「Ham Care」へ統一。Home本体のアバターを190→224px、分析準備を108→128px（compact88→104px）、クイック記録3画像を44→58pxに拡大した。クイック記録は既存52px枠で軽微な見切れを許容し、Resolver／状態対応／fallback／タップ動作は維持。既存関連テスト66件PASS、実Widget合成描画4件（320／390px・明暗）PASS、Drawerとクイック記録の実Widget描画も目視確認。端末でこの表示変更を確認したという意味ではない。flutter analyzeはmain基準と同じ既存57件（新規0）、git diff --check・iOS plist形式PASS。過去の固定fontによるGolden全体再実行・期待画像更新は行わない。描画・ログは `/private/tmp/hamcare-display-polish-20261109/` と同名接頭辞のログへ保存。配信済みcode4／build4・署名・成果物・版番号は変更せず、新ビルド／upload／配信、main merge／pushは行っていない。次回配布で表示修正を取り込む場合は、新しい未使用build番号を使用し、配信済み4を差し替えない。
 <!-- hamcare-pre-optin-rc4-cutover-20261108:end -->
 
+<!-- hamcare-display-five-polish-20261109:start -->
+## 2026-11-09 追加微修正（体重の測定時期は任意）
+
+- **体重保存**：測定時期を選ばない場合も、有効な体重だけで保存可能。既存の `unknownMeasurementTiming`（precision／confirmationともunknown）を明示し、対象日は保持する。選択済みの時期・保存済み時刻・訂正・legacy本人確認・pending同一再送は維持。既存Repo／サーバーは同形式を受理しており変更不要。
+- **限定検証と既存失敗**：直接関連8ファイルのテストは114件PASS、既存のListTile／DecoratedBox診断2件FAIL（旧記録の本人確認・狭幅操作）。両失敗は前回main／HEADにも同一の診断で存在し、今回由来の失敗0。新規の未選択→不明・不正体重の保存禁止・既存測定時期保持・同一再送はPASS。実アカウントの体重保存、評価／通知／AI／課金の変更、Store反映は0。
+<!-- hamcare-display-five-polish-20261109:end -->
+
 <!-- hamcare-pre-optin-audit-c-final-20261108:start -->
 ## 2026-11-08 統合再監査の残件C確定（一斉切替で対応可能・実行前）
 
