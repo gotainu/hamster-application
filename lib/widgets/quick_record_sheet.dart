@@ -81,6 +81,7 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final reward = _reward;
     final media = MediaQuery.of(context);
     final availableHeight = media.size.height - media.viewInsets.bottom;
     final maximumSheetHeight = math.min(
@@ -155,15 +156,22 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
                               duration: const Duration(milliseconds: 260),
                               switchInCurve: Curves.easeOutCubic,
                               switchOutCurve: Curves.easeInCubic,
-                              child: _reward != null
-                                  ? QuickRecordRewardView(
-                                      key: ValueKey(_reward),
-                                      reward: _reward!,
-                                      completionListenable:
-                                          widget.completionListenable,
-                                      onContinue: _backToCategories,
-                                      onClose: () =>
-                                          Navigator.of(context).pop(),
+                              child: reward != null
+                                  ? StreamBuilder<PetProfile?>(
+                                      key: ValueKey(reward),
+                                      stream: _petStream,
+                                      builder: (context, snapshot) =>
+                                          QuickRecordRewardView(
+                                        reward: reward,
+                                        petProfile: snapshot.hasError
+                                            ? null
+                                            : snapshot.data,
+                                        completionListenable:
+                                            widget.completionListenable,
+                                        onContinue: _backToCategories,
+                                        onClose: () =>
+                                            Navigator.of(context).pop(),
+                                      ),
                                     )
                                   : PaidFeatureGate(
                                       key: const ValueKey('record-form'),
@@ -391,17 +399,15 @@ class _QuickRecordCategoryTile extends StatelessWidget {
           child: Row(
             children: [
               Container(
+                key: ValueKey(
+                    'quick-record-icon-surface-${avatarCondition.assetKey}'),
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: useBrandMark
-                      ? Colors.black
-                      : accent.withValues(alpha: 0.13),
+                  color: AppTheme.quickRecordObjectSurface(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(
-                    color: useBrandMark
-                        ? const Color(0xFFFFF1D1).withValues(alpha: 0.28)
-                        : accent.withValues(alpha: 0.25),
+                    color: AppTheme.quickRecordObjectBorder(context),
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,

@@ -24,13 +24,19 @@
 - **2026-11-09の確定方針・P1クローズ**：本人は旧code3／build3以前を実運用しておらず重要なユーザーデータもないとして、旧版後方互換性を今回のリリース要件から外した。新しい部分保存をcode4／build4以降の正規仕様とし、P1の旧クライアント誤読は要件変更に基づく非ブロッキングとして閉じる。コード上の完全後方互換を実装・検証した意味ではない。旧版互換の追加実装・二段階配布・強制更新機構は不要。外部テスターへの案内対象はcode4のみで、今回の方針決定自体では招待・メール送信・対象拡大を実施しない。以下の過去の一斉切替ゲートより本決定を優先する。
 - **部分保存の仕様と確認範囲**：code4／build4以降の部分保存を正規仕様とする。本番の新部分記録0件は11/8 22:04:56 JSTのmetadata照合時点の結果で、現在件数の再照会は行わない。個別の部分保存8ケース・新部分に対するRaw／Silver／Gold／AI文脈／通知の実測は未実施のまま区別する。本人の正常ログイン・記録・動作確認を受領したことを、これら全ケースのPASSへ読み替えない。旧版の全環境切替や完全後方互換を追加のリリース条件にはしない。
 - **表示調整完了（ソースのみ）**：端末のAndroid／iOSアプリ表示名・Flutter title・ドロワー名を「Ham Care」へ統一。Home本体のアバターを190→224px、分析準備を108→128px（compact88→104px）、クイック記録3画像を44→58pxに拡大した。クイック記録は既存52px枠で軽微な見切れを許容し、Resolver／状態対応／fallback／タップ動作は維持。既存関連テスト66件PASS、実Widget合成描画4件（320／390px・明暗）PASS、Drawerとクイック記録の実Widget描画も目視確認。端末でこの表示変更を確認したという意味ではない。flutter analyzeはmain基準と同じ既存57件（新規0）、git diff --check・iOS plist形式PASS。過去の固定fontによるGolden全体再実行・期待画像更新は行わない。描画・ログは `/private/tmp/hamcare-display-polish-20261109/` と同名接頭辞のログへ保存。配信済みcode4／build4・署名・成果物・版番号は変更せず、新ビルド／upload／配信、main merge／pushは行っていない。次回配布で表示修正を取り込む場合は、新しい未使用build番号を使用し、配信済み4を差し替えない。
+- **11/9のローカル表示確認用起動**：追加の本人依頼により、320c6d7の名称／サイズ修正6ファイルだけを成功済みAndroidビルド環境の新規一時コピーへ重ね、提出物とは別のローカルDebug APKを生成。専用AVD `HamCare_Display_Preview_20261109`（emulator-5556）へ新規導入し、表示名Ham Care・MainActivity起動Status ok・ログイン画面を確認した。旧Play用AVD／Samsung／iPhone・配布済みcode4/build4・元の署名設定と版番号は保持。専用AVDはログイン前で、Home／拡大アバターの本人操作確認はまだ行っていない。ログイン・AI送信・記録保存・課金・Store uploadは代行せず、APKと起動記録は `/private/tmp/hamcare-display-preview-runtime-20261109/` に分離。専用ブランチのソース・mainは変更せず、本行だけを既存進捗へ未コミット追記。
 <!-- hamcare-pre-optin-rc4-cutover-20261108:end -->
 
 <!-- hamcare-display-five-polish-20261109:start -->
-## 2026-11-09 追加微修正（体重の測定時期は任意）
+## 2026-11-09 追加微修正5点完了（ローカル確認版更新済み・Store未反映）
 
 - **体重保存**：測定時期を選ばない場合も、有効な体重だけで保存可能。既存の `unknownMeasurementTiming`（precision／confirmationともunknown）を明示し、対象日は保持する。選択済みの時期・保存済み時刻・訂正・legacy本人確認・pending同一再送は維持。既存Repo／サーバーは同形式を受理しており変更不要。
 - **限定検証と既存失敗**：直接関連8ファイルのテストは114件PASS、既存のListTile／DecoratedBox診断2件FAIL（旧記録の本人確認・狭幅操作）。両失敗は前回main／HEADにも同一の診断で存在し、今回由来の失敗0。新規の未選択→不明・不正体重の保存禁止・既存測定時期保持・同一再送はPASS。実アカウントの体重保存、評価／通知／AI／課金の変更、Store反映は0。
+- **クイック記録**：3アイコン枠の背景／境界線を既存の中立なすりガラス調Surfaceへ統一し、種類別の画像・58px表示・タップ／遷移は維持。保存完了は選択中ペットのhappyアバター（欠損時は同外見stable→既存安全表示）へ変更。円形の塗り・枠・切抜きを除き、黄色のぼかしshadowだけを維持。完了中のペット切替も合成ストリームで確認した。
+- **ドロワー書体**：文字列「Ham Care」と副題は維持し、ログインと同じCaveat・700へ統一。既存google_fonts 6.3.2が使う同一BoldファイルをGoogle公式配布から取得し、SHA一致を検証してOFLとともに同梱。依存更新なし。ネットワーク取得を禁止したDrawerテストでも実フォントの読込・320／390px明暗・文字1.3倍・6遷移・非切れをPASS確認。
+- **うちの子レポート**：「うちの子らしさを集めています」の肉球を、選択中ペットのinsufficient_dataアバターへ変更。同外見stableと安全表示の既存fallback、ペット／owner切替を確認し、レポート生成・履歴・A3処理は維持。将来の頬袋アセットは制作せず、種類・毛色・状態キーを追加しない。
+- **検証・実行境界**：今回由来の失敗0、flutter analyzeは前回mainと同じ57件（新規0）。既存8ファイルの114PASS／既存2FAILに加え、実際のぼかしで再描画したクイック記録17件もPASS。git diff --check PASS。確認画像とログは `/private/tmp/hamcare-polish-five-20261109/`。未選択の体重は既存の不明形式として扱い、サーバー／重み・閾値・通知・権限・課金・Auth／App Check／DeviceCheckは変更しない。
+- **エミュレータ反映**：成功済み一時コピーでローカルDebug APKを更新ビルド。専用AVD `HamCare_Display_Preview_20261109`（emulator-5556）の既存APKと署名一致を確認してinstall -rがSuccess、MainActivity起動Status ok。初回導入時刻09:50:15とデータ領域を保持し、再ログインなしで既存ペットのHome表示を10:32に観測した。初回UID比較はAndroid項目名appIdをuserIdとして読んだため未成立で、UIDの前後完全比較PASSとは記録しない。実記録の追加保存・AI送信・同意操作は0。既存Play用AVD・Samsung・iPhone・配布済みcode4/build4／提出用成果物・署名設定・版番号は変更せず、Store upload・tester連絡・main merge／pushは0。5点の本人操作による最終確認はこれからとする。
 <!-- hamcare-display-five-polish-20261109:end -->
 
 <!-- hamcare-pre-optin-audit-c-final-20261108:start -->

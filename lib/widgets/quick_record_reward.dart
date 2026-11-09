@@ -5,8 +5,13 @@ import 'package:flutter/foundation.dart';
 
 import '../models/daily_record_completion.dart';
 import '../models/daily_star_progress.dart';
+import '../models/hamster_avatar.dart';
+import '../models/pet_profile.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
 import '../screens/daily_stars.dart';
 import '../theme/app_theme.dart';
+import 'hamster_avatar_view.dart';
 
 enum QuickRecordRewardKind {
   activity,
@@ -69,6 +74,7 @@ class QuickRecordRewardData {
 
 class QuickRecordRewardView extends StatefulWidget {
   final QuickRecordRewardData reward;
+  final PetProfile? petProfile;
   final VoidCallback onContinue;
   final VoidCallback onClose;
   final ValueListenable<DailyRecordCompletion?>? completionListenable;
@@ -76,6 +82,7 @@ class QuickRecordRewardView extends StatefulWidget {
   const QuickRecordRewardView({
     super.key,
     required this.reward,
+    this.petProfile,
     required this.onContinue,
     required this.onClose,
     this.completionListenable,
@@ -133,6 +140,16 @@ class _QuickRecordRewardViewState extends State<QuickRecordRewardView>
   @override
   Widget build(BuildContext context) {
     final accent = _accent(context);
+    final avatar = const HamsterAvatarAssetResolver().resolve(
+      appearance:
+          const HamsterAvatarAppearanceResolver().resolve(widget.petProfile),
+      conditionResult: const HamsterAvatarConditionResult(
+        condition: HamsterAvatarCondition.happy,
+        cause: HamsterAvatarCause.none,
+        message: '',
+        animateBreathing: false,
+      ),
+    );
 
     return Semantics(
       liveRegion: true,
@@ -156,28 +173,24 @@ class _QuickRecordRewardViewState extends State<QuickRecordRewardView>
               ScaleTransition(
                 scale: _entrance,
                 child: Container(
+                  key: const ValueKey('quick-record-reward-glow'),
                   width: 104,
                   height: 104,
-                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: accent.withValues(alpha: 0.12),
-                    border: Border.all(
-                      color: accent.withValues(alpha: 0.42),
-                    ),
                     boxShadow: [
                       BoxShadow(
-                        color: accent.withValues(alpha: 0.24),
+                        color: AppTheme.envCaution.withValues(alpha: 0.24),
                         blurRadius: 30,
                         spreadRadius: 3,
                       ),
                     ],
                   ),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'store_assets/icons/google_play_icon_512.png',
-                      fit: BoxFit.cover,
-                    ),
+                  child: HamsterAvatarView(
+                    key: const ValueKey('quick-record-reward-avatar'),
+                    presentation: avatar,
+                    size: 104,
+                    showBackdrop: false,
                   ),
                 ),
               ),

@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/personality_report.dart';
+import '../models/pet_profile.dart';
+import '../services/pet_profile_repo.dart';
+import '../services/hamster_avatar_appearance_resolver.dart';
+import '../services/hamster_avatar_asset_resolver.dart';
+import '../services/hamster_avatar_condition_resolver.dart';
+import '../widgets/hamster_avatar_view.dart';
 import '../services/personality_reports_repo.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/personality_report_view_model.dart';
@@ -33,6 +39,7 @@ class PersonalityReportScreen extends StatefulWidget {
       this.onLegacyReportViewed,
       this.logLegacyView,
       this.legacyAutoPresented = false,
+      this.petStream,
       this.viewService});
   final PersonalityReportsSource? repo;
   final String? reportId;
@@ -46,6 +53,7 @@ class PersonalityReportScreen extends StatefulWidget {
   final FutureOr<void> Function()? onLegacyReportViewed;
   final Future<void> Function(String ownerUid, int revision)? logLegacyView;
   final PersonalityReportViewService? viewService;
+  final Stream<PetProfile?>? petStream;
   @override
   State<PersonalityReportScreen> createState() =>
       _PersonalityReportScreenState();
@@ -191,7 +199,13 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
                     widget.reportId == null) {
                   return _legacyBody(ownerUid: state.ownerUid, fallback: true);
                 }
-                return _StateContent(phase: state.phase, onRetry: _retry);
+                return _StateContent(
+                    phase: state.phase,
+                    onRetry: _retry,
+                    ownerUid: state.ownerUid,
+                    petStream: widget.petStream,
+                    watchCurrentPet: widget.repo == null ||
+                        widget.repo is PersonalityReportsRepo);
               },
             ),
     );
@@ -213,7 +227,12 @@ class _PersonalityReportScreenState extends State<PersonalityReportScreen> {
           logView: widget.logLegacyView,
           missingBuilder: fallback
               ? (_) => _StateContent(
-                  phase: PersonalityReportPhase.learning, onRetry: _retry)
+                  phase: PersonalityReportPhase.learning,
+                  onRetry: _retry,
+                  ownerUid: ownerUid,
+                  petStream: widget.petStream,
+                  watchCurrentPet: widget.repo == null ||
+                      widget.repo is PersonalityReportsRepo)
               : null);
 }
 
@@ -224,9 +243,18 @@ class _LegacyOnlyReportSource implements PersonalityReportsSource {
 }
 
 class _StateContent extends StatelessWidget {
-  const _StateContent({required this.phase, required this.onRetry});
+  const _StateContent({
+    required this.phase,
+    required this.onRetry,
+    this.ownerUid,
+    this.petStream,
+    this.watchCurrentPet = false,
+  });
   final PersonalityReportPhase phase;
   final VoidCallback onRetry;
+  final String? ownerUid;
+  final Stream<PetProfile?>? petStream;
+  final bool watchCurrentPet;
   @override
   Widget build(BuildContext context) {
     final loading = phase == PersonalityReportPhase.loading;
@@ -237,9 +265,14 @@ class _StateContent extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (loading)
           const CircularProgressIndicator()
+        else if (learning)
+          _LearningAvatar(
+            key: ValueKey(ownerUid),
+            petStream: petStream,
+            watchCurrentPet: watchCurrentPet,
+          )
         else
-          Icon(learning ? Icons.pets_rounded : Icons.cloud_off_rounded,
-              size: 52, color: AppTheme.accent),
+          const Icon(Icons.cloud_off_rounded, size: 52, color: AppTheme.accent),
         const SizedBox(height: 24),
         Text(
             loading
@@ -272,6 +305,65 @@ class _StateContent extends StatelessWidget {
       ]),
     ));
   }
+}
+
+// Only the learning surface needs a live pet. Report snapshots and their A3
+// lifecycle stay independent of profile reads. Re-keying by owner discards a
+// prior account's avatar while the next profile is loading.
+class _LearningAvatar extends StatefulWidget {
+  const _LearningAvatar({
+    super.key,
+    required this.petStream,
+    required this.watchCurrentPet,
+  });
+  final Stream<PetProfile?>? petStream;
+  final bool watchCurrentPet;
+
+  @override
+  State<_LearningAvatar> createState() => _LearningAvatarState();
+}
+
+class _LearningAvatarState extends State<_LearningAvatar> {
+  late Stream<PetProfile?> _stream = _watchPet();
+
+  Stream<PetProfile?> _watchPet() =>
+      widget.petStream ??
+      (widget.watchCurrentPet
+          ? PetProfileRepo().watchMainPet()
+          : const Stream.empty());
+
+  @override
+  void didUpdateWidget(covariant _LearningAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.petStream != widget.petStream ||
+        oldWidget.watchCurrentPet != widget.watchCurrentPet) {
+      _stream = _watchPet();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<PetProfile?>(
+        stream: _stream,
+        builder: (context, snapshot) {
+          final profile = snapshot.hasError ? null : snapshot.data;
+          if (profile == null || !profile.hasAvatarIdentity) {
+            return const Icon(Icons.pets_rounded,
+                size: 52, color: AppTheme.accent);
+          }
+          final presentation = const HamsterAvatarAssetResolver().resolve(
+            appearance:
+                const HamsterAvatarAppearanceResolver().resolve(profile),
+            conditionResult: const HamsterAvatarConditionResolver()
+                .resolve(assessment: null, petName: profile.name),
+          );
+          return HamsterAvatarView(
+            key: const ValueKey('report-learning-avatar'),
+            presentation: presentation,
+            size: 128,
+            showBackdrop: false,
+          );
+        },
+      );
 }
 
 Future<void> _openDoi(BuildContext context, Uri uri) async {

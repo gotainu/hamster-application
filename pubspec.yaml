@@ -90,6 +90,7 @@ flutter:
     - assets/images/chat.png
     - assets/images/onboarding/
     - assets/images/auth/
+    - assets/fonts/
     - assets/maps/
     - assets/images/switchbot_guide_01_prepare_hub_app.png
     - assets/images/switchbot_guide_02_open_app.png

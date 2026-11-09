@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../models/hamster_avatar.dart';
 import '../models/health_assessment.dart';
@@ -236,12 +237,14 @@ class _DrawerHeader extends StatelessWidget {
                       'Ham Care',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: AppTheme.drawerPrimaryText(context),
-                            fontSize: 21,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 0.1,
-                          ),
+                      style: GoogleFonts.caveat(
+                        textStyle: Theme.of(context).textTheme.titleLarge,
+                        color: AppTheme.drawerPrimaryText(context),
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        height: 0.95,
+                        letterSpacing: 0.1,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     AnimatedSwitcher(

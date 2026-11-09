@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hamster_project/models/daily_record_completion.dart';
 import 'package:hamster_project/models/personality_report.dart';
 import 'package:hamster_project/models/hamster_avatar.dart';
@@ -465,8 +466,11 @@ Future<void> _openNew(WidgetTester tester) async {
 void main() {
   final db = _Firestore();
   HttpOverrides? previous;
+  late bool previousFontFetching;
   setUpAll(() {
     previous = HttpOverrides.current;
+    previousFontFetching = GoogleFonts.config.allowRuntimeFetching;
+    GoogleFonts.config.allowRuntimeFetching = false;
     HttpOverrides.global = _NoNetwork();
     cp.FirebasePlatform.instance = _Core();
     ap.FirebaseAuthPlatform.instance = _Auth();
@@ -475,6 +479,7 @@ void main() {
   setUp(db.reset);
   tearDownAll(() async {
     HttpOverrides.global = previous;
+    GoogleFonts.config.allowRuntimeFetching = previousFontFetching;
     await db.changes.close();
   });
 
@@ -902,8 +907,10 @@ void main() {
     expect(find.text('Hamster Project'), findsNothing);
     expect(find.text('いぶきの記録と管理'), findsOneWidget);
     final title = tester.widget<Text>(find.text('Ham Care'));
-    expect(title.style?.fontSize, 21);
-    expect(title.style?.fontWeight, FontWeight.w900);
+    expect(title.style?.fontSize, 30);
+    expect(title.style?.fontFamily, 'Caveat_700');
+    expect(title.style?.height, 0.95);
+    expect(title.style?.fontWeight, FontWeight.w700);
     expect(title.style?.letterSpacing, 0.1);
     expect(title.maxLines, 1);
     expect(title.overflow, TextOverflow.ellipsis);

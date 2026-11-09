@@ -20,6 +20,7 @@ import 'package:hamster_project/widgets/daily_condition_input_card.dart';
 import 'package:hamster_project/widgets/hamster_avatar_view.dart';
 import 'package:hamster_project/widgets/paid_feature_gate.dart';
 import 'package:hamster_project/widgets/quick_record_sheet.dart';
+import 'package:hamster_project/widgets/quick_record_reward.dart';
 import 'package:hamster_project/widgets/weight_input_card.dart';
 import 'package:hamster_project/widgets/wheel_rotation_input_card.dart';
 
@@ -28,6 +29,15 @@ import 'first_ai_monitoring_cta_test.dart'
 
 const _captureKey = ValueKey('quick-record-local-capture');
 const _captureFont = 'HamCareQuickRecordLayoutJapanese';
+
+// Optional local screenshots use production shadows; regular tests keep the
+// normal deterministic binding behaviour.
+class _QuickRecordAvatarTestBinding extends AutomatedTestWidgetsFlutterBinding {
+  @override
+  bool get disableShadows =>
+      Platform.environment['HAMCARE_QUICK_RECORD_CAPTURE_DIR'] == null;
+}
+
 const _uid = 'onboarding-widget-test';
 const _profilePath = 'users/$_uid/pet_profiles/main_pet';
 const _states = [
@@ -122,6 +132,22 @@ void _expectDecodedAvatar(
   expect(decoded.image!.height, greaterThan(0));
 }
 
+void _expectNeutralIconSurfaces(WidgetTester tester) {
+  final decorations = [
+    for (final condition in _states)
+      tester
+          .widget<Container>(find.byKey(
+              ValueKey('quick-record-icon-surface-${condition.assetKey}')))
+          .decoration as BoxDecoration,
+  ];
+  final context = tester.element(find.byType(QuickRecordSheet));
+  for (final decoration in decorations) {
+    expect(decoration.color, AppTheme.quickRecordObjectSurface(context));
+    expect(decoration.border,
+        Border.all(color: AppTheme.quickRecordObjectBorder(context)));
+  }
+}
+
 Future<void> _showSheet(
   WidgetTester tester, {
   AssetBundle? bundle,
@@ -195,7 +221,7 @@ Future<void> _closeSheet(WidgetTester tester) async {
 }
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
+  _QuickRecordAvatarTestBinding();
   final functions = _NoQuickRecordFunctions();
   late ({
     Map<String, Map<String, dynamic>> documents,
@@ -286,6 +312,7 @@ void main() {
       await _showSheet(tester, bundle: bundle, width: width, dark: dark);
       expect(find.byType(PaidFeatureGate), findsOneWidget);
       expect(find.byType(HamsterAvatarView), findsNWidgets(3));
+      _expectNeutralIconSurfaces(tester);
       for (final condition in _states) {
         final path =
             'assets/avatars/${appearance.directory}/${condition.assetKey}.png';
@@ -330,6 +357,7 @@ void main() {
       final bundle = _QuickAvatarBundle();
       await _showSheet(tester, bundle: bundle);
       expect(find.byType(HamsterAvatarView), findsNothing);
+      _expectNeutralIconSurfaces(tester);
       expect(find.byIcon(Icons.directions_run_rounded), findsOneWidget);
       expect(find.byIcon(Icons.monitor_weight_outlined), findsOneWidget);
       final brand = find.byWidgetPredicate((widget) =>
@@ -426,6 +454,43 @@ void main() {
       await _closeSheet(tester);
     });
   }
+
+  testWidgets('reward follows the active pet stream without recording data',
+      (tester) async {
+    setProfile(species: 'シリアン', color: 'クリーム・淡色系');
+    await _showSheet(tester);
+    await tester.tap(find.text('今日の様子'));
+    await _frames(tester);
+    // Exercise the existing confirmed-save callback without submitting a record.
+    tester
+        .widget<DailyConditionInputCard>(find.byType(DailyConditionInputCard))
+        .onSaved!();
+    await _frames(tester);
+    expect(find.byType(QuickRecordRewardView), findsOneWidget);
+    final avatar = find.byKey(const ValueKey('quick-record-reward-avatar'));
+    expect(
+        tester.widget<HamsterAvatarView>(avatar).presentation.assetCandidates, [
+      'assets/avatars/syrian/cream/happy.png',
+      'assets/avatars/syrian/cream/stable.png'
+    ]);
+    setProfile(color: 'パイド', subjectId: 'synthetic-quick-pet-b');
+    await _frames(tester);
+    expect(
+        tester.widget<HamsterAvatarView>(avatar).presentation.assetCandidates, [
+      'assets/avatars/roborovski/pied/happy.png',
+      'assets/avatars/roborovski/pied/stable.png'
+    ]);
+    final image = tester.widget<Image>(
+        find.descendant(of: avatar, matching: find.byType(Image)));
+    expect((image.image as AssetImage).assetName,
+        'assets/avatars/roborovski/pied/happy.png');
+    await _captureSheet(tester, 'reward_roborovski_pied');
+    await tester.tap(find.text('ほかも記録'));
+    await _frames(tester);
+    _expectNeutralIconSurfaces(tester);
+    expect(tester.takeException(), isNull);
+    await _closeSheet(tester);
+  });
 
   testWidgets('open all records retains the existing modal result',
       (tester) async {
