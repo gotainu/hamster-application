@@ -4,8 +4,21 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-first-task2-20261114:start -->
+## 2026-11-14 戦略C・タスク2：Webログイン（Preview確認済み・本人承認待ち）
+
+- **開始・保護**：本人承認済みタスク1 `98e4b204e05a` を起点に、既存の `feature/web-first-stripe-checkout`／専用worktreeを継続。元アプリ作業ツリーのHEAD・dirty10件・未追跡2,110件は維持し、main merge／push・アプリ変更・依存更新なし。今回のログインだけを `feat(web): add Firebase account sign-in` の1コミットで保存して停止する。
+- **登録・公開範囲**：作成直前にWebアプリ0件を再確認し、同じFirebaseプロジェクトへ **HamCare Webを1件**登録。Analyticsは追加しない。Auth許可ドメインは既存3件を保持し、正確な `hamster-breeding-app--web-first-task1-lco08m60.web.app` **1件だけ追加**。その他Auth設定は不変。Preview終了後にはこの一時ドメインだけを削除する必要がある。
+- **実装**：既存LPの会員CTAから `/account/` へ進む。メール／パスワードとGoogle Popupを既存Firebase Authへ接続。メール新規登録・自動リンク・統合は実装しない。未確認メールでは本人情報読取りと次画面を遮断し、確認／パスワード再設定は既存アプリの手順を案内。Apple Webログインは未対応。標準 `browserSessionPersistence`、ログアウト、表示切替、日本語エラー、連打防止、ユーザー切替／ログアウト後の遅延レスポンス破棄を実装。SDKは既存と同じ12.17.1固定、Firestore Liteによるサーバー読取り、独自token保存・Analytics・Functions呼出しなし。
+- **本人確認画面**：本人UID直下の `owner_profiles/main.displayName`、`billing/subscription`、`feature_access/initial_trial_v2` の3文書だけを取得。ニックネーム／マスクメール／登録済みログイン方法／契約保存状態と期間末／体験保存状態と終了日時を表示し、文書なしと取得不能を分ける。実Previewではニックネーム・マスクメール・方法・契約記録を表示、体験文書は「開始記録なし」、取得不能項目なし。保存済みstatusは現在の権限判定と同一とは限らないため、Web独自の期限判定・権限解放は行わず、実利用可否は既存アプリで確認する。「月額プランを確認する」は準備中表示だけで、Checkoutを作成しない。
+- **Googleの注意**：未登録Googleでの初回ログインはFirebase Authが新UIDを作成し得る。Firebase標準の信頼済みプロバイダ処理で同メールの既存アカウントへ連携される場合もあり、衝突が必ずエラーになるとは扱わない。アプリ独自のメール照合／UID統合はない。今回の本人Google確認は同じ既存プロフィール・契約記録を表示し、新規ユーザー警告なし。将来の新規Auth作成では既存 `analyticsAccountRegistered` の登録イベント書込みが発生し得るため、将来の全Google利用までFirestore書込み0とは保証しない。今回、新規ユーザーの本番試験はしていない。
+- **限定検証**：モデル／サービス／UI **34件PASS**、Auth＋Firestore Emulatorと現行Rules **15件PASS**（既存／誤入力／未確認・確認済み／Google新規・既存・衝突／本人3文書・別UID拒否／billing・体験書込み拒否／ログアウト）。LP静的 **73/73**、ログイン安全境界 **43/43**、構文・`git diff --check` PASS。Chrome実Previewで本人メールとGoogle成功、再読込保持、別タブ／終了後の再ログイン要求、ログアウト消去、Google Popupを閉じた日本語案内、準備中画面、LP入口、360／390／768／1440px・Tab／Space可視フォーカス・表示切替・空入力エラーを確認。エラー通知のrole/ARIAは確認したが実読み上げは未確認。実機Android Chrome／iOS Safariは未確認、Mac Safari起動確認は操作ツールのtimeoutで未完了。DevToolsの3エラーはSDK source mapの取得を狭いCSPが遮断したもので、認証／読取りの失敗ではなく個人情報も含まない。CSPを広げて消していない。
+- **Previewと本番境界**：[Webログイン](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)、同じ `web-first-task1` channelへ **2026-11-14 15:39:11 JST**反映、期限 **2026-11-21 15:39 JST**、version `ba068e9852825333`。静的LPの通信禁止を維持し、ログイン経路だけ必要なFirebase／Google接続を許可、no-store／noindex／no-referrerを付与。本番live version `2365135bf558c278`・公開Privacyは不変。**本実装・実Preview確認による本番Firestore書込み0（Emulatorの合成データを除く）、Stripe書込み0、本番Functions課金呼出し0、契約／体験／権限／Firestoreプロフィール変更0**。Web登録1・許可ドメイン追加1・Preview反映1・本人Authログインは許可された別操作として区別する。
+- **次工程・停止**：本人承認後のタスク3は独自の月額プラン確認画面。Stripe／Webhook／Portal／本番billing・アプリCTA変更へは進まない。Apple WebログインのService ID／Return URL等とモバイル実ブラウザ確認は公開前の残件。Apple回答・戦略Cの最新扱いは下記タスク1節を維持し、事前承認済みとはしない。
+<!-- hamcare-web-first-task2-20261114:end -->
+
 <!-- hamcare-web-first-task1-20261114:start -->
-## 2026-11-14 戦略C・タスク1：公式ランディングページ（Preview反映済み・本人承認待ち）
+## 2026-11-14 戦略C・タスク1：公式ランディングページ（98e4b204e05a・本人承認済み）
 
 - **範囲と保護**：本人指定の `feature/web-first-stripe-checkout` を、開始HEAD `f696b24663a2a03d7d55385f16a70cd6bcc8ee2c` からクリーンなworktreeに作成。元作業ツリーのdirty10件・未追跡2,110件・元HEADは維持し、コピー／stash／reset／clean／混在コミットなし。今回のタスク1だけを1コミットで保存し、タスク2へは本人承認後に進む。main merge／pushなし。
 - **実装**：`public/index.html` と専用CSSで「HamCareを試す」「有料会員について」の2入口、4機能の実画面、21日体験、FAQ、正式Google Playリンクを実装。Androidは登録済み日本Alphaテスター限定、iOS一般公開は準備中と明示。ログイン・申込・決済は未実装、申込CTAはdisabled。月額1種類だけ、550円税込／500円税抜は10%想定のPreview表示で、既存の本番Price・契約を変更しない。
@@ -1053,7 +1066,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-14）**：戦略Cのタスク1・公式LPを専用worktreeで実装し、独立Preview反映／限定検証済み。既存テスト配信・本番課金を維持し、Webログイン以降は本人承認待ち。Appleの回答共有と最新方針は上記11/14節を正とする。以下の配信・募集欄は旧時点の経緯で、今回ストア再監査・再テストは行わない。
+- **最新作業（2026-11-14）**：戦略Cタスク1は本人承認済み。タスク2のメール／Google Webログイン・本人3文書の読取り・準備中画面を同じPreviewへ反映、限定検証済み。契約・体験・権限・アプリとlive Hostingは維持し、タスク2を1コミットして停止、独自月額プラン確認は本人承認後。Apple回答共有と最新方針は上記11/14節を正とする。以下の配信・募集欄は旧時点の経緯で、今回ストア再監査・アプリ再テストは行わない。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1156,7 +1169,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク1 Preview完了・本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | LP／既存素材／71静的チェック／4幅目視／Preview内容一致PASS。ログイン・決済は未実装。月額550円税込はPreview限定。本番書込み0件、許可されたPreview反映1件。タスク2は本人承認後。 |
+| `WEB-01` | タスク1承認済み・タスク2 Preview完了／本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | メール／Google・本人3文書・準備中画面。34単体/UI＋15 Emulator、静的73＋43 PASS、4幅確認。本確認のFirestore／Stripe／契約書込み0。Web登録1・正確な一時Authドメイン追加1・同Preview更新1。Apple Web／実機ブラウザは残件。次は本人承認後に独自月額プラン確認、Checkoutは未実装。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

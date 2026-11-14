@@ -155,10 +155,10 @@ def main():
         hosting = {}
     check("Preview reuses the existing site and public directory", hosting.get("site") == "hamster-breeding-app" and hosting.get("public") == "public")
     check("Preview does not add server routes or deploy hooks", not any(hosting.get(key) for key in ("rewrites", "redirects", "predeploy", "postdeploy")))
-    headers = {header.get("key", "").lower(): header.get("value", "") for rule in hosting.get("headers", []) if rule.get("source") == "**" for header in rule.get("headers", [])}
+    headers = {header.get("key", "").lower(): header.get("value", "") for rule in hosting.get("headers", []) if rule.get("source") in {"**", "/"} for header in rule.get("headers", [])}
     csp = {parts[0]: parts[1:] for directive in headers.get("content-security-policy", "").split(";") if (parts := directive.split())}
-    check("Preview forbids connections and form submission", all(csp.get(directive) == ["'none'"] for directive in ("default-src", "connect-src", "form-action")))
-    check("Preview forbids scripts, base overrides, and framing", csp.get("script-src", csp.get("default-src")) == ["'none'"] and all(csp.get(directive) == ["'none'"] for directive in ("base-uri", "frame-ancestors")))
+    check("Landing Preview forbids connections and form submission", all(csp.get(directive) == ["'none'"] for directive in ("default-src", "connect-src", "form-action")))
+    check("Landing Preview forbids scripts, base overrides, and framing", csp.get("script-src", csp.get("default-src")) == ["'none'"] and all(csp.get(directive) == ["'none'"] for directive in ("base-uri", "frame-ancestors")))
     check("Preview suppresses indexing and referrer disclosure", {"noindex", "nofollow", "noarchive"}.issubset({part.strip().lower() for part in headers.get("x-robots-tag", "").split(",")}) and headers.get("referrer-policy") == "no-referrer")
     check("Preview disables MIME sniffing", headers.get("x-content-type-options") == "nosniff")
     ignored = lambda relative: any(fnmatch(relative, pattern) for pattern in hosting.get("ignore", []))

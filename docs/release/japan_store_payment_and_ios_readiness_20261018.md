@@ -1,6 +1,39 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-14 Webファースト戦略C・タスク1（Preview限定）
+## 2026-11-14 Webファースト戦略C・タスク2（Webログインのみ）
+
+タスク1 `98e4b204e05a` は本人承認済み。今回は既存ブランチ `feature/web-first-stripe-checkout` の専用worktreeでログイン・本人情報の読取りだけを追加し、1コミット後に停止する。下記タスク1の「未実装」「許可ドメイン3件」は当時の記録であり、現在は本節を優先する。
+
+- **Firebase登録**：同プロジェクトのWeb一覧0件を作成直前に再確認し、`HamCare Web` 1件を登録。Analyticsは未追加。公開Web Configはクライアント設定4項目だけで、Admin SDK資格情報・サービスアカウント・計測IDを含めない。Firebase公開apiKeyは秘密鍵とは区別する。
+- **許可ドメイン**：既存のlocalhost／firebaseapp.com／web.appを保持し、`hamster-breeding-app--web-first-task1-lco08m60.web.app` だけ追加。その他Auth設定は不変。Preview終了後に正確なこの1項目だけを削除し、既存ドメインは削除しない。ワイルドカード追加なし。
+- **Preview**：[LP](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/) →「有料会員になる（アカウント確認）」→ [ログイン](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)。同じ `web-first-task1` channelへ2026-11-14 15:39:11 JST更新、version `ba068e9852825333`、期限2026-11-21 15:39 JST。反映コマンドは下記タスク1と同じ専用config／`--no-authorized-domains`。live Hosting・Functionsへ反映しない。
+- **認証**：既存メール／パスワードとGoogle Popupのみ。メール新規登録なし、Appleは準備中表示。未確認メールは次画面とFirestore読取りを遮断し、再確認のみ行う。メール確認とパスワード再設定の再送は既存アプリへ案内し、Webからメール送信しない。Firebase SDKは既存と同じ12.17.1、標準browserSessionPersistence、Firestore Liteのサーバー読取り。独自token保存なし、URLへtoken／UID／メール／Customer IDを載せない。ログアウト／ユーザー切替／遅れて完了するGoogle Popupでも別ユーザー情報を残さない。
+- **Google仕様**：未登録のGoogleはFirebase Authが新UIDを作成し得るため画面で明記し、new-user時はアプリへの案内と次ボタン無効化を行う。信頼済みプロバイダ同メールはFirebase標準側で既存アカウントへ連携される場合もある。独自email照合・UID統合・linkWithCredentialは実装しない。衝突はアプリで使った方法を選ぶ日本語案内。既存Auth onCreateの `analyticsAccountRegistered`（`functions/src/analyticsJourneyEvents.ts`）が新規Auth登録時にjourney_eventsへ記録し得る点は既存挙動であり、将来の新Google利用全件をFirestore書込み0と保証しない。本番で新規Google作成試験はしていない。
+
+### 本人情報の正本と表示の限界
+
+| 情報 | 読取り先（すべて認証中の本人UID直下） | 表示・制約 |
+| --- | --- | --- |
+| ニックネーム | `users/{uid}/owner_profiles/main.displayName` | trim後の値、未設定は「未設定」。Auth displayNameを代用しない。 |
+| 契約 | `users/{uid}/billing/subscription` | 保存済みplan／status／currentPeriodEnd／cancelAtPeriodEndのみ。契約ID・Customer IDは表示しない。 |
+| 21日体験 | `users/{uid}/feature_access/initial_trial_v2` | 保存済みstatus／endsAt／存在する利用回数のみ。体験を開始しない。 |
+| アカウント | Firebase Auth | マスクメールと登録済みプロバイダ名のみ。UID・tokenを出さない。 |
+
+- 文書なしとpermission-denied／通信失敗は分離して表示。実Previewの本人既存アカウントではニックネーム・契約保存記録・マスクメール・方法を取得し、体験は「開始記録なし」、取得不能項目0。本人メールとGoogleで同じプロフィール・契約記録を表示した。
+- Flutterの `BillingStatus`／`InitialTrialAccess` とサーバーの `getFeatureAccess` を確認。保存済みactiveと期間末は現在の権限を保証しないため、Webで期限計算や権限判定を複製しない。必要なら後続で既存サーバー判定を返す安全な読取り専用APIを検討する。今回の次ボタンは「プラン確認画面は現在準備中です」だけで、プラン申込・Checkout・Portalは存在しない。
+
+### 検証と反映境界
+
+- `node --test tools/test_web_account.mjs tools/test_web_account_view.mjs`：**34/34 PASS**。モデル／マスク／日本語エラー／固定3文書／未確認遮断／遅延レスポンス／ログアウト優先／表示切替／二重操作／準備中画面を確認。
+- Auth／Firestore Emulator：**15/15 PASS**。既存SDKを使い、`demo-hamcare-web-auth-task2` とloopback以外では実行を拒否する。現行Rulesをそのまま使用し、別UID読取り拒否、ログアウト後拒否、billing／体験書込み拒否を確認。owner profileには従来の本人更新権限があるが、このWeb実装はwriterを持たない。再現は既存Node22と既存functions/node_modules、専用のローカルEmulator設定を利用し、依存やRulesを更新しない。
+- `python3 tools/check_web_landing.py`：**73/73 PASS**、`python3 tools/check_web_account.py`：**43/43 PASS**、Node構文・`git diff --check` PASS。
+- 実Chrome：本人メール／Google成功、再読込保持、別タブ／終了後はログイン要求、ログアウト消去、Google Popupを閉じた日本語エラー、LP入口と準備中画面を確認。360／390／768／1440pxで切れ／横はみ出しなし、Tab／Space可視フォーカス、パスワード表示切替、空入力の日本語エラーを確認。role=alert／ARIAの実装・AX表示は確認、実読み上げは未確認。モバイル幅はChrome DevToolsであり実機Android Chrome／iOS Safariの成功とは扱わない。Mac Safariは操作ツールの起動timeoutで未検証。
+- ブラウザconsoleのSDK source map取得3件は限定CSPにより遮断。デバッグ用mapの制限であり、ログイン・本人読取りは成功し、メッセージに個人情報なし。表示上の警告を消すためにCSPを拡大しない。アプリ独自console出力・Analytics送信なし。
+- LPのscript／connect禁止は維持し、`/account/**` にだけ固定SDK／Auth／Firestore／Google Popupの必要な接続を許可。フォーム送信は禁止、初期操作disabled、URL送信を避ける。ログインHTMLにno-store、共通noindex／no-referrer／nosniff。旧billing／法務／内部素材台帳はPreview配信から除外したまま。
+- **今回のWeb実装・実Preview確認：本番Firestore書込み0（Emulatorの合成データを除く）、Stripe書込み0、本番Functions課金呼出し0、契約・Firestoreプロフィール・体験・権限変更0**。本人のAuthログインと、承認済みWeb登録1・Auth許可ドメイン追加1・Preview更新1は別に記録する。本番live version `2365135bf558c278`／11月12日release／Privacy内容は不変。実Previewの新規Google登録は未実施。証拠はMacの非公開一時監査領域、資格情報・個人情報・実アカウント値はGitへ保存しない。
+- **次工程**：タスク2コミットの本人承認後に、独自の月額プラン確認（タスク3）。Apple WebログインはService ID／Return URL等を本番公開前の独立タスクとし、実機ブラウザ確認も残す。今回の停止地点でmain merge／push、live反映、Stripe／Webhook変更、申込／課金、アプリ変更へ進まない。
+
+## 2026-11-14 Webファースト戦略C・タスク1（Preview限定・本人承認済み）
 
 - 最新の本人決定はStripe継続、月額1種類、Firebase UID正本、独自プラン確認＋Embedded Checkout。年額／Pricing Tableは追加しない。今回の実装はLPのみで、ログイン・決済・Webhook・Portalは後続の個別承認タスク。現在のアプリ購入導線／既存Customer・Subscription・本番Price／テスターは変更しない。
 - 既存Apple問い合わせの最新回答は本人共有に基づく。Case22954972はユーザーが独立して発見したWeb上で開始・完了する購入が日本の代替決済ビジネス条件の対象外との案内、Case103009817213は提出前の事前承認を行わず実際の提出で判断との回答。以下の10/27節は受付当時の履歴であり、回答待ちを現在の状態へ戻さない。戦略CをApple事前承認済みとも書かない。

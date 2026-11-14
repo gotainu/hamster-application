@@ -12,7 +12,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
-    <div class="preview-banner"><span>PREVIEW</span> 公開前の確認用ページです。ログイン・申込・決済はできません。</div>
+    <div class="preview-banner"><span>PREVIEW</span> 公開前の確認用ページです。ログインと状態確認のみ利用できます。申込・決済はできません。</div>
     <header class="site-header wrap">
       <a class="brand" href="#top" aria-label="HamCare トップ">
         <img src="/assets/landing/hamcare-mark.png" width="40" height="40" alt="" />
@@ -149,8 +149,8 @@
             <strong>このページから契約はできません。</strong>
             <p>価格はPreview専用の検証表示です。本番公開前に税務上の取扱いと最終請求額を確認します。現在の契約・本番料金は変更していません。</p>
           </div>
-          <button class="button member-button" type="button" disabled aria-describedby="member-unavailable">有料会員になる（準備中）</button>
-          <p class="small-text" id="member-unavailable">次の工程でWebログインと申込画面を実装します。ログイン・決済はまだ利用できません。</p>
+          <a class="button member-button" href="/account/" aria-describedby="member-unavailable">有料会員になる（アカウント確認） <span aria-hidden="true">→</span></a>
+          <p class="small-text" id="member-unavailable">既存のHamCareアカウントでログインし、契約対象を確認できます。申込・決済はまだ利用できません。</p>
           <p class="small-text">毎月自動更新のプランを予定しています。解約・返金などの条件は、申込機能の公開前に確認できる形で整備します。</p>
         </div>
       </section>
@@ -166,7 +166,7 @@
           <details><summary>AI相談は何回使えますか？</summary><p>無料体験中のAI相談は最大20回です。運営側の共通利用枠などによる制限があるため、20回の利用を保証するものではありません。AIの回答は診断・治療の代わりにはなりません。</p></details>
           <details><summary>SwitchBotを持っていなくても使えますか？</summary><p>はい。手入力の飼育記録や変化の確認、AI相談などを利用できます。温湿度の自動取得を使う場合に、対応するSwitchBot温湿度計・ハブ・公式アプリでの連携設定が必要です。</p></details>
           <details><summary>個体別の分析は、すぐに始まりますか？</summary><p>記録が十分に集まった指標から使えるようになります。体重・活動量は、それぞれ有効な記録7件と14日以上の観察期間が必要です。毎日すべてを入力することを求めるものではありません。</p></details>
-          <details><summary>すでに有料契約がある場合は？</summary><p>現在のアプリにある契約管理の導線をご利用ください。このPreviewは既存の契約や利用権限を変更しません。Webログイン・申込・契約管理は次の工程で実装する予定です。</p></details>
+          <details><summary>すでに有料契約がある場合は？</summary><p>現在のアプリにある契約管理の導線をご利用ください。このPreviewは既存の契約や利用権限を変更しません。このPreviewではWebログインと状態確認のみ利用できます。申込・契約管理は次の工程で実装する予定です。</p></details>
         </div>
       </section>
 
