@@ -4,11 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
-    <meta name="theme-color" content="#f1faf7" />
+    <meta name="theme-color" content="#181a20" />
     <meta name="description" content="既存のHamCareアカウントでログインし、本人の契約・体験状態を確認するPreviewです。申込や決済はできません。" />
     <title>HamCareアカウントへログイン｜Preview</title>
-    <link rel="icon" href="/assets/landing/hamcare-mark.png" type="image/png" />
+    <link rel="icon" href="/assets/landing/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/assets/landing/apple-touch-icon.png" sizes="180x180" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="HamCare｜アカウント確認（Preview）" />
+    <meta property="og:description" content="HamCareアカウントへログインし、契約対象を確認できます。申込・決済は準備中です。" />
+    <meta property="og:image" content="https://hamster-breeding-app--web-first-task1-lco08m60.web.app/assets/landing/og-hamcare.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="HamCareの白いハムスターアイコンと、星空・草原の実アプリ画面例。うちの子と、もっと健康で幸せに。" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="HamCare｜アカウント確認（Preview）" />
+    <meta name="twitter:description" content="本人アカウントの確認だけを行うPreviewです。申込・決済はできません。" />
+    <meta name="twitter:image" content="https://hamster-breeding-app--web-first-task1-lco08m60.web.app/assets/landing/og-hamcare.jpg" />
+    <meta name="twitter:image:alt" content="HamCareのアイコン、ハムスターと実アプリ画面例" />
     <link rel="stylesheet" href="/assets/landing.css" />
+    <link rel="stylesheet" href="/assets/brand.css" />
     <link rel="stylesheet" href="/assets/account.css" />
     <script type="module" src="/assets/account.mjs"></script>
   </head>
@@ -16,7 +30,7 @@
     <a class="skip-link" href="#main">本文へ移動</a>
     <div class="preview-banner"><span>PREVIEW</span> ログインと状態確認のみ利用できます。申込・決済はできません。</div>
     <header class="account-header wrap">
-      <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark.png" width="40" height="40" alt="" /><span>HamCare</span></a>
+      <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark.png" width="48" height="48" alt="白いハムスターとシアンの心電図を描いたHamCareアイコン" /><span class="brand-copy"><span class="brand-name">HamCare</span><span class="brand-tagline">うちの子と、もっと健康で幸せに</span></span></a>
       <a class="back-home" href="/">トップへ戻る</a>
     </header>
     <main class="account-shell" id="main">
@@ -50,7 +64,7 @@
         </form>
         <details class="password-help"><summary>パスワードを忘れた場合</summary><p>HamCareアプリのログイン画面にあるパスワード再設定の案内をご利用ください。このPreviewから再設定メールを自動送信することはありません。</p></details>
         <div class="sign-in-divider" aria-hidden="true"><span>または</span></div>
-        <button class="button google-button full-width" type="button" id="google-signin" disabled>Googleでログイン</button>
+        <button class="button google-button full-width" type="button" id="google-signin" disabled><img src="/assets/landing/google-g.png" width="20" height="20" alt="" />Googleでログイン</button>
         <p class="help-copy">アプリで使用したGoogleアカウントを選んでください。未登録のGoogleアカウントでは新しいログイン情報が作成される場合がありますが、体験・契約は自動で開始しません。</p>
         <p class="apple-note">Appleで作成したアカウントのWebログインは準備中です。</p>
         <p id="session-note" class="session-note">共有端末では、確認後に必ずログアウトしてください。ログイン状態はこのタブのセッション内だけで保持します。</p>

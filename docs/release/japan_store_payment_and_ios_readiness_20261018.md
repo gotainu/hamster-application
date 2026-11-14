@@ -1,5 +1,66 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+## 2026-11-14 戦略C・Webブランド統一（デザイン確認待ち）
+
+同じ `feature/web-first-stripe-checkout`、開始HEAD `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から、LP・ログイン・アカウント確認のデザインだけを独立1コミットで保存する。タスク3は本人確認後。下記タスク2の認証機能・許可ドメイン等は維持し、今回Firebase設定を追加変更しない。
+
+### Flutter正本からの対応
+
+| 調査対象 | 実装の正本 | Webへの反映 |
+| --- | --- | --- |
+| ThemeData／ColorScheme／文字階層 | `lib/theme/app_theme.dart` の `AppTheme.darkTheme` とdark token、`lib/screens/auth.dart` | primary #315DAF、surface #232635、入力#24273B、白／白70系。本文16px相当、見出しはrem＋clamp。日本語はWebのOS標準フォント、既存Caveatをブランド名へ再利用。 |
+| Drawer／影／blur | `app_theme.dart` drawer token、`lib/widgets/main_drawer.dart` | 18pxの局所blur、#121924系のガラス、#222A38系の濃い確認面、0/9/18の黒.18 shadow。Webの読みやすさのため不透明度と枠を増やした。 |
+| BottomSheet／ナビ／ボタン | `lib/widgets/quick_record_sheet.dart`、`floating_bottom_navigation.dart`、app_themeのquickRecord token | #0f151e系surface、cyan/mint #79E2DD、Primary青、控えめな境界glow。新しい固定モバイルナビは追加しない。 |
+| Home／状態別背景 | `lib/widgets/app_habitat_background.dart`、app_themeのHabitat token | standard night／day、状態別背景とfallback、黒overlayの既存構造を確認。Webは承認済み `assets/images/theme/bg_default_night.webp` の同一コピーを使用し、文字側に濃いoverlay。状態によるWeb背景切替は追加しない。 |
+| アバター | `lib/widgets/hamster_avatar_view.dart`／既存Resolver | 既存stable3種・既存alphaのままcontain配置。アプリのモデル／Resolver／88アセットは変更なし。 |
+| ブランド書体 | `main_drawer.dart` のCaveat30、`screens/auth.dart` のCaveat40 | 同じCaveat-Bold.ttf／OFLを再利用。フォント追加・依存更新なし。 |
+
+### Web共通トークン（public/assets/brand.css）
+
+| Token | 値 |
+| --- | --- |
+| `--hamcare-bg-deep` | `#181a20` |
+| `--hamcare-bg-surface` | `#232635` |
+| `--hamcare-glass` | `rgba(15,21,30,.90)` |
+| `--hamcare-glass-strong` | `rgba(34,42,56,.97)` |
+| `--hamcare-border` | `rgba(255,255,255,.20)` |
+| `--hamcare-border-glow` | `rgba(121,226,221,.38)` |
+| `--hamcare-text-primary` | `#ffffff` |
+| `--hamcare-text-secondary` | `#c5cbd4` |
+| `--hamcare-accent-cyan`／`--hamcare-accent-mint` | `#79e2dd` |
+| `--hamcare-accent-blue`／`--hamcare-primary-action` | `#315daf` |
+| `--hamcare-danger` | `#ff6b6b` |
+| `--hamcare-warning` | `#ffc857` |
+| `--hamcare-radius-card` | `24px` |
+| `--hamcare-blur` | `18px` |
+| `--hamcare-shadow` | `0 9px 18px rgba(0,0,0,.18)` |
+
+入力境界は#8390a6を使い、無効状態は文言／disabled属性でも区別。背景の明部を最悪白としてoverlayとガラスを合成したコントラストも検査する。blur非対応時は先に指定した不透明面を使用し、WebKit prefix、prefers-reduced-transparency／prefers-contrast／forced-colors／prefers-reduced-motionに対応する。これらの実OS表示全組合せを確認済みとはしない。
+
+### アイコン・画像・ページ変更
+
+- 本人指定図案の正本は `assets/branding/hamster_care_app_icon_master.png`（SHA256 `29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f`）。Webの `hamcare-mark.png` は既に同図案の縮小版で、元バイトを維持。code5 AAB／build5 IPAのlauncherには旧輪郭iconが残っていることを読み取り確認した。指定された白い正面ハムスターをWeb正本として使用し、現在の配布nativeと一致すると偽らず、アプリアイコンは範囲外のまま変更しない。
+- favicon32、Apple Touch180、OG1200×630と両HTMLのOG／Twitter Card／theme-color／title／descriptionを統一。Web旧輪郭icon参照なし、PWA manifest／Service Workerなし。OGへメール／UID／契約情報を入れず、ログインURLに私的情報を付けない。
+- LPは星空・草原、実Homeを中心にしたヒーロー、承認済み3アバター、4機能の実画面、濃いFAQ／法務リンク。キャッチフレーズ「うちの子と、もっと健康で幸せに」をヘッダーにも追加。全リンクと順序、2入口、プラン／無料体験条件は不変。Homeは本人提供1000017308.jpgからOSバーだけを切り取り、テストプロフィールの「記録待ち」の実画面を使用。画像を生成・捏造しない。既存4機能PNGはバイト一致を維持。
+- ログインは紺ガラス・明確な入力境界・白文字・青Primary・穏やかな赤エラー。Google Gは[公式アセット／ブランド要件](https://developers.google.com/identity/branding-guidelines)を確認し、公式PNGを未加工で白ボタンに配置。ボタンID／イベントを維持。
+- アカウント確認はログインより濃いsurfaceと区切りを使い、ニックネーム・マスクメール・ログイン方法・契約・体験を整理。本人3文書だけを読む既存JSは変更せず、再確認／ログアウト／準備中ボタンも不変。
+- 変更対象：`public/index.html`、`public/account/index.html`、`public/assets/landing.css`、`account.css`、新`brand.css`、既存`landing/provenance.json`、新画像6点（favicon／Touch／night／Home／OG／Google G）、限定検査`tools/check_web_brand.py`、既存進捗／本書。原画・比較候補・アプリ・authJS・Firebase設定・lock・Rulesを追加stageしない。
+
+### 検証・実ブラウザの範囲
+
+- 再実行：`node --test tools/test_web_account.mjs tools/test_web_account_view.mjs` **34/34**、`python3 tools/check_web_landing.py` **84/84**、`check_web_account.py` **46/46**、`check_web_brand.py` **130/130 PASS**。静的計260（うちコントラスト28）。`git diff --check` PASS。タスク2Emulator15件は引継ぎで今回の実行数へ加えない。
+- [WCAG AAの通常文字4.5:1](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)に対し、対象CSSの最小本文5.06:1、focus／入力境界3.09:1。これは色の計算結果であり、全ページの包括的な適合認証を意味しない。
+- Chrome DevToolsで **320／360／390／430／768／1024／1440pxの7幅**をLP・ログイン・確認画面に適用し、主画像の切れ／文字折返し／横はみ出しなしを目視。ログインと確認画面の幅比較は非公開localhostで同じHTML/CSS・既存viewを架空データ表示し、個人情報や実認証通信を使わない。同じPreview反映後のLPとログインも表示確認。LP／ログイン200％拡大、FAQのTab→Enter展開・可視focusを確認。
+- ヘッダーは非固定。44px以上の操作領域、alt、form label、見出し、role=alert／ARIA、色だけに依存しない状態、装飾を無視する指定を確認。実スクリーンリーダー読上げ、確認画面200％、OS高コントラスト／Reduced Motionの実描画、実機Android Chrome／iOS Safariは未確認。SafariのWebKit blurは実装済みだが、Mac Safariは操作ツール起動timeout、iOS Safariは今回接続していないため実描画PASSにしない。
+- PreviewのDevToolsで現れるSDK map3件のCSP遮断は以前と同じデバッグ情報取得制限。ログインSDK自体は読込み済みで、警告を消すためCSPを広げていない。今回新たな本番認証・AI送信・Emulatorデータ操作・課金は行わない。
+
+### Preview・本番保護・停止
+
+- URL：[LP](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)／[ログイン・確認](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)。既存channel `web-first-task1`、2026-11-14 **16:25:38 JST**、version `c1b4a97c5eff76c0`、期限2026-11-21 **16:25 JST**。下記の既存専用Previewコマンドと `--no-authorized-domains` を再利用し、liveへ反映しない。
+- 明示27リソースのHTTP200／SHA／noindex／nosniff／no-referrer、account no-store PASS。Hostingの29ファイルはこの27とFirebase生成の `/__/firebase/init.js`／`init.json` の2件。内部素材台帳・旧billing／Privacy・ローカルfixtureの5経路は404。LPのscript／connect禁止、account限定接続、法務リンク先は不変。
+- 反映前後の本番live version `2365135bf558c278`／release、公開Privacy SHA、Auth許可ドメイン4件は一致。認証4module・Web config・Preview configの6ファイルが開始時とバイト一致。元アプリHEAD／status／dirty10件の内容・未追跡2,110件を保持。秘密情報・私的プロフィールをコミットしない。
+- **本番Firestore書込み0、Stripe書込み0、本番Functions／契約／体験／権限変更0**。Preview静的反映1件とは区別する。`style(web): align pages with HamCare app theme` の1コミット後に停止し、本人デザイン確認までタスク3・Stripe・main merge／pushへ進まない。Safari等の未確認は公開前に残す。Apple回答の最新扱いは下記タスク1を維持する。
+
 ## 2026-11-14 Webファースト戦略C・タスク2（Webログインのみ）
 
 タスク1 `98e4b204e05a` は本人承認済み。今回は既存ブランチ `feature/web-first-stripe-checkout` の専用worktreeでログイン・本人情報の読取りだけを追加し、1コミット後に停止する。下記タスク1の「未実装」「許可ドメイン3件」は当時の記録であり、現在は本節を優先する。

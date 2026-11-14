@@ -2,8 +2,11 @@
   "purpose": "Existing approved HamCare assets reused for isolated Web-first preview landing page; no new generated UI or avatar artwork.",
   "asset_selection_date": "2026-11-14",
   "brand": {
-    "accent": "#167f82",
-    "ink": "#234c5a",
+    "concept": "静かな夜に、うちの子を見守る。",
+    "background": "#181a20",
+    "surface": "#232635",
+    "primary_action": "#315daf",
+    "glow": "#79e2dd",
     "catchphrase": "うちの子と、もっと健康で幸せに"
   },
   "evidence_manifests": [
@@ -12,7 +15,7 @@
   ],
   "privacy_review": {
     "method": "Each included visual was opened and inspected before selection.",
-    "result": "No email address, UID, authentication information, private person or pet name, pet/user photograph is visible in selected outputs. Existing published AI excerpts contain only a generic care question and answer.",
+    "result": "Previously reviewed four feature crops retained. New actual Home has only a synthetic test profile name, no email/UID/private pet photograph; source OS bars cropped. Approved master, habitat and avatars carry no personal information.",
     "new_ai_requests": 0,
     "app_capture_or_rebuild": false,
     "source_files_modified": false
@@ -138,6 +141,85 @@
       "output_sha256": "163a2b400e16916ad3196296c946c526d0efce6baf22a2164269ffc62fb9f671",
       "bytes": 4384,
       "notes": "Existing complete Caveat SIL Open Font License, unchanged."
+    },
+    {
+      "file": "favicon-32.png",
+      "source": "assets/branding/hamster_care_app_icon_master.png",
+      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
+      "output_sha256": "690e5b16d4a9cfc5bc9c4c7a76ae38f412709f476249e516bdef6823f4e7b36d",
+      "bytes": 1868,
+      "width": 32,
+      "height": 32,
+      "mode": "RGB",
+      "notes": "Approved master resized to 32px; not regenerated."
+    },
+    {
+      "file": "apple-touch-icon.png",
+      "source": "assets/branding/hamster_care_app_icon_master.png",
+      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
+      "output_sha256": "1eca8a91f0154d415be9f464ec9df69f9af9f36219ef44fd6c672ea42b840bc2",
+      "bytes": 35183,
+      "width": 180,
+      "height": 180,
+      "mode": "RGB",
+      "notes": "Approved master resized to 180px; not regenerated."
+    },
+    {
+      "file": "habitat-night.webp",
+      "source": "assets/images/theme/bg_default_night.webp",
+      "source_sha256": "6cf5233c0529b135dbebce10ee3c2f3d8e5d958252d8cae9894267a59cf310fe",
+      "output_sha256": "6cf5233c0529b135dbebce10ee3c2f3d8e5d958252d8cae9894267a59cf310fe",
+      "bytes": 2358552,
+      "width": 1672,
+      "height": 941,
+      "mode": "RGB",
+      "notes": "Byte-identical approved Home standard night habitat."
+    },
+    {
+      "file": "home-screen.jpg",
+      "source": "user-provided/1000017308.jpg",
+      "source_sha256": "00e5c2031334cdf4ec3e83b9eed0db360247fe1353af39ea0e751a394e9e9095",
+      "output_sha256": "ee881dcb984ee70765017dd536311abbe3521e80777704294c498ba7076f6f90",
+      "bytes": 150309,
+      "width": 591,
+      "height": 1148,
+      "mode": "RGB",
+      "notes": "Actual owner-provided Home, synthetic test pet name, no score or invented data. Crop [0,54,591,1202] removes OS bars only; JPEG quality92. Original kept outside repository."
+    },
+    {
+      "file": "og-hamcare.jpg",
+      "source": "composite: approved icon, habitat-night.webp, home-screen.jpg, avatar-djungarian.png, Caveat and system Japanese font",
+      "source_sha256": null,
+      "output_sha256": "69dc161f2f876825ebd78e93c5ef8c93dea17b7cb7618c5876538ea4d558405c",
+      "bytes": 216286,
+      "width": 1200,
+      "height": 630,
+      "mode": "RGB",
+      "notes": "1200x630 social graphic composed from existing sources only. Actual Home and approved avatar; no generated artwork."
+    },
+    {
+      "file": "google-g.png",
+      "source": "https://developers.google.com/static/identity/images/g-logo.png",
+      "source_sha256": "d1ce9c2af0b10a7333abc99bc706f9a6a199e5b65bf3e3009624f076b8638e6a",
+      "output_sha256": "d1ce9c2af0b10a7333abc99bc706f9a6a199e5b65bf3e3009624f076b8638e6a",
+      "bytes": 33661,
+      "width": 200,
+      "height": 204,
+      "mode": "RGBA",
+      "notes": "Official Google sign-in branding asset, downloaded unchanged; not taken from app or recolored."
     }
+  ],
+  "icon_verification": {
+    "approved_master_matches_requested_design": true,
+    "web_mark_already_matches_master": true,
+    "code5_build5_native_launchers": "Legacy outline icon found by read-only artifact inspection; native assets intentionally unchanged in this Web-only task."
+  },
+  "theme_sources": [
+    "lib/theme/app_theme.dart",
+    "lib/widgets/main_drawer.dart",
+    "lib/widgets/quick_record_sheet.dart",
+    "lib/widgets/floating_bottom_navigation.dart",
+    "lib/widgets/app_habitat_background.dart",
+    "lib/screens/auth.dart"
   ]
 }

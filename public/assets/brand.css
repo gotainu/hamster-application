@@ -1,0 +1,71 @@
+/* HamCare Web tokens, adapted from lib/theme/app_theme.dart.
+   Base/card/Primary are exact app values. Glass uses quickRecordSheetSurface;
+   the account surface raises drawerGroupSurface opacity for readable private data.
+   Cyan/mint = quickRecordGlow; local blur = drawer18. Border/opacity are raised for Web contrast.
+   Web retains the app's sharp habitat image and darkens text surfaces instead. */
+:root {
+  color-scheme: dark;
+  --hamcare-bg-deep: #181a20;
+  --hamcare-bg-surface: #232635;
+  --hamcare-glass: rgba(15, 21, 30, .90);
+  --hamcare-glass-strong: rgba(34, 42, 56, .97);
+  --hamcare-border: rgba(255, 255, 255, .20);
+  --hamcare-border-glow: rgba(121, 226, 221, .38);
+  --hamcare-text-primary: #ffffff;
+  --hamcare-text-secondary: #c5cbd4;
+  --hamcare-accent-cyan: #79e2dd;
+  --hamcare-accent-blue: #315daf;
+  --hamcare-primary-action: #315daf;
+  --hamcare-accent-mint: #79e2dd;
+  --hamcare-danger: #ff6b6b;
+  --hamcare-warning: #ffc857;
+  --hamcare-radius-card: 24px;
+  --hamcare-blur: 18px;
+  --hamcare-shadow: 0 9px 18px rgba(0, 0, 0, .18);
+  --ink: var(--hamcare-text-primary);
+  --muted: var(--hamcare-text-secondary);
+  --teal: var(--hamcare-accent-mint);
+  --teal-dark: var(--hamcare-accent-mint);
+  --mist: var(--hamcare-bg-surface);
+  --line: var(--hamcare-border);
+  --white: #ffffff;
+}
+body { color: var(--hamcare-text-primary); background: var(--hamcare-bg-deep); isolation: isolate; }
+body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(180deg, rgba(15,21,30,.76), rgba(24,26,32,.93) 88%), url("/assets/landing/habitat-night.webp") center top / cover no-repeat; }
+a { color: var(--hamcare-accent-mint); }
+:where(a, button, summary, input):focus-visible { outline: 3px solid var(--hamcare-accent-cyan); outline-offset: 4px; }
+.skip-link { z-index: 30; color: #fff; background: #181a20; border: 1px solid #79e2dd; border-radius: 12px; }
+.preview-banner { color: #c5cbd4; background: #121924; border-bottom: 1px solid var(--hamcare-border); font-size: .75rem; }
+:is(.site-header, .account-header) { padding-inline: 24px; margin-top: 18px; border: 1px solid var(--hamcare-border); border-radius: 24px; background: #121924; box-shadow: var(--hamcare-shadow); }
+.brand { color: #fff; min-width: 0; flex-shrink: 1; }
+.brand img { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 13px; }
+.brand .brand-copy { display: grid; gap: 0; font: inherit; letter-spacing: normal; }
+.brand .brand-name { color: #fff; font: 700 2.75rem/1.05 HamCareBrand, cursive; letter-spacing: -.03em; }
+.brand .brand-tagline { color: #c5cbd4; font: 500 .6875rem/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; letter-spacing: .015em; }
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :is(.site-header, .account-header) { background: rgba(18,25,36,.90); -webkit-backdrop-filter: blur(var(--hamcare-blur)); backdrop-filter: blur(var(--hamcare-blur)); }
+}
+@media (max-width: 600px) {
+  :is(.site-header, .account-header) { padding: 12px 16px; border-radius: 20px; margin-top: 12px; flex-wrap: wrap; }
+  .brand { gap: 10px; }
+  .brand img { width: 44px; height: 44px; flex-basis: 44px; }
+  .brand .brand-name { font-size: 2.25rem; }
+  .brand .brand-tagline { font-size: .625rem; }
+  .preview-banner { font-size: .6875rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  body::before { display: none; }
+  :is(.site-header, .account-header) { background: #121924; -webkit-backdrop-filter: none; backdrop-filter: none; border-color: #8390a6; }
+}
+@media (forced-colors: active) {
+  body { color: CanvasText; background: Canvas; }
+  body::before { display: none; }
+  :is(.site-header, .account-header), .preview-banner { color: CanvasText; background: Canvas; border: 1px solid CanvasText; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  .brand .brand-name, .brand .brand-tagline { color: CanvasText; }
+  a { color: LinkText; }
+  :where(a, button, summary, input):focus-visible { outline-color: Highlight; }
+}

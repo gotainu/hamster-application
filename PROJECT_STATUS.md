@@ -4,6 +4,19 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-brand-20261114:start -->
+## 2026-11-14 戦略C・Webブランド統一（Preview反映済み・本人デザイン確認待ち）
+
+- **範囲・保護**：タスク2の `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から同じ `feature/web-first-stripe-checkout`／専用worktreeを継続。LP・ログイン・アカウント確認の見た目だけを独立1コミットにする。元アプリHEAD・dirty10件の内容・未追跡2,110件は開始時と一致。認証JS4件・公開Firebase config・Preview configの計6件はバイト一致、Flutter／Functions／Rules／依存／本番法務は変更なし。
+- **デザイン正本**：`lib/theme/app_theme.dart` のThemeData／ColorScheme、Drawer・QuickRecord・FloatingNavの色／blur、`app_habitat_background.dart` の背景と `main_drawer.dart`／`screens/auth.dart` のCaveatを調査。Web共通の `public/assets/brand.css` にネイビー#181a20、surface#232635、Primary#315daf、mint/cyan#79e2dd、glass18px、24px角丸を定義。Webで読めるようガラス面と枠の不透明度を上げ、非対応時は不透明面にする。詳細トークン／対応ファイルは既存の日本公開準備書先頭へ記録した。
+- **アイコンの照合差**：本人指定の白い正面ハムスター＋ネイビー＋シアン心電図の正本は `assets/branding/hamster_care_app_icon_master.png`。既存Webの `hamcare-mark.png` は既に同図案の縮小版なので再生成・置換しない。ヘッダー／ログイン／確認画面で継続利用し、同じ正本から32px favicon・180px Apple Touch・1200×630 OGを整備。Web旧輪郭アイコン参照0、PWA manifest／Service Workerなし。読み取ったcode5 AAB／build5 IPAのnative launcherには旧輪郭図案が残るため、「指定正本＝現配信native icon」とは記録しない。アプリ側は今回変更しない。
+- **画面**：「静かな夜に、うちの子を見守る。」の星空・草原と控えめな発光へ統一。Homeは本人提供の実画面1000017308.jpg（テスト用プロフィール、記録待ち）をOSバーだけ除いて再利用、画面内の値やUIは変更しない。承認済みstable3種と既存の実画面4点を維持。4機能・FAQは濃いガラス面、ログインは読みやすい入力欄、アカウント確認はさらに不透明度の高い面へ。Googleボタンは公式Gを未加工で使用し、白地と標準色を維持。LPの2入口・全リンク・項目・同意／料金／体験条件は維持。
+- **限定検証**：既存認証モデル／サービス／UI **34/34 PASS**、LP静的 **84/84**、アカウント静的 **46/46**、ブランド／素材／安全境界 **130/130**（計260静的、うち実CSSコントラスト28ケース）PASS。最小本文5.06:1、境界／focus3.09:1。形式・構文・`git diff --check` PASS。タスク2のEmulator15件は既存証拠を維持し、今回再実行・新規本番ログインはしない。
+- **実ブラウザと限界**：Chrome DevToolsの320／360／390／430／768／1024／1440pxでLP・ログイン・確認画面の切れ／折返し／横はみ出しを目視確認。ログイン／確認の7幅比較は同じHTML/CSSと既存view moduleに架空データを与えた非公開localhost表示で、実認証成功とは区別する。同じPreview反映後のLP／ログインも表示確認し、FAQのTab→Enter展開と可視focusを確認。LP／ログインの200％拡大を確認。ヘッダーは非固定で本文を覆わない。44px領域・alt／label／見出し・role=alert／ARIA・reduced-motion／forced-colors／透過非対応fallbackはコード検査済み。実読み上げ、OS高コントラスト等の実描画、確認画面200％、Android実機Chrome／iOS Safariのblurは未確認。Mac Safariは操作ツールの起動timeoutのため確認できておらずPASSにしない。SDK map取得3件のCSP遮断は既存制限のまま維持。
+- **反映・本番不変**：同じ[LP Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)／[アカウント](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)、channel `web-first-task1`、**2026-11-14 16:25:38 JST**、version `c1b4a97c5eff76c0`、期限 **2026-11-21 16:25 JST**。明示27ファイルはHTTP200・SHA一致・noindex／nosniff／no-referrer、account no-store PASS（Hosting合計29はFirebase自動init2件を含む）。内部出典台帳・旧billing／Privacy・ローカル表示fixtureは404。本番live version `2365135bf558c278`・公開Privacy・Auth許可ドメイン4件は反映前後で不変。**本番Firestore書込み0、Stripe書込み0、契約／体験／権限変更0**。静的Preview更新1件とは区別する。
+- **停止点**：本人のデザイン確認待ち。タスク3の独自月額プラン確認・Checkoutは未着手。main merge／push・本番Hosting・ストア・アプリ変更は行わない。Safari等の未確認を公開前の確認として残す。最新Apple回答と戦略Cの制約は下記タスク1節を維持する。
+<!-- hamcare-web-brand-20261114:end -->
+
 <!-- hamcare-web-first-task2-20261114:start -->
 ## 2026-11-14 戦略C・タスク2：Webログイン（Preview確認済み・本人承認待ち）
 
@@ -1066,7 +1079,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-14）**：戦略Cタスク1は本人承認済み。タスク2のメール／Google Webログイン・本人3文書の読取り・準備中画面を同じPreviewへ反映、限定検証済み。契約・体験・権限・アプリとlive Hostingは維持し、タスク2を1コミットして停止、独自月額プラン確認は本人承認後。Apple回答共有と最新方針は上記11/14節を正とする。以下の配信・募集欄は旧時点の経緯で、今回ストア再監査・アプリ再テストは行わない。
+- **最新作業（2026-11-14）**：戦略CのLP・ログイン・アカウント確認を既存アプリの星空／ネイビー／ガラス表現へ統一し、同じPreviewへ反映。認証34件と静的260件PASS、Chrome7幅を確認。認証／Firebase設定・本番・元アプリ作業状態は不変。独立1コミット後、本人デザイン確認までタスク3へ進まない。Safari等の未確認は先頭節へ明記し、下記の旧配信・募集履歴と区別する。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1169,7 +1182,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク1承認済み・タスク2 Preview完了／本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | メール／Google・本人3文書・準備中画面。34単体/UI＋15 Emulator、静的73＋43 PASS、4幅確認。本確認のFirestore／Stripe／契約書込み0。Web登録1・正確な一時Authドメイン追加1・同Preview更新1。Apple Web／実機ブラウザは残件。次は本人承認後に独自月額プラン確認、Checkoutは未実装。 |
+| `WEB-01` | タスク1承認済み・タスク2／ブランド統一Preview完了・本人確認待ち | Webファースト戦略C・公式LPから独自申込画面へ | 既存認証34＋静的260 PASS、Chrome7幅。指定icon／星空／ガラス／実Home／OG統一。Firestore・Stripe書込み0、Auth/config不変。同じPreview version c1b4a97c5eff76c0。Safari等は先頭節の未確認を維持。本人デザイン確認後に独自月額プラン確認、Checkout未実装。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |
