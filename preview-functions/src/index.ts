@@ -5,10 +5,15 @@ import {onRequest} from 'firebase-functions/v2/https';
 import {defineSecret} from 'firebase-functions/params';
 import Stripe from 'stripe';
 import {CheckoutError,createPreviewEngine,hash,PREVIEW_ORIGIN,PreviewStore,RecordData} from './engine';
+import {readPreviewFacts,parseWebhookConfig} from './preview-runtime';
+import {readPreviewBilling} from './billing-view';
+import {PREVIEW_SYNC_EVENT_TYPES} from './subscription-sync';
+export {stripePreviewWebhook} from './webhook';
 
 initializeApp();
 const credentials=defineSecret('HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS');
 const price=defineSecret('HAMCARE_PREVIEW_STRIPE_TEST_PRICE');
+const webhook=defineSecret('HAMCARE_PREVIEW_STRIPE_WEBHOOK_CONFIG');
 const NAMESPACE='preview_checkout_task4';
 const db=getFirestore();
 const subjectRef=(subject:string)=>{if(!/^[a-f0-9]{64}$/.test(subject))throw new CheckoutError('unauthenticated');return db.collection(NAMESPACE).doc(subject);};
@@ -30,7 +35,7 @@ const store: PreviewStore={
 function maskEmail(value:string):string {const [name,domain]=value.split('@');return domain?name.slice(0,2)+'***@'+domain:'未設定';}
 const allowedErrors=new Set(['unauthenticated','email_unverified','app_account_required','plan_not_allowed','billing_unresolved','existing_subscription','already_subscribed','subscription_unresolved','trial_unresolved','trial_invalid','trial_too_short','server_clock_invalid','test_mode_required','test_configuration_invalid','price_mismatch','customer_unresolved','confirmation_required','review_expired','processing','preview_limit','checkout_unresolved','session_expired','test_webhook_unresolved']);
 
-export const createPreviewStripeCheckoutSession=onRequest({region:'us-central1',secrets:[credentials,price],maxInstances:2,concurrency:10,timeoutSeconds:60,memory:'256MiB',invoker:'public',cors:false},async(req,res)=>{
+export const createPreviewStripeCheckoutSession=onRequest({region:'us-central1',secrets:[credentials,price,webhook],maxInstances:2,concurrency:10,timeoutSeconds:60,memory:'256MiB',invoker:'public',cors:false},async(req,res)=>{
   res.set('Cache-Control','no-store, max-age=0');res.set('Pragma','no-cache');res.set('X-Content-Type-Options','nosniff');res.set('Referrer-Policy','no-referrer');
   const origin=req.get('Origin');
   if(origin!==PREVIEW_ORIGIN){res.status(403).json({code:'origin_not_allowed'});return;}
@@ -40,22 +45,20 @@ export const createPreviewStripeCheckoutSession=onRequest({region:'us-central1',
   const operation=req.path.replace(/^\//,'');
   const body=req.body;
   const keys=operation==='session'?['planKey','reviewToken','termsAccepted']:['planKey'];
-  if(!['review','session','status','cancel'].includes(operation)||!body||Array.isArray(body)||typeof body!=='object'||Object.keys(body).some(k=>!keys.includes(k))||body.planKey!=='premium_monthly') {res.status(400).json({code:'plan_not_allowed'});return;}
+  if(!['review','session','status','cancel','billing'].includes(operation)||!body||Array.isArray(body)||typeof body!=='object'||Object.keys(body).some(k=>!keys.includes(k))||body.planKey!=='premium_monthly') {res.status(400).json({code:'plan_not_allowed'});return;}
   try {
     const bearer=req.get('Authorization');if(!bearer?.startsWith('Bearer ')||bearer.length>8192)throw new CheckoutError('unauthenticated');
     const token=await getAuth().verifyIdToken(bearer.slice(7),true);
     const user=await getAuth().getUser(token.uid);
     if(user.disabled||!user.email)throw new CheckoutError('unauthenticated');
     if(token.email_verified!==true||!user.emailVerified)throw new CheckoutError('email_unverified');
+    if(operation==='billing'){const facts=await readPreviewFacts(user.uid);if(!facts.appAccountExists)throw new CheckoutError('app_account_required');res.json(await readPreviewBilling(user.uid));return;}
     const config=JSON.parse(credentials.value());
     if(typeof config.secretKey!=='string'||!config.secretKey.startsWith('sk_test_')||typeof config.publishableKey!=='string'||!config.publishableKey.startsWith('pk_test_'))throw new CheckoutError('test_configuration_invalid');
     const stripe=new Stripe(config.secretKey,{apiVersion:'2025-02-24.acacia',maxNetworkRetries:1,timeout:20000,telemetry:false});
-    const engine=createPreviewEngine({stripe,store,priceId:price.value().trim(),publishableKey:config.publishableKey,now:()=>new Date(),readFacts:async uid=>{
-      const root=db.collection('users').doc(uid);
-      const [pet,billing,trial,owner]=await db.getAll(root.collection('pet_profiles').doc('main_pet'),root.collection('billing').doc('subscription'),root.collection('feature_access').doc('initial_trial_v2'),root.collection('owner_profiles').doc('main'));
-      const item=(snap:typeof billing)=>snap.exists?{kind:'found',data:snap.data()}:{kind:'missing'};
-      const name=owner.data()?.displayName;
-      return {appAccountExists:pet.exists,billing:item(billing),trial:item(trial),nickname:typeof name==='string'&&name.trim()?name.trim().slice(0,80):'未設定',maskedEmail:maskEmail(user.email!)};
+    const wh=parseWebhookConfig(webhook.value());
+    const engine=createPreviewEngine({stripe,store,priceId:price.value().trim(),publishableKey:config.publishableKey,allowedWebhook:{id:wh.endpointId,url:wh.endpointUrl,events:PREVIEW_SYNC_EVENT_TYPES},now:()=>new Date(),readFacts:async uid=>{
+      const facts=await readPreviewFacts(uid);return {...facts,maskedEmail:maskEmail(user.email!)};
     }});
     const identity={uid:user.uid,emailVerified:user.emailVerified,email:user.email};
     // Read-only auth/account verification applies to every operation, including status/cancel.

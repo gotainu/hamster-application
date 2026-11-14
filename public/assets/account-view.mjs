@@ -1,4 +1,5 @@
-import { createCheckoutController } from './checkout-view.mjs';
+import { createCheckoutController, clearPreviewBilling, renderPreviewBilling } from './checkout-view.mjs';
+import { projectPreviewBilling } from './checkout-model.mjs';
 import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
@@ -21,6 +22,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   let destroyed = false;
   let checkout = null;
   let resumePending = resumeCheckout;
+  let previewRead = 0;
+  const previewPrefixes = ['account-preview', 'plan-preview'];
 
   function setPanel(id, heading) {
     for (const panel of panels) element(panel).hidden = panel !== id;
@@ -30,6 +33,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   function clearPersonal() {
     currentSummary = null;
+    previewRead++;
+    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix); element(prefix + '-refresh').disabled = true; }
     checkout?.clear();
     checkoutService?.clear();
     element('plan-checkout').disabled = true;
@@ -93,6 +98,28 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     }
   }
 
+  async function refreshPreviewBilling() {
+    if (!checkoutService?.getPreviewBilling || !currentUser?.emailVerified || currentUser.isNewUser || destroyed) return;
+    const request = ++previewRead;
+    const generation = epoch;
+    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix, 'Preview契約状態を確認しています。'); element(prefix + '-refresh').disabled = true; }
+    try {
+      const raw = await checkoutService.getPreviewBilling();
+      if (destroyed || generation !== epoch || request !== previewRead || !currentUser?.emailVerified) return;
+      const model = projectPreviewBilling(raw);
+      for (const prefix of previewPrefixes) renderPreviewBilling(prefix, model);
+    } catch {
+      if (destroyed || generation !== epoch || request !== previewRead) return;
+      for (const prefix of previewPrefixes) clearPreviewBilling(prefix, 'Preview契約状態を確認できません。時間をおいて再確認するか、サポートへお問い合わせください。');
+    } finally {
+      if (!destroyed && generation === epoch && request === previewRead) for (const prefix of previewPrefixes) element(prefix + '-refresh').disabled = false;
+    }
+  }
+  function acceptPreviewBilling(model) {
+    previewRead++;
+    for (const prefix of previewPrefixes) { renderPreviewBilling(prefix, model); element(prefix + '-refresh').disabled = false; }
+  }
+
   async function renderUser(user, { focus = false, plan = false } = {}) {
     const request = ++epoch;
     currentUser = user;
@@ -133,9 +160,11 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       if (plan && !user.isNewUser) {
         renderPlan(summary);
         setPanel('plan-panel', 'plan-title');
+        void refreshPreviewBilling();
       } else {
         setPanel('account-panel', focus ? 'confirm-title' : null);
         if (resumePending && checkout && !user.isNewUser) { resumePending = false; void checkout.resume(); }
+        else if (!user.isNewUser) void refreshPreviewBilling();
       }
     } catch (cause) {
       if (destroyed || request !== epoch) return;
@@ -258,9 +287,11 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   };
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
-  if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) setPanel('plan-panel', 'plan-title'); }});
+  if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
   const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
   element('plan-checkout').addEventListener('click', onCheckout);
+  const onPreviewRefresh = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser) void refreshPreviewBilling(); };
+  for (const prefix of previewPrefixes) element(prefix + '-refresh').addEventListener('click', onPreviewRefresh);
   const onPopState = () => { if (!element('checkout-panel').hidden && currentUser?.emailVerified) void checkout?.resume(); };
   window.addEventListener('popstate', onPopState);
 
@@ -299,6 +330,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     checkout?.destroy();
     checkoutService?.clear();
     element('plan-checkout').removeEventListener('click', onCheckout);
+    for (const prefix of previewPrefixes) element(prefix + '-refresh').removeEventListener('click', onPreviewRefresh);
     window.removeEventListener('popstate', onPopState);
     ++epoch;
     clearPersonal();

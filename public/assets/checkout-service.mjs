@@ -30,6 +30,7 @@ export function createPreviewCheckoutService({auth, fetchRequest = globalThis.fe
     reviewPreviewCheckout:()=>request('review'),
     createPreviewCheckout:({reviewToken,termsAccepted})=>request('session',{reviewToken,termsAccepted}),
     getPreviewCheckoutStatus:()=>request('status'),
+    getPreviewBilling:()=>request('billing'),
     cancelPreviewCheckout:()=>request('cancel'),
     clear(){generation++;for(const controller of pending)controller.abort();pending.clear();},
   };

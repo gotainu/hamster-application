@@ -50,3 +50,14 @@
   #checkout-panel .button:disabled { background: Canvas; color: GrayText; border-color: GrayText; }
   #checkout-embed iframe { forced-color-adjust: auto; }
 }
+
+/* Preview-only mirror is visibly separate from production account facts. */
+.preview-billing-card { margin-top: 24px; padding: 20px; min-width: 0; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-left: 3px solid var(--hamcare-accent-cyan, #79e2dd); border-radius: 18px; background: var(--hamcare-bg-surface, #232635); }
+.preview-billing-card h2, .preview-billing-card h3 { font-size: 1.125rem; line-height: 1.8; color: var(--hamcare-text-primary, #fff); }
+.preview-billing-card > [role="status"] { margin-block: 16px; font-size: .875rem; line-height: 1.9; color: var(--hamcare-text-secondary, #c5cbd4); overflow-wrap: anywhere; }
+.preview-billing-card .quiet-button { margin-top: 18px; min-height: 44px; white-space: normal; }
+.preview-billing-details { margin-top: 14px; }
+.preview-billing-details > div { padding-block: 12px; }
+.preview-billing-details dd { font-size: .9375rem; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .preview-billing-card { padding: 18px 14px; } .preview-billing-card .quiet-button { width: 100%; } }
+@media (forced-colors: active) { .preview-billing-card { background: Canvas; color: CanvasText; border-color: CanvasText; } .preview-billing-card h2, .preview-billing-card h3, .preview-billing-card > [role="status"] { color: CanvasText; } }

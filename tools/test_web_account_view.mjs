@@ -11,11 +11,12 @@ class Element {
   setAttribute(key,val){this.attrs[key]=val;}
   removeAttribute(key){delete this.attrs[key];}
   focus(){globalThis.focused=this.id;}
+  replaceChildren(){this.textContent='';}
   dispatch(name,event={}){return this.listeners.get(name)?.(event);}
 }
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function setup() {
+async function setup({checkoutService=null}={}) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
   nodes.get('premium-monthly').value='premium_monthly';
   nodes.get('premium-monthly').checked=false;
@@ -28,7 +29,7 @@ async function setup() {
   const user={emailVerified:true,maskedEmail:'sa***@example.invalid',methods:['メール/パスワード'],isNewUser:false};
   const summary={nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
   const service={ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
-  const cleanup=await mountAccountPage(service);
+  const cleanup=await mountAccountPage(service,{checkoutService});
   return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners};
 }
 test('initial login and empty form guard',async()=>{
@@ -108,4 +109,40 @@ test('arbitrary client plan keys are never accepted or sent',async()=>{
 test('plan HTML includes account, all contract terms, legal links and no purchase form',()=>{
  for (const text of ['請求周期','自動更新','サービス開始時期','次回請求','解約方法','解約期限','返金','税抜500円','550','特定商取引法に基づく表記','本番公開前','月額500円（税込）']) assert.ok(html.includes(text),text);
  assert.match(html,/<button[^>]+id="plan-checkout"[^>]+disabled>/);assert.match(html,/<input[^>]+id="premium-monthly"[^>]+value="premium_monthly"/);assert.equal([...html.matchAll(/<form\b/g)].length,1);assert.doesNotMatch(html,/<iframe|card-number|price_[A-Za-z0-9]+/);
+});
+
+
+function previewBilling(status='active') {
+  return {testMode:true,syncState:'synced',billing:{planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',status,currentPeriodStart:'2026-11-14T09:00:00.000Z',currentPeriodEnd:'2026-12-14T09:00:00.000Z',trialEnd:null,firstChargeAt:'2026-11-14T09:00:00.000Z',nextChargeAt:'2026-12-14T09:00:00.000Z',cancelAtPeriodEnd:false,syncedAt:'2026-11-14T09:01:00.000Z',entitlementMirror:status==='active'}};
+}
+function previewService(read) {
+  return {getPreviewBilling:read,clear(){}};
+}
+test('Preview billing appears separately in account and plan while production billing stays unchanged',async()=>{
+ let reads=0;const h=await setup({checkoutService:previewService(async()=>{reads++;return previewBilling();})});
+ h.emit(h.user);await flush();assert.equal(reads,1);assert.equal(h.el('account-billing').textContent,'未契約');assert.equal(h.el('account-preview-details').hidden,false);assert.equal(h.el('account-preview-state').textContent,'有料会員');assert.match(h.el('account-preview-status').textContent,/本番利用権限には反映されません/);
+ h.el('review-plan').dispatch('click');await flush();assert.equal(reads,2);assert.equal(h.el('plan-billing').textContent,'未契約');assert.equal(h.el('plan-preview-state').textContent,'有料会員');assert.equal(h.el('plan-preview-details').hidden,false);h.cleanup();
+});
+test('Preview billing manual refresh changes only its read-only mirror',async()=>{
+ let reads=0;const h=await setup({checkoutService:previewService(async()=>previewBilling(++reads===1?'active':'past_due'))});
+ h.emit(h.user);await flush();h.el('account-preview-refresh').dispatch('click');await flush();assert.equal(reads,2);assert.equal(h.el('account-preview-state').textContent,'お支払いの確認が必要です');assert.equal(h.el('plan-preview-state').textContent,'お支払いの確認が必要です');assert.equal(h.el('account-billing').textContent,'未契約');assert.equal(h.calls.email,0);assert.equal(h.calls.google,0);assert.equal(h.calls.signOut,0);h.cleanup();
+});
+test('unverified and newly created accounts cannot read Preview billing',async()=>{
+ let reads=0;const h=await setup({checkoutService:previewService(async()=>{reads++;return previewBilling();})});
+ h.emit({...h.user,emailVerified:false});await flush();h.el('account-preview-refresh').dispatch('click');assert.equal(reads,0);
+ h.emit({...h.user,isNewUser:true});await flush();h.el('plan-preview-refresh').dispatch('click');assert.equal(reads,0);assert.equal(h.el('account-preview-details').hidden,true);h.cleanup();
+});
+test('old account Preview billing cannot replace the current account after auth switch',async()=>{
+ const a=deferred(),b=deferred();let reads=0;const h=await setup({checkoutService:previewService(()=>++reads===1?a.promise:b.promise)});
+ h.emit({...h.user,maskedEmail:'a***@example.invalid'});await flush();assert.equal(reads,1);
+ h.emit({...h.user,maskedEmail:'b***@example.invalid'});await flush();assert.equal(reads,2);b.resolve(previewBilling('past_due'));await flush();assert.equal(h.el('account-preview-state').textContent,'お支払いの確認が必要です');
+ a.resolve(previewBilling('active'));await flush();assert.equal(h.el('account-preview-state').textContent,'お支払いの確認が必要です');assert.equal(h.el('account-email').textContent,h.summary.maskedEmail);h.cleanup();
+});
+test('logout clears Preview billing and ignores an in-flight read',async()=>{
+ const d=deferred();const h=await setup({checkoutService:previewService(()=>d.promise)});h.emit(h.user);await flush();await h.el('logout').dispatch('click');d.resolve(previewBilling());await flush();
+ assert.equal(h.el('account-preview-details').hidden,true);assert.equal(h.el('account-preview-state').textContent,'');assert.equal(h.el('plan-preview-state').textContent,'');assert.equal(h.el('account-preview-refresh').disabled,true);assert.equal(h.el('login-panel').hidden,false);h.cleanup();
+});
+test('Preview read failure is unavailable rather than no-contract or paid success',async()=>{
+ const h=await setup({checkoutService:previewService(async()=>{throw new Error('private server response');})});h.emit(h.user);await flush();
+ assert.equal(h.el('account-preview-details').hidden,true);assert.match(h.el('account-preview-status').textContent,/確認できません/);assert.doesNotMatch(h.el('account-preview-status').textContent,/private|未契約|登録が完了/);assert.equal(h.el('account-preview-refresh').disabled,false);assert.equal(h.el('account-billing').textContent,'未契約');h.cleanup();
 });

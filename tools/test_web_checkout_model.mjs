@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, checkoutErrorMessage } from '../public/assets/checkout-model.mjs';
+import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, projectPreviewBilling, checkoutErrorMessage } from '../public/assets/checkout-model.mjs';
 
 const quote = () => ({
   testMode: true, planKey: 'premium_monthly', amount: 550, currency: 'jpy', interval: 'month', reviewToken: 'opaque_fixture_review_token_12345',
@@ -53,7 +53,7 @@ test('completion requires confirmed paid or trial no-payment-required without gr
   for (const paymentStatus of ['paid', 'no_payment_required']) {
     const result = projectCheckoutStatus({ testMode: true, state: 'complete', paymentStatus });
     assert.equal(result.state, 'complete'); assert.equal(result.terminal, true);
-    assert.match(result.copy, /利用権限には反映されません/); assert.match(result.copy, /次の開発タスク/);
+    assert.match(result.copy, /利用権限には反映されません/); assert.match(result.copy, /Webhook/);
   }
 });
 test('complete but unpaid remains processing rather than a successful payment', () => {
@@ -103,4 +103,38 @@ test('Stripe test client secret remains opaque, including percent-encoded ASCII 
     rejects(()=>projectCheckoutSession({testMode:true,publishableKey,clientSecret}));
   }
   rejects(()=>projectCheckoutSession({testMode:true,publishableKey:'pk_live_fixtureKey0000',clientSecret:encoded}));
+});
+
+const mirrored = (status = 'active') => ({testMode:true,syncState:'synced',billing:{planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',status,currentPeriodStart:'2026-11-14T09:20:00Z',currentPeriodEnd:'2026-12-14T09:20:00Z',firstChargeAt:'2026-11-14T09:20:00Z',nextChargeAt:'2026-12-14T09:20:00Z',trialEnd:null,cancelAtPeriodEnd:false,syncedAt:'2026-11-14T09:20:02Z',entitlementMirror:status==='active'}});
+test('Webhook mirror maps all subscription states to Japanese without exposing raw status', () => {
+  const expected={trialing:'体験期間中・契約登録済み',active:'有料会員',past_due:'お支払いの確認が必要です',unpaid:'お支払いを確認できませんでした',paused:'契約は一時停止中です',incomplete:'お申し込みは未完了です',incomplete_expired:'お申し込みの有効期限が切れました',canceled:'解約済み'};
+  for(const [status,label] of Object.entries(expected)){
+    const model=projectPreviewBilling(mirrored(status));assert.equal(model.statusLabel,label);assert.equal(model.amountLabel,'月額550円（税込）／1か月ごとの自動更新');assert.match(model.syncedAtLabel,/日本時間/);
+    assert.match(model.copy,/本番利用権限には反映されません/);
+  }
+});
+test('pending, missing and unavailable mirrors are never promoted to paid membership', () => {
+  for(const syncState of ['pending','none','unavailable']){
+    const model=projectPreviewBilling({...mirrored(),syncState});assert.notEqual(model.outcome,'active');assert.equal(model.planLabel,'未確認');assert.equal(model.entitlementLabel,'未確認');
+  }
+  const unknown=projectPreviewBilling(mirrored('future-internal-status'));assert.equal(unknown.statusLabel,'契約状態を確認できません');assert.doesNotMatch(JSON.stringify(unknown),/future-internal-status/);
+});
+test('mirror authority stays server-provided and never becomes a browser expiry rule', () => {
+  const raw=mirrored();raw.billing.currentPeriodEnd='2000-01-01T00:00:00Z';raw.billing.entitlementMirror=true;
+  assert.match(projectPreviewBilling(raw).entitlementLabel,/有効として保存/);
+  raw.billing.entitlementMirror=false;assert.match(projectPreviewBilling(raw).entitlementLabel,/無効として保存/);assert.equal(projectPreviewBilling(raw).outcome,'stored');
+});
+test('mirror rejects Live, foreign plans, wrong total and missing verified sync timestamp', () => {
+  rejects(()=>projectPreviewBilling({...mirrored(),testMode:false}));
+  for(const patch of [{planKey:'other'},{amount:500},{currency:'usd'},{interval:'year'},{syncedAt:null},{entitlementMirror:'true'},{cancelAtPeriodEnd:'false'}])rejects(()=>projectPreviewBilling({...mirrored(),billing:{...mirrored().billing,...patch}}));
+});
+test('mirror projection excludes identifiers and displays server dates without fabricating next charge', () => {
+  const raw=mirrored();Object.assign(raw.billing,{uid:'private_uid_fixture',stripeCustomerId:'cus_private_fixture',subscriptionId:'sub_private_fixture',nextChargeAt:null,cancelAtPeriodEnd:true});
+  const model=projectPreviewBilling(raw);assert.equal(model.cancelLabel,'期間末に解約予定');assert.equal(model.nextChargeLabel,'予定を確認できません');assert.doesNotMatch(JSON.stringify(model),/private_uid_fixture|cus_private_fixture|sub_private_fixture/);assert.match(model.managementNotice,/次の開発タスク/);
+});
+test('trialing sync confirms the original first-charge date and labels isolated test fixtures', () => {
+  const raw=mirrored('trialing');Object.assign(raw.billing,{trialEnd:'2026-11-30T01:00:00Z',firstChargeAt:'2026-11-30T01:00:00Z',entitlementMirror:true,testDataSource:'preview_fixture'});
+  const model=projectPreviewBilling(raw);assert.equal(model.outcome,'trialing');assert.match(model.title,/カード登録が完了/);assert.match(model.copy,/Preview専用のテストデータ/);assert.match(model.copy,/本番の体験状態は変更しません/);
+  assert.match(projectCheckoutReview({...trial(),testDataSource:'preview_fixture'}).trialNote,/Preview専用の体験データ/);
+  raw.billing.firstChargeAt='2026-11-29T01:00:00Z';rejects(()=>projectPreviewBilling(raw));
 });

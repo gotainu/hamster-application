@@ -4,7 +4,7 @@ import { createCheckoutController } from '../public/assets/checkout-view.mjs';
 
 const originalDocument = globalThis.document;
 afterEach(() => { globalThis.document = originalDocument; });
-const ids = ['checkout-panel', 'checkout-title', 'checkout-error', 'checkout-status', 'checkout-review', 'checkout-account-name', 'checkout-account-email', 'checkout-plan-name', 'checkout-amount', 'checkout-card-date', 'checkout-first-charge-date', 'checkout-first-charge-amount', 'checkout-trial-note', 'checkout-terms', 'checkout-start', 'checkout-payment', 'checkout-embed', 'checkout-result', 'checkout-result-title', 'checkout-result-copy', 'checkout-refresh', 'checkout-back', 'checkout-cancel'];
+const ids = ['checkout-panel', 'checkout-title', 'checkout-error', 'checkout-status', 'checkout-review', 'checkout-account-name', 'checkout-account-email', 'checkout-plan-name', 'checkout-amount', 'checkout-card-date', 'checkout-first-charge-date', 'checkout-first-charge-amount', 'checkout-trial-note', 'checkout-terms', 'checkout-start', 'checkout-payment', 'checkout-embed', 'checkout-result', 'checkout-result-title', 'checkout-result-copy', 'checkout-refresh', 'checkout-back', 'checkout-cancel', 'checkout-preview-panel', 'checkout-preview-status', 'checkout-preview-details', ...['state','plan','amount','first-charge','next-charge','period-start','period-end','trial-end','cancel','synced-at','entitlement'].map(suffix => 'checkout-preview-' + suffix)];
 class Element {
   constructor() { this.textContent = ''; this.hidden = false; this.disabled = false; this.checked = false; this.listeners = new Map(); this.attributes = new Map(); this.focused = false; this.childrenCleared = 0; }
   addEventListener(name, action) { this.listeners.set(name, action); }
@@ -18,23 +18,32 @@ const quote = () => ({ testMode: true, planKey: 'premium_monthly', amount: 550, 
 const session = () => ({ testMode: true, publishableKey: 'pk_test_fixtureKey0000', clientSecret: 'cs_test_fixture_secret_fakeValueOnly' });
 const deferred = () => { let resolve, reject; const promise = new Promise((a,b) => { resolve=a; reject=b; }); return { promise, resolve, reject }; };
 const settle = async () => { for (let i=0;i<5;i++) await new Promise(resolve => setImmediate(resolve)); };
+const billing = (status = 'active') => ({testMode:true,syncState:'synced',billing:{planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',status,currentPeriodStart:'2026-11-14T09:20:00Z',currentPeriodEnd:'2026-12-14T09:20:00Z',trialEnd:null,firstChargeAt:'2026-11-14T09:20:00Z',nextChargeAt:'2026-12-14T09:20:00Z',cancelAtPeriodEnd:false,syncedAt:'2026-11-14T09:20:01Z',entitlementMirror:true}});
+class Clock {
+  constructor(){this.time=0;this.next=1;this.tasks=new Map();}
+  setTimeout(fn,ms){const id=this.next++;this.tasks.set(id,{at:this.time+ms,fn});return id;}
+  clearTimeout(id){this.tasks.delete(id);}
+  async advance(ms){const end=this.time+ms;for(;;){const item=[...this.tasks.entries()].filter(([,task])=>task.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!item)break;this.time=item[1].at;this.tasks.delete(item[0]);item[1].fn();await settle();}this.time=end;}
+}
 function setup(overrides = {}) {
   const elements = Object.fromEntries(ids.map(id => [id,new Element()]));
   globalThis.document = { getElementById: id => { assert.ok(elements[id], id); return elements[id]; } };
-  const calls = { review: 0, create: [], status: 0, cancel: 0, show: 0, back: 0, loads: [], mounts: 0, destroys: 0, stripeOptions: null };
+  const calls = { review: 0, create: [], status: 0, billing: 0, cancel: 0, show: 0, back: 0, loads: [], mounts: 0, destroys: 0, stripeOptions: null };
   const service = {
     async reviewPreviewCheckout() { calls.review++; return quote(); },
     async createPreviewCheckout(body) { calls.create.push(body); return session(); },
     async getPreviewCheckoutStatus() { calls.status++; return { testMode: true, state: 'open' }; },
     async cancelPreviewCheckout() { calls.cancel++; return { testMode: true, state: 'canceled' }; },
+    async getPreviewBilling() { calls.billing++; return billing(); },
     ...overrides.service,
   };
   const instance = { mount(target) { assert.equal(target,elements['checkout-embed']); calls.mounts++; }, destroy() { calls.destroys++; } };
   const loadStripe = overrides.loadStripe || (async key => { calls.loads.push(key); return { async initEmbeddedCheckout(options) { calls.stripeOptions = options; return instance; } }; });
-  const controller = createCheckoutController({ service, onShow() { calls.show++; }, onBack() { calls.back++; }, loadStripe });
+  const clock = new Clock();
+  const controller = createCheckoutController({ service, onShow() { calls.show++; }, onBack() { calls.back++; }, loadStripe, timers:clock });
   const consent = () => { elements['checkout-terms'].checked = true; elements['checkout-terms'].event('change'); };
   const start = async () => { consent(); elements['checkout-start'].event(); await settle(); };
-  return { elements, calls, service, controller, consent, start, instance };
+  return { elements, calls, service, controller, consent, start, instance, clock };
 }
 
 test('opening only reviews server facts; consent is required before any Stripe call', async () => {
@@ -151,4 +160,36 @@ test('an uncertain create response can discover completion by status without res
   await x.controller.open();await x.start();x.elements['checkout-refresh'].event();await settle();
   assert.equal(x.calls.status,1);assert.equal(x.calls.review,1);assert.equal(x.calls.create.length,1);assert.equal(x.calls.loads.length,0);assert.equal(x.calls.back,0);
   assert.match(x.elements['checkout-result-title'].textContent,/Test Mode/);assert.match(x.elements['checkout-result-copy'].textContent,/利用権限には反映されません/);
+});
+
+test('Stripe completion waits for a signed-Webhook mirror before showing membership success', async () => {
+  let synced=false;
+  const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return synced?billing():{testMode:true,syncState:'pending',billing:null};}}});
+  await x.controller.resume();await settle();assert.equal(x.calls.billing,1);assert.equal(x.elements['checkout-result-title'].textContent,'支払い情報を確認しています');assert.equal(x.elements['checkout-preview-details'].hidden,true);
+  synced=true;await x.clock.advance(5000);assert.equal(x.calls.billing,2);assert.match(x.elements['checkout-result-title'].textContent,/有料会員登録が完了/);assert.equal(x.elements['checkout-preview-state'].textContent,'有料会員');assert.equal(x.elements['checkout-preview-details'].hidden,false);assert.equal(x.clock.tasks.size,0);
+  assert.equal(x.elements['checkout-cancel'].disabled,true);assert.equal(x.calls.cancel,0);assert.match(x.elements['checkout-result-copy'].textContent,/本番利用権限には反映されません/);
+});
+test('payment-attention Webhook mirror does not show active success', async () => {
+  const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;const raw=billing('past_due');raw.billing.entitlementMirror=false;return raw;}}});
+  await x.controller.resume();await settle();assert.match(x.elements['checkout-result-title'].textContent,/お支払いを確認できません/);assert.equal(x.elements['checkout-preview-state'].textContent,'お支払いの確認が必要です');assert.match(x.elements['checkout-preview-entitlement'].textContent,/無効として保存/);assert.equal(x.clock.tasks.size,0);
+});
+test('Webhook polling is bounded to six reads and only manual retry starts a new cycle', async () => {
+  let synced=false;
+  const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return synced?billing():{testMode:true,syncState:'pending',billing:null};}}});
+  await x.controller.resume();await settle();await x.clock.advance(30000);assert.equal(x.calls.billing,6);assert.match(x.elements['checkout-result-title'].textContent,/時間がかかっています/);assert.equal(x.elements['checkout-refresh'].disabled,false);
+  await x.clock.advance(60000);assert.equal(x.calls.billing,6);synced=true;x.elements['checkout-refresh'].event();await settle();assert.equal(x.calls.billing,7);assert.match(x.elements['checkout-result-title'].textContent,/有料会員登録が完了/);assert.equal(x.calls.create.length,0);
+});
+test('a hung mirror read times out at thirty seconds and cannot paint a late success', async () => {
+  const pending=deferred();const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return pending.promise;}}});
+  await x.controller.resume();await settle();await x.clock.advance(30000);assert.equal(x.calls.billing,1);assert.match(x.elements['checkout-result-title'].textContent,/時間がかかっています/);
+  pending.resolve(billing());await settle();assert.match(x.elements['checkout-result-title'].textContent,/時間がかかっています/);assert.equal(x.elements['checkout-preview-details'].hidden,true);
+});
+test('clearing identity cancels mirror timers and prevents old-user billing from appearing', async () => {
+  const pending=deferred();const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return pending.promise;}}});
+  await x.controller.resume();await settle();x.controller.clear();assert.equal(x.clock.tasks.size,0);pending.resolve(billing());await settle();await x.clock.advance(60000);
+  assert.equal(x.calls.billing,1);assert.equal(x.elements['checkout-preview-state'].textContent,'');assert.equal(x.elements['checkout-result-title'].textContent,'');assert.equal(x.elements['checkout-preview-panel'].hidden,true);
+});
+test('back during Webhook wait cancels polling without canceling the completed subscription', async () => {
+  const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return {testMode:true,syncState:'pending',billing:null};}}});
+  await x.controller.resume();await settle();x.elements['checkout-back'].event();await settle();assert.equal(x.calls.back,1);assert.equal(x.calls.cancel,0);assert.equal(x.clock.tasks.size,0);await x.clock.advance(30000);assert.equal(x.calls.billing,1);
 });

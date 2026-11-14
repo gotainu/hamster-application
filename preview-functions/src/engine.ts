@@ -13,10 +13,11 @@ export interface PreviewStore {
   reserveBudget(subject: string, day: string, attempt: string): Promise<void>;
 }
 export interface Identity { uid: string; emailVerified: boolean; email: string; }
-export interface AppFacts { appAccountExists: boolean; billing: any; trial: any; nickname: string; maskedEmail: string; }
+export interface AppFacts { appAccountExists: boolean; billing: any; trial: any; nickname: string; maskedEmail: string; testDataSource?: 'app'|'preview_fixture'; }
 export interface EngineDependencies {
   stripe: Stripe; store: PreviewStore; priceId: string; publishableKey: string;
   readFacts(uid: string): Promise<AppFacts>; now(): Date;
+  allowedWebhook?: {id:string;url:string;events:readonly string[]};
 }
 function fail(code: string): never { throw new CheckoutError(code); }
 function testObject(value: {livemode?: boolean}): void { if (value.livemode !== false) fail('test_mode_required'); }
@@ -28,7 +29,10 @@ export function createPreviewEngine(d: EngineDependencies) {
     const app = await d.readFacts(identity.uid);
     const policy = assessPreviewCheckout({identity, appAccountExists: app.appAccountExists, billing: app.billing, trial: app.trial, planKey, now: d.now()});
     const endpoints = await d.stripe.webhookEndpoints.list({limit:100});
-    if (endpoints.has_more || endpoints.data.some(e=>e.status === 'enabled')) fail('test_webhook_unresolved');
+    const enabled=endpoints.data.filter(e=>e.status==='enabled');
+    if (endpoints.has_more || (d.allowedWebhook
+      ? enabled.length!==1 || enabled.some(e=>e.id!==d.allowedWebhook!.id || e.url!==d.allowedWebhook!.url || e.livemode!==false || e.api_version!=='2025-02-24.acacia' || JSON.stringify([...e.enabled_events].sort())!==JSON.stringify([...d.allowedWebhook!.events].sort()))
+      : enabled.length!==0)) fail('test_webhook_unresolved');
     const price = await d.stripe.prices.retrieve(d.priceId);
     testObject(price);
     if (price.metadata.previewScope !== SCOPE) fail('price_mismatch');
@@ -44,6 +48,7 @@ export function createPreviewEngine(d: EngineDependencies) {
     testObject(c as Stripe.Customer);
     const value = c as Stripe.Customer;
     if (value.metadata.previewScope !== SCOPE || value.metadata.previewSubjectHash !== subject) fail('customer_unresolved');
+    if (value.metadata.previewFirebaseUid && hash(value.metadata.previewFirebaseUid)!==subject) fail('customer_unresolved');
     if (value.balance !== 0 || value.discount) fail('price_mismatch');
   }
   async function noSubscription(customer: string) {
@@ -57,13 +62,17 @@ export function createPreviewEngine(d: EngineDependencies) {
   }
   async function getCustomer(identity: Identity, subject: string): Promise<Stripe.Customer> {
     const stored = await d.store.read(subject);
-    const known = await knownCustomer(subject, stored); if (known) return known;
-    const matches = await d.stripe.customers.search({query:`metadata['previewScope']:'${SCOPE}' AND metadata['previewSubjectHash']:'${subject}'`,limit:2});
+    if(stored.previewFirebaseUid && stored.previewFirebaseUid!==identity.uid) fail('customer_unresolved');
+    const known = await knownCustomer(subject, stored);
+    const matches = known ? {data:[known],has_more:false} : await d.stripe.customers.search({query:`metadata['previewScope']:'${SCOPE}' AND metadata['previewSubjectHash']:'${subject}'`,limit:2});
     if (matches.has_more || matches.data.length > 1) fail('customer_unresolved');
-    let customer = matches.data[0];
-    if (!customer) customer = await d.stripe.customers.create({email:identity.email,metadata:{previewScope:SCOPE,previewSubjectHash:subject}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
+    let customer = known || matches.data[0];
+    if (!customer) customer = await d.stripe.customers.create({email:identity.email,metadata:{previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
     ownCustomer(customer,subject);
-    await d.store.mutate(subject,s=>({state:{...s,customerId:customer.id},result:null}));
+    // Only an Admin-verified owner may bind the previously hash-only Test Customer.
+    if(!customer.metadata.previewFirebaseUid)customer=await d.stripe.customers.update(customer.id,{metadata:{...customer.metadata,previewFirebaseUid:identity.uid}});
+    if(customer.metadata.previewFirebaseUid!==identity.uid)fail('customer_unresolved');
+    await d.store.mutate(subject,s=>{if(s.previewFirebaseUid && s.previewFirebaseUid!==identity.uid)fail('customer_unresolved');return {state:{...s,customerId:customer.id,previewFirebaseUid:identity.uid},result:null};});
     return customer;
   }
   async function checkSession(session: Stripe.Checkout.Session, subject: string, expectedCustomer: string, attempt: RecordData) {
@@ -126,9 +135,9 @@ export function createPreviewEngine(d: EngineDependencies) {
       const subject = hash(identity.uid); const {app,policy} = await facts(identity,planKey);
       const state = await d.store.read(subject); const c = await knownCustomer(subject,state); if (c) await noSubscription(c.id);
       const token = randomUUID(); const now = d.now();
-      await d.store.mutate(subject,s=>({state:{...s,quote:{tokenHash:hash(token),expiresAt:now.getTime()+180000,policyKey:assessmentKey(policy)}},result:null}));
+      await d.store.mutate(subject,s=>{if(s.previewFirebaseUid && s.previewFirebaseUid!==identity.uid)fail('customer_unresolved');return {state:{...s,previewFirebaseUid:identity.uid,quote:{tokenHash:hash(token),expiresAt:now.getTime()+180000,policyKey:assessmentKey(policy)}},result:null};});
       const firstCharge = new Date(policy.firstChargeAtSeconds*1000).toISOString();
-      return {testMode:true,planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:token,account:{nickname:app.nickname,maskedEmail:app.maskedEmail},billing:{kind:policy.chargeTiming === 'trial_end' ? 'trial':'immediate',cardRegistrationAt:now.toISOString(),firstChargeAt:firstCharge,firstChargeAmount:550,trialEndsAt:policy.trialEndSeconds ? firstCharge:null}};
+      return {testMode:true,testDataSource:app.testDataSource||'app',planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:token,account:{nickname:app.nickname,maskedEmail:app.maskedEmail},billing:{kind:policy.chargeTiming === 'trial_end' ? 'trial':'immediate',cardRegistrationAt:now.toISOString(),firstChargeAt:firstCharge,firstChargeAmount:550,trialEndsAt:policy.trialEndSeconds ? firstCharge:null}};
     },
     async create(identity: Identity, body: RecordData) {
       if (body.termsAccepted !== true || typeof body.reviewToken !== 'string') fail('confirmation_required');
@@ -173,7 +182,7 @@ export function createPreviewEngine(d: EngineDependencies) {
       await noSubscription(customer.id);
       const open=await d.stripe.checkout.sessions.list({customer:customer.id,status:'open',limit:100});
       if (open.has_more || open.data.some(s=>s.metadata?.previewAttempt !== attempt.id)) fail('checkout_unresolved');
-      const metadata={previewScope:SCOPE,previewSubjectHash:subject,previewAttempt:attempt.id,previewPlan:'premium_monthly'};
+      const metadata={previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid,previewAttempt:attempt.id,previewPlan:'premium_monthly'};
       const session=await d.stripe.checkout.sessions.create({mode:'subscription',ui_mode:'embedded',locale:'ja',customer:customer.id,line_items:[{price:d.priceId,quantity:1}],payment_method_types:['card'],payment_method_collection:'always',automatic_tax:{enabled:false},allow_promotion_codes:false,expires_at:attempt.expiresAt,return_url:PREVIEW_ORIGIN+'/account/?checkout=return',redirect_on_completion:'if_required',metadata,subscription_data:{metadata,...(attempt.trialEndSeconds ? {trial_end:attempt.trialEndSeconds}: {})}}, {idempotencyKey:`${SCOPE}:session:${subject}:${attempt.id}`});
       await checkSession(session,subject,customer.id,attempt);
       await d.store.mutate(subject,s=>{

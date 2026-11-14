@@ -1,5 +1,5 @@
 import { PREMIUM_MONTHLY } from './plan-model.mjs';
-import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, checkoutErrorMessage } from './checkout-model.mjs';
+import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, projectPreviewBilling, checkoutErrorMessage } from './checkout-model.mjs';
 
 let stripeScriptPromise;
 export async function loadStripeSdk(publishableKey) {
@@ -18,8 +18,20 @@ export async function loadStripeSdk(publishableKey) {
   return window.Stripe(publishableKey, { locale: 'ja' });
 }
 
+const previewBillingFields = { state: 'statusLabel', plan: 'planLabel', amount: 'amountLabel', 'first-charge': 'firstChargeLabel', 'next-charge': 'nextChargeLabel', 'period-start': 'periodStartLabel', 'period-end': 'periodEndLabel', 'trial-end': 'trialEndLabel', cancel: 'cancelLabel', 'synced-at': 'syncedAtLabel', entitlement: 'entitlementLabel' };
+export function clearPreviewBilling(prefix, message = 'Preview契約状態はまだ確認していません。') {
+  document.getElementById(prefix + '-status').textContent = message;
+  document.getElementById(prefix + '-details').hidden = true;
+  for (const suffix of Object.keys(previewBillingFields)) document.getElementById(prefix + '-' + suffix).textContent = '';
+}
+export function renderPreviewBilling(prefix, model) {
+  document.getElementById(prefix + '-status').textContent = model.title + ' ' + model.copy;
+  document.getElementById(prefix + '-details').hidden = model.state !== 'synced';
+  for (const [suffix, key] of Object.entries(previewBillingFields)) document.getElementById(prefix + '-' + suffix).textContent = model.state === 'synced' ? model[key] : '';
+}
+
 /** Tokens stay in the account service. Card fields stay exclusively in Stripe's iframe. */
-export function createCheckoutController({ service, onShow, onBack, loadStripe = loadStripeSdk }) {
+export function createCheckoutController({ service, onShow, onBack, loadStripe = loadStripeSdk, onBillingUpdate = () => {}, timers = globalThis }) {
   const el = id => document.getElementById(id);
   const personal = ['checkout-account-name', 'checkout-account-email', 'checkout-plan-name', 'checkout-amount', 'checkout-card-date', 'checkout-first-charge-date', 'checkout-first-charge-amount', 'checkout-trial-note'];
   const terms = el('checkout-terms');
@@ -30,6 +42,11 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
   let embedded = null;
   let sessionKnown = false;
   let completionPending = false;
+  let stripeOperationComplete = false;
+  let syncEpoch = 0;
+  let syncRunning = false;
+  let nextSyncTimer = null;
+  let syncDeadlineTimer = null;
   const busy = () => ['reviewing', 'creating', 'checking', 'canceling'].includes(phase);
   const terminal = () => ['complete', 'expired', 'canceled', 'none'].includes(phase);
   const current = generation => !destroyed && epoch === generation;
@@ -39,9 +56,9 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     el('checkout-start').hidden = phase !== 'review';
     terms.disabled = phase !== 'review';
     el('checkout-back').disabled = busy();
-    el('checkout-cancel').disabled = busy() || !sessionKnown || terminal();
-    el('checkout-refresh').disabled = busy() || terminal();
-    el('checkout-refresh').textContent = sessionKnown ? '支払い状況を再確認する' : '申込内容を再確認する';
+    el('checkout-cancel').disabled = busy() || !sessionKnown || terminal() || stripeOperationComplete;
+    el('checkout-refresh').disabled = busy() || syncRunning || (terminal() && !stripeOperationComplete);
+    el('checkout-refresh').textContent = stripeOperationComplete ? 'Preview契約状態を再確認する' : sessionKnown ? '支払い状況を再確認する' : '申込内容を再確認する';
     el('checkout-panel').setAttribute('aria-busy', String(busy()));
   }
   function setPhase(value, message = '') {
@@ -64,8 +81,20 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     el('checkout-embed').replaceChildren();
     el('checkout-payment').hidden = true;
   }
+  function stopBillingSync() {
+    syncEpoch++;
+    syncRunning = false;
+    if (nextSyncTimer !== null) timers.clearTimeout(nextSyncTimer);
+    if (syncDeadlineTimer !== null) timers.clearTimeout(syncDeadlineTimer);
+    nextSyncTimer = null;
+    syncDeadlineTimer = null;
+  }
   function clear() {
     epoch++;
+    stopBillingSync();
+    stripeOperationComplete = false;
+    clearPreviewBilling('checkout-preview');
+    el('checkout-preview-panel').hidden = true;
     destroyEmbedded();
     review = null;
     sessionKnown = false;
@@ -92,12 +121,66 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     };
     for (const [id, text] of Object.entries(fields)) el(id).textContent = text;
   }
+  function startBillingSync() {
+    stopBillingSync();
+    syncRunning = true;
+    const generation = epoch;
+    const run = syncEpoch;
+    let attempts = 0;
+    const isCurrent = () => current(generation) && run === syncEpoch;
+    el('checkout-preview-panel').hidden = false;
+    const pending = projectPreviewBilling({ testMode: true, syncState: 'pending' });
+    renderPreviewBilling('checkout-preview', pending);
+    el('checkout-result-title').textContent = pending.title;
+    el('checkout-result-copy').textContent = pending.copy;
+    el('checkout-result').hidden = false;
+    setPhase('syncing');
+    const timeout = () => {
+      if (!isCurrent()) return;
+      stopBillingSync();
+      el('checkout-result-title').textContent = '契約状態の確認に時間がかかっています';
+      el('checkout-result-copy').textContent = '支払い処理は完了している可能性がありますが、契約状態の確認に時間がかかっています。再確認するか、サポートへお問い合わせください。Preview専用のため、HamCareアプリの本番利用権限には反映されません。';
+      setPhase('sync-timeout');
+    };
+    syncDeadlineTimer = timers.setTimeout(timeout, 30000);
+    const read = async () => {
+      if (!isCurrent()) return;
+      attempts++;
+      try {
+        const raw = await service.getPreviewBilling();
+        if (!isCurrent()) return;
+        const model = projectPreviewBilling(raw);
+        renderPreviewBilling('checkout-preview', model);
+        onBillingUpdate(model);
+        if (model.state === 'synced') {
+          stopBillingSync();
+          el('checkout-result-title').textContent = model.title;
+          el('checkout-result-copy').textContent = model.copy;
+          setPhase('synced');
+          el('checkout-result-title').focus();
+          return;
+        }
+      } catch {
+        if (!isCurrent()) return;
+        clearPreviewBilling('checkout-preview', 'Preview契約状態を取得できません。反映を再確認しています。');
+      }
+      if (!isCurrent()) return;
+      if (attempts >= 6) { timeout(); return; }
+      nextSyncTimer = timers.setTimeout(() => { nextSyncTimer = null; void read(); }, 5000);
+    };
+    void read();
+  }
   function presentStatus(value) {
     if (value.terminal) {
       destroyEmbedded();
       review = null;
       terms.checked = false;
       el('checkout-review').hidden = true;
+    }
+    if (value.state === 'complete') {
+      stripeOperationComplete = true;
+      startBillingSync();
+      return;
     }
     if (value.state === 'open' && embedded) {
       el('checkout-result').hidden = true;
@@ -134,6 +217,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
   }
   async function checkStatus() {
     if (destroyed || !sessionKnown) return;
+    if (stripeOperationComplete) { if (!syncRunning) startBillingSync(); return; }
     if (busy()) { completionPending = true; return; }
     const generation = epoch;
     clearError();
@@ -187,7 +271,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
   }
   async function cancel({ back = false } = {}) {
     if (destroyed || busy()) return;
-    if (!sessionKnown || terminal()) {
+    if (!sessionKnown || terminal() || stripeOperationComplete) {
       clear();
       await onBack();
       return;
@@ -219,7 +303,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
   }
   const onTerms = () => { if (phase === 'review') { clearError(); controls(); } };
   const onStart = () => { void start(); };
-  const onRefresh = () => { if (!busy() && !terminal()) void (sessionKnown ? checkStatus() : open()); };
+  const onRefresh = () => { if (busy() || syncRunning) return; if (stripeOperationComplete) startBillingSync(); else if (!terminal()) void (sessionKnown ? checkStatus() : open()); };
   const onCancel = () => { void cancel(); };
   const onBackClick = () => { void cancel({ back: true }); };
   terms.addEventListener('change', onTerms);

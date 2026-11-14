@@ -12,6 +12,8 @@ export function projectCheckoutReview(raw) {
   if (!record(raw) || raw.testMode !== true || raw.planKey !== PREMIUM_MONTHLY.key || raw.amount !== 550 || String(raw.currency).toLowerCase() !== 'jpy' || raw.interval !== 'month') fail();
   if (typeof raw.reviewToken !== 'string' || !/^[A-Za-z0-9_-]{16,512}$/.test(raw.reviewToken)) fail();
   if (!record(raw.account) || typeof raw.account.maskedEmail !== 'string' || !/^[^@\s]{1,2}\*{3}@[^@\s]+\.[^@\s]+$/.test(raw.account.maskedEmail)) fail();
+  const fixture = raw.testDataSource === 'preview_fixture';
+  if (raw.testDataSource !== undefined && !['app', 'preview_fixture'].includes(raw.testDataSource)) fail();
   const billing = raw.billing;
   if (!record(billing) || !['trial', 'immediate'].includes(billing.kind) || billing.firstChargeAmount !== 550 || !isoDate(billing.cardRegistrationAt) || !isoDate(billing.firstChargeAt)) fail();
   if (billing.kind === 'trial') {
@@ -28,9 +30,10 @@ export function projectCheckoutReview(raw) {
     cardRegistrationLabel: dateLabel(billing.cardRegistrationAt),
     firstChargeLabel: billing.kind === 'trial' ? dateLabel(billing.firstChargeAt) : '申込時（即時）',
     firstChargeAmountLabel: '550円（税込）',
-    trialNote: billing.kind === 'trial'
-      ? '本日カードをご登録いただきます。最初の550円の請求は、現在の体験終了日時に行われる予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
-      : '申し込み時に550円（税込）をお支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。',
+    trialNote: (fixture ? 'Preview専用のテストデータを使用しています。本番の体験状態は変更しません。' : '') + (billing.kind === 'trial'
+      ? fixture ? '本日カードをご登録いただくテストです。最初の550円の請求は、Preview専用の体験データに記録した終了日時の予定です。それまでは請求されません。本番の体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+        : '本日カードをご登録いただきます。最初の550円の請求は、現在の体験終了日時に行われる予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+      : '申し込み時に550円（税込）をお支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。'),
   });
 }
 
@@ -42,13 +45,13 @@ export function projectCheckoutSession(raw) {
 
 export function projectCheckoutStatus(raw) {
   if (!record(raw) || raw.testMode !== true) fail();
-  const noAccess = '現在はPreview環境のため、HamCareアプリの利用権限には反映されません。契約状態の同期は次の開発タスクで実装します。';
+  const noAccess = '現在はPreview環境のため、HamCareアプリの利用権限には反映されません。WebhookによるPreview契約状態の反映を確認しています。';
   switch (raw.state) {
     case 'none': return { state: 'none', terminal: true, title: '支払い手続きは作成されていません', copy: 'このアカウントに対応するテスト決済の作成記録はありません。支払い完了とは扱わず、プラン確認へ戻ってから内容をお確かめください。' };
     case 'processing': return { state: 'processing', terminal: false, title: 'テスト決済の処理状況を確認しています', copy: `処理結果はまだ確定していません。新しい申込を繰り返さず、少し時間をおいて状況を再確認してください。${noAccess}` };
     case 'complete':
       if (raw.paymentStatus !== 'paid' && raw.paymentStatus !== 'no_payment_required') return { state: 'processing', terminal: false, title: '支払い状態を確認しています', copy: `Stripeの支払い結果はまだ確定していません。少し時間をおいて、状況を再確認してください。${noAccess}` };
-      return { state: 'complete', terminal: true, title: 'Stripe Test Modeでの支払い操作が完了しました', copy: noAccess };
+      return { state: 'complete', terminal: true, title: 'Stripe Test Modeの支払い情報を確認しています', copy: noAccess };
     case 'open': return { state: 'open', terminal: false, title: '支払い操作はまだ完了していません', copy: 'Stripeの画面で操作を続けるか、キャンセルしてください。拒否や3D Secureの案内がある場合は、Stripe画面内の表示をご確認ください。' };
     case 'expired': return { state: 'expired', terminal: true, title: '支払い画面の期限が切れました', copy: '以前の支払い画面は再利用しません。プラン確認へ戻って、内容と請求日をもう一度ご確認ください。' };
     case 'canceled': return { state: 'canceled', terminal: true, title: '支払い操作をキャンセルしました', copy: 'プラン確認へ戻れます。HamCareアプリの体験期間や利用権限は変更していません。' };
@@ -83,4 +86,50 @@ export function checkoutErrorMessage(error) {
     case 'stripe_load_failed': return 'Stripeの安全な支払い画面を読み込めませんでした。接続を確認してから再度お試しください。';
     default: return '現在、支払い操作の結果を確認できません。状況を再確認するか、サポートへお問い合わせください。';
   }
+}
+
+
+/** Readonly projection of the server's isolated Webhook mirror; never decide app access. */
+export function projectPreviewBilling(raw) {
+  if (!record(raw) || raw.testMode !== true || !['none', 'pending', 'synced', 'unavailable'].includes(raw.syncState)) fail();
+  const disclaimer = 'Preview専用のテスト契約です。HamCareアプリの本番利用権限には反映されません。';
+  const empty = {
+    state: raw.syncState, outcome: 'pending', title: '支払い情報を確認しています', copy: `Webhookによる契約状態の反映を待っています。${disclaimer}`,
+    statusLabel: '反映待ち', planLabel: '未確認', amountLabel: '未確認', firstChargeLabel: '未記録', nextChargeLabel: '予定を確認できません',
+    periodStartLabel: '未記録', periodEndLabel: '未記録', trialEndLabel: '未記録', cancelLabel: '未確認', syncedAtLabel: '未記録', entitlementLabel: '未確認',
+    managementNotice: '契約管理画面は次の開発タスクで実装します。',
+  };
+  if (raw.syncState === 'none') return Object.freeze({...empty, outcome: 'none', title: 'Preview契約の反映記録はありません', copy: `同期されたテスト契約の記録はありません。未契約や支払い完了とは断定していません。${disclaimer}`, statusLabel: '反映記録なし'});
+  if (raw.syncState === 'unavailable') return Object.freeze({...empty, outcome: 'unknown', title: 'Preview契約状態を確認できません', copy: `時間をおいて再確認するか、サポートへお問い合わせください。${disclaimer}`, statusLabel: '確認できません'});
+  if (raw.syncState === 'pending') return Object.freeze(empty);
+  const billing = raw.billing;
+  if (!record(billing) || billing.planKey !== PREMIUM_MONTHLY.key || billing.amount !== 550 || String(billing.currency).toLowerCase() !== 'jpy' || billing.interval !== 'month' || !isoDate(billing.syncedAt)) fail();
+  if (billing.cancelAtPeriodEnd !== true && billing.cancelAtPeriodEnd !== false) fail();
+  if (billing.entitlementMirror !== true && billing.entitlementMirror !== false && billing.entitlementMirror !== null) fail();
+  const date = value => { if (value === null || value === undefined) return '未記録'; if (!isoDate(value)) fail(); return dateLabel(value); };
+  const statuses = {
+    trialing: '体験期間中・契約登録済み', active: '有料会員', past_due: 'お支払いの確認が必要です', unpaid: 'お支払いを確認できませんでした',
+    paused: '契約は一時停止中です', incomplete: 'お申し込みは未完了です', incomplete_expired: 'お申し込みの有効期限が切れました', canceled: '解約済み',
+  };
+  const fixtureNote = billing.testDataSource === 'preview_fixture' ? 'Preview専用のテストデータを使用しています。本番の体験状態は変更しません。' : '';
+  const result = {...empty, state: 'synced', outcome: 'stored', statusLabel: statuses[billing.status] || '契約状態を確認できません', planLabel: PREMIUM_MONTHLY.name,
+    amountLabel: '月額550円（税込）／1か月ごとの自動更新', firstChargeLabel: date(billing.firstChargeAt), nextChargeLabel: billing.nextChargeAt ? date(billing.nextChargeAt) : '予定を確認できません',
+    periodStartLabel: date(billing.currentPeriodStart), periodEndLabel: date(billing.currentPeriodEnd), trialEndLabel: date(billing.trialEnd),
+    cancelLabel: billing.cancelAtPeriodEnd ? '期間末に解約予定' : '期間末の解約予定なし', syncedAtLabel: date(billing.syncedAt),
+    entitlementLabel: billing.entitlementMirror === true ? '有効として保存（Preview限定）' : billing.entitlementMirror === false ? '無効として保存（Preview限定）' : '確認できません',
+    title: 'Preview契約状態の反映を確認しました', copy: fixtureNote + disclaimer,
+  };
+  if (billing.status === 'trialing' && billing.entitlementMirror === true) {
+    if (!isoDate(billing.firstChargeAt) || !isoDate(billing.trialEnd) || Date.parse(billing.firstChargeAt) !== Date.parse(billing.trialEnd)) fail();
+    result.outcome = 'trialing'; result.title = 'カード登録が完了しました（Stripe Test Mode／Preview）';
+    result.copy = fixtureNote + `最初の550円の請求は${dateLabel(billing.firstChargeAt)}の予定です。${billing.testDataSource === 'preview_fixture' ? 'Preview専用データで確認しています。' : '既存の体験終了日時は変更していません。'}${disclaimer}`;
+  } else if (billing.status === 'active' && billing.entitlementMirror === true) {
+    result.outcome = 'active'; result.title = '有料会員登録が完了しました（Stripe Test Mode／Preview）';
+  } else if (['past_due', 'unpaid', 'incomplete', 'incomplete_expired'].includes(billing.status)) {
+    result.outcome = 'attention'; result.title = 'お支払いを確認できませんでした（Preview）';
+    result.copy = fixtureNote + `支払いに確認が必要な状態として同期されています。新しい申込を繰り返さず、サポートへお問い合わせください。${disclaimer}`;
+  } else if (!statuses[billing.status]) {
+    result.outcome = 'unknown'; result.title = 'Preview契約状態を確認できません';
+  }
+  return Object.freeze(result);
 }

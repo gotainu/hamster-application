@@ -1,6 +1,41 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-14 戦略C・タスク4：Stripe Embedded Checkout（実装・Test Preview確認完了／本人承認待ち）
+## 2026-11-14 戦略C・タスク5：Preview専用Webhook・契約状態同期（実装・Test Preview検証完了／保存後に本人承認待ち）
+
+本人承認済みタスク4 `b94eb7a5f2c0` を起点に、同じ専用ブランチ／Hosting Previewでタスク5だけを実装した。本番アプリの権限は変更せず、Test Subscriptionの最新状態を署名検証済みWebhookから隔離billingへ同期し、同一申込の反映完了をWebで確認する。今回分を `feat(billing): sync preview Stripe subscriptions by Firebase UID` の1コミットに保存した後で停止し、Task6 Customer Portalは本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
+
+### 実装と分離境界
+
+| 項目 | タスク5の実装・証拠 |
+| --- | --- |
+| Webhook | 別名 `stripePreviewWebhook` と既存Preview申込Functionだけを配備。raw body署名・300秒以内の署名時刻・Content-Type・Test Modeを確認し、不正署名／古い時刻／Live flagを拒否する。登録先とハンドラは checkout.session.completed、customer.subscription.created／updated／deleted、invoice.paid、invoice.payment_failed の6イベントで一致。 |
+| Secrets | credentials／Price／Webhook設定の専用3 Secretだけを参照し、本番Secret・Webhookを流用しない。Webhook URL・署名SecretはGit／HTML／JavaScript／Firestore／ログに保存しない。本書にもendpoint名だけを記載し、URL・実UID／メール／Customer／Subscription／Event ID・個人の体験日時は転載しない。 |
+| UID照合 | Admin検証済みFirebase UID→専用Test Customer→Test Subscriptionのmetadataと隔離対応表を照合する。メール一致で紐付けず、別UID・scope／価格不一致・Live objectは安全拒否。一般HTTP入力からUID・体験日時・金額・Price・Customer IDを採用しない。 |
+| 保存先 | `preview_checkout_task4/{sha256(uid)}/billing/subscription`、同namespaceの対応／予約枠／fixture、および `preview_checkout_task4/_events/events/{eventHash}` のみ。本番users配下のbilling／trial／プロフィール／利用権限へ書かない。隔離namespaceへの実書込はあるため、Firestoreプロジェクト全体の書込0とは記録しない。 |
+| 最新状態・冪等性 | payloadはroutingにのみ使い、最新Test Subscription・Customer・Price・最新Invoiceを再取得。subjectとeventの期限付きlease、billingとprocessed receiptの同一transactionで、並行処理・順序逆転・再送・一時失敗を扱う。古いイベントや他attemptの状態だけで成功扱いにしない。 |
+| 状態・権限mirror | incomplete／incomplete_expired／trialing／active／past_due／unpaid／paused／canceledを別保存し日本語表示へ変換。本番のpaid＋active/trialing＋期間内という条件だけをPreviewの参照表示へ写し、past_due／unpaidへ新しい猶予は与えない。実アプリの有料機能を解放する処理ではない。 |
+| Web反映 | 同じattemptのWebhook同期前は反映待ち。同期後にカード登録完了／最初の請求予定または有料会員登録完了を表示し、支払確認が必要・確認不能・タイムアウトと区別する。最大6回／30秒の再確認・手動再確認・ログアウト／別UID時の消去。Portalは次タスク案内のみ、Portal Session作成0件。 |
+| fixture | 未開始／期限切れは本人UIDのPreview operator fixtureを使い、テスト用データと明記して実Stripeへ接続。本番体験は書き換えない。無効化済みfixtureは新規HTTPへ適用せず、本来のapp factsへ戻る。有効のまま期限切れになったfixtureは拒否。Auth Emulator由来の無効化済みfixtureだけは、署名検証済み遅延Webhookが元trialを照合する正本として保持する。 |
+
+### 検証結果と証拠の区別
+
+- **runtime395件PASS**：backend unit176、frontend122、既存policy84、Firestore Emulator13。Emulator13件にはクライアントRules拒否72ケースを含む。8状態、API一時失敗・再試行・順序逆転・別UID・lease競合等は合成検証の範囲として記録する。実unpaid到達を確認済みとは扱わない。
+- **静的347件PASS**：LP84、account106、brand157。strict TypeScript compile／`git diff --check` PASS。保護11ファイルSHA一致、既存依存／lock／SDKは更新しない。
+- **実Embedded3ケース**：本人所有アカウントの既存app trialは当日Invoice0円・trialing・元終了日時一致。未開始／終了済みはPreview operator fixtureで各550円即時paid・activeを確認。本番trial未開始／期限切れの実データへ変更した試験ではない。対象の本番業務4文書SHAは前後一致で、延長・リセット・新21日付与なし。
+- **実Clock**：共有Embedded Customerとは別の専用Auth Emulator UID／Test Customerを使用。初回550円paid→翌月550円paid、期間末解約予約→canceled／mirror=falseを確認。失敗ケースは初回550円Invoice open・入金0円→past_due／mirror=falseを確認。trial_will_end Testイベントは2件観測したが、今回の権限遷移には不要なため登録イベントへ追加しなかった。
+- **実署名イベント再送**：所有する真正Event14件を逆順で2巡、28送信でHTTP200。重複21回のbilling再書込なし、canceledを維持。不正署名・古い署名時刻・Live flagの合成送信は400／状態不変で、真正イベントの証拠と区別する。
+- **実表示**：Chrome360／390／430／768／1440px、Enterによる再確認・再読込・ログアウトを確認。別UIDへの非漏洩は合成テスト／Emulatorで確認し、実アカウント2人目のログインとは区別。物理Android Chrome／iOS Safariのblur／実スクリーンリーダー等は従来どおり後続の公開前確認とし、全実機PASSにはしない。
+
+### Preview・本番保護・後始末と次工程
+
+- 同じ[ログイン・申込Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)・channel `web-first-task1`、最終version **`bd3f9a9e5afe22f2`**、期限 **2026-11-21 21:41 JST**。専用2 Functionsの配備成功を確認した。
+- 本番54 Functionsのstate／updateTime、live Hosting release SHA／version、Auth許可ドメイン4件は前後不変。構成全体のバイト／SHA一致まで主張しない。保護Web11ファイル、元アプリHEAD・dirty10ファイルSHA・全2,120行のGit statusも開始時と一致する。
+- 本番Stripe・本番業務billing／trial／権限の変更0。Preview namespaceには実書込みあり。最終実照合ではTest Customer3件／Clock2件を保持、Subscription7件（旧Task4履歴2件を含む）はすべてcanceled、有効0・open Checkout0・有効fixture0。receipt28件はすべてprocessed、retryable／error0。Clockの真正retryable3件は再送200＋重複200・billing不変で回復した。失敗証拠の550円未払いopen Invoice1件、Webhook／専用Secretは保持する。旧取消済み2件のUIDフィールド未保存は履歴として識別し、補完・変更していない。
+- Task5だけを1コミットに保存して停止する。Task6 Portalは未実装／Session作成0件で、本人承認後に着手。main merge／push、live Hosting、本番Stripe／billing、Flutter／ストアの変更は行わない。
+
+## 2026-11-14 戦略C・タスク4：Stripe Embedded Checkout（b94eb7a5f2c0・本人承認済み）
+
+本人のタスク5指示で上記コミットを承認済み。以下はタスク4実施時の検証・未確認を保存した履歴であり、現在の作業・停止点は先頭のタスク5節を優先する。
 
 本人承認済みタスク3 `98f3fb8a6cd8` を起点に、Test Mode限定タスク4の実装・Test Preview確認を完了。本人のTestキー保存と既存未契約アカウントでのログイン後、実Embedded操作・各カード拒否・3D Secure・成功に加え、実2タブの同一Session共有・明示失効・戻るを確認し、競合対策の最終backend配備もACTIVE。開始HEADは `98f3fb8a6cd8`。本実装・検証・記録を独立1コミットへ保存し、本番公開可能・全実機確認済みとは扱わない。保存後に停止し、タスク5Webhook／権限同期は次工程として本人の別承認後に実装する。
 
@@ -37,7 +72,7 @@
 
 ## 2026-11-14 戦略C・タスク3：独自月額プラン確認（98f3fb8a6cd8・本人承認済み）
 
-本人の後続タスク4指示で、このコミットの実装とPreview表示を承認済み。以下はタスク3実施時の記録であり、当時のChrome白画面・未確認を自動検証PASSへ書き換えない。最新の実施範囲・停止点は先頭のタスク4節を参照する。
+本人の後続タスク4指示で、このコミットの実装とPreview表示を承認済み。以下はタスク3実施時の記録であり、当時のChrome白画面・未確認を自動検証PASSへ書き換えない。最新の実施範囲・停止点は先頭のタスク5節を参照する。
 
 本人承認済みの `320c726`（ブランド統一）と `57e625c`（輪郭アイコン訂正）を起点に、同じ `feature/web-first-stripe-checkout`／専用worktreeで、ログイン後のプラン・契約対象・条件確認だけを追加。決済接続はタスク4以降とし、今回Checkout／Portal／Customer／Subscription／Webhook／Functions／本番billingを操作しない。
 

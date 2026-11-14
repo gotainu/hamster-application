@@ -94,6 +94,27 @@
           <div><dt>現在の契約状態</dt><dd id="account-billing"></dd></div>
           <div><dt>21日体験の状態</dt><dd id="account-trial"></dd></div>
         </dl>
+        <section class="preview-billing-card" id="account-preview-panel" aria-labelledby="account-preview-title">
+          <h2 id="account-preview-title">Preview契約の反映状況</h2>
+          <p class="help-copy">この欄はテスト用契約の反映状況です。本番の契約状態とは別に表示し、HamCareアプリの本番利用権限は変更しません。</p>
+          <p id="account-preview-status" role="status" aria-live="polite" aria-atomic="true">Preview契約状態はまだ確認していません。</p>
+          <dl class="account-summary preview-billing-details" id="account-preview-details" hidden>
+            <div><dt>Preview契約状態</dt><dd id="account-preview-state"></dd></div>
+            <div><dt>プラン</dt><dd id="account-preview-plan"></dd></div>
+            <div><dt>月額・請求周期</dt><dd id="account-preview-amount"></dd></div>
+            <div><dt>初回請求予定日</dt><dd id="account-preview-first-charge"></dd></div>
+            <div><dt>次回請求予定日</dt><dd id="account-preview-next-charge"></dd></div>
+            <div><dt>契約期間の開始</dt><dd id="account-preview-period-start"></dd></div>
+            <div><dt>契約期間の終了</dt><dd id="account-preview-period-end"></dd></div>
+            <div><dt>体験終了日時</dt><dd id="account-preview-trial-end"></dd></div>
+            <div><dt>期間末解約予定</dt><dd id="account-preview-cancel"></dd></div>
+            <div><dt>最終同期日時</dt><dd id="account-preview-synced-at"></dd></div>
+            <div><dt>サーバーのPreview権限保存状態</dt><dd id="account-preview-entitlement"></dd></div>
+          </dl>
+          <button class="quiet-button" id="account-preview-refresh" type="button" disabled>Preview契約状態を再確認する</button>
+          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+        </section>
+
         <p class="help-copy">サーバーに保存されている状態と終了日を表示しています。実際の利用可否はHamCareアプリで確認してください。</p>
         <p class="account-notice" id="unavailable-fields" hidden></p>
         <button class="quiet-button refresh-button" type="button" id="refresh-account">表示内容を再確認する</button>
@@ -144,6 +165,27 @@
                 <div><dt>決済手続きの進行状況</dt><dd id="plan-checkout-check"></dd></div>
               </dl>
               <p class="help-copy">ここにはアカウントに保存された情報を表示しています。実際の利用権限をこのWeb画面で変更・判定することはありません。</p>
+        <section class="preview-billing-card" id="plan-preview-panel" aria-labelledby="plan-preview-title">
+          <h3 id="plan-preview-title">Preview契約の反映状況</h3>
+          <p class="help-copy">この欄はテスト用契約の反映状況です。本番の契約状態とは別に表示し、HamCareアプリの本番利用権限は変更しません。</p>
+          <p id="plan-preview-status" role="status" aria-live="polite" aria-atomic="true">Preview契約状態はまだ確認していません。</p>
+          <dl class="account-summary preview-billing-details" id="plan-preview-details" hidden>
+            <div><dt>Preview契約状態</dt><dd id="plan-preview-state"></dd></div>
+            <div><dt>プラン</dt><dd id="plan-preview-plan"></dd></div>
+            <div><dt>月額・請求周期</dt><dd id="plan-preview-amount"></dd></div>
+            <div><dt>初回請求予定日</dt><dd id="plan-preview-first-charge"></dd></div>
+            <div><dt>次回請求予定日</dt><dd id="plan-preview-next-charge"></dd></div>
+            <div><dt>契約期間の開始</dt><dd id="plan-preview-period-start"></dd></div>
+            <div><dt>契約期間の終了</dt><dd id="plan-preview-period-end"></dd></div>
+            <div><dt>体験終了日時</dt><dd id="plan-preview-trial-end"></dd></div>
+            <div><dt>期間末解約予定</dt><dd id="plan-preview-cancel"></dd></div>
+            <div><dt>最終同期日時</dt><dd id="plan-preview-synced-at"></dd></div>
+            <div><dt>サーバーのPreview権限保存状態</dt><dd id="plan-preview-entitlement"></dd></div>
+          </dl>
+          <button class="quiet-button" id="plan-preview-refresh" type="button" disabled>Preview契約状態を再確認する</button>
+          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+        </section>
+
               <div class="plan-management" id="plan-management" hidden>
                 <h3>契約管理の確認方法</h3>
                 <p>HamCareアプリの「アプリの設定 → 利用プラン → プランを管理する」からご確認ください。操作できない場合はサポートへお問い合わせください。</p>
@@ -221,6 +263,26 @@
         </div>
         <div id="checkout-payment" hidden><p class="help-copy">Stripeが提供するテスト用カード入力欄です。実カードは使用しないでください。入力内容はStripeが処理し、HamCareでは受け取りません。</p><div id="checkout-embed"></div></div>
         <section id="checkout-result" hidden aria-labelledby="checkout-result-title"><h2 id="checkout-result-title" tabindex="-1"></h2><p id="checkout-result-copy"></p></section>
+
+        <section class="preview-billing-card" id="checkout-preview-panel" aria-labelledby="checkout-preview-title" hidden>
+          <h2 id="checkout-preview-title">WebhookによるPreview契約の反映</h2>
+          <p class="help-copy">この欄はテスト用契約の反映状況です。本番の契約状態とは別に表示し、HamCareアプリの本番利用権限は変更しません。</p>
+          <p id="checkout-preview-status" role="status" aria-live="polite" aria-atomic="true">Preview契約状態はまだ確認していません。</p>
+          <dl class="account-summary preview-billing-details" id="checkout-preview-details" hidden>
+            <div><dt>Preview契約状態</dt><dd id="checkout-preview-state"></dd></div>
+            <div><dt>プラン</dt><dd id="checkout-preview-plan"></dd></div>
+            <div><dt>月額・請求周期</dt><dd id="checkout-preview-amount"></dd></div>
+            <div><dt>初回請求予定日</dt><dd id="checkout-preview-first-charge"></dd></div>
+            <div><dt>次回請求予定日</dt><dd id="checkout-preview-next-charge"></dd></div>
+            <div><dt>契約期間の開始</dt><dd id="checkout-preview-period-start"></dd></div>
+            <div><dt>契約期間の終了</dt><dd id="checkout-preview-period-end"></dd></div>
+            <div><dt>体験終了日時</dt><dd id="checkout-preview-trial-end"></dd></div>
+            <div><dt>期間末解約予定</dt><dd id="checkout-preview-cancel"></dd></div>
+            <div><dt>最終同期日時</dt><dd id="checkout-preview-synced-at"></dd></div>
+            <div><dt>サーバーのPreview権限保存状態</dt><dd id="checkout-preview-entitlement"></dd></div>
+          </dl>
+          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+        </section>
         <div class="checkout-actions"><button class="quiet-button" id="checkout-refresh" type="button">支払い操作の状態を再確認する</button><button class="button secondary full-width" id="checkout-back" type="button">プラン確認へ戻る</button><button class="quiet-button" id="checkout-cancel" type="button">テスト申込をキャンセルする</button></div>
         <p class="help-copy">本番契約の作成・変更や、アプリへの権限反映は行いません。</p>
       </section>

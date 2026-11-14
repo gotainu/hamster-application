@@ -30,7 +30,7 @@ class MemoryAtomicStore {
   async reserveBudget(subject, day, attempt) {this.reserveCalls.push({subject,day,attempt}); this.reservations.add(`${subject}:${day}:${attempt}`);}
 }
 
-function fixture() {
+function fixture(overrides = {}) {
   let clock = new Date(NOW), sequence = 0;
   const store = new MemoryAtomicStore();
   const customers = new Map(), sessions = new Map(), subscriptions = new Map();
@@ -46,6 +46,7 @@ function fixture() {
     prices: {async retrieve(id) {calls.price.push(id); return price();}},
     customers: {
       async retrieve(id) {calls.customerRetrieve.push(id); if (!customers.has(id)) throw new Error('synthetic missing customer'); return copy(customers.get(id));},
+      async update(id,params) {const c=customers.get(id);if(!c)throw new Error('synthetic missing customer');c.metadata=copy(params.metadata);return copy(c);},
       async search(query) {calls.customerSearch.push(copy(query)); const match = query.query.match(/previewSubjectHash'\]:'([^']+)'/); return {data: [...customers.values()].filter(c => c.metadata.previewSubjectHash === match?.[1]).map(copy), has_more: options.customerHasMore};},
       async create(params, operation) {
         calls.customerCreate.push({params:copy(params), operation:copy(operation)});
@@ -73,7 +74,7 @@ function fixture() {
       async expire(id) {calls.expire.push(id); if (options.expireHook) return options.expireHook(id); const value = sessions.get(id); if (value.status !== 'open') throw new Error('synthetic session already changed'); value.status = 'expired'; return copy(value);},
     }},
   };
-  const engine = createPreviewEngine({stripe, store, priceId:PRICE, publishableKey:'pk_test_synthetic_only', now:() => new Date(clock), readFacts: async uid => {calls.facts.push(uid); return factsFor(uid);}});
+  const engine = createPreviewEngine({stripe, store, priceId:PRICE, publishableKey:'pk_test_synthetic_only', now:() => new Date(clock), readFacts: async uid => {calls.facts.push(uid); return factsFor(uid);},...overrides});
   const subject = identity => hash(identity.uid);
   async function review(identity = OWNER) {return engine.review(identity, 'premium_monthly');}
   async function create(quote, identity = OWNER) {return engine.create(identity,{planKey:'premium_monthly',termsAccepted:true,reviewToken:quote.reviewToken});}
@@ -221,3 +222,11 @@ test('status reconciliation cannot steal a renewed create lease for the same att
   assert.equal(created.ok,true);assert.equal(created.value.clientSecret,'synthetic-client-secret');
   const recovered=await f.store.read(f.subject(OWNER));assert.equal(recovered.attempt.id,renewed.attempt.id);assert.equal(recovered.attempt.phase,'open');assert.equal(f.calls.sessionCreate.length,1);
 });
+
+const allowedWebhook={id:'we_synthetic',url:'https://example.test/test-only',events:['checkout.session.completed','customer.subscription.created','customer.subscription.updated','customer.subscription.deleted','invoice.paid','invoice.payment_failed']};
+const endpoint=()=>({id:allowedWebhook.id,url:allowedWebhook.url,enabled_events:[...allowedWebhook.events],status:'enabled',livemode:false,api_version:'2025-02-24.acacia'});
+test('Task5 only its exact configured Test webhook and event set permit checkout',async()=>{const f=fixture({allowedWebhook});f.options.webhookData=[endpoint()];await f.opened();assert.equal(f.sessions.size,1);});
+for(const [name,change] of [['URL',{url:'https://untrusted.invalid'}],['ID',{id:'we_another'}],['live',{livemode:true}],['events',{enabled_events:['*']}],['version',{api_version:'2020-08-27'}]])test('Task5 refuses webhook '+name+' drift',async()=>{const f=fixture({allowedWebhook});f.options.webhookData=[{...endpoint(),...change}];await rejectsCode(()=>f.review(),'test_webhook_unresolved');assert.equal(f.sessions.size,0);});
+test('Task5 binds verified Firebase UID using only preview-specific metadata',async()=>{const f=fixture();const {session,state}=await f.opened();const c=[...f.customers.values()][0];assert.equal(c.metadata.previewFirebaseUid,OWNER.uid);assert.equal(session.metadata.previewFirebaseUid,OWNER.uid);assert.equal(state.previewFirebaseUid,OWNER.uid);assert.equal(session.metadata.firebaseUid,undefined);assert.equal(session.client_reference_id,undefined);});
+test('Task5 safely binds a legacy hash-only Test Customer without duplicating it',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);const c=[...f.customers.values()][0];delete c.metadata.previewFirebaseUid;await f.create(await f.review());assert.equal(f.customers.size,1);assert.equal(c.metadata.previewFirebaseUid,OWNER.uid);});
+test('Task5 mismatched Firebase UID metadata is refused',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);[...f.customers.values()][0].metadata.previewFirebaseUid=OTHER.uid;await rejectsCode(()=>f.review(),'customer_unresolved');});
