@@ -14,7 +14,7 @@ import subprocess
 import sys
 from urllib.parse import urlparse
 
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / 'public'
@@ -22,6 +22,7 @@ ASSETS = PUBLIC / 'assets/landing'
 BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
 PREVIEW = 'https://hamster-breeding-app--web-first-task1-lco08m60.web.app'
 CATCHPHRASE = 'うちの子と、もっと健康で幸せに'
+ICON_SOURCE = 'store_assets/icons/hamster_pencil_mark_master.png'
 
 
 class Page(HTMLParser):
@@ -176,20 +177,19 @@ def main():
         elif entry.get('source_sha256'):
             check('unbundled source fingerprint ' + filename, re.fullmatch(r'[0-9a-f]{64}', entry['source_sha256']) is not None)
 
-    master = Image.open(ROOT / 'assets/branding/hamster_care_app_icon_master.png').convert('RGB')
-    for filename, side in [('hamcare-mark.png', 256), ('favicon-32.png', 32), ('apple-touch-icon.png', 180)]:
+    # The owner's latest clarification selects the native pencil-outline
+    # identity. Versioned file names also avoid reusing the rejected image URLs.
+    master = Image.open(ROOT / ICON_SOURCE).convert('RGB')
+    check('current outline master unchanged', (ROOT / ICON_SOURCE).read_bytes() == baseline(ICON_SOURCE))
+    check('native outline source is the same app/store image', (ROOT / 'store_assets/icons/app_store_icon_1024.png').read_bytes() == (ROOT / 'ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png').read_bytes())
+    for filename, side in [('hamcare-mark-outline.png', 256), ('favicon-outline-32.png', 32), ('apple-touch-icon-outline.png', 180)]:
         image = Image.open(ASSETS / filename).convert('RGB')
         expected = master.resize((side, side), Image.Resampling.LANCZOS)
-        if filename == 'hamcare-mark.png':
-            # This existing, already-approved derivative used a different
-            # reduction pass. Preserve its exact baseline bytes and require
-            # sub-one-level mean channel difference from the master reduction.
-            preserved = (ASSETS / filename).read_bytes() == baseline('public/assets/landing/' + filename)
-            similar = image.size == expected.size and max(ImageStat.Stat(ImageChops.difference(image, expected)).mean) < 1
-            check('approved existing mark preserved and matches master', preserved and similar)
-        else:
-            check('icon derives from approved master ' + filename, image.size == (side, side) and image.tobytes() == expected.tobytes())
-    check('OG dimensions', Image.open(ASSETS / 'og-hamcare.jpg').size == (1200, 630))
+        check('outline icon derives from current native master ' + filename, entries[filename]['source'] == ICON_SOURCE and image.size == (side, side) and image.tobytes() == expected.tobytes())
+    og_image = Image.open(ASSETS / 'og-hamcare-outline.png')
+    check('outline OG dimensions and format', og_image.size == (1200, 630) and og_image.format == 'PNG')
+    rejected = {'hamcare-mark.png', 'favicon-32.png', 'apple-touch-icon.png', 'og-hamcare.jpg'}
+    check('rejected white-hamster derivatives are not public', all(not (ASSETS / name).exists() and name not in entries for name in rejected))
     home = entries['home-screen.jpg']
     crop = re.search(r'Crop\s*\[([\d, ]+)\]', home['notes'])
     rectangle = [int(value) for value in crop[1].split(',')] if crop else []
@@ -204,9 +204,11 @@ def main():
         links = {attrs.get('rel'): attrs for tag, attrs in page.nodes if tag == 'link'}
         check(path + ' shared theme', any(tag == 'link' and attrs.get('href') == '/assets/brand.css' for tag, attrs in page.nodes))
         check(path + ' metadata', all(meta.get(key) for key in ('description', 'og:title', 'og:description', 'og:image:alt', 'twitter:title', 'twitter:description', 'twitter:image:alt')))
-        check(path + ' shared OG/Twitter', meta.get('og:image') == meta.get('twitter:image') == PREVIEW + '/assets/landing/og-hamcare.jpg' and meta.get('twitter:card') == 'summary_large_image')
-        check(path + ' icon links', links.get('icon', {}).get('href') == '/assets/landing/favicon-32.png' and links.get('apple-touch-icon', {}).get('href') == '/assets/landing/apple-touch-icon.png')
-        check(path + ' shared header identity', 'class="brand-tagline">' + CATCHPHRASE in html and any(tag == 'img' and attrs.get('src') == '/assets/landing/hamcare-mark.png' and '白' in attrs.get('alt', '') and 'シアン' in attrs.get('alt', '') for tag, attrs in page.nodes))
+        check(path + ' shared OG/Twitter', meta.get('og:image') == meta.get('twitter:image') == PREVIEW + '/assets/landing/og-hamcare-outline.png' and meta.get('twitter:card') == 'summary_large_image')
+        check(path + ' icon links', links.get('icon', {}).get('href') == '/assets/landing/favicon-outline-32.png' and links.get('apple-touch-icon', {}).get('href') == '/assets/landing/apple-touch-icon-outline.png')
+        check(path + ' shared header identity', 'class="brand-tagline">' + CATCHPHRASE in html and any(tag == 'img' and attrs.get('src') == '/assets/landing/hamcare-mark-outline.png' and all(word in attrs.get('alt', '') for word in ('黒', '白', '輪郭')) for tag, attrs in page.nodes))
+        check(path + ' outline metadata description', all('輪郭' in meta.get(key, '') and 'シアン' not in meta.get(key, '') for key in ('og:image:alt', 'twitter:image:alt')))
+        check(path + ' rejected image URLs absent', all('/assets/landing/' + name not in html for name in rejected))
         check(path + ' alt for every image', all('alt' in attrs for tag, attrs in page.nodes if tag == 'img'))
         decorative = {'/assets/landing/google-g.png', '/assets/landing/avatar-roborovski.png'}
         check(path + ' empty alt only for intentional decoration', all(attrs['src'] in decorative for tag, attrs in page.nodes if tag == 'img' and attrs.get('alt') == ''))

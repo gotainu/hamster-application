@@ -67,12 +67,12 @@
       ]
     },
     {
-      "file": "hamcare-mark.png",
-      "source": "assets/branding/hamster_care_app_icon_master.png",
-      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
-      "output_sha256": "344c9d2e2dcf0d881696d60f7207f59d63fcc15eba80cb1acb3262c7c7c6c20d",
-      "bytes": 68080,
-      "notes": "Existing HamCare application icon; resized proportionally only.",
+      "file": "hamcare-mark-outline.png",
+      "source": "store_assets/icons/hamster_pencil_mark_master.png",
+      "source_sha256": "b840351c85de4c2ab2cc7589df91f427fea1589556572a74126c89d6ddbcf86a",
+      "output_sha256": "7fe34ddb1035fba5b2d7d9b0254864062b0eb144fff9fbb5b5f53ce87fb219b8",
+      "bytes": 34646,
+      "notes": "Owner-confirmed current black-background white-outline pencil hamster with heartbeat. Native app/store exports use this design. Proportional resize only; original preserved.",
       "width": 256,
       "height": 256,
       "mode": "RGB",
@@ -143,26 +143,26 @@
       "notes": "Existing complete Caveat SIL Open Font License, unchanged."
     },
     {
-      "file": "favicon-32.png",
-      "source": "assets/branding/hamster_care_app_icon_master.png",
-      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
-      "output_sha256": "690e5b16d4a9cfc5bc9c4c7a76ae38f412709f476249e516bdef6823f4e7b36d",
-      "bytes": 1868,
+      "file": "favicon-outline-32.png",
+      "source": "store_assets/icons/hamster_pencil_mark_master.png",
+      "source_sha256": "b840351c85de4c2ab2cc7589df91f427fea1589556572a74126c89d6ddbcf86a",
+      "output_sha256": "b2a66e13f5cf029b60d7d2b133d7f5f62df338f375d48a84d751e47f47513d4f",
+      "bytes": 1382,
       "width": 32,
       "height": 32,
       "mode": "RGB",
-      "notes": "Approved master resized to 32px; not regenerated."
+      "notes": "Owner-confirmed current black-background white-outline pencil hamster with heartbeat. Native app/store exports use this design. Proportional resize only; original preserved."
     },
     {
-      "file": "apple-touch-icon.png",
-      "source": "assets/branding/hamster_care_app_icon_master.png",
-      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
-      "output_sha256": "1eca8a91f0154d415be9f464ec9df69f9af9f36219ef44fd6c672ea42b840bc2",
-      "bytes": 35183,
+      "file": "apple-touch-icon-outline.png",
+      "source": "store_assets/icons/hamster_pencil_mark_master.png",
+      "source_sha256": "b840351c85de4c2ab2cc7589df91f427fea1589556572a74126c89d6ddbcf86a",
+      "output_sha256": "38c355809abdc62cdb53b02e1aef54b18ee098f0be405502cbee3197a5f3e762",
+      "bytes": 17427,
       "width": 180,
       "height": 180,
       "mode": "RGB",
-      "notes": "Approved master resized to 180px; not regenerated."
+      "notes": "Owner-confirmed current black-background white-outline pencil hamster with heartbeat. Native app/store exports use this design. Proportional resize only; original preserved."
     },
     {
       "file": "habitat-night.webp",
@@ -187,15 +187,15 @@
       "notes": "Actual owner-provided Home, synthetic test pet name, no score or invented data. Crop [0,54,591,1202] removes OS bars only; JPEG quality92. Original kept outside repository."
     },
     {
-      "file": "og-hamcare.jpg",
-      "source": "composite: approved icon, habitat-night.webp, home-screen.jpg, avatar-djungarian.png, Caveat and system Japanese font",
+      "file": "og-hamcare-outline.png",
+      "source": "composite: OG layout from 320c726 plus current outline icon master",
       "source_sha256": null,
-      "output_sha256": "69dc161f2f876825ebd78e93c5ef8c93dea17b7cb7618c5876538ea4d558405c",
-      "bytes": 216286,
+      "output_sha256": "2e8abd7dd2222538a4757a0826de0d0cde897850b9fb9607e534843a8612c631",
+      "bytes": 834614,
       "width": 1200,
       "height": 630,
       "mode": "RGB",
-      "notes": "1200x630 social graphic composed from existing sources only. Actual Home and approved avatar; no generated artwork."
+      "notes": "Owner correction: black-background white-outline app icon is current. Only rectangle [64,70,172,178] replaced from original1254 master. Remaining OG pixels preserved; outputPNG avoids re-encoding remaining layout. Previous OG derivative retained in Git history and private audit."
     },
     {
       "file": "google-g.png",
@@ -210,9 +210,13 @@
     }
   ],
   "icon_verification": {
-    "approved_master_matches_requested_design": true,
-    "web_mark_already_matches_master": true,
-    "code5_build5_native_launchers": "Legacy outline icon found by read-only artifact inspection; native assets intentionally unchanged in this Web-only task."
+    "owner_instruction": "2026-11-14: attachment1 black-background white outline is latest; white rendered hamster and cyan ECG must not be used as icon.",
+    "approved_master": "store_assets/icons/hamster_pencil_mark_master.png",
+    "approved_master_sha256": "b840351c85de4c2ab2cc7589df91f427fea1589556572a74126c89d6ddbcf86a",
+    "native_exports": "store_assets/icons/app_store_icon_1024.png and ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png match byte-for-byte; same outline design.",
+    "previous_interpretation_corrected": true,
+    "superseded_white_icon_references": 0,
+    "app_files_changed": false
   },
   "theme_sources": [
     "lib/theme/app_theme.dart",

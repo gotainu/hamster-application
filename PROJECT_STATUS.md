@@ -4,12 +4,21 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-icon-correction-20261114:start -->
+## 2026-11-14 戦略C・Webアイコン正本の訂正（Preview反映・表示確認済み）
+
+- **本人の確定指定**：最新アイコンは、黒背景に白いハムスター輪郭の図案。`store_assets/icons/hamster_pencil_mark_master.png`（1254×1254px）を正本として再利用する。白い立体ハムスター＋シアン心電図の図案は今回使用しない。直前の `320c726` で両者の新旧を逆に説明した判断を訂正し、配信nativeの輪郭図案を「旧」とした説明も撤回する。
+- **限定変更**：Webだけに版名を分けた `hamcare-mark-outline.png`（256px）、`favicon-outline-32.png`（32px）、`apple-touch-icon-outline.png`（180px）、`og-hamcare-outline.png`（1200×630px）を用意し、LP／ログイン・アカウント確認／favicon／Touch／OG・Twitterの参照を合わせる。アプリ素材・認証JS・Firebase設定・CSS・本番データは変更しない。撤回したWeb派生4件は非公開監査領域とGit履歴へ保持し、publicの配信対象から外した。
+- **反映・確認**：同じ[Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)へ最終反映 **2026-11-14 16:47:36 JST**、version `bc548fb3fe72eaeb`、期限 **2026-11-21 16:47 JST**。LP84／account46／brand137の**静的267件PASS**、`git diff --check` PASS。元アイコン／native素材不変、OGはアイコン矩形以外の画素が前版と一致。明示27配信ファイルはHTTP200・SHA／安全ヘッダー一致、撤回した白ハムスター派生4URLを含む9除外経路404。Chrome実PreviewでLPヘッダー／favicon・ログインの輪郭図案を目視確認。認証／CSS／本番live／公開Privacy／Auth許可設定・元アプリ作業状態は維持。今回のPreview更新は説明alt訂正を含む2回、本番Firestore／Stripe書込みは0、main merge／push・タスク3は未実施。
+- **停止点**：`fix(web): use current outline app icon` の独立1コミット後、本人の確認まで停止する。前回のネイビー／星空／ガラス表現と既存認証機能は維持する。
+<!-- hamcare-web-icon-correction-20261114:end -->
+
 <!-- hamcare-web-brand-20261114:start -->
 ## 2026-11-14 戦略C・Webブランド統一（Preview反映済み・本人デザイン確認待ち）
 
 - **範囲・保護**：タスク2の `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から同じ `feature/web-first-stripe-checkout`／専用worktreeを継続。LP・ログイン・アカウント確認の見た目だけを独立1コミットにする。元アプリHEAD・dirty10件の内容・未追跡2,110件は開始時と一致。認証JS4件・公開Firebase config・Preview configの計6件はバイト一致、Flutter／Functions／Rules／依存／本番法務は変更なし。
 - **デザイン正本**：`lib/theme/app_theme.dart` のThemeData／ColorScheme、Drawer・QuickRecord・FloatingNavの色／blur、`app_habitat_background.dart` の背景と `main_drawer.dart`／`screens/auth.dart` のCaveatを調査。Web共通の `public/assets/brand.css` にネイビー#181a20、surface#232635、Primary#315daf、mint/cyan#79e2dd、glass18px、24px角丸を定義。Webで読めるようガラス面と枠の不透明度を上げ、非対応時は不透明面にする。詳細トークン／対応ファイルは既存の日本公開準備書先頭へ記録した。
-- **アイコンの照合差**：本人指定の白い正面ハムスター＋ネイビー＋シアン心電図の正本は `assets/branding/hamster_care_app_icon_master.png`。既存Webの `hamcare-mark.png` は既に同図案の縮小版なので再生成・置換しない。ヘッダー／ログイン／確認画面で継続利用し、同じ正本から32px favicon・180px Apple Touch・1200×630 OGを整備。Web旧輪郭アイコン参照0、PWA manifest／Service Workerなし。読み取ったcode5 AAB／build5 IPAのnative launcherには旧輪郭図案が残るため、「指定正本＝現配信native icon」とは記録しない。アプリ側は今回変更しない。
+- **アイコン判断の訂正**：`320c726` では白い正面ハムスター＋ネイビー＋シアン心電図を現行図案と誤認し、その図案のWeb素材を整備した。後続の本人確認によりこの採用判断を取り消す。黒背景・白い輪郭の `store_assets/icons/hamster_pencil_mark_master.png` が最新の正本であり、配信nativeの輪郭図案を「旧」とした説明も撤回する。今回のWeb限定訂正は先頭節を正とし、アプリ側は変更しない。PWA manifest／Service Workerなし。
 - **画面**：「静かな夜に、うちの子を見守る。」の星空・草原と控えめな発光へ統一。Homeは本人提供の実画面1000017308.jpg（テスト用プロフィール、記録待ち）をOSバーだけ除いて再利用、画面内の値やUIは変更しない。承認済みstable3種と既存の実画面4点を維持。4機能・FAQは濃いガラス面、ログインは読みやすい入力欄、アカウント確認はさらに不透明度の高い面へ。Googleボタンは公式Gを未加工で使用し、白地と標準色を維持。LPの2入口・全リンク・項目・同意／料金／体験条件は維持。
 - **限定検証**：既存認証モデル／サービス／UI **34/34 PASS**、LP静的 **84/84**、アカウント静的 **46/46**、ブランド／素材／安全境界 **130/130**（計260静的、うち実CSSコントラスト28ケース）PASS。最小本文5.06:1、境界／focus3.09:1。形式・構文・`git diff --check` PASS。タスク2のEmulator15件は既存証拠を維持し、今回再実行・新規本番ログインはしない。
 - **実ブラウザと限界**：Chrome DevToolsの320／360／390／430／768／1024／1440pxでLP・ログイン・確認画面の切れ／折返し／横はみ出しを目視確認。ログイン／確認の7幅比較は同じHTML/CSSと既存view moduleに架空データを与えた非公開localhost表示で、実認証成功とは区別する。同じPreview反映後のLP／ログインも表示確認し、FAQのTab→Enter展開と可視focusを確認。LP／ログインの200％拡大を確認。ヘッダーは非固定で本文を覆わない。44px領域・alt／label／見出し・role=alert／ARIA・reduced-motion／forced-colors／透過非対応fallbackはコード検査済み。実読み上げ、OS高コントラスト等の実描画、確認画面200％、Android実機Chrome／iOS Safariのblurは未確認。Mac Safariは操作ツールの起動timeoutのため確認できておらずPASSにしない。SDK map取得3件のCSP遮断は既存制限のまま維持。
@@ -1079,7 +1088,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-14）**：戦略CのLP・ログイン・アカウント確認を既存アプリの星空／ネイビー／ガラス表現へ統一し、同じPreviewへ反映。認証34件と静的260件PASS、Chrome7幅を確認。認証／Firebase設定・本番・元アプリ作業状態は不変。独立1コミット後、本人デザイン確認までタスク3へ進まない。Safari等の未確認は先頭節へ明記し、下記の旧配信・募集履歴と区別する。
+- **最新作業（2026-11-14）**：本人の訂正に従い、戦略C Webのアイコンを黒背景・白い輪郭の正本 `store_assets/icons/hamster_pencil_mark_master.png` へ統一する限定修正を準備中。直前の白いハムスター＋心電図を現行とした判断は撤回。既存の星空／ネイビー／ガラス・認証機能を維持し、同Previewへの反映結果は先頭節へ確定後に記録する。独立1コミット後、本人確認までタスク3へ進まない。過去の認証34件・静的260件・Chrome7幅とSafari等の未確認は当時の証拠として保持する。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1182,7 +1191,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク1承認済み・タスク2／ブランド統一Preview完了・本人確認待ち | Webファースト戦略C・公式LPから独自申込画面へ | 既存認証34＋静的260 PASS、Chrome7幅。指定icon／星空／ガラス／実Home／OG統一。Firestore・Stripe書込み0、Auth/config不変。同じPreview version c1b4a97c5eff76c0。Safari等は先頭節の未確認を維持。本人デザイン確認後に独自月額プラン確認、Checkout未実装。 |
+| `WEB-01` | タスク2／ブランド統一済み・輪郭アイコン訂正のPreview準備中 | Webファースト戦略C・公式LPから独自申込画面へ | 最新正本は黒背景・白い輪郭 `hamster_pencil_mark_master.png`。白いハムスター＋心電図の採用判断を撤回し、版名付きWeb素材4件と参照だけを修正。既存認証34＋静的260 PASS・Chrome7幅の証拠、星空／ガラス／実Home、Safari等の未確認を維持。今回の限定確認・同Preview反映は確定後に先頭節へ記録。本人確認後に独自月額プラン確認、Checkout未実装。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

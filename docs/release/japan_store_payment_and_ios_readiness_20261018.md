@@ -1,5 +1,21 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+## 2026-11-14 Webアイコン正本の訂正（限定修正・Preview反映済み）
+
+本人の追加指定により、最新アイコンは**黒背景に白いハムスター輪郭**の図案と確定。正本は `store_assets/icons/hamster_pencil_mark_master.png`（1254×1254px）。直前の `320c726` では白い立体ハムスター＋シアン心電図を現行と誤認したため、この採用判断と、配信nativeの輪郭アイコンを「旧」とした説明を訂正する。白い立体ハムスター＋心電図は今回使用しない。
+
+| Web用の新しい版名 | 寸法 | 用途 |
+| --- | --- | --- |
+| `public/assets/landing/hamcare-mark-outline.png` | 256×256px | LP／ログイン・アカウント確認のヘッダー |
+| `public/assets/landing/favicon-outline-32.png` | 32×32px | favicon |
+| `public/assets/landing/apple-touch-icon-outline.png` | 180×180px | Apple Touch Icon |
+| `public/assets/landing/og-hamcare-outline.png` | 1200×630px | OGP／Twitter Card |
+
+- 元の輪郭正本を再利用し、アプリ素材や既存候補画像は変更・削除しない。新しい版名により従来Web画像のキャッシュと区別し、両HTMLの画像参照・説明を合わせる。撤回したWeb派生4件は非公開監査とGit履歴へ保存し、publicからは除外した。
+- 認証JS・Firestore読取り・Firebase／Preview設定・CSS・本番契約には変更を加えない。既存の星空・ネイビー・ガラス表現、実Home画面、既存機能・リンクを維持する。
+- 同じ[Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)へ最終反映 **2026-11-14 16:47:36 JST**、version `bc548fb3fe72eaeb`、期限 **2026-11-21 16:47 JST**。LP84／account46／brand137の静的267件・`git diff --check` PASS。元アイコン／native素材は不変、OGは[64,70,172,178]のアイコン矩形外が前版と画素一致。配信27ファイルHTTP200・SHA／安全ヘッダー一致、撤回した白ハムスター派生4URLを含む9経路404。Chrome実PreviewのLPヘッダー・favicon・ログインの図案を目視。認証JS／Firebase設定／CSS、本番live／Privacy／Auth許可ドメインは不変。Preview更新2回は本番書込みと区別し、本番Firestore／Stripe操作は0。前回の認証34件・Chrome7幅は引継ぎであり今回再実行していない。
+- `fix(web): use current outline app icon` の独立1コミットで保存後、本人確認まで停止。main merge／push・本番Hosting・Stripe／Firestore書込み・タスク3は行わない。
+
 ## 2026-11-14 戦略C・Webブランド統一（デザイン確認待ち）
 
 同じ `feature/web-first-stripe-checkout`、開始HEAD `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から、LP・ログイン・アカウント確認のデザインだけを独立1コミットで保存する。タスク3は本人確認後。下記タスク2の認証機能・許可ドメイン等は維持し、今回Firebase設定を追加変更しない。
@@ -39,8 +55,8 @@
 
 ### アイコン・画像・ページ変更
 
-- 本人指定図案の正本は `assets/branding/hamster_care_app_icon_master.png`（SHA256 `29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f`）。Webの `hamcare-mark.png` は既に同図案の縮小版で、元バイトを維持。code5 AAB／build5 IPAのlauncherには旧輪郭iconが残っていることを読み取り確認した。指定された白い正面ハムスターをWeb正本として使用し、現在の配布nativeと一致すると偽らず、アプリアイコンは範囲外のまま変更しない。
-- favicon32、Apple Touch180、OG1200×630と両HTMLのOG／Twitter Card／theme-color／title／descriptionを統一。Web旧輪郭icon参照なし、PWA manifest／Service Workerなし。OGへメール／UID／契約情報を入れず、ログインURLに私的情報を付けない。
+- **後続本人確認による訂正**：`320c726` では `assets/branding/hamster_care_app_icon_master.png` の白い正面ハムスター＋シアン心電図を現行と誤認し、対応するWeb素材を整備した。本人が指定する最新正本は黒背景・白い輪郭の `store_assets/icons/hamster_pencil_mark_master.png`。前の採用判断と、code5 AAB／build5 IPAの輪郭launcherを「旧」とした説明を撤回する。Webの限定訂正は先頭節を正とし、アプリ素材は変更しない。
+- 当時のfavicon32、Apple Touch180、OG1200×630と両HTMLのメタ情報の整備履歴を保持し、アイコン図案だけは先頭節の本人指定へ訂正する。輪郭図案を旧と分類しない。PWA manifest／Service Workerなし。OGへメール／UID／契約情報を入れず、ログインURLに私的情報を付けない。
 - LPは星空・草原、実Homeを中心にしたヒーロー、承認済み3アバター、4機能の実画面、濃いFAQ／法務リンク。キャッチフレーズ「うちの子と、もっと健康で幸せに」をヘッダーにも追加。全リンクと順序、2入口、プラン／無料体験条件は不変。Homeは本人提供1000017308.jpgからOSバーだけを切り取り、テストプロフィールの「記録待ち」の実画面を使用。画像を生成・捏造しない。既存4機能PNGはバイト一致を維持。
 - ログインは紺ガラス・明確な入力境界・白文字・青Primary・穏やかな赤エラー。Google Gは[公式アセット／ブランド要件](https://developers.google.com/identity/branding-guidelines)を確認し、公式PNGを未加工で白ボタンに配置。ボタンID／イベントを維持。
 - アカウント確認はログインより濃いsurfaceと区切りを使い、ニックネーム・マスクメール・ログイン方法・契約・体験を整理。本人3文書だけを読む既存JSは変更せず、再確認／ログアウト／準備中ボタンも不変。
