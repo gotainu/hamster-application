@@ -39,7 +39,7 @@ export function projectPlanReview(billingItem) {
     return result(
       'review',
       '月額プランを確認できます',
-      '契約の保存記録はありません。Stripe側の契約有無はまだ照合していません。このPreviewでは内容確認だけを行い、申込・請求は行いません。',
+      '契約の保存記録はありません。Stripe側の契約有無はまだ照合していません。本番の契約・請求は変更しません。テスト用の支払い操作は、次の画面でサーバーが再確認します。',
       CUSTOMER_ABSENT,
     );
   }
@@ -67,7 +67,7 @@ export function projectPlanReview(billingItem) {
     return result(
       'review',
       '月額プランを確認できます',
-      '未契約として保存されています。Stripe側の契約有無はまだ照合していません。このPreviewでは内容確認だけを行い、申込・請求は行いません。',
+      '未契約として保存されています。Stripe側の契約有無はまだ照合していません。本番の契約・請求は変更しません。テスト用の支払い操作は、次の画面でサーバーが再確認します。',
       customerRecord,
     );
   }
@@ -75,7 +75,7 @@ export function projectPlanReview(billingItem) {
     return result(
       'review',
       '月額プランを確認できます',
-      'キャンセル済みの契約記録が保存されています。Stripe側の最新状態はまだ照合していません。このPreviewでは内容確認だけを行い、再契約・請求は行いません。',
+      'キャンセル済みの契約記録が保存されています。Stripe側の最新状態はまだ照合していません。本番の再契約・請求は行いません。テスト用の支払い操作は、次の画面でサーバーが再確認します。',
       customerRecord,
     );
   }

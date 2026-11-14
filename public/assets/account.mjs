@@ -1,3 +1,4 @@
+import { createPreviewCheckoutService } from './checkout-service.mjs';
 import { firebaseConfig } from './firebase-web-config.mjs';
 import { createAccountService } from './account-service.mjs';
 import { mountAccountPage } from './account-view.mjs';
@@ -17,7 +18,10 @@ try {
   auth.languageCode = 'ja';
   const db = dbSDK.getFirestore(app);
   const service = createAccountService({ auth, db, sdk: { ...authSDK, getDoc: dbSDK.getDoc, doc: dbSDK.doc } });
-  await mountAccountPage(service);
+  const checkoutService = createPreviewCheckoutService({auth});
+  const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';
+  if (resumeCheckout) history.replaceState(null, '', '/account/');
+  await mountAccountPage(service, {checkoutService, resumeCheckout});
 } catch (error) {
   // Never print Firebase errors, identifiers, addresses, or tokens.
   document.getElementById('loading-title').textContent = '現在ログインできません';

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <meta name="theme-color" content="#181a20" />
-    <meta name="description" content="既存のHamCareアカウントでログインし、本人の契約・体験状態を確認するPreviewです。申込や決済はできません。" />
+    <meta name="description" content="既存のHamCareアカウントを確認し、Stripe Test Modeの申込操作を試せるPreviewです。本番の請求や権限変更はありません。" />
     <title>HamCareアカウントへログイン｜Preview</title>
     <link rel="icon" href="/assets/landing/favicon-outline-32.png" type="image/png" sizes="32x32" />
     <link rel="apple-touch-icon" href="/assets/landing/apple-touch-icon-outline.png" sizes="180x180" />
@@ -25,11 +25,12 @@
     <link rel="stylesheet" href="/assets/brand.css" />
     <link rel="stylesheet" href="/assets/account.css" />
     <link rel="stylesheet" href="/assets/plan.css" />
+    <link rel="stylesheet" href="/assets/checkout.css" />
     <script type="module" src="/assets/account.mjs"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
-    <div class="preview-banner"><span>PREVIEW</span> ログイン・プランと契約内容の確認用です。申込・決済はできません。</div>
+    <div class="preview-banner"><span>PREVIEW</span> Stripe Test Mode専用です。実際の請求・アプリの権限変更は行いません。</div>
     <header class="account-header wrap">
       <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark-outline.png" width="48" height="48" alt="黒い背景に白いハムスターの輪郭線と心拍の波形を描いたHamCareアイコン" /><span class="brand-copy"><span class="brand-name">HamCare</span><span class="brand-tagline">うちの子と、もっと健康で幸せに</span></span></a>
       <a class="back-home" href="/">トップへ戻る</a>
@@ -97,7 +98,7 @@
         <p class="account-notice" id="unavailable-fields" hidden></p>
         <button class="quiet-button refresh-button" type="button" id="refresh-account">表示内容を再確認する</button>
         <button class="button primary full-width" type="button" id="review-plan">月額プランを確認する</button>
-        <p class="help-copy">月額プランと契約条件を確認できます。このPreviewから申し込みや決済はできません。</p>
+        <p class="help-copy">月額プランと契約条件を確認できます。このPreviewでは、テスト専用の支払い操作まで確認できます。実際の請求は行われません。</p>
         <p class="session-note">アカウントを変更する場合はログアウトし、HamCareアプリと同じ方法でログインし直してください。</p>
       </section>
 
@@ -105,7 +106,7 @@
         <header class="plan-heading">
           <p class="eyebrow">HAMCARE PREMIUM · PREVIEW</p>
           <h1 id="plan-title" tabindex="-1">うちの子との毎日に、<br />これからも寄り添う。</h1>
-          <p class="panel-lead">月額プランと、契約前に確かめたいことを一緒に。この画面では申し込み・決済・契約変更は行われません。</p>
+          <p class="panel-lead">月額プランと、契約前に確かめたいことを一緒に。この画面からStripe Test Modeの支払い画面へ進めます。本番の契約や利用権限は変更しません。</p>
         </header>
         <div class="plan-readiness" role="status" aria-live="polite" aria-atomic="true">
           <h2 id="plan-route-title"></h2>
@@ -166,10 +167,10 @@
             </section>
             <section class="plan-section" aria-labelledby="plan-terms-title">
               <h2 id="plan-terms-title">契約前に知っておきたいこと</h2>
-              <p class="plan-preview-note">以下は既存の公開条件をもとにした確認用の案内です。実際の申し込みはまだできません。</p>
+              <p class="plan-preview-note">以下は既存の公開条件をもとにした確認用の案内です。次の画面はStripe Test Mode専用で、実請求はありません。</p>
               <dl class="account-summary plan-terms">
                 <div><dt>請求周期・自動更新</dt><dd>1か月ごとの自動更新です。解約するまで、初回決済日を基準として毎月決済されます。</dd></div>
-                <div><dt>初回のお支払い・次回請求</dt><dd>将来の申込時は初回決済時にお支払い。具体的な次回請求日時は決済・契約管理画面で確認します。このPreviewでは請求日を作成しません。</dd></div>
+                <div><dt>初回のお支払い・次回請求</dt><dd>初回請求日は、次の画面でサーバーが確認します。体験中は現在の体験終了日時から、未開始・終了済みは申込時からの請求予定です。このPreviewでは実際の請求は発生しません。</dd></div>
                 <div><dt>サービス開始時期</dt><dd>支払い完了後、契約状態の反映を確認でき次第、有料機能を利用できます。反映に時間がかかる場合があります。</dd></div>
                 <div><dt>解約方法・解約期限</dt><dd>アプリの「利用プラン」から契約管理画面を開き、次回更新前に解約手続きを行います。具体的な更新日時は契約管理画面でご確認ください。</dd></div>
                 <div><dt>解約後の利用</dt><dd>支払済みの期間末まで利用でき、次回更新日以後の請求は行われません。</dd></div>
@@ -188,10 +189,40 @@
         </div>
         <div class="plan-actions">
           <p id="plan-selection-status" role="status" aria-live="polite" aria-atomic="true">プランはまだ選択していません。</p>
-          <button class="button primary full-width" id="plan-checkout" type="button" disabled>申込・決済は準備中です</button>
-          <p class="help-copy">この画面で選択しても、申し込み・請求・契約変更は行われません。カード情報を入力する欄はありません。</p>
+          <button class="button primary full-width" id="plan-checkout" type="button" disabled>テスト用の支払い内容を確認する</button>
+          <p class="help-copy">プランを選ぶだけでは契約・請求は行われません。次の確認画面で内容を確認してから、Stripeの安全なテスト用カード入力欄へ進みます。実カードは入力しないでください。</p>
           <button class="button secondary full-width" type="button" id="back-to-account">アカウント確認へ戻る</button>
         </div>
+      </section>
+      <section class="account-card checkout-panel" id="checkout-panel" aria-labelledby="checkout-title" hidden>
+        <p class="eyebrow">STRIPE TEST MODE · PREVIEW</p>
+        <h1 id="checkout-title" tabindex="-1">お申し込み内容を、<br />もう一度ご確認ください。</h1>
+        <p class="panel-lead">この画面はテスト専用です。実際のお支払いは発生せず、HamCareアプリの契約・体験・利用権限も変更しません。</p>
+        <p id="checkout-error" role="alert" tabindex="-1" hidden></p>
+        <p id="checkout-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <div id="checkout-review">
+          <dl class="account-summary">
+            <div><dt>契約するHamCareアカウント</dt><dd id="checkout-account-name"></dd></div>
+            <div><dt>メールアドレス</dt><dd id="checkout-account-email"></dd></div>
+            <div><dt>プラン</dt><dd id="checkout-plan-name"></dd></div>
+            <div><dt>月額料金・自動更新</dt><dd id="checkout-amount"></dd></div>
+            <div><dt>カード登録日</dt><dd id="checkout-card-date"></dd></div>
+            <div><dt>初回請求予定日</dt><dd id="checkout-first-charge-date"></dd></div>
+            <div><dt>初回請求額</dt><dd id="checkout-first-charge-amount"></dd></div>
+          </dl>
+          <p id="checkout-trial-note" class="plan-preview-note"></p>
+          <p>解約するまで1か月ごとに自動更新されます。次回更新前にアプリの利用プランから解約します。支払済み期間末まで利用でき、利用者都合の日割り返金は原則ありません。詳細は公開条件をご確認ください。</p>
+          <nav class="plan-legal-links" aria-label="お申し込みの条件">
+            <a href="https://hamster-breeding-app.web.app/terms/">利用規約</a><a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a><a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a><a href="https://hamster-breeding-app.web.app/support/">サポート</a>
+          </nav>
+          <p class="help-copy">公開条件の本番料金は500円税込です。このPreviewのテスト料金550円とは異なります。本番への反映前に表示・請求条件を確定します。</p>
+          <label class="checkout-consent" for="checkout-terms"><input id="checkout-terms" type="checkbox" /><span>料金・自動更新・解約・返金条件と利用規約・プライバシーポリシーを確認しました。Stripe Test Modeのテスト操作であることを理解しました。</span></label>
+          <button class="button primary full-width" id="checkout-start" type="button" disabled>Stripeの安全な支払い画面へ進む</button>
+        </div>
+        <div id="checkout-payment" hidden><p class="help-copy">Stripeが提供するテスト用カード入力欄です。実カードは使用しないでください。入力内容はStripeが処理し、HamCareでは受け取りません。</p><div id="checkout-embed"></div></div>
+        <section id="checkout-result" hidden aria-labelledby="checkout-result-title"><h2 id="checkout-result-title" tabindex="-1"></h2><p id="checkout-result-copy"></p></section>
+        <div class="checkout-actions"><button class="quiet-button" id="checkout-refresh" type="button">支払い操作の状態を再確認する</button><button class="button secondary full-width" id="checkout-back" type="button">プラン確認へ戻る</button><button class="quiet-button" id="checkout-cancel" type="button">テスト申込をキャンセルする</button></div>
+        <p class="help-copy">本番契約の作成・変更や、アプリへの権限反映は行いません。</p>
       </section>
     </main>
     <footer class="account-footer wrap">

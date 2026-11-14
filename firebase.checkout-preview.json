@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "source": "preview-functions",
+    "codebase": "hamcare-checkout-preview",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "**/test/**",
+      "**/*.test.*",
+      "**/.env*"
+    ]
+  }
+}

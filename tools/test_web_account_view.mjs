@@ -69,7 +69,7 @@ test('verification refresh requests actual service state',async()=>{
  const h=await setup();h.emit({...h.user,emailVerified:false});await flush();await h.el('check-verification').dispatch('click');await flush();assert.equal(h.calls.reload,1);assert.equal(h.el('account-panel').hidden,false);h.cleanup();
 });
 test('UI contract avoids credential-bearing native navigation',()=>{
- assert.match(html,/<form[^>]+method="post"/);assert.doesNotMatch(html,/<input[^>]+name=/);assert.match(html,/<fieldset id="email-fields" disabled>/);assert.doesNotMatch(html,/type="(?:number|tel)"|stripe|createUserWithEmailAndPassword|console\./i);
+ assert.match(html,/<form[^>]+method="post"/);assert.doesNotMatch(html,/<input[^>]+name=/);assert.match(html,/<fieldset id="email-fields" disabled>/);assert.doesNotMatch(html,/type="(?:number|tel)"|card-number|createUserWithEmailAndPassword|console\./i);
 });
 
 test('plan entry re-reads same account, selection changes only local summary',async()=>{

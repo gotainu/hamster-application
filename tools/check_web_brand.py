@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Offline brand checks; contrast arithmetic is not a browser AA audit.
 
-The d969c19 baseline guards Auth/hosting and original functional controls.
-Task 3 may replace only the pending plan panel and extend the read-only view.
-Emulator and browser tests remain separate.
+The d969c19 baseline guards Auth providers and original functional controls.
+Task 3 replaced the pending plan panel; Task 4 adds an isolated Test Checkout.
+Payment runtime/security checks live in check_web_account.py. Emulator and
+browser tests remain separate.
 """
 from collections import Counter
 from hashlib import sha256
@@ -22,6 +23,7 @@ PUBLIC = ROOT / 'public'
 ASSETS = PUBLIC / 'assets/landing'
 BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
 PLAN_BASE = '57e625c5451a617caeaa5670e22740c135187994'
+CHECKOUT_BASE = '98f3fb8a6cd8a3fdcee91149ea3a72f2fe404b9a'
 PREVIEW = 'https://hamster-breeding-app--web-first-task1-lco08m60.web.app'
 CATCHPHRASE = 'うちの子と、もっと健康で幸せに'
 ICON_SOURCE = 'store_assets/icons/hamster_pencil_mark_master.png'
@@ -114,7 +116,7 @@ def main():
     def check(name, condition):
         checks.append((name, bool(condition)))
 
-    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css', 'plan.css')}
+    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css', 'plan.css', 'checkout.css')}
     rules = {name: list(css_rules(source)) for name, source in sources.items()}
     tokens = {}
     for name in ('landing.css', 'brand.css'):
@@ -225,32 +227,34 @@ def main():
         check(path + ' accessible references resolve', all(value in ids for _, attrs in page.nodes for name in ('for', 'aria-controls', 'aria-labelledby', 'aria-describedby') if name in attrs for value in attrs[name].split()))
         check(path + ' zoom not suppressed', 'user-scalable=no' not in html and 'maximum-scale=1' not in html)
         if path.endswith('account/index.html'):
-            # New read-only plan controls are outside Auth. Guard every original
+            # New plan and Stripe Test controls are outside Auth. Guard original
             # form/control and associated label without freezing the new panel.
             controls = {'form', 'input', 'button', 'fieldset', 'label'}
             existing_control_ids = {attrs['id'] for tag, attrs in old.nodes if tag in controls and 'id' in attrs}
             signature = lambda tree: [(tag, {key: value for key, value in attrs.items() if key != 'class'}) for tag, attrs in tree.nodes if tag in controls and (attrs.get('id') in existing_control_ids or attrs.get('for') in existing_control_ids)]
             check('Auth form behavior attributes unchanged', signature(page) == signature(old))
             form = lambda value: re.search(r'<form\b[^>]*\bid="email-form"[^>]*>.*?</form>', value, re.S)[0]
-            check('Auth form markup unchanged for Task 3', form(html) == form(baseline(path, PLAN_BASE).decode()))
+            check('Auth form markup unchanged for Checkout', form(html) == form(baseline(path, CHECKOUT_BASE).decode()))
             check('error live region retained', any(attrs.get('role') == 'alert' for _, attrs in page.nodes) and any(attrs.get('aria-live') == 'polite' for _, attrs in page.nodes))
         else:
             feature_images = [attrs['src'] for tag, attrs in page.nodes if tag == 'img' and attrs.get('src', '').rsplit('/', 1)[-1].startswith('screen-')]
             check('four actual feature screenshots retained', set(feature_images) == {'/assets/landing/screen-' + item + '.png' for item in ('record', 'changes', 'ai', 'environment')})
             check('actual Home with visible example note', 'class="home-screen"' in html and '実際のHome画面例' in html and 'テスト用プロフィール' in html)
 
-    protected = ['firebase.preview.json', 'public/assets/firebase-web-config.mjs', 'public/assets/account.mjs', 'public/assets/account-service.mjs']
+    protected = ['public/assets/firebase-web-config.mjs', 'public/assets/account-service.mjs']
     for path in protected:
-        check('design-only boundary unchanged ' + path, (ROOT / path).read_bytes() == baseline(path))
-    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/account.css']:
-        check('Task 3 existing brand unchanged ' + path, (ROOT / path).read_bytes() == baseline(path, PLAN_BASE))
-    readonly_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs'))
-    check('plan extension remains read-only without custom storage or payment API', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|checkout\.stripe|api\.stripe|cloudfunctions\.net|run\.app', readonly_code))
+        check('original Auth service/config unchanged ' + path, (ROOT / path).read_bytes() == baseline(path))
+    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/account.css', 'public/assets/plan.css']:
+        check('existing brand unchanged for Checkout ' + path, (ROOT / path).read_bytes() == baseline(path, CHECKOUT_BASE))
+    presentation_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs', 'checkout-model.mjs', 'checkout-view.mjs'))
+    check('presentation has no business writer, custom storage or direct payment transport', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch|fetchRequest)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|api\.stripe|cloudfunctions\.net|run\.app', presentation_code))
     for filename in ('screen-record.png', 'screen-changes.png', 'screen-ai.png', 'screen-environment.png'):
         check('real screenshot unchanged ' + filename, (ASSETS / filename).read_bytes() == baseline('public/assets/landing/' + filename))
 
     for name, source in sources.items():
-        check(name + ' motion/contrast fallback', all(value in source for value in ('prefers-reduced-motion', 'forced-colors', 'focus-visible')))
+        # Checkout reuses the original .account-card input/.button focus styles.
+        focus_source = source + sources['account.css'] if name == 'checkout.css' else source
+        check(name + ' motion/contrast fallback', all(value in source for value in ('prefers-reduced-motion', 'forced-colors')) and 'focus-visible' in focus_source)
     check('glass has prefixed and unprefixed conditional support', all(value in sources['brand.css'] + sources['account.css'] for value in ('@supports', '-webkit-backdrop-filter', 'backdrop-filter')))
     check('solid fallback before glass', declaration('account.css', '.account-card', 'background').startswith('#') and declaration('account.css', '#account-panel', 'background').startswith('#'))
     for file, selector in [('landing.css', '.button'), ('landing.css', '.site-header nav a'), ('landing.css', '.text-link'), ('account.css', '.quiet-button'), ('account.css', '.account-card input'), ('account.css', '.password-toggle')]:
@@ -307,6 +311,13 @@ def main():
     ratio('plan option boundary outside', color(plan_boundary), plan_surface, 3)
     ratio('plan radio focus', color(tokens['--hamcare-accent-cyan']), plan_choice, 3)
     ratio('disabled checkout text', color(declaration('plan.css', '.plan-actions .button:disabled', 'color')), color(declaration('plan.css', '.plan-actions .button:disabled', 'background')))
+    consent_surface = color(declaration('checkout.css', '.account-card .checkout-consent', 'background'))
+    consent_border = re.search(r'#[0-9a-fA-F]{3,6}\b', declaration('checkout.css', '.account-card .checkout-consent', 'border'))[0]
+    ratio('Checkout consent text', color(declaration('checkout.css', '.account-card .checkout-consent', 'color')), consent_surface)
+    ratio('Checkout consent boundary inside', color(consent_border), consent_surface, 3)
+    ratio('Checkout consent boundary outside', color(consent_border), strong_worst, 3)
+    ratio('Checkout disabled text', color(declaration('checkout.css', '#checkout-panel .button:disabled', 'color')), color(declaration('checkout.css', '#checkout-panel .button:disabled', 'background')))
+    ratio('Stripe surrounding payment note', color(declaration('checkout.css', '#checkout-payment', 'color')), color(declaration('checkout.css', '#checkout-payment', 'background')))
 
     passed = sum(ok for _, ok in checks)
     print(f'Web brand checks: {passed}/{len(checks)} PASS')

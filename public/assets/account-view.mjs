@@ -1,9 +1,10 @@
+import { createCheckoutController } from './checkout-view.mjs';
 import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
-export async function mountAccountPage(service) {
+export async function mountAccountPage(service, { checkoutService = null, resumeCheckout = false } = {}) {
   const element = (id) => document.getElementById(id);
-  const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel'];
+  const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel', 'checkout-panel'];
   const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields', 'plan-nickname', 'plan-email', 'plan-method', 'plan-billing', 'plan-trial', 'plan-customer-check', 'plan-checkout-check', 'plan-route-title', 'plan-route-detail'];
   const form = element('email-form');
   const email = element('email');
@@ -18,15 +19,20 @@ export async function mountAccountPage(service) {
   let signInPending = false;
   let unsubscribe = () => {};
   let destroyed = false;
+  let checkout = null;
+  let resumePending = resumeCheckout;
 
   function setPanel(id, heading) {
     for (const panel of panels) element(panel).hidden = panel !== id;
-    element('main').setAttribute('data-page', id === 'plan-panel' ? 'plan' : 'account');
+    element('main').setAttribute('data-page', ['plan-panel','checkout-panel'].includes(id) ? 'plan' : 'account');
     if (heading) element(heading).focus();
   }
 
   function clearPersonal() {
     currentSummary = null;
+    checkout?.clear();
+    checkoutService?.clear();
+    element('plan-checkout').disabled = true;
     for (const id of personalFields) element(id).textContent = '';
     element('premium-monthly').checked = false;
     element('plan-fields').disabled = true;
@@ -129,6 +135,7 @@ export async function mountAccountPage(service) {
         setPanel('plan-panel', 'plan-title');
       } else {
         setPanel('account-panel', focus ? 'confirm-title' : null);
+        if (resumePending && checkout && !user.isNewUser) { resumePending = false; void checkout.resume(); }
       }
     } catch (cause) {
       if (destroyed || request !== epoch) return;
@@ -246,9 +253,16 @@ export async function mountAccountPage(service) {
     element('plan-selected-name').textContent = PREMIUM_MONTHLY.name;
     element('plan-selected-amount').textContent = `月額${PREMIUM_MONTHLY.taxInclusiveYen}円（税込）／税抜${PREMIUM_MONTHLY.taxExclusiveYen}円`;
     element('plan-selection-status').textContent = '月額プランを選択しました。内容の確認のみで、申し込みは行われていません。';
-    // Selection lives only in the page. No request or purchase is dispatched.
+    element('plan-checkout').disabled = !checkout;
+    // Choosing a plan itself sends no request. Checkout requires a fresh review.
   };
   element('premium-monthly').addEventListener('change', onPlanChoice);
+
+  if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) setPanel('plan-panel', 'plan-title'); }});
+  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
+  element('plan-checkout').addEventListener('click', onCheckout);
+  const onPopState = () => { if (!element('checkout-panel').hidden && currentUser?.emailVerified) void checkout?.resume(); };
+  window.addEventListener('popstate', onPopState);
 
   const onPageHide = () => {
     ++epoch;
@@ -282,6 +296,10 @@ export async function mountAccountPage(service) {
 
   return () => {
     destroyed = true;
+    checkout?.destroy();
+    checkoutService?.clear();
+    element('plan-checkout').removeEventListener('click', onCheckout);
+    window.removeEventListener('popstate', onPopState);
     ++epoch;
     clearPersonal();
     resetPassword();

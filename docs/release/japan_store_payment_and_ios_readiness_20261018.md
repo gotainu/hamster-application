@@ -1,6 +1,43 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-14 戦略C・タスク3：独自月額プラン確認（Preview反映・表示確認待ち）
+## 2026-11-14 戦略C・タスク4：Stripe Embedded Checkout（実装・Test Preview確認完了／本人承認待ち）
+
+本人承認済みタスク3 `98f3fb8a6cd8` を起点に、Test Mode限定タスク4の実装・Test Preview確認を完了。本人のTestキー保存と既存未契約アカウントでのログイン後、実Embedded操作・各カード拒否・3D Secure・成功に加え、実2タブの同一Session共有・明示失効・戻るを確認し、競合対策の最終backend配備もACTIVE。開始HEADは `98f3fb8a6cd8`。本実装・検証・記録を独立1コミットへ保存し、本番公開可能・全実機確認済みとは扱わない。保存後に停止し、タスク5Webhook／権限同期は次工程として本人の別承認後に実装する。
+
+### 実装した境界
+
+| 項目 | 実装・制約と現在の証拠 |
+| --- | --- |
+| Functions | `preview-functions/`、codebase `hamcare-checkout-preview`、別名HTTP `createPreviewStripeCheckoutSession` を専用 `firebase.checkout-preview.json` から配備しACTIVEを確認。本番Functions entryや既存Stripe clientを呼ばず、既存依存・lockを再利用。`gcp-build`空指定でクラウド再buildを抑止し、コンパイル済み4ファイルを同梱する。maxInstances2／concurrency10。 |
+| Secrets・IAM | 別名 `HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS`／`HAMCARE_PREVIEW_STRIPE_TEST_PRICE` だけを参照。本人保存のcredentials有効v1を値非出力で確認。配備関数の既定runtime SAが専用Secret2件のAccessorを持つことを確認した。Testキーprefix／livemode=falseを検証し、値をHTML／Git／Firestore／ログ／文書へ保存しない。codebase分離をFirestore IAMの完全隔離とは扱わず、書込先をコードで限定する。 |
+| Firebase UID | Authorization HeaderのID TokenをAdmin SDKで検証し、失効・disabled・メール確認状態とserver-only `pet_profiles/main_pet` の存在を確認。本文からUID／メール／金額／Price／Customer ID／trial_endを採用しない。Origin／JSON body／サイズ／操作名も限定する。 |
+| 保存先 | Test Customer対応・attempt・quote・予約枠はルート `preview_checkout_task4` のみに限定し、現在は隔離namespace内2文書へ実書込みあり。本番 `users/{uid}/billing/subscription`、プロフィール、体験、権限等の本番業務データ書込みは0。同一Firestoreプロジェクト全体の書込み0とは混同しない。 |
+| 料金 | Test Product `prod_VcunlHPeZzngHQ`／Test Price `price_1UbexYGqALYlhFyzkAHsBm1j` はpremium_monthly用・JPY550円・月次1か月・inclusive。実Checkout／Subscriptionも正本Price・数量1・月次550円で一致し、Automatic Tax無効・税／割引の追加なし。Price IDは公開クライアントへ渡さず、カード入力はStripe iframe内だけ。既存本番500円税込Price・公開条件は変更しない。 |
+| 21日体験 | 既存startedAt／endsAtをサーバーで確認し、既存終了日時由来のtrial_endとbilling_cycle_anchorが実Stripeの値に一致。体験中のため初回Invoiceは0円、次回Invoice previewは550円で、期間開始も元の体験終了に一致した。Unix秒精度への切上げは最大999ms。体験の延長／リセット／新21日付与は行わず、残り48時間＋60秒未満は安全拒否。未開始／終了済みの即時550円はpolicy／mockで確認し、本人実アカウントのE2Eは未実施。 |
+| 重複・回復 | 3分の確認proofと条件再照合、UID単位lease、サーバーidempotency、Customer再利用、Test Subscription／open Session再確認、期限切れcreatingの同attempt照合、状態更新のCASを実装。新Session作成予約だけUID10件／日・全体100件／日とし、全API呼出回数の上限とは混同しない。 |
+| Webhook混線 | Test metadataは専用scope／subject hashのみ。既存本番Webhookが解釈するfirebaseUid／client_reference_idは付けない。実APIでTestの有効Webhook送信先0件を確認。今後有効送信先がある場合は安全側に拒否する。タスク5のWebhook・Firestore権限同期は未実装で、有料機能利用可能とは表示しない。 |
+| Web UI | 既存プラン確認からサーバー請求内容・規約同意を経てEmbeddedへ進み、成功／未確定／拒否／期限切れ／取消／戻るを区別する構造を追加。認証方法・標準セッション・LP・既存ブランドは維持。Stripe.js／専用backend用の接続はaccount CSPだけへ限定追加。本番公開・Flutter導線・ストアは変更しない。 |
+
+### 実施済み検証と未実施
+
+- **合成runtime：263件PASS**。Web102、純粋policy84、engine68、HTTP9。認証拒否・token失効／未確認・別UID・任意入力拒否、価格／体験／多重処理／cancel・statusのpending回復／同attemptのlease・phase競合保護／日本語表示等をmock・合成データで検証した。policy再実行の初回はNODE_PATH不足による既存module読込失敗、正しい既存module指定後に84件PASSで、依存更新なし。Client Secretは長さ制限付きTest用opaque値としてStripe SDKだけへ渡し、URL／画面／ログ／独自永続化へ出さない。実Stripeの結果は下記と区別する。
+- **静的：340件PASS**。LP84、account99、brand157。実CSSコントラスト43ケース、最小本文5.06:1・境界／focus3.09:1。strict TypeScript build／`git diff --check` PASS。保護10対象、元アプリdirty10件／未追跡2,110件、既存lockのバイト一致とsecret patternを確認。依存／SDK更新・既存テストの広範再実行は行わない。
+- **実Stripe／Chrome UI**：取消→Session expired、通常のカード拒否、資金不足、期限切れカード、CVC不正、3D Secure失敗／成功、通常テストカード成功を確認。公式Test Modeカードだけを使用した。同一Test Customer1件を再利用し、最終Sessionは計4件（expired2／complete2）、Subscription2件を順に作成。二重クリックでも新Sessionは1件だけ、有効Test契約がある状態での新reviewは拒否。試験用Subscription2件は最後にどちらも請求／prorationなしで取消済み、有効Test契約0・open Session0、Customer1件は再利用用に保持し、本番契約には触れない。
+- **実Stripe価格・請求日**：HamCare表示550円、通常成功した2件目SubscriptionのJPY550円／inclusive／月次／数量1・既存体験中の当日Invoice0円を照合。次回Invoice preview550円は1件目の取消前に確認済み。Stripe trial_endとbilling_cycle_anchorは既存HamCare終了日時からのサーバー判断に一致し、将来請求開始も元の体験終了に一致した。個人の体験終了日時や実アカウント値は本書へ転載しない。未開始／終了済みの即時課金は本人実アカウントでは未実施で、policy・mockの証拠と分ける。
+- **実2タブ・失効**：複製タブでも認証を保持し、review／startが同じopen Sessionを返すことを確認。Stripe上のscope内Sessionは全4件で、当該操作は1タブ目で新規1件・2タブ目の追加0件。最後のopen SessionをStripe Test APIで明示失効し、両タブの再確認で「支払い画面の期限が切れました」と表示、旧iframe消去を確認。結果見出し→Tabでプランへ戻る→Enterでプラン見出しへ戻れ、ログインも維持した。自然経過による失効は実施せず、実API明示失効・合成テストと区別する。
+- **限定表示・未実施**：Chromeの360／390／430／768／1440pxでStripe iframeの視認性と横はみ出しなし、Tabのカード番号→有効期限→CVC→名義への移動を確認。360〜768pxは100％、1440pxは50％拡大率でCSS viewport1440pxを確認した条件付き結果。物理Android Chrome／実機Safari／実スクリーンリーダーは未実施。Safari・読み上げは一連の購入フロー完成後へ繰越し。自然失効と、未開始／終了済みの本人実アカウント即時550円E2Eも未実施として残す。
+- **Preview反映**：競合対策を含む専用backendの最終配備はACTIVE、updateTime **2026-11-14 20:59:45 JST**（cloud-final.json）。同じ[Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)はClient Secret形式の限定修正を含むversion **`9332c8153d265143`**・期限 **2026-11-21 21:04 JST**へ更新。初回CLIのversion空欄は推測せず実metadataで確定した。タスク3の古い請求日説明だけを、次画面でサーバーが体験状態に応じて確認する文言へ合わせた。最終説明文を含む公開33リソースHTTP200／SHA／安全ヘッダー一致、除外6経路404、Test Price ID非含有と配備拒否HTTP4件PASS。
+- **本番保護と操作件数**：最終配備後も既存54FunctionsのupdateTimeは全件不変で、追加・更新対象は専用1関数のみの計55関数。本番live release SHA／version `2365135bf558c278`／Auth許可設定・元アプリ作業状態は維持。本番Stripe書込み0件、本番業務Firestore・既存契約／体験／権限変更0件。隔離namespace内2文書へは書込みがあり、Firestoreプロジェクト全体の書込み0とは表記しない。Test Product1／Price1／Customer1／Session4／Subscription2とSecret／Preview配備は許可済みのTest専用操作。両Test契約は請求・prorationなしで取消済み、有効Test契約0・open Session0で後始末を完了した。
+
+### 本人操作・残る順序・停止
+
+1. 本人によるTestキー保存と未契約の本人既存アカウントでのWebログインは完了。秘密値・実メール・UID・個別の体験日時をチャット／Git文書へ転載しない。審査用有料アカウント・本番体験・利用枠は維持する。
+2. 実2タブ・明示失効・最終競合対策のbackend反映と照合は完了。自然経過失効／物理Android／Safari／読み上げ／本人即時課金E2Eは未確認のまま区別し、本番公開・全実機試験の完了へ読み替えない。
+3. タスク4の実装・Test Preview確認が完了したため、今回の対象だけを明示stageし、`feat(web): add Stripe embedded checkout` の独立1コミットで保存して停止する。コミットハッシュはGit履歴と完了報告で確認する。main merge／push、live Hosting、本番Stripe／Customer／Subscription／billing、アプリ／ストア変更は行わない。次のタスク5Webhook／権限同期は未実装で、本人の別承認後に進められる。
+
+## 2026-11-14 戦略C・タスク3：独自月額プラン確認（98f3fb8a6cd8・本人承認済み）
+
+本人の後続タスク4指示で、このコミットの実装とPreview表示を承認済み。以下はタスク3実施時の記録であり、当時のChrome白画面・未確認を自動検証PASSへ書き換えない。最新の実施範囲・停止点は先頭のタスク4節を参照する。
 
 本人承認済みの `320c726`（ブランド統一）と `57e625c`（輪郭アイコン訂正）を起点に、同じ `feature/web-first-stripe-checkout`／専用worktreeで、ログイン後のプラン・契約対象・条件確認だけを追加。決済接続はタスク4以降とし、今回Checkout／Portal／Customer／Subscription／Webhook／Functions／本番billingを操作しない。
 
@@ -50,7 +87,7 @@
 - 同じ[Preview](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)へ最終反映 **2026-11-14 16:47:36 JST**、version `bc548fb3fe72eaeb`、期限 **2026-11-21 16:47 JST**。LP84／account46／brand137の静的267件・`git diff --check` PASS。元アイコン／native素材は不変、OGは[64,70,172,178]のアイコン矩形外が前版と画素一致。配信27ファイルHTTP200・SHA／安全ヘッダー一致、撤回した白ハムスター派生4URLを含む9経路404。Chrome実PreviewのLPヘッダー・favicon・ログインの図案を目視。認証JS／Firebase設定／CSS、本番live／Privacy／Auth許可ドメインは不変。Preview更新2回は本番書込みと区別し、本番Firestore／Stripe操作は0。前回の認証34件・Chrome7幅は引継ぎであり今回再実行していない。
 - `fix(web): use current outline app icon` の独立1コミットで保存後、本人確認まで停止。main merge／push・本番Hosting・Stripe／Firestore書込み・タスク3は行わない。
 
-## 2026-11-14 戦略C・Webブランド統一（デザイン確認待ち）
+## 2026-11-14 戦略C・Webブランド統一（320c726・本人承認済み）
 
 同じ `feature/web-first-stripe-checkout`、開始HEAD `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から、LP・ログイン・アカウント確認のデザインだけを独立1コミットで保存する。タスク3は本人確認後。下記タスク2の認証機能・許可ドメイン等は維持し、今回Firebase設定を追加変更しない。
 
