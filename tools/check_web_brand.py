@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Offline design-task checks; contrast arithmetic is not a browser AA audit.
+"""Offline brand checks; contrast arithmetic is not a browser AA audit.
 
-The d969c19 baseline deliberately guards this design-only change against any
-Auth/hosting behavior edits. Emulator and browser tests remain separate.
+The d969c19 baseline guards Auth/hosting and original functional controls.
+Task 3 may replace only the pending plan panel and extend the read-only view.
+Emulator and browser tests remain separate.
 """
 from collections import Counter
 from hashlib import sha256
@@ -20,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / 'public'
 ASSETS = PUBLIC / 'assets/landing'
 BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
+PLAN_BASE = '57e625c5451a617caeaa5670e22740c135187994'
 PREVIEW = 'https://hamster-breeding-app--web-first-task1-lco08m60.web.app'
 CATCHPHRASE = 'うちの子と、もっと健康で幸せに'
 ICON_SOURCE = 'store_assets/icons/hamster_pencil_mark_master.png'
@@ -35,8 +37,8 @@ class Page(HTMLParser):
         self.nodes.append((tag, dict(attrs)))
 
 
-def baseline(path):
-    return subprocess.check_output(['git', 'show', f'{BASE}:{path}'], cwd=ROOT)
+def baseline(path, revision=BASE):
+    return subprocess.check_output(['git', 'show', f'{revision}:{path}'], cwd=ROOT)
 
 
 def split_selectors(value):
@@ -112,7 +114,7 @@ def main():
     def check(name, condition):
         checks.append((name, bool(condition)))
 
-    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css')}
+    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css', 'plan.css')}
     rules = {name: list(css_rules(source)) for name, source in sources.items()}
     tokens = {}
     for name in ('landing.css', 'brand.css'):
@@ -215,24 +217,35 @@ def main():
         check(path + ' local evidenced images only', all(attrs.get('src', '').startswith('/assets/landing/') and attrs.get('src', '').rsplit('/', 1)[-1] in entries for tag, attrs in page.nodes if tag == 'img'))
         ids = {attrs['id'] for _, attrs in page.nodes if 'id' in attrs}
         old_ids = {attrs['id'] for _, attrs in old.nodes if 'id' in attrs}
-        check(path + ' existing feature and Auth IDs retained', old_ids <= ids)
+        permitted_replacements = {'pending-panel', 'pending-title'} if path.endswith('account/index.html') else set()
+        check(path + ' existing feature and Auth IDs retained except replaced pending panel', old_ids - ids == permitted_replacements)
         destinations = Counter(attrs.get('href') for tag, attrs in page.nodes if tag == 'a')
         old_destinations = Counter(attrs.get('href') for tag, attrs in old.nodes if tag == 'a')
         check(path + ' existing navigation and legal destinations retained', not (old_destinations - destinations))
         check(path + ' accessible references resolve', all(value in ids for _, attrs in page.nodes for name in ('for', 'aria-controls', 'aria-labelledby', 'aria-describedby') if name in attrs for value in attrs[name].split()))
         check(path + ' zoom not suppressed', 'user-scalable=no' not in html and 'maximum-scale=1' not in html)
         if path.endswith('account/index.html'):
-            signature = lambda tree: [(tag, {key: value for key, value in attrs.items() if key != 'class'}) for tag, attrs in tree.nodes if tag in ('form', 'input', 'button', 'fieldset', 'label')]
+            # New read-only plan controls are outside Auth. Guard every original
+            # form/control and associated label without freezing the new panel.
+            controls = {'form', 'input', 'button', 'fieldset', 'label'}
+            existing_control_ids = {attrs['id'] for tag, attrs in old.nodes if tag in controls and 'id' in attrs}
+            signature = lambda tree: [(tag, {key: value for key, value in attrs.items() if key != 'class'}) for tag, attrs in tree.nodes if tag in controls and (attrs.get('id') in existing_control_ids or attrs.get('for') in existing_control_ids)]
             check('Auth form behavior attributes unchanged', signature(page) == signature(old))
+            form = lambda value: re.search(r'<form\b[^>]*\bid="email-form"[^>]*>.*?</form>', value, re.S)[0]
+            check('Auth form markup unchanged for Task 3', form(html) == form(baseline(path, PLAN_BASE).decode()))
             check('error live region retained', any(attrs.get('role') == 'alert' for _, attrs in page.nodes) and any(attrs.get('aria-live') == 'polite' for _, attrs in page.nodes))
         else:
             feature_images = [attrs['src'] for tag, attrs in page.nodes if tag == 'img' and attrs.get('src', '').rsplit('/', 1)[-1].startswith('screen-')]
             check('four actual feature screenshots retained', set(feature_images) == {'/assets/landing/screen-' + item + '.png' for item in ('record', 'changes', 'ai', 'environment')})
             check('actual Home with visible example note', 'class="home-screen"' in html and '実際のHome画面例' in html and 'テスト用プロフィール' in html)
 
-    protected = ['firebase.preview.json', 'public/assets/firebase-web-config.mjs', 'public/assets/account.mjs', 'public/assets/account-model.mjs', 'public/assets/account-service.mjs', 'public/assets/account-view.mjs']
+    protected = ['firebase.preview.json', 'public/assets/firebase-web-config.mjs', 'public/assets/account.mjs', 'public/assets/account-service.mjs']
     for path in protected:
         check('design-only boundary unchanged ' + path, (ROOT / path).read_bytes() == baseline(path))
+    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/account.css']:
+        check('Task 3 existing brand unchanged ' + path, (ROOT / path).read_bytes() == baseline(path, PLAN_BASE))
+    readonly_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs'))
+    check('plan extension remains read-only without custom storage or payment API', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|checkout\.stripe|api\.stripe|cloudfunctions\.net|run\.app', readonly_code))
     for filename in ('screen-record.png', 'screen-changes.png', 'screen-ai.png', 'screen-environment.png'):
         check('real screenshot unchanged ' + filename, (ASSETS / filename).read_bytes() == baseline('public/assets/landing/' + filename))
 
@@ -283,6 +296,17 @@ def main():
     google_border = re.search(r'#[0-9a-fA-F]{3,6}\b', declaration('account.css', '.account-shell .google-button', 'border'))[0]
     ratio('Google button boundary inside', color(google_border), white, 3)
     ratio('Google button boundary outside', color(google_border), glass_worst, 3)
+    plan_surface = color(declaration('plan.css', '.plan-section', 'background'))
+    plan_choice = color(declaration('plan.css', '.plan-panel .plan-choice .plan-option', 'background'))
+    plan_boundary = re.search(r'#[0-9a-fA-F]{3,6}\b', declaration('plan.css', '.plan-panel .plan-choice .plan-option', 'border'))[0]
+    for label, surface in [('plan section', plan_surface), ('plan option', plan_choice)]:
+        ratio(label + ' primary', primary, surface)
+        ratio(label + ' secondary', secondary, surface)
+        ratio(label + ' link', color(tokens['--hamcare-accent-cyan']), surface)
+    ratio('plan option boundary inside', color(plan_boundary), plan_choice, 3)
+    ratio('plan option boundary outside', color(plan_boundary), plan_surface, 3)
+    ratio('plan radio focus', color(tokens['--hamcare-accent-cyan']), plan_choice, 3)
+    ratio('disabled checkout text', color(declaration('plan.css', '.plan-actions .button:disabled', 'color')), color(declaration('plan.css', '.plan-actions .button:disabled', 'background')))
 
     passed = sum(ok for _, ok in checks)
     print(f'Web brand checks: {passed}/{len(checks)} PASS')

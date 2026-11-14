@@ -1,5 +1,39 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+## 2026-11-14 戦略C・タスク3：独自月額プラン確認（Preview反映・表示確認待ち）
+
+本人承認済みの `320c726`（ブランド統一）と `57e625c`（輪郭アイコン訂正）を起点に、同じ `feature/web-first-stripe-checkout`／専用worktreeで、ログイン後のプラン・契約対象・条件確認だけを追加。決済接続はタスク4以降とし、今回Checkout／Portal／Customer／Subscription／Webhook／Functions／本番billingを操作しない。
+
+### 表示とデータ境界
+
+| 項目 | 今回の実装・制約 |
+| --- | --- |
+| プラン | `public/assets/plan-model.mjs` の固定 `premium_monthly` 1種類。月額550円税込／500円税抜・10％想定のPreview専用表示。年額・割引なし。実Price／Product IDは未接続。金額やplan keyをサーバーへ送信しない。 |
+| 契約アカウント | 既存確認画面から進む際、本人のowner profile／billing subscription／initial trial v2の3文書を毎回再取得し、nickname・マスクメール・登録済み方法・保存契約／体験状態を表示。取得不能は未確認表示と選択不可にし、未確認メール／ユーザー切替では経路を遮断する。 |
+| 選択 | 単一のネイティブラジオで確認中プランと税込総額を表示するだけ。ローカル仮選択を永続化せず、再読取／ログアウト／アカウント変更時に消去。申込・決済ボタンは全状態でdisabled。 |
+| 契約記録がある場合 | `paid`＋`active`／`trialing`（期間末解約予定を含む）は管理確認を優先し、新規プラン選択を不可にする。既存アプリの「アプリの設定 → 利用プラン → プランを管理する」を案内し、WebからPortalを開かない。 |
+| 不明・不整合の場合 | 未知／incomplete等の支払い確認状態／型不整合／読取失敗は契約確認を優先し選択不可。日時や欠損を未契約・利用可能へ変換しない。 |
+| 文書なし／明示none／整合したキャンセル済み（plan=none） | 内容確認だけを許可し、Stripe側の未契約・契約再開可能とは断定しない。実処理前のサーバー再照合は後続タスク。 |
+| Customer・Checkout | 既存 `stripeCustomerId` フィールドの保存参照の有無のみを安全な文言へ変換。実IDは表示・URL・ログへ出さず、Customerの現在の存在を確認したとは扱わない。Checkoutは常に「未照合（決済接続時にサーバーで確認）」と表示。過去ID・時刻・履歴だけで進行中か判断しない。 |
+| 料金・更新日時 | 現行公開規約／特商法の月額500円税込とPreview550円の不一致を画面内で明示。本番公開前に税務・法務・最終請求額を一致させる。currentPeriodEndは保存済み契約期間末として表示し、正確な次回請求日時を独自計算しない。 |
+
+- 既存公開文書を基に、含まれる機能、自動更新、サービス提供、解約方法／期限、返金、カード不要21日体験との違い、動作環境、規約／Privacy／特商法／サポートを画面に整理する。未確定条件を確定済みとしない。
+- `projectPlanReview()` は保存契約の安全な表示・重複申込を避ける画面制御であり、権限解放やWeb独自の期限評価を行わない。Stripe server allowlist／Price解決・既存契約／進行中Checkoutの実照合はタスク4以降で設計する。
+- 既存の黒背景・白輪郭アイコン、星空・ガラス・ブランドトークンを維持。新 `plan.css` のみで、プラン表示時の最大1000px・900px以上2列／モバイル1列、ネイティブラジオ・44px以上の操作領域、文字折返し、Reduced Motion／forced-colorsを実装。既存共通CSSは変更しない。
+
+### 変更・検証と未確認
+
+- 変更対象は既存account HTML／`account-model.mjs` の安全なprojection／`account-view.mjs` の再読取・選択・クリアと状態guard、新 `plan-model.mjs`／`plan.css`、直接関連する既存UI・静的テストと新 `tools/test_web_plan_model.mjs`、本書／PROJECT_STATUS。認証entry／service／Firebase config／Preview config／brand.css／account.css／LP HTML／LP CSSの**8ファイルは開始時とバイト一致**。
+- Node **59/59 PASS**。LP静的 **84/84**、account **61/61**、brand／plan／安全境界 **152/152**、計 **297/297 PASS**。うち実CSSコントラスト **38ケース**、最小本文 **5.06:1**・境界／focus **3.09:1**。構文と`git diff --check` PASS。既存Emulator15件は引継ぎで、今回の実行数へ加えない。
+- **Chrome表示確認は未完了**。操作ツールでlocal／実Preview双方が白一色、ページ本文も取得できず、本人へMacの表示状態／ロック解除の確認を依頼中。今回の7幅・200％・プラン画面目視をPASSにしない。下記の過去のChrome確認とは区別する。
+- **Safariと実スクリーンリーダーは本人の指示で後続へ繰越し**。Embedded Checkoutを含む一連の申込フロー完成後に確認する項目とし、タスク3の完了判定を妨げるものとはしない。今回の未検証を実施済みへ変更しない。
+
+### Preview・保護・停止
+
+- 同じ[LP](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)／[ログイン・プラン確認](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)、channel `web-first-task1` へ **2026-11-14 18:19:30 JST**反映、version **`38180b0967ad3f37`**、期限 **2026-11-21 18:19 JST**。専用Preview設定と`--no-authorized-domains`を再利用。明示29リソースHTTP200・SHA／安全ヘッダー一致、対象外5経路404。
+- 本番live version `2365135bf558c278`／公開Privacy／Auth許可ドメイン4件は不変。元アプリの既存dirty10件・未追跡2,110件を保持。本番Firestore書込み0、Stripe書込み0、Customer／Subscription／Webhook／契約／体験／利用権限変更0、Functions配備・アプリ変更0。Previewの静的更新は別操作として記録する。
+- 今回の確認画面だけを `feat(web): add subscription plan confirmation` の独立1コミットに保存後、本人確認まで停止。main merge／push、live公開、タスク4の決済接続、アプリ／ストア変更は行わない。
+
 ## 2026-11-14 Webアイコン正本の訂正（限定修正・Preview反映済み）
 
 本人の追加指定により、最新アイコンは**黒背景に白いハムスター輪郭**の図案と確定。正本は `store_assets/icons/hamster_pencil_mark_master.png`（1254×1254px）。直前の `320c726` では白い立体ハムスター＋シアン心電図を現行と誤認したため、この採用判断と、配信nativeの輪郭アイコンを「旧」とした説明を訂正する。白い立体ハムスター＋心電図は今回使用しない。

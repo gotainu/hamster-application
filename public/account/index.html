@@ -24,11 +24,12 @@
     <link rel="stylesheet" href="/assets/landing.css" />
     <link rel="stylesheet" href="/assets/brand.css" />
     <link rel="stylesheet" href="/assets/account.css" />
+    <link rel="stylesheet" href="/assets/plan.css" />
     <script type="module" src="/assets/account.mjs"></script>
   </head>
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
-    <div class="preview-banner"><span>PREVIEW</span> ログインと状態確認のみ利用できます。申込・決済はできません。</div>
+    <div class="preview-banner"><span>PREVIEW</span> ログイン・プランと契約内容の確認用です。申込・決済はできません。</div>
     <header class="account-header wrap">
       <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark-outline.png" width="48" height="48" alt="黒い背景に白いハムスターの輪郭線と心拍の波形を描いたHamCareアイコン" /><span class="brand-copy"><span class="brand-name">HamCare</span><span class="brand-tagline">うちの子と、もっと健康で幸せに</span></span></a>
       <a class="back-home" href="/">トップへ戻る</a>
@@ -96,15 +97,101 @@
         <p class="account-notice" id="unavailable-fields" hidden></p>
         <button class="quiet-button refresh-button" type="button" id="refresh-account">表示内容を再確認する</button>
         <button class="button primary full-width" type="button" id="review-plan">月額プランを確認する</button>
-        <p class="help-copy">プラン確認は準備中です。申込・決済へは進みません。</p>
+        <p class="help-copy">月額プランと契約条件を確認できます。このPreviewから申し込みや決済はできません。</p>
         <p class="session-note">アカウントを変更する場合はログアウトし、HamCareアプリと同じ方法でログインし直してください。</p>
       </section>
 
-      <section class="account-card" id="pending-panel" aria-labelledby="pending-title" hidden>
-        <p class="eyebrow">COMING NEXT</p>
-        <h1 id="pending-title" tabindex="-1">プラン確認画面は<br />現在準備中です</h1>
-        <p class="panel-lead">このPreviewでは、本人のアカウント情報の確認まで利用できます。申し込みや決済は行われていません。</p>
-        <button class="button secondary full-width" type="button" id="back-to-account">アカウント確認へ戻る</button>
+      <section class="account-card plan-panel" id="plan-panel" aria-labelledby="plan-title" hidden>
+        <header class="plan-heading">
+          <p class="eyebrow">HAMCARE PREMIUM · PREVIEW</p>
+          <h1 id="plan-title" tabindex="-1">うちの子との毎日に、<br />これからも寄り添う。</h1>
+          <p class="panel-lead">月額プランと、契約前に確かめたいことを一緒に。この画面では申し込み・決済・契約変更は行われません。</p>
+        </header>
+        <div class="plan-readiness" role="status" aria-live="polite" aria-atomic="true">
+          <h2 id="plan-route-title"></h2>
+          <p id="plan-route-detail"></p>
+        </div>
+        <div class="plan-layout">
+          <div>
+            <section class="plan-section" aria-labelledby="plan-choice-title">
+              <h2 id="plan-choice-title">1. 月額プランを選ぶ</h2>
+              <fieldset class="plan-choice" id="plan-fields" aria-describedby="plan-price-note" disabled>
+                <legend class="visually-hidden">確認するプラン</legend>
+                <label class="plan-option" for="premium-monthly">
+                  <input type="radio" id="premium-monthly" value="premium_monthly" />
+                  <span><strong>HamCare プレミアム</strong><span class="plan-price"><span class="plan-price-amount">550<span class="plan-price-period">円（税込）／月</span></span><span>税抜500円・標準税率10％を想定</span></span></span>
+                </label>
+              </fieldset>
+              <p class="plan-preview-note" id="plan-price-note">Preview専用の検証価格です。現在の契約や本番の請求額を変更するものではありません。年額・割引プランはありません。</p>
+              <h3>プランに含まれること</h3>
+              <ul class="plan-feature-list">
+                <li><strong>日々の飼育記録</strong><span>体重、食欲、動き、気づいたことを、続けられるペースで残す。</span></li>
+                <li><strong>変化の振り返り</strong><span>体重や活動量、環境の推移を確認する。</span></li>
+                <li><strong>うちの子レポート</strong><span>十分な記録が集まった指標から、普段の傾向を振り返る。</span></li>
+                <li><strong>AIへの飼育相談</strong><span>飼育の疑問を相談する。運営側の共通利用枠などによる制限があり、無制限の利用は保証されません。</span></li>
+                <li><strong>SwitchBot温湿度連携</strong><span>対応機器・ハブと連携し、ケージの温度・湿度を確認する。対応機器がなくても他の機能は利用できます。</span></li>
+                <li><strong>状態を振り返るための通知</strong><span>対応する通知機能を利用する。端末の許可や設定、記録・判定条件により通知されない場合があります。</span></li>
+              </ul>
+              <p class="help-copy">AIや評価は観察を補助するもので、診断・治療の代わりではありません。機器の自動制御は行いません。</p>
+            </section>
+            <section class="plan-section" aria-labelledby="plan-current-title">
+              <h2 id="plan-current-title">現在の契約を確認</h2>
+              <dl class="account-summary plan-account-summary">
+                <div><dt>契約の保存状態</dt><dd id="plan-billing"></dd></div>
+                <div><dt>21日体験の保存状態</dt><dd id="plan-trial"></dd></div>
+                <div><dt>過去の決済アカウントの紐付け記録</dt><dd id="plan-customer-check"></dd></div>
+                <div><dt>決済手続きの進行状況</dt><dd id="plan-checkout-check"></dd></div>
+              </dl>
+              <p class="help-copy">ここにはアカウントに保存された情報を表示しています。実際の利用権限をこのWeb画面で変更・判定することはありません。</p>
+              <div class="plan-management" id="plan-management" hidden>
+                <h3>契約管理の確認方法</h3>
+                <p>HamCareアプリの「アプリの設定 → 利用プラン → プランを管理する」からご確認ください。操作できない場合はサポートへお問い合わせください。</p>
+                <a class="text-link" href="https://hamster-breeding-app.web.app/support/">サポートを確認する <span aria-hidden="true">→</span></a>
+                <p class="help-copy">このPreviewでは契約管理画面を作成したり、既存契約の解約・変更を行ったりしません。</p>
+              </div>
+            </section>
+          </div>
+          <div>
+            <section class="plan-section" aria-labelledby="plan-summary-title">
+              <h2 id="plan-summary-title">2. アカウントと内容を確認</h2>
+              <dl class="account-summary plan-account-summary">
+                <div><dt>契約するHamCareアカウント</dt><dd id="plan-nickname"></dd></div>
+                <div><dt>メールアドレス</dt><dd id="plan-email"></dd></div>
+                <div><dt>ログイン方法</dt><dd id="plan-method"></dd></div>
+                <div><dt>確認中のプラン</dt><dd id="plan-selected-name">未選択</dd></div>
+                <div><dt>月額の税込総額（Preview）</dt><dd id="plan-selected-amount">プランを選ぶと表示します</dd></div>
+              </dl>
+              <p class="help-copy">契約対象は、今ログインしているHamCareアカウントです。アカウントを変える場合は、アカウント確認へ戻ってログアウトし、アプリと同じ方法でログインし直してください。</p>
+              <p class="help-copy">21日間の無料体験はアプリで別途開始する仕組みです。カード登録は不要で、体験終了後の自動課金はありません。体験のAI相談は最大20回で、共通枠などの制限もあります。この画面から体験は開始しません。</p>
+            </section>
+            <section class="plan-section" aria-labelledby="plan-terms-title">
+              <h2 id="plan-terms-title">契約前に知っておきたいこと</h2>
+              <p class="plan-preview-note">以下は既存の公開条件をもとにした確認用の案内です。実際の申し込みはまだできません。</p>
+              <dl class="account-summary plan-terms">
+                <div><dt>請求周期・自動更新</dt><dd>1か月ごとの自動更新です。解約するまで、初回決済日を基準として毎月決済されます。</dd></div>
+                <div><dt>初回のお支払い・次回請求</dt><dd>将来の申込時は初回決済時にお支払い。具体的な次回請求日時は決済・契約管理画面で確認します。このPreviewでは請求日を作成しません。</dd></div>
+                <div><dt>サービス開始時期</dt><dd>支払い完了後、契約状態の反映を確認でき次第、有料機能を利用できます。反映に時間がかかる場合があります。</dd></div>
+                <div><dt>解約方法・解約期限</dt><dd>アプリの「利用プラン」から契約管理画面を開き、次回更新前に解約手続きを行います。具体的な更新日時は契約管理画面でご確認ください。</dd></div>
+                <div><dt>解約後の利用</dt><dd>支払済みの期間末まで利用でき、次回更新日以後の請求は行われません。</dd></div>
+                <div><dt>キャンセル・返金</dt><dd>支払い後の利用者都合による当該請求期間のキャンセル・日割り返金は原則として受け付けません。重複請求・決済上の誤り・法令上必要な返金はサポートへご相談ください。</dd></div>
+                <div><dt>その他の費用・利用環境</dt><dd>通信料金は利用者負担です。対応するスマートフォンとインターネット接続が必要です。SwitchBotの自動取得には対応機器・ハブなどが必要です。</dd></div>
+              </dl>
+              <p class="plan-preview-note">現在公開中の規約・特商法表記の料金は月額500円（税込）です。このPreviewの550円表示とは異なるため、本番公開前に税務上の扱い、表示条件と最終請求額を一致させます。現在の本番料金は変更していません。</p>
+              <nav class="plan-legal-links" aria-label="契約条件・お問い合わせ">
+                <a href="https://hamster-breeding-app.web.app/terms/">利用規約</a>
+                <a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a>
+                <a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a>
+                <a href="https://hamster-breeding-app.web.app/support/">お問い合わせ</a>
+              </nav>
+            </section>
+          </div>
+        </div>
+        <div class="plan-actions">
+          <p id="plan-selection-status" role="status" aria-live="polite" aria-atomic="true">プランはまだ選択していません。</p>
+          <button class="button primary full-width" id="plan-checkout" type="button" disabled>申込・決済は準備中です</button>
+          <p class="help-copy">この画面で選択しても、申し込み・請求・契約変更は行われません。カード情報を入力する欄はありません。</p>
+          <button class="button secondary full-width" type="button" id="back-to-account">アカウント確認へ戻る</button>
+        </div>
       </section>
     </main>
     <footer class="account-footer wrap">

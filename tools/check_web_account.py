@@ -4,9 +4,11 @@ from pathlib import Path
 from html.parser import HTMLParser
 import json
 import re
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / 'public'
+AUTH_BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
 class Page(HTMLParser):
     def __init__(self): super().__init__(); self.nodes=[]
     def handle_starttag(self, tag, attrs): self.nodes.append((tag,dict(attrs)))
@@ -35,15 +37,24 @@ def main():
     check('errors are announced',any(a.get('role')=='alert' for _,a in nodes))
     check('loading and safe guidance exist','準備中' in html and 'Apple' in html and 'ログアウト' in html)
     check('no payment controls or signup form',not re.search(r'type=["\'](?:tel|number)["\']|createUserWithEmailAndPassword|card-number|CVC',html))
-    scripts=list((PUBLIC/'assets').glob('account*.mjs'))+[PUBLIC/'assets/firebase-web-config.mjs']
+    scripts=sorted((PUBLIC/'assets').glob('account*.mjs'))+sorted((PUBLIC/'assets').glob('plan*.mjs'))+[PUBLIC/'assets/firebase-web-config.mjs']
     code='\n'.join(p.read_text() for p in scripts)
     check('no business writers or linking',not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|linkWithCredential|linkWithPopup|createUserWithEmailAndPassword|sendEmailVerification|sendPasswordResetEmail)\s*\(',code))
     check('no custom persistence or raw DOM injection',not re.search(r'localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|document\.write',code))
     check('no credential or error logging',not re.search(r'console\s*\.|onLog\s*\(',code))
     check('no Stripe/Functions/Analytics',not re.search(r'checkout\.stripe|api\.stripe|firebase-functions|firebase-analytics|cloudfunctions\.net|run\.app',code))
+    check('no custom network transport',not re.search(r'\b(?:fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\(',code))
     check('standard session persistence only','browserSessionPersistence' in code and 'browserLocalPersistence' not in code)
     check('read-only Firestore Lite', 'firebase-firestore-lite.js' in code and 'sdk.getDoc(' in code)
-    check('no timestamp-based Web entitlement decision',not re.search(r'Date\.now|isPaid|canUsePaidFeatures|isActiveAt|isInitialTrialActive', (PUBLIC/'assets/account-model.mjs').read_text()))
+    projections='\n'.join((PUBLIC/'assets'/name).read_text() for name in ('account-model.mjs','plan-model.mjs'))
+    check('no timestamp-based Web entitlement decision',not re.search(r'Date\.now|isPaid|canUsePaidFeatures|isActiveAt|isInitialTrialActive',projections))
+    for path in ['firebase.preview.json','public/assets/firebase-web-config.mjs','public/assets/account.mjs','public/assets/account-service.mjs']:
+        before=subprocess.check_output(['git','show',f'{AUTH_BASE}:{path}'],cwd=ROOT)
+        check('protected Auth/config unchanged '+path,(ROOT/path).read_bytes()==before)
+    plan_model=(PUBLIC/'assets/plan-model.mjs').read_text()
+    plan_view=(PUBLIC/'assets/account-view.mjs').read_text()
+    check('pure plan projection has no SDK or credential access',not re.search(r'\b(?:import|document|window|navigator|auth|sdk)\b|idToken|getIdToken|accessToken|refreshToken|firebaseUid',plan_model))
+    check('plan selection has no purchase listener',not re.search(r"element\(['\"]plan-checkout['\"]\)\.addEventListener|plan-checkout['\"]\)\.disabled\s*=\s*false",plan_view))
     check('existing SDK version pinned',set(re.findall(r'https://www\.gstatic\.com/firebasejs/([^/]+)/',code))=={'12.17.1'})
     check('public config only',set(json.loads((PUBLIC/'assets/firebase-web-config.mjs').read_text().split('Object.freeze(',1)[1].rsplit(');',1)[0]))=={'apiKey','authDomain','projectId','appId'})
     config=json.loads((ROOT/'firebase.preview.json').read_text())

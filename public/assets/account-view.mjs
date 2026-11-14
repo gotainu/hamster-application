@@ -1,8 +1,10 @@
+import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
+
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
 export async function mountAccountPage(service) {
   const element = (id) => document.getElementById(id);
-  const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'pending-panel'];
-  const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields'];
+  const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel'];
+  const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields', 'plan-nickname', 'plan-email', 'plan-method', 'plan-billing', 'plan-trial', 'plan-customer-check', 'plan-checkout-check', 'plan-route-title', 'plan-route-detail'];
   const form = element('email-form');
   const email = element('email');
   const password = element('password');
@@ -10,6 +12,7 @@ export async function mountAccountPage(service) {
   const status = element('auth-status');
   let epoch = 0;
   let currentUser = null;
+  let currentSummary = null;
   let busy = true;
   let loggingOut = false;
   let signInPending = false;
@@ -18,11 +21,19 @@ export async function mountAccountPage(service) {
 
   function setPanel(id, heading) {
     for (const panel of panels) element(panel).hidden = panel !== id;
+    element('main').setAttribute('data-page', id === 'plan-panel' ? 'plan' : 'account');
     if (heading) element(heading).focus();
   }
 
   function clearPersonal() {
+    currentSummary = null;
     for (const id of personalFields) element(id).textContent = '';
+    element('premium-monthly').checked = false;
+    element('plan-fields').disabled = true;
+    element('plan-management').hidden = true;
+    element('plan-selected-name').textContent = '未選択';
+    element('plan-selected-amount').textContent = 'プランを選ぶと表示します';
+    element('plan-selection-status').textContent = 'プランはまだ選択していません。';
     element('unavailable-fields').hidden = true;
     element('new-google-note').hidden = true;
   }
@@ -56,7 +67,27 @@ export async function mountAccountPage(service) {
     element('toggle-password').setAttribute('aria-pressed', 'false');
   }
 
-  async function renderUser(user, { focus = false } = {}) {
+  function renderPlan(summary) {
+    const review = summary.planReview || projectPlanReview(null);
+    element('plan-nickname').textContent = summary.nickname || '未設定';
+    element('plan-email').textContent = summary.maskedEmail || currentUser.maskedEmail || '確認できませんでした';
+    element('plan-method').textContent = (summary.methods || currentUser.methods || []).join('・') || '確認できませんでした';
+    element('plan-billing').textContent = summary.billingLabel || '確認できませんでした';
+    element('plan-trial').textContent = summary.trialLabel || '確認できませんでした';
+    element('plan-customer-check').textContent = review.customerRecord;
+    element('plan-checkout-check').textContent = review.checkoutCheck;
+    element('plan-route-title').textContent = review.title;
+    element('plan-route-detail').textContent = review.detail;
+    element('plan-fields').disabled = !review.canSelectPlan;
+    element('plan-management').hidden = review.route === 'review';
+    if (!review.canSelectPlan) {
+      element('plan-selected-name').textContent = '現在の契約の確認を優先します';
+      element('plan-selected-amount').textContent = '上記は新規プランの参考価格です';
+      element('plan-selection-status').textContent = 'プラン選択はできません。現在の契約をアプリまたはサポートで確認してください。';
+    }
+  }
+
+  async function renderUser(user, { focus = false, plan = false } = {}) {
     const request = ++epoch;
     currentUser = user;
     clearPersonal();
@@ -82,6 +113,7 @@ export async function mountAccountPage(service) {
     try {
       const summary = await service.readAccountSummary();
       if (destroyed || request !== epoch || !currentUser || !currentUser.emailVerified) return;
+      currentSummary = summary;
       element('account-nickname').textContent = summary.nickname || '未設定';
       element('account-email').textContent = summary.maskedEmail || user.maskedEmail || '確認できませんでした';
       element('account-method').textContent = (summary.methods || user.methods || []).join('・') || '確認できませんでした';
@@ -92,7 +124,12 @@ export async function mountAccountPage(service) {
       element('unavailable-fields').hidden = unavailable.length === 0;
       element('new-google-note').hidden = !user.isNewUser;
       setBusy(false);
-      setPanel('account-panel', focus ? 'confirm-title' : null);
+      if (plan && !user.isNewUser) {
+        renderPlan(summary);
+        setPanel('plan-panel', 'plan-title');
+      } else {
+        setPanel('account-panel', focus ? 'confirm-title' : null);
+      }
     } catch (cause) {
       if (destroyed || request !== epoch) return;
       setBusy(false);
@@ -190,7 +227,8 @@ export async function mountAccountPage(service) {
 
   const onPlan = () => {
     if (busy || !currentUser?.emailVerified || currentUser.isNewUser) return;
-    setPanel('pending-panel', 'pending-title');
+    // Re-read the same UID-scoped documents; do not rely on stale account text.
+    void renderUser(currentUser, { focus: true, plan: true });
   };
   element('review-plan').addEventListener('click', onPlan);
   const onBack = () => {
@@ -198,6 +236,19 @@ export async function mountAccountPage(service) {
     setPanel('account-panel', 'confirm-title');
   };
   element('back-to-account').addEventListener('click', onBack);
+  const onPlanChoice = () => {
+    const option = element('premium-monthly');
+    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+      option.checked = false;
+      return;
+    }
+    if (!option.checked) return;
+    element('plan-selected-name').textContent = PREMIUM_MONTHLY.name;
+    element('plan-selected-amount').textContent = `月額${PREMIUM_MONTHLY.taxInclusiveYen}円（税込）／税抜${PREMIUM_MONTHLY.taxExclusiveYen}円`;
+    element('plan-selection-status').textContent = '月額プランを選択しました。内容の確認のみで、申し込みは行われていません。';
+    // Selection lives only in the page. No request or purchase is dispatched.
+  };
+  element('premium-monthly').addEventListener('change', onPlanChoice);
 
   const onPageHide = () => {
     ++epoch;
@@ -244,6 +295,7 @@ export async function mountAccountPage(service) {
     element('check-verification').removeEventListener('click', onVerify);
     element('review-plan').removeEventListener('click', onPlan);
     element('back-to-account').removeEventListener('click', onBack);
+    element('premium-monthly').removeEventListener('change', onPlanChoice);
     window.removeEventListener('pagehide', onPageHide);
     window.removeEventListener('pageshow', onPageShow);
   };

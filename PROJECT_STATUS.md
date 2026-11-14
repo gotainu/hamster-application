@@ -4,6 +4,20 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-first-task3-20261114:start -->
+## 2026-11-14 戦略C・タスク3：月額プラン・申込内容の確認（Preview反映済み・表示確認待ち）
+
+- **承認・範囲**：本人承認済みのブランド統一 `320c726` と輪郭アイコン訂正 `57e625c` を維持し、同じ `feature/web-first-stripe-checkout`／専用worktreeで月額プラン確認だけを実装。黒背景・白い輪郭の現行アイコン、星空・ガラス表現は不変。元アプリHEAD・dirty10件の内容・未追跡2,110件を維持する。タスク4の決済接続へは進まない。
+- **画面と価格**：ログイン後の「月額プランを確認する」から、毎回本人の既存3文書を再読取りして同じ画面内のプラン確認へ進む。候補は `premium_monthly` の1種類だけ、**月額550円税込／500円税抜・10％想定のPreview専用表示**。年額・割引を追加せず、実Price IDやProduct IDを送信・解決しない。ラジオ選択は画面内の仮選択のみで保存しない。契約アカウント・マスクメール・方法・保存契約／体験状態と、機能・自動更新・解約／返金等の既存条件を表示し、申込・決済ボタンは常に無効。
+- **重複申込を避ける表示**：保存済み `paid`＋`active`／`trialing` は期間末解約予定も含め新規選択を止め、既存アプリの契約管理手順を案内。未知・不整合・支払い未完了・読取不能は確認優先として選択不可。文書なし／明示的none／キャンセル済みは内容確認だけを許可し、Stripe上の未契約や再契約可能とは断定しない。Customerは既存 `stripeCustomerId` の**保存参照の有無だけ**、Checkoutの進行状況は常に「未照合」。ID・保存時刻・過去履歴を最新Stripe状態の証拠にしない。権限解放・Web独自の体験期限判定・実Stripe照合は行わない。
+- **料金・日時の限界**：現在の公開規約／特商法の500円税込とPreviewの550円との差を画面内で明示し、本番公開前に最終請求額と法務表示を一致させる。保存済みcurrentPeriodEndは契約期間末としてのみ表示し、正確な次回請求日時を計算・捏造しない。Price許可リスト／サーバー再照合／実決済はタスク4以降の独立範囲。
+- **変更と保護**：account HTML／安全な保存状態projection／viewへ確認画面・再読取・ローカル選択・クリア処理を追加し、新 `plan-model.mjs`／`plan.css` と直接関連テストを追加。認証entry／service／公開Firebase config／Preview config／共通brand.css／account.css／LP HTML／LP CSSの**8ファイルは開始時とバイト一致**。認証プロバイダ・セッション・Rules・Functions・アプリ・署名・依存更新なし。ユーザー切替／ログアウト／再読取失敗・未確認メールで個人情報や選択を残さない。
+- **限定検証**：既存認証・UIと追加プランprojection／選択テストの **Node59件PASS**。LP静的 **84/84**、アカウント **61/61**、ブランド／プラン／安全境界 **152/152**、計 **297件PASS**（実CSSコントラスト38ケース、最小本文5.06:1・境界／focus3.09:1）。構文・`git diff --check` PASS。既存Emulator15件の証拠は維持し、今回は再実行数へ加えない。
+- **表示確認の未完了と繰越し**：現時点のChrome操作ツールはlocal／実Previewの双方で白一色の画面となり本文を取得できず、画面表示確認は未完了。本人へMacの表示／ロック解除確認を依頼中で、今回の7幅・200％・実プラン画面の目視PASSは先取りしない。Safari／実スクリーンリーダーは、本人指示によりEmbedded Checkoutまで一連の申込フローが完成した段階で確認する後続項目とし、タスク3のブロッカーにはしない。過去のChrome表示確認を今回の成功へ転記しない。
+- **Previewと本番境界**：同じ[LP](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)／[ログイン・プラン確認](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account/)、channel `web-first-task1`、**2026-11-14 18:19:30 JST**、version `38180b0967ad3f37`、期限 **2026-11-21 18:19 JST**。明示29リソースのHTTP200・SHA／安全ヘッダー一致、対象外5経路404。本番live version `2365135bf558c278`・公開Privacy・Auth許可ドメイン4件は不変。**本番Firestore書込み0、Stripe書込み0、Customer／Subscription／Webhook／契約・体験・権限変更0**。Previewの静的更新とは区別する。
+- **停止点**：今回だけを `feat(web): add subscription plan confirmation` の独立1コミットへ保存後、本人確認まで停止する。Checkout／Portal呼出し、Functions配備、本番Hosting、アプリ／ストア変更、main merge／pushは行わない。次工程の決済接続は別の本人承認が必要。
+<!-- hamcare-web-first-task3-20261114:end -->
+
 <!-- hamcare-web-icon-correction-20261114:start -->
 ## 2026-11-14 戦略C・Webアイコン正本の訂正（Preview反映・表示確認済み）
 
@@ -14,7 +28,7 @@
 <!-- hamcare-web-icon-correction-20261114:end -->
 
 <!-- hamcare-web-brand-20261114:start -->
-## 2026-11-14 戦略C・Webブランド統一（Preview反映済み・本人デザイン確認待ち）
+## 2026-11-14 戦略C・Webブランド統一（320c726・本人承認済み）
 
 - **範囲・保護**：タスク2の `d969c1955e2861a8eea4a3a4b5a101561532b7b3` から同じ `feature/web-first-stripe-checkout`／専用worktreeを継続。LP・ログイン・アカウント確認の見た目だけを独立1コミットにする。元アプリHEAD・dirty10件の内容・未追跡2,110件は開始時と一致。認証JS4件・公開Firebase config・Preview configの計6件はバイト一致、Flutter／Functions／Rules／依存／本番法務は変更なし。
 - **デザイン正本**：`lib/theme/app_theme.dart` のThemeData／ColorScheme、Drawer・QuickRecord・FloatingNavの色／blur、`app_habitat_background.dart` の背景と `main_drawer.dart`／`screens/auth.dart` のCaveatを調査。Web共通の `public/assets/brand.css` にネイビー#181a20、surface#232635、Primary#315daf、mint/cyan#79e2dd、glass18px、24px角丸を定義。Webで読めるようガラス面と枠の不透明度を上げ、非対応時は不透明面にする。詳細トークン／対応ファイルは既存の日本公開準備書先頭へ記録した。
@@ -1088,7 +1102,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-14）**：本人の訂正に従い、戦略C Webのアイコンを黒背景・白い輪郭の正本 `store_assets/icons/hamster_pencil_mark_master.png` へ統一する限定修正を準備中。直前の白いハムスター＋心電図を現行とした判断は撤回。既存の星空／ネイビー／ガラス・認証機能を維持し、同Previewへの反映結果は先頭節へ確定後に記録する。独立1コミット後、本人確認までタスク3へ進まない。過去の認証34件・静的260件・Chrome7幅とSafari等の未確認は当時の証拠として保持する。
+- **最新作業（2026-11-14）**：ブランド統一320c726・輪郭アイコン訂正57e625cを引き継ぎ、戦略Cタスク3の月額プラン／契約対象・条件確認を同じPreviewへ反映。Node59件・静的297件PASS、Stripe／本番Firestore書込み0。Chromeは操作ツールの白画面で実表示未確認、本人へ表示確認依頼中。Safari／実読み上げは本人指定で一連のEmbedded申込フロー完成後へ繰越し。独立1コミット後に停止し、決済接続・タスク4へは本人の別承認まで進まない。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1191,7 +1205,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク2／ブランド統一済み・輪郭アイコン訂正のPreview準備中 | Webファースト戦略C・公式LPから独自申込画面へ | 最新正本は黒背景・白い輪郭 `hamster_pencil_mark_master.png`。白いハムスター＋心電図の採用判断を撤回し、版名付きWeb素材4件と参照だけを修正。既存認証34＋静的260 PASS・Chrome7幅の証拠、星空／ガラス／実Home、Safari等の未確認を維持。今回の限定確認・同Preview反映は確定後に先頭節へ記録。本人確認後に独自月額プラン確認、Checkout未実装。 |
+| `WEB-01` | ブランド承認済み・タスク3 Preview反映／表示確認待ち | Webファースト戦略C・公式LPから独自申込画面へ | 単一月額550円税込のPreview確認、本人3文書再読取、契約記録別の選択制御。Node59＋静的297 PASS、今回Chrome目視は白画面で未確認。Safari／実読み上げは本人指定でEmbedded一連フロー完成後。version38180b0967ad3f37。本番Firestore／Stripe書込み0、Checkout／Portal未接続。タスク3の独立1コミット後、本人確認まで停止。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

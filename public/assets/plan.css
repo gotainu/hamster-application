@@ -1,0 +1,83 @@
+/* Task 3: readonly plan confirmation. Uses the existing HamCare Web theme.
+   No new backdrop layer: the account card retains its opaque fallback. */
+.account-shell[data-page="plan"] { width: min(1000px, calc(100% - 40px)); }
+#plan-panel.plan-panel { max-width: 1000px; background: var(--hamcare-glass-strong, #222a38); }
+.plan-panel { min-width: 0; }
+.plan-heading { margin-bottom: 28px; }
+.plan-heading > p:not(.eyebrow) { max-width: 720px; color: var(--hamcare-text-secondary, #c5cbd4); font-size: .9375rem; line-height: 1.9; }
+.plan-heading h1 { margin-bottom: 18px; }
+.plan-layout { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 24px; }
+.plan-layout > * { min-width: 0; }
+.plan-panel h2 { color: var(--hamcare-text-primary, #fff); font-size: 1.125rem; line-height: 1.7; }
+.plan-panel h3 { color: var(--hamcare-text-primary, #fff); font-size: 1rem; line-height: 1.7; }
+.plan-panel p, .plan-panel li, .plan-panel dd, .plan-panel dt { overflow-wrap: anywhere; }
+.plan-panel .plan-choice { padding: 0; margin: 0; border: 0; min-width: 0; }
+.plan-choice legend { margin-bottom: 12px; padding: 0; color: var(--hamcare-text-primary, #fff); font-size: 1.125rem; line-height: 1.7; font-weight: 700; }
+.plan-panel .plan-choice .plan-option { display: flex; align-items: flex-start; gap: 12px; min-height: 64px; padding: 18px 16px; margin: 0; border: 1px solid #8390a6; border-radius: 18px; background: var(--hamcare-bg-surface, #232635); color: var(--hamcare-text-primary, #fff); font-size: 1rem; line-height: 1.75; cursor: pointer; }
+.plan-option > :not(input) { min-width: 0; }
+.plan-panel .plan-option input[type="radio"] { width: 20px; height: 20px; min-width: 20px; min-height: 20px; flex: 0 0 20px; padding: 0; margin: 4px 0 0; accent-color: var(--hamcare-accent-cyan, #79e2dd); border-radius: 50%; cursor: pointer; }
+.plan-panel .plan-option input[type="radio"]:focus-visible { outline: 3px solid var(--hamcare-accent-cyan, #79e2dd); outline-offset: 4px; box-shadow: none; }
+.plan-option strong { display: block; font-weight: 700; }
+.plan-option small { display: block; margin-top: 5px; color: var(--hamcare-text-secondary, #c5cbd4); font-size: .8125rem; line-height: 1.8; font-weight: 400; }
+.plan-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; margin-block: 22px 8px; color: var(--hamcare-text-primary, #fff); }
+.plan-price-amount { font-size: clamp(2.5rem, 5vw, 3.25rem); font-weight: 700; letter-spacing: -.04em; line-height: 1.2; }
+.plan-price-period { font-size: 1rem; line-height: 1.7; }
+.plan-preview-note { padding: 14px 16px; margin-top: 16px; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-left: 3px solid var(--hamcare-accent-cyan, #79e2dd); border-radius: 14px; background: var(--hamcare-bg-deep, #181a20); color: var(--hamcare-text-secondary, #c5cbd4); font-size: .8125rem; line-height: 1.9; }
+.plan-preview-note strong { color: var(--hamcare-text-primary, #fff); }
+.plan-feature-list { padding-left: 1.3rem; margin-block: 16px 0; color: var(--hamcare-text-primary, #fff); font-size: .9375rem; line-height: 1.9; }
+.plan-feature-list li { padding-left: 3px; }
+.plan-feature-list li + li { margin-top: 10px; }
+.plan-feature-list li::marker { color: var(--hamcare-accent-mint, #79e2dd); }
+.plan-section { padding: 22px; margin-top: 22px; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-radius: 18px; background: var(--hamcare-bg-surface, #232635); }
+.plan-layout > .plan-section { margin-top: 0; }
+.plan-section > h2 + p, .plan-section > h3 + p { margin-top: 12px; }
+.plan-section > p { color: var(--hamcare-text-secondary, #c5cbd4); font-size: .875rem; line-height: 1.9; }
+.plan-account-summary.account-summary { margin-top: 8px; }
+.plan-account-summary.account-summary > div { padding-block: 15px; }
+.plan-account-summary.account-summary > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.plan-account-summary dd { font-size: .9375rem; }
+.plan-terms { margin: 12px 0 0; }
+.plan-terms > div { padding-block: 14px; border-bottom: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); }
+.plan-terms > div:last-child { border-bottom: 0; padding-bottom: 0; }
+.plan-terms dt { margin: 0 0 6px; color: var(--hamcare-text-secondary, #c5cbd4); font-size: .8125rem; line-height: 1.8; }
+.plan-terms dd { margin: 0; color: var(--hamcare-text-primary, #fff); font-size: .875rem; line-height: 1.9; }
+.plan-readiness { padding: 16px; margin-top: 22px; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-left: 3px solid var(--hamcare-warning, #ffc857); border-radius: 14px; background: var(--hamcare-bg-deep, #181a20); color: var(--hamcare-text-secondary, #c5cbd4); font-size: .875rem; line-height: 1.9; }
+.plan-readiness strong { color: var(--hamcare-text-primary, #fff); }
+.plan-legal-links { display: flex; flex-wrap: wrap; align-items: start; gap: 4px 18px; margin-top: 18px; }
+.plan-legal-links a { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; color: var(--hamcare-accent-cyan, #79e2dd); font-size: .8125rem; line-height: 1.8; overflow-wrap: anywhere; }
+.plan-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+.plan-actions .button, .plan-actions .quiet-button { width: 100%; min-height: 54px; white-space: normal; }
+.plan-actions .button:disabled { opacity: 1; color: var(--hamcare-text-secondary, #c5cbd4); background: var(--hamcare-bg-surface, #232635); border-color: #8390a6; box-shadow: none; cursor: not-allowed; }
+.plan-management { padding: 22px; margin-top: 22px; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-radius: 18px; background: var(--hamcare-bg-surface, #232635); color: var(--hamcare-text-secondary, #c5cbd4); font-size: .9375rem; line-height: 1.9; }
+.plan-management h2, .plan-management h3, .plan-management strong { color: var(--hamcare-text-primary, #fff); }
+.plan-management > :is(h2,h3) + p { margin-top: 12px; }
+@media (min-width: 900px) {
+  .plan-layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; }
+}
+@media (max-width: 600px) {
+  .account-shell[data-page="plan"] { width: calc(100% - 32px); }
+  .plan-heading { margin-bottom: 24px; }
+  .plan-heading > p:not(.eyebrow) { font-size: .875rem; }
+  .plan-layout { gap: 20px; }
+  .plan-panel .plan-choice .plan-option { padding: 16px 14px; }
+  .plan-section, .plan-management { padding: 18px 16px; }
+  .plan-preview-note, .plan-readiness { padding: 14px; }
+  .plan-feature-list { font-size: .875rem; }
+  .plan-legal-links { gap: 4px 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-panel *, .plan-panel *::before, .plan-panel *::after { animation: none !important; transition: none !important; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  #plan-panel.plan-panel { background: var(--hamcare-bg-deep, #181a20); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .plan-section, .plan-management, .plan-preview-note, .plan-readiness, .plan-panel .plan-choice .plan-option { border-color: #8390a6; }
+}
+@media (forced-colors: active) {
+  #plan-panel.plan-panel, .plan-section, .plan-management, .plan-preview-note, .plan-readiness, .plan-panel .plan-choice .plan-option { color: CanvasText; background: Canvas; border: 1px solid CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .plan-panel h1, .plan-panel h2, .plan-panel h3, .plan-heading > p:not(.eyebrow), .plan-option small, .plan-price, .plan-feature-list, .plan-section > p, .plan-account-summary dd, .plan-terms dt, .plan-terms dd, .plan-preview-note strong, .plan-readiness strong, .plan-management strong { color: CanvasText; }
+  .plan-legal-links a { color: LinkText; }
+  .plan-feature-list li::marker { color: CanvasText; }
+  .plan-panel .plan-option input[type="radio"] { appearance: auto; accent-color: auto; forced-color-adjust: auto; }
+  .plan-panel .plan-option input[type="radio"]:focus-visible { outline-color: Highlight; }
+  .plan-actions .button:disabled { background: Canvas; color: GrayText; border-color: GrayText; }
+}

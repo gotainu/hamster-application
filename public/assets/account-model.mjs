@@ -1,3 +1,5 @@
+import { projectPlanReview } from './plan-model.mjs';
+
 // Display-only projections of existing server documents. No entitlement decision.
 export function maskEmail(email) {
   if (typeof email !== 'string') return '未設定';
@@ -76,5 +78,6 @@ export function summarizeAccount(user, docs) {
     maskedEmail: maskEmail(user?.email),
     methods: loginMethods(user?.providerData),
     billingLabel, trialLabel, unavailableFields,
+    planReview: projectPlanReview(docs?.billing),
   };
 }
