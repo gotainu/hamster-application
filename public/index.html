@@ -3,60 +3,190 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Hamster Careのサポート・利用規約・プライバシー情報" />
-    <title>Hamster Care</title>
-    <link rel="stylesheet" href="/assets/legal.css" />
+    <meta name="description" content="日々の飼育記録、変化の振り返り、AI相談。ハムスターとの暮らしを支えるHamCareの公式Webページ・Previewです。" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="theme-color" content="#f1faf7" />
+    <title>HamCare｜うちの子と、もっと健康で幸せに（Preview）</title>
+    <link rel="icon" href="/assets/landing/hamcare-mark.png" type="image/png" />
+    <link rel="stylesheet" href="/assets/landing.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a class="brand" href="/">Hamster Care</a>
-        <nav class="site-nav" aria-label="主要メニュー">
-          <a href="/support/">サポート</a>
-          <a href="/privacy/">プライバシー</a>
-          <a href="/terms/">利用規約</a>
-        </nav>
-      </div>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <div class="preview-banner"><span>PREVIEW</span> 公開前の確認用ページです。ログイン・申込・決済はできません。</div>
+    <header class="site-header wrap">
+      <a class="brand" href="#top" aria-label="HamCare トップ">
+        <img src="/assets/landing/hamcare-mark.png" width="40" height="40" alt="" />
+        <span>HamCare</span>
+      </a>
+      <nav aria-label="主要メニュー">
+        <a href="#features">できること</a>
+        <a href="#membership">プラン</a>
+        <a href="#faq">FAQ</a>
+      </nav>
     </header>
-    <main class="page">
-      <section class="hero">
-        <p class="eyebrow">Hamster Care</p>
-        <h1>ハムスターとの毎日を、記録とデータで見守る。</h1>
-        <p class="lead">
-          Hamster Careは、飼育記録、温湿度管理、環境評価、AI相談を通じて、日々の観察を続けやすくする飼育支援アプリです。
-        </p>
-        <div class="action-grid">
-          <a class="action-card" href="/support/">
-            <strong>サポート</strong>
-            <span>お問い合わせ、よくある質問、アカウント削除</span>
-          </a>
-          <a class="action-card" href="/privacy/">
-            <strong>プライバシーポリシー</strong>
-            <span>取得するデータ、利用目的、外部サービス</span>
-          </a>
-          <a class="action-card" href="/terms/">
-            <strong>利用規約</strong>
-            <span>サービスの利用条件と注意事項</span>
-          </a>
-          <a class="action-card" href="/commercial-transactions/">
-            <strong>特定商取引法に基づく表記</strong>
-            <span>月額プランの料金、支払・解約・返金条件</span>
-          </a>
+    <main id="main">
+      <section class="hero wrap" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="small-line"></span> ハムスターと暮らす、あなたへ。</p>
+          <h1 id="hero-title">うちの子と、<br />もっと健康で<br class="mobile-break" />幸せに<span class="teal-dot">。</span></h1>
+          <p class="lead">小さな「いつも」を残すことが、<br />大切な気づきにつながる。</p>
+          <p class="hero-description">日々の飼育記録から、変化の振り返り、AIへの相談まで。<br class="desktop-break" />HamCareは、うちの子との毎日に寄り添うアプリです。</p>
+          <div class="actions">
+            <a class="button primary" href="#try">HamCareを試す <span aria-hidden="true">↗</span></a>
+            <a class="button secondary" href="#membership">有料会員について <span aria-hidden="true">↓</span></a>
+          </div>
+          <p class="hero-footnote">21日間の無料体験 · カード登録不要 · 自動課金なし</p>
         </div>
-        <div class="notice">
-          本アプリは獣医師による診断や治療の代替ではありません。体調に異変がある場合は、動物病院への相談を優先してください。
+        <div class="hero-art">
+          <div class="art-halo" aria-hidden="true"></div>
+          <p class="art-note">それぞれの「うちの子」に。</p>
+          <img class="hero-avatar syrian" src="/assets/landing/avatar-syrian.png" width="512" height="512" alt="丸い耳のシリアンハムスター" fetchpriority="high" />
+          <img class="hero-avatar djungarian" src="/assets/landing/avatar-djungarian.png" width="512" height="512" alt="グレーと白のジャンガリアンハムスター" />
+          <img class="hero-avatar roborovski" src="/assets/landing/avatar-roborovski.png" width="512" height="512" alt="小柄なロボロフスキーハムスター" />
+          <p class="art-caption"><span aria-hidden="true">✧</span> いつもの姿も、小さな変化も。</p>
         </div>
+      </section>
+
+      <section class="introduction wrap" aria-labelledby="intro-title">
+        <p class="eyebrow">CARE, RECORD, NOTICE.</p>
+        <h2 id="intro-title">大切にしたい気持ちを、<br />毎日のケアにつなげる。</h2>
+        <p>覚えておくのは大変でも、少しずつ残せば振り返れる。<br class="desktop-break" />知識を「知る」だけで終わらせず、うちの子の暮らしに活かすために。</p>
+      </section>
+
+      <section class="features wrap" id="features" aria-labelledby="features-title">
+        <div class="section-heading">
+          <p class="eyebrow">HAMCAREでできること</p>
+          <h2 id="features-title">記録から相談まで、<br />ひとつの場所で。</h2>
+          <p>掲載画像は実際のアプリ画面からの抜粋です。数値や回答は表示例で、健康改善の実績や診断を示すものではありません。現在の配信版とは一部の表示が異なる場合があります。</p>
+        </div>
+        <article class="feature-row">
+          <div class="feature-copy">
+            <span class="feature-number" aria-hidden="true">01</span>
+            <h3>今日のうちの子を、<br />少しずつ記録。</h3>
+            <p>体重、食欲、うんち、動き、気になったこと。日々の様子を残し、カレンダーであとから振り返れます。</p>
+            <p class="feature-detail">体重は毎日でなくても大丈夫。続けられるペースで記録しましょう。</p>
+          </div>
+          <figure class="screen-frame">
+            <img src="/assets/landing/screen-record.png" width="574" height="578" alt="今日の様子の記録項目と、体重102g・任意メモを入力する実際の画面例" loading="lazy" />
+            <figcaption>飼育記録の入力画面（表示例）</figcaption>
+          </figure>
+        </article>
+        <article class="feature-row reverse">
+          <div class="feature-copy">
+            <span class="feature-number" aria-hidden="true">02</span>
+            <h3>「いつもと違う？」を、<br />振り返るきっかけに。</h3>
+            <p>体重や活動量の推移を見て、日々の変化を確認。記録が集まると、準備が整った指標からうちの子の普段の傾向も振り返れます。</p>
+            <p class="feature-detail">数値だけで健康を断定するのではなく、毎日の観察とあわせて使うための機能です。</p>
+          </div>
+          <figure class="screen-frame">
+            <img src="/assets/landing/screen-changes.png" width="574" height="629" alt="7日間の活動量平均1254mと、前の7日より73%少ないという変化を示す実画面例" loading="lazy" />
+            <figcaption>活動量と変化の確認画面（表示例）</figcaption>
+          </figure>
+        </article>
+        <article class="feature-row">
+          <div class="feature-copy">
+            <span class="feature-number" aria-hidden="true">03</span>
+            <h3>飼育の「どうしよう」を、<br />AIに相談。</h3>
+            <p>環境やお世話で気になることを、言葉にして相談できます。回答と、参照された飼育情報を確認するきっかけになります。</p>
+            <p class="feature-detail">AIの回答には誤りが含まれる場合があります。診断や治療の代わりではありません。異変があるときは動物病院への相談を優先してください。</p>
+          </div>
+          <figure class="screen-frame screen-frame-wide">
+            <img src="/assets/landing/screen-ai.png" width="839" height="809" alt="『暑い？』という質問と、暑い環境での様子についての既存AI回答、参照された内容を見るボタンの実画面例" loading="lazy" />
+            <figcaption>既存の質問・AI回答の抜粋（回答例）</figcaption>
+          </figure>
+        </article>
+        <article class="feature-row reverse environment-row">
+          <div class="feature-copy">
+            <span class="feature-number" aria-hidden="true">04</span>
+            <h3>ケージの環境も、<br />記録と一緒に。</h3>
+            <p>対応するSwitchBot温湿度計と連携すると、ケージの温度・湿度を自動取得し、推移を振り返れます。</p>
+            <p class="feature-detail">自動取得には対応機器・ハブ・連携設定が必要です。温度の自動制御や機器操作を行う機能ではありません。SwitchBotがなくても、手入力の記録や他の機能を利用できます。</p>
+          </div>
+          <figure class="screen-frame environment-screen">
+            <img src="/assets/landing/screen-environment.png" width="574" height="984" alt="温度の7日平均23.1℃、適正範囲の評価と温度履歴グラフを表示するSwitchBot連携画面例" loading="lazy" />
+            <figcaption>温度の確認・履歴画面（表示例）</figcaption>
+          </figure>
+        </article>
+      </section>
+
+      <section class="try-section" id="try" aria-labelledby="try-title">
+        <div class="wrap try-inner">
+          <div>
+            <p class="eyebrow">まずは、うちの子と。</p>
+            <h2 id="try-title">21日間、<br />暮らしの中で試してみる。</h2>
+            <p>アプリ内で無料体験を始めると、有料対象機能を体験できます。カード登録は不要。体験終了後に自動で課金されることもありません。</p>
+            <p class="small-text">AI相談は最大20回です。運営側の共通利用枠などにより利用できない場合があり、20回の利用を保証するものではありません。体験は初回の1回のみです。</p>
+          </div>
+          <div class="download-panel">
+            <p class="download-status"><span class="status-dot" aria-hidden="true"></span> Android クローズドテスト実施中</p>
+            <a class="button primary store-link" href="https://play.google.com/store/apps/details?id=com.gotainu.hamster">Google Playで開く <span aria-hidden="true">↗</span></a>
+            <p class="small-text">現在は日本の登録済みAlphaテスター向けです。案内されたGoogleアカウントで参加登録のうえ、同じアカウントのGoogle Playからインストールしてください。未登録の方はまだインストールできません。</p>
+            <p class="small-text">対応：Android 7.0以降</p>
+            <button class="button ios-button" type="button" disabled>iOS版は公開準備中</button>
+            <p class="small-text">App Storeでの一般公開はまだ開始していません。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="membership wrap" id="membership" aria-labelledby="membership-title">
+        <div class="member-copy">
+          <p class="eyebrow">有料会員について</p>
+          <h2 id="membership-title">いつものケアを、<br />これからも。</h2>
+          <p>体験後も使いたい方へ、月額プランを準備しています。日々の記録、変化の確認、個体別レポート、AI相談、SwitchBot連携などを、同じHamCareアカウントで利用するためのプランです。</p>
+          <ul class="member-points">
+            <li>契約にはHamCareアカウントへのログインが必要です。</li>
+            <li>契約権限は、そのアカウントでログインしたアプリへ反映する設計です。</li>
+            <li>カード情報はStripeが処理します。HamCareはカード番号・CVCを保存しません。</li>
+          </ul>
+          <p class="small-text">個体別レポートには十分な記録の蓄積が必要です。AI相談などには利用枠があります。無制限のプランではありません。</p>
+        </div>
+        <div class="plan-card">
+          <p class="plan-label">PREVIEW · 月額プラン1種類</p>
+          <h3>HamCare プレミアム</h3>
+          <p class="price"><span class="price-number">550</span><span>円（税込）<br /><span class="price-period">／月</span></span></p>
+          <p class="tax-note">税抜価格500円 · 標準税率10%を想定</p>
+          <div class="plan-notice">
+            <strong>このページから契約はできません。</strong>
+            <p>価格はPreview専用の検証表示です。本番公開前に税務上の取扱いと最終請求額を確認します。現在の契約・本番料金は変更していません。</p>
+          </div>
+          <button class="button member-button" type="button" disabled aria-describedby="member-unavailable">有料会員になる（準備中）</button>
+          <p class="small-text" id="member-unavailable">次の工程でWebログインと申込画面を実装します。ログイン・決済はまだ利用できません。</p>
+          <p class="small-text">毎月自動更新のプランを予定しています。解約・返金などの条件は、申込機能の公開前に確認できる形で整備します。</p>
+        </div>
+      </section>
+
+      <section class="faq-section wrap" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading">
+          <p class="eyebrow">小さな疑問に、お答えします。</p>
+          <h2 id="faq-title">よくあるご質問</h2>
+        </div>
+        <div class="faq-list">
+          <details><summary>今すぐ、誰でも使えますか？</summary><p>Androidは現在、日本の登録済みAlphaテスター向けに配信しています。参加案内のGoogleアカウントでテストへ参加してから、Google Playでインストールしてください。iOSの一般公開は準備中です。このPreviewからテスター登録や契約はできません。</p></details>
+          <details><summary>無料体験にカード登録は必要ですか？</summary><p>必要ありません。アプリ内で21日間の無料体験を開始できます。体験は初回の1回のみで、終了後の自動課金はありません。有料契約は別途お申し込みいただく方式です。</p></details>
+          <details><summary>AI相談は何回使えますか？</summary><p>無料体験中のAI相談は最大20回です。運営側の共通利用枠などによる制限があるため、20回の利用を保証するものではありません。AIの回答は診断・治療の代わりにはなりません。</p></details>
+          <details><summary>SwitchBotを持っていなくても使えますか？</summary><p>はい。手入力の飼育記録や変化の確認、AI相談などを利用できます。温湿度の自動取得を使う場合に、対応するSwitchBot温湿度計・ハブ・公式アプリでの連携設定が必要です。</p></details>
+          <details><summary>個体別の分析は、すぐに始まりますか？</summary><p>記録が十分に集まった指標から使えるようになります。体重・活動量は、それぞれ有効な記録7件と14日以上の観察期間が必要です。毎日すべてを入力することを求めるものではありません。</p></details>
+          <details><summary>すでに有料契約がある場合は？</summary><p>現在のアプリにある契約管理の導線をご利用ください。このPreviewは既存の契約や利用権限を変更しません。Webログイン・申込・契約管理は次の工程で実装する予定です。</p></details>
+        </div>
+      </section>
+
+      <section class="closing wrap" aria-labelledby="closing-title">
+        <img src="/assets/landing/avatar-roborovski.png" width="512" height="512" alt="" loading="lazy" />
+        <div><p class="eyebrow">小さな毎日を、大切に。</p><h2 id="closing-title">うちの子を知ることから、<br />一緒にはじめましょう。</h2><a class="text-link" href="#try">体験できる環境を確認する <span aria-hidden="true">→</span></a></div>
       </section>
     </main>
     <footer class="site-footer">
-      <div class="site-footer__inner">
-        <span>© 2026 Hamster Care</span>
-        <nav class="footer-links" aria-label="フッターメニュー">
-          <a href="/privacy/">プライバシー</a>
-          <a href="/terms/">利用規約</a>
-          <a href="/commercial-transactions/">特商法表記</a>
-          <a href="/account-deletion/">アカウント削除</a>
+      <div class="wrap footer-inner">
+        <a class="brand" href="#top" aria-label="HamCare トップ"><span>HamCare</span></a>
+        <p>ハムスターとの暮らしを、知識と記録で支える。</p>
+        <nav class="legal-links" aria-label="法務・サポート">
+          <a href="https://hamster-breeding-app.web.app/terms/">利用規約</a>
+          <a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a>
+          <a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a>
+          <a href="https://hamster-breeding-app.web.app/support/">お問い合わせ</a>
         </nav>
+        <p class="footer-note">リンク先は現在公開中の法務・サポートページです。Previewの価格は未提供の検証表示で、現在の本番条件を変更するものではありません。</p>
+        <small>© 2026 HamCare · Preview</small>
       </div>
     </footer>
   </body>

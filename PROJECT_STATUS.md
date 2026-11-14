@@ -1,8 +1,20 @@
 # Hamster Care プロジェクト状況
 
-最終更新: 2026-11-09
+最終更新: 2026-11-14
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
+
+<!-- hamcare-web-first-task1-20261114:start -->
+## 2026-11-14 戦略C・タスク1：公式ランディングページ（Preview反映済み・本人承認待ち）
+
+- **範囲と保護**：本人指定の `feature/web-first-stripe-checkout` を、開始HEAD `f696b24663a2a03d7d55385f16a70cd6bcc8ee2c` からクリーンなworktreeに作成。元作業ツリーのdirty10件・未追跡2,110件・元HEADは維持し、コピー／stash／reset／clean／混在コミットなし。今回のタスク1だけを1コミットで保存し、タスク2へは本人承認後に進む。main merge／pushなし。
+- **実装**：`public/index.html` と専用CSSで「HamCareを試す」「有料会員について」の2入口、4機能の実画面、21日体験、FAQ、正式Google Playリンクを実装。Androidは登録済み日本Alphaテスター限定、iOS一般公開は準備中と明示。ログイン・申込・決済は未実装、申込CTAはdisabled。月額1種類だけ、550円税込／500円税抜は10%想定のPreview表示で、既存の本番Price・契約を変更しない。
+- **素材**：採用済みstable3種（syrian/golden、djungarian/normal、roborovski/normal）、既存アプリアイコン、Caveat＋OFL、公開フォーム用の実画面4点を再利用。新規AI送信・画面捏造・アバター再生成なし。画像の出典／SHA／表示例／個人情報目視確認は `public/assets/landing/provenance.json`。4画面は以前の公開用抜粋で、最新build5を撮り直したものではない。
+- **Preview**：[確認ページ](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/)。既存Hostingの別channel `web-first-task1` へ2026-11-14 14:58:32 JSTに反映、期限2026-11-21 14:58 JST。Preview version `6987069cc164351e`。`firebase.preview.json` のみ使用し、`--no-authorized-domains`、Functions／rewrites／ログイン／Stripe SDKなし。法務リンクは現在の公開URLへ向け、古い法務・billingページと内部素材台帳はPreview配信から除外、OFLはフォントと一緒に配信する。
+- **限定検証**：標準ライブラリの `tools/check_web_landing.py` は71/71 PASS、安全境界を崩す合成設定5ケースは5/5拒否PASS。Chromeレスポンシブ表示で360／390／768／1440pxの冒頭・画像と文章の折返しを目視、390pxで実画面4点を順に確認、360pxで料金／申込不可表示を確認。FAQはTab→Enterで展開、Spaceで折りたたみと可視フォーカスPASS。主要操作領域はCSSで44px以上を設定。CSSのreduced-motion／alt／見出し階層も確認。実機Safari／Androidブラウザ・支援技術の全組合せは未検証。アプリE2E／Flutter全体再試験は今回対象外。
+- **配信・本番不変**：PreviewのHTML／CSS／画像8点／フォント／OFL計12リソースはHTTP200・SHA一致・CSP／noindex／nosniff／no-referrer PASS。除外3経路は404。本番live version `2365135bf558c278` と11/12のrelease、公開PrivacyのSHA、Auth許可ドメイン3件は反映前後で不変。本番Hosting反映・Firestore書込み・Functions配備・Stripe操作・既存契約／テスター権限変更は**0件**。同じFirebaseプロジェクト内のPreview channel／静的コンテンツ反映は**1件**であり、プロジェクト全体の書込み0件とは区別する。
+- **確定方針と残り**：Firebase UIDを契約主体とし、将来のWebログイン／独自プラン確認／Stripe Embedded Checkout／テスト専用billing同期／Portalは後続タスク。年額・Pricing Table・Apple Webログイン・アプリCTA／Deep Link変更・本番税込550円課金は未実装／未実施。本人からの最新Apple回答共有は「Case22954972：独立Web購入は日本の代替決済条件の対象外」「Case103009817213：事前承認せず実際の提出で判断」。回答待ちへ戻さず、戦略CのApple承認済みとも扱わない。以下の旧日付節は当時の記録であり、本節の最新状態を優先する。
+<!-- hamcare-web-first-task1-20261114:end -->
 
 <!-- hamcare-ui-polish-release5-20261109:start -->
 ## 2026-11-09 微修正反映版code5／build5（Play未送信2変更・build5内部Testing）
@@ -1041,6 +1053,8 @@
 
 ## 現在地
 
+- **最新作業（2026-11-14）**：戦略Cのタスク1・公式LPを専用worktreeで実装し、独立Preview反映／限定検証済み。既存テスト配信・本番課金を維持し、Webログイン以降は本人承認待ち。Appleの回答共有と最新方針は上記11/14節を正とする。以下の配信・募集欄は旧時点の経緯で、今回ストア再監査・再テストは行わない。
+
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
 - 最優先タスク: `REL-02`のクローズド募集開始判断。Alpha code3・日本のみ・登録1名と11/2実opt-in0／12人以上14日・製品版申請無効を分離して確認済み。未投稿のX／YouTube募集原稿・参加案内と、応募／フィードバック各6問の実フォーム2件は本人追加承認後11/2 13:32 JST公開・回答受付PASS、現0回答。応募回答URLを募集原稿へ差し込み済みで、本人がXへ投稿すれば応募受付できる状態。投稿・招待・tester追加は今回行わず、採用後Alpha専用リスト案は未設定・別承認待ち。既存code3／build3配信・端末確認・88枚と限定12PASSは維持、Apple Case103009817213と決済判断は回答待ち。
@@ -1051,6 +1065,8 @@
 - 文書の扱い: 日付別節は当時の経緯・証拠として保持し、後続で解消した旧OS待ち・旧AI拒否・旧APK未導入を現在の残件へ戻さない。MATOMEは全体図、進捗の正本は本書。
 
 ## 次に着手する作業
+
+- **今回の停止点**：タスク1の1コミット後に停止。本人承認後だけタスク2「Webログイン」へ進む。以下の既存リリース計画は保持し、今回の範囲へ自動追加しない。
 
 1. `REL-02`：Alpha code3・日本のみを維持。11/2の許可登録1名／実opt-in0と、12名以上が申請直前14日連続で参加する条件を分離する。募集素材と応募／アンケート各6問の実フォームは本人追加承認後に公開・入力画面確認PASS、応募回答URLをX／YouTube原稿へ、feedback回答URLを採用後案内へ差し込み済み。本人が内容確認後にXへ投稿すれば受付可能。募集実投稿・招待・tester追加／Alpha専用リスト設定は今回行わず、共用internal-testersは増員しない。通常21日体験・最大20件／有限共有枠、既存権限、Apple決済判断保留を維持する。
 2. `REL-03`／`SEC-03`：Google本人OAuth→HamCare復帰→Home→再起動保持は現Releaseで本人PASS。DeviceCheckは登録・Release指定に加え、TestFlight更新時刻の交換HTTP200と対象iOS AppIDのVALID検証を組み合わせたサーバー計測で実動作PASS。個体SDK callback・token・expiryの直接観測は行っていない。既存AI／Apple／Google認証の再実行は不要。残る公開対象操作は既存回答・履歴で確認しAIを再送しない。
@@ -1140,6 +1156,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
+| `WEB-01` | タスク1 Preview完了・本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | LP／既存素材／71静的チェック／4幅目視／Preview内容一致PASS。ログイン・決済は未実装。月額550円税込はPreview限定。本番書込み0件、許可されたPreview反映1件。タスク2は本人承認後。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

@@ -1,5 +1,23 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+## 2026-11-14 Webファースト戦略C・タスク1（Preview限定）
+
+- 最新の本人決定はStripe継続、月額1種類、Firebase UID正本、独自プラン確認＋Embedded Checkout。年額／Pricing Tableは追加しない。今回の実装はLPのみで、ログイン・決済・Webhook・Portalは後続の個別承認タスク。現在のアプリ購入導線／既存Customer・Subscription・本番Price／テスターは変更しない。
+- 既存Apple問い合わせの最新回答は本人共有に基づく。Case22954972はユーザーが独立して発見したWeb上で開始・完了する購入が日本の代替決済ビジネス条件の対象外との案内、Case103009817213は提出前の事前承認を行わず実際の提出で判断との回答。以下の10/27節は受付当時の履歴であり、回答待ちを現在の状態へ戻さない。戦略CをApple事前承認済みとも書かない。
+- 専用ブランチ `feature/web-first-stripe-checkout`、クリーンworktreeで実装。本番の `firebase.json`／法務ページは変更なし。素材の原本は保持、Web用コピーと出典／SHAだけを追加。Web公開価格は550円税込／500円税抜（標準税率10%想定）のPreview専用表示。現行本番の請求条件との差を明記し、契約ボタンは無効化した。本番公開前に税務と最終請求額を照合する。
+- Preview URL：<https://hamster-breeding-app--web-first-task1-lco08m60.web.app/>。2026-11-14 14:58:32 JST反映、2026-11-21 14:58 JST期限。Androidリンクは正式Google Play詳細URLで、現在は日本の登録済みAlphaテスター向け。iOS一般公開は準備中、架空のストアリンクは作らない。
+- 専用設定 `firebase.preview.json` は静的Hostingだけ。API／Functions／rewritesなし、旧billing・法務・内部素材台帳は配信から除外。法務リンクは現行liveページへ向ける。CSPはスクリプト・外部通信・フォーム送信を禁止、noindex／no-referrer／nosniffを付与。フォントとOFLは配信に含める。
+- 再現確認：`python3 tools/check_web_landing.py` →71/71 PASS、合成unsafe設定5ケースはすべて拒否、`git diff --check` PASS。Chromeで360／390／768／1440pxを目視し、390pxの実画面4点・360pxの価格と申込不可・FAQキーボード開閉／可視フォーカスを確認。実機各ブラウザの網羅確認はしていない。配信12リソースのHTTP200／SHA一致／安全ヘッダー、除外3経路404を確認。
+- Preview反映時は既存のNode22環境と以下の専用コマンドを使用する。`firebase deploy` や live channelへの操作に置き換えない。Authドメインの自動追加も行わない。
+
+```sh
+firebase hosting:channel:deploy web-first-task1 --expires 7d --no-authorized-domains --project hamster-breeding-app --config firebase.preview.json --non-interactive
+```
+
+- 反映前後の本番Hosting live version `2365135bf558c278`／release時刻、公開PrivacyのSHA、Auth許可ドメイン3件が一致。本番Hosting反映・Firestore書込み・Functions配備・Stripe操作は0件、Preview反映は1件。非公開証拠はローカル監査領域へ保存し、資格情報・トークンはGitへ入れない。
+- タスク1は指定メッセージ `feat(web): add HamCare public landing page` の1コミットで終了する。本人がPreviewを承認するまでタスク2（Webログイン）、本番公開、main merge／pushを行わない。
+
+
 ## 2026-10-27 Apple App Reviewへの決済方式問い合わせ（受付確認・回答待ち）
 
 - 旧Apple Case22954972は10/27に代替配信／決済担当から当該窓口のscope外との回答を受領。これはStripe導線の可否回答ではない。本人承認の指定文面で、公式 https://developer.apple.com/contact/app-store/ から実窓口「App Review → App Review に関するその他のお問い合わせ → Eメール（公式フォーム）」を選び、2026-10-27 11:46:34 JSTにApp Review宛て新問い合わせを送信。受付結果公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認、新Case ID103009817213。回答は未受領で、A／B導線・Stripe維持条件の判断は回答待ち。

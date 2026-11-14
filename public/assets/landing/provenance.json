@@ -1,0 +1,143 @@
+{
+  "purpose": "Existing approved HamCare assets reused for isolated Web-first preview landing page; no new generated UI or avatar artwork.",
+  "asset_selection_date": "2026-11-14",
+  "brand": {
+    "accent": "#167f82",
+    "ink": "#234c5a",
+    "catchphrase": "うちの子と、もっと健康で幸せに"
+  },
+  "evidence_manifests": [
+    "store_assets/forms/closed_test_20261102/real_screens_20261106.json",
+    "store_assets/social/x_closed_test_20261102/production_manifest.json"
+  ],
+  "privacy_review": {
+    "method": "Each included visual was opened and inspected before selection.",
+    "result": "No email address, UID, authentication information, private person or pet name, pet/user photograph is visible in selected outputs. Existing published AI excerpts contain only a generic care question and answer.",
+    "new_ai_requests": 0,
+    "app_capture_or_rebuild": false,
+    "source_files_modified": false
+  },
+  "assets": [
+    {
+      "file": "avatar-syrian.png",
+      "source": "assets/avatars/syrian/golden/stable.png",
+      "source_sha256": "0a16cb725aff4dfb33d6c89735009b75a62b83432359d14555e50b67e125d50f",
+      "output_sha256": "a897666394c8fdbcafd3ad544b981529b84b1142f4f11bdd4f30c4c188555a5e",
+      "bytes": 176337,
+      "notes": "Adopted Syrian golden stable avatar; resized proportionally only. Existing alpha and illustration including original base preserved.",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    {
+      "file": "avatar-djungarian.png",
+      "source": "assets/avatars/djungarian/normal/stable.png",
+      "source_sha256": "e1a0c89539b5e5766767d972cc7a9bcce85a7aaecf6e483770866571ac79e635",
+      "output_sha256": "e1a0c89539b5e5766767d972cc7a9bcce85a7aaecf6e483770866571ac79e635",
+      "bytes": 209723,
+      "notes": "Adopted Djungarian normal stable avatar; unchanged PNG.",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    {
+      "file": "avatar-roborovski.png",
+      "source": "assets/avatars/roborovski/normal/stable.png",
+      "source_sha256": "38afe80abf2e3c725a542456217bde1a37eeb5e543d8b5a08901b76ae80a58b3",
+      "output_sha256": "38afe80abf2e3c725a542456217bde1a37eeb5e543d8b5a08901b76ae80a58b3",
+      "bytes": 149730,
+      "notes": "Adopted Roborovski normal stable avatar; unchanged PNG.",
+      "width": 512,
+      "height": 512,
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ]
+    },
+    {
+      "file": "hamcare-mark.png",
+      "source": "assets/branding/hamster_care_app_icon_master.png",
+      "source_sha256": "29b0f587d37686e2bc11ae9beb0a72173174503567dfe55568369dfce3f0d80f",
+      "output_sha256": "344c9d2e2dcf0d881696d60f7207f59d63fcc15eba80cb1acb3262c7c7c6c20d",
+      "bytes": 68080,
+      "notes": "Existing HamCare application icon; resized proportionally only.",
+      "width": 256,
+      "height": 256,
+      "mode": "RGB",
+      "alpha_range": null
+    },
+    {
+      "file": "screen-record.png",
+      "source": "store_assets/forms/closed_test_20261102/form_feature_record_20261106.png",
+      "source_sha256": "6a9ed9705f96f013d28ce9020b6a8b1ce6de6f145e42b576e6a21e13bf6af961",
+      "output_sha256": "6a9ed9705f96f013d28ce9020b6a8b1ce6de6f145e42b576e6a21e13bf6af961",
+      "bytes": 81960,
+      "notes": "Previously published form artwork made from actual app UI crops. Daily-condition entry menu and weight/memo input. 102 g is a screen example, not outcome evidence; not recaptured from current build.",
+      "width": 574,
+      "height": 578,
+      "mode": "RGB",
+      "alpha_range": null
+    },
+    {
+      "file": "screen-changes.png",
+      "source": "store_assets/forms/closed_test_20261102/form_feature_changes_20261106.png",
+      "source_sha256": "7344a68eb13a9357d2bfcf70fa9cdd58cbaa055dac67b5afc8cfdc6360112beb",
+      "output_sha256": "7344a68eb13a9357d2bfcf70fa9cdd58cbaa055dac67b5afc8cfdc6360112beb",
+      "bytes": 296891,
+      "notes": "Previously published actual activity comparison/evaluation excerpt: populated data, no graph claimed visible. Values are screen examples, not health improvement evidence; not recaptured from current build.",
+      "width": 574,
+      "height": 629,
+      "mode": "RGB",
+      "alpha_range": null
+    },
+    {
+      "file": "screen-ai.png",
+      "source": "store_assets/forms/closed_test_20261102/form_feature_ai_20261106.png",
+      "source_sha256": "2c01dc1d79a2ab90df2bdd2948012639e5d54345cae0781b079b0dd711376709",
+      "output_sha256": "2c01dc1d79a2ab90df2bdd2948012639e5d54345cae0781b079b0dd711376709",
+      "bytes": 335478,
+      "notes": "Previously published actual question/answer excerpts from store material. Text unmodified; private follow-up and pet photographs were excluded in existing published crop. No AI request was made for this page; not recaptured from current build.",
+      "width": 839,
+      "height": 809,
+      "mode": "RGB",
+      "alpha_range": null
+    },
+    {
+      "file": "screen-environment.png",
+      "source": "store_assets/forms/closed_test_20261102/form_feature_environment_20261106.png",
+      "source_sha256": "cfa1d7b75eec4238c9165a6b86e5ec973d08dc2fd23a3bf68d32049fd6afd293",
+      "output_sha256": "cfa1d7b75eec4238c9165a6b86e5ec973d08dc2fd23a3bf68d32049fd6afd293",
+      "bytes": 376611,
+      "notes": "Previously published actual temperature tab, evaluation and history excerpt. Temperature value is visible; no humidity value claimed. SwitchBot-supported environment monitoring, not automatic device control; not recaptured from current build.",
+      "width": 574,
+      "height": 984,
+      "mode": "RGB",
+      "alpha_range": null
+    },
+    {
+      "file": "Caveat-Bold.ttf",
+      "source": "assets/fonts/Caveat-Bold.ttf",
+      "source_sha256": "997fd1ca13c8e19572064462e5db0b1abd5ccce949334ec0921ed1fd7127b9d3",
+      "output_sha256": "997fd1ca13c8e19572064462e5db0b1abd5ccce949334ec0921ed1fd7127b9d3",
+      "bytes": 251560,
+      "notes": "Existing app brand font, redistributed unmodified under adjacent SIL Open Font License."
+    },
+    {
+      "file": "OFL.txt",
+      "source": "assets/fonts/OFL.txt",
+      "source_sha256": "163a2b400e16916ad3196296c946c526d0efce6baf22a2164269ffc62fb9f671",
+      "output_sha256": "163a2b400e16916ad3196296c946c526d0efce6baf22a2164269ffc62fb9f671",
+      "bytes": 4384,
+      "notes": "Existing complete Caveat SIL Open Font License, unchanged."
+    }
+  ]
+}
