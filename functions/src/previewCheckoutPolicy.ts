@@ -33,6 +33,8 @@ export interface PreviewCheckoutIdentity {
   /** Firebase Admin-verified identity, never the request body's UID. */
   uid: unknown;
   emailVerified: unknown;
+  /** Server-produced evidence only; never accepted from HTTP request bodies. */
+  authBasis?: 'verified_email' | 'apple_provider';
 }
 export interface PreviewCheckoutSourceDocument {
   kind: 'found' | 'missing' | 'denied' | 'unavailable';
@@ -100,11 +102,19 @@ function immediate(nowMillis: number): PreviewCheckoutDecision {
   return {...PLAN, chargeTiming: 'immediate', firstChargeAtSeconds: Math.floor(nowMillis / 1000)};
 }
 
+/** The HTTP boundary produces Apple evidence only after revoked-token and
+ * same-UID Admin provider-subject checks. A real false emailVerified value is
+ * preserved; provider identity confirmation is not email verification. */
+export function isPreviewIdentityConfirmed(identity: PreviewCheckoutIdentity): boolean {
+  if (identity.authBasis === 'apple_provider') return typeof identity.emailVerified === 'boolean';
+  return (identity.authBasis === undefined || identity.authBasis === 'verified_email') && identity.emailVerified === true;
+}
+
 export function assessPreviewCheckout(input: PreviewCheckoutPolicyInput): PreviewCheckoutDecision {
   const identity = input.identity;
   if (!identity || typeof identity.uid !== 'string' || identity.uid.length > 128 ||
       !/^[^/\s\u0000-\u001f\u007f]+$/u.test(identity.uid)) fail('unauthenticated');
-  if (identity.emailVerified !== true) fail('email_unverified');
+  if (!isPreviewIdentityConfirmed(identity)) fail('email_unverified');
   if (input.appAccountExists !== true) fail('app_account_required');
   if (input.planKey !== PLAN.planKey) fail('plan_not_allowed');
   const nowMillis = timestampMillis(input.now);

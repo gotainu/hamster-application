@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import {AppFacts, CheckoutError, hash, Identity, PREVIEW_ORIGIN, PreviewStore, SCOPE} from './engine';
+import {isPreviewIdentityConfirmed} from '../../functions/src/previewCheckoutPolicy';
 import {selectPreferredPaidSubscription} from '../../functions/src/stripeSubscriptionPriority';
 
 export const PREVIEW_PORTAL_PURPOSE = 'customer-portal-task6';
@@ -146,11 +147,11 @@ export function createPreviewPortalEngine(d: PreviewPortalDependencies) {
     // still allow payment-method management rather than inventing a grace period.
   }
   return {
-    async create(identity: (Pick<Identity, 'uid' | 'emailVerified'> & Partial<Pick<Identity, 'email'>>) | null | undefined): Promise<{testMode: true; url: string}> {
+    async create(identity: (Pick<Identity, 'uid' | 'emailVerified' | 'authBasis'> & Partial<Pick<Identity, 'email'>>) | null | undefined): Promise<{testMode: true; url: string}> {
       try {
         if (!identity || typeof identity.uid !== 'string' || identity.uid.length > 128 ||
             !/^[^/\s\u0000-\u001f\u007f]+$/u.test(identity.uid)) fail('unauthenticated');
-        if (identity.emailVerified !== true) fail('email_unverified');
+        if (!isPreviewIdentityConfirmed(identity)) fail('email_unverified');
         const now = d.now();
         if (!(now instanceof Date) || !Number.isSafeInteger(now.getTime()) || now.getTime() <= 0) fail('server_clock_invalid');
         const uid = identity.uid; const subject = hash(uid);

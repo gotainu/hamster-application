@@ -12,7 +12,7 @@ export interface PreviewStore {
   mutate<T>(subject: string, update: (state: RecordData) => {state: RecordData, result: T}): Promise<T>;
   reserveBudget(subject: string, day: string, attempt: string): Promise<void>;
 }
-export interface Identity { uid: string; emailVerified: boolean; email: string; }
+export interface Identity { uid: string; emailVerified: boolean; email?: string; authBasis?: 'verified_email' | 'apple_provider'; }
 export interface AppFacts { appAccountExists: boolean; billing: any; trial: any; nickname: string; maskedEmail: string; testDataSource?: 'app'|'preview_fixture'; }
 export interface EngineDependencies {
   stripe: Stripe; store: PreviewStore; priceId: string; publishableKey: string;
@@ -67,7 +67,7 @@ export function createPreviewEngine(d: EngineDependencies) {
     const matches = known ? {data:[known],has_more:false} : await d.stripe.customers.search({query:`metadata['previewScope']:'${SCOPE}' AND metadata['previewSubjectHash']:'${subject}'`,limit:2});
     if (matches.has_more || matches.data.length > 1) fail('customer_unresolved');
     let customer = known || matches.data[0];
-    if (!customer) customer = await d.stripe.customers.create({email:identity.email,metadata:{previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
+    if (!customer) customer = await d.stripe.customers.create({...(identity.email ? {email:identity.email}:{}),metadata:{previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
     ownCustomer(customer,subject);
     // Only an Admin-verified owner may bind the previously hash-only Test Customer.
     if(!customer.metadata.previewFirebaseUid)customer=await d.stripe.customers.update(customer.id,{metadata:{...customer.metadata,previewFirebaseUid:identity.uid}});

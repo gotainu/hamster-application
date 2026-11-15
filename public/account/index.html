@@ -68,7 +68,14 @@
         <div class="sign-in-divider" aria-hidden="true"><span>または</span></div>
         <button class="button google-button full-width" type="button" id="google-signin" disabled><img src="/assets/landing/google-g.png" width="20" height="20" alt="" />Googleでログイン</button>
         <p class="help-copy">アプリで使用したGoogleアカウントを選んでください。未登録のGoogleアカウントでは新しいログイン情報が作成される場合がありますが、体験・契約は自動で開始しません。</p>
-        <button class="button apple-button" type="button" id="apple-signin" aria-describedby="apple-signin-note" disabled><img src="/assets/landing/apple-sign-in-ja.png" width="780" height="162" alt="Appleでサインイン" /></button>
+        <section class="apple-linking-notice" aria-labelledby="apple-linking-title">
+          <h2 id="apple-linking-title">Appleログインの前に</h2>
+          <p id="apple-linking-description">Appleでログインすると、確認済みメールアドレス等が一致する既存のHamCareアカウントへ、Appleログイン方法が追加される場合があります。</p>
+          <p>同じHamCareアカウントの飼育記録・契約状態を引き続き利用できます。別アカウントのデータを自動で統合・コピーすることはありません。</p>
+          <p class="help-copy" id="apple-private-email-note">「メールを非公開」を選ぶと、Appleが発行する中継メールアドレスが利用されます。中継メールと他のメールアドレスを、文字の一致だけで同じ人と判断することはありません。</p>
+          <label class="apple-linking-choice" for="apple-linking-consent"><input id="apple-linking-consent" type="checkbox" aria-describedby="apple-linking-description apple-private-email-note" required disabled /><span>Appleログインを既存のHamCareアカウントへ関連付ける場合があることに同意します</span></label>
+        </section>
+        <button class="button apple-button" type="button" id="apple-signin" aria-describedby="apple-signin-note apple-linking-description" disabled><img src="/assets/landing/apple-sign-in-ja.png" width="780" height="162" alt="Appleでサインイン" /></button>
         <p class="apple-note" id="apple-signin-note">Appleログインは設定確認中です。Appleで作成したHamCareアカウントのWebログインは、現在ご利用いただけません。アプリのログイン状態や契約は変更しません。</p>
         <p id="session-note" class="session-note">共有端末では、確認後に必ずログアウトしてください。ログイン状態はこのタブのセッション内だけで保持します。</p>
         <div class="install-note"><h2>HamCareアカウントがない方へ</h2><p>先にHamCareアプリをインストールし、アプリ内でアカウントを作成してください。</p><a class="text-link" href="/#try">アプリの利用案内を見る <span aria-hidden="true">→</span></a></div>

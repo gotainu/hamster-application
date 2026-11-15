@@ -5,6 +5,12 @@ import test from 'node:test';
 import {maskEmail, loginMethods, safeAuthError, summarizeAccount} from '../public/assets/account-model.mjs';
 import {createAccountService} from '../public/assets/account-service.mjs';
 
+const PROJECT='demo-hamcare-preview-sync';
+const sdkTokenResult = user => {
+  const provider=user.providerData?.[0]?.providerId || 'password';
+  return {signInProvider:provider,claims:{aud:PROJECT,iss:'https://securetoken.google.com/'+PROJECT,sub:user.uid,user_id:user.uid,email_verified:user.emailVerified===true,firebase:{sign_in_provider:provider,identities:{}}}};
+};
+
 const missing = () => ({kind: 'missing'});
 const found = data => ({kind: 'found', data});
 const docs = overrides => ({owner: missing(), billing: missing(), trial: missing(), ...overrides});
@@ -170,11 +176,12 @@ function fakeService(overrides = {}) {
   let notify = () => {};
   const calls = [];
   const user = {uid: 'synthetic-subject-a', email: 'go@example.test', emailVerified: true, providerData: [{providerId: 'password'}]};
-  const auth = {currentUser: user, authStateReady: async () => { calls.push('auth-ready'); }};
+  const auth = {app:{options:{projectId:PROJECT}},currentUser: user, authStateReady: async () => { calls.push('auth-ready'); }};
   const sdk = {
     browserSessionPersistence: Symbol('Firebase session persistence'),
     onAuthStateChanged: (_auth, callback) => { notify = callback; return () => {}; },
     setPersistence: async (target, persistence) => { assert.equal(target, auth); assert.equal(persistence, sdk.browserSessionPersistence); calls.push('session-persistence'); },
+    getIdTokenResult: async (target,forceRefresh) => { assert.equal(forceRefresh,true);return sdkTokenResult(target); },
     doc: (_db, ...parts) => parts.join('/'),
     getDoc: async resource => { calls.push(resource); return {exists: () => true, data: () => resource.includes('owner_profiles') ? {displayName: 'Owner A'} : {status: 'active'}}; },
     signOut: async () => { auth.currentUser = null; notify(null); },
@@ -209,7 +216,7 @@ test('service reads only the four fixed documents belonging to the signed-in UID
 test('service refuses account reads for an unverified or signed-out identity', async () => {
   const {service, auth, calls} = fakeService();
   auth.currentUser.emailVerified = false;
-  await assert.rejects(service.readAccountSummary(), error => error.code === 'account/session-changed');
+  await assert.rejects(service.readAccountSummary(), error => error.code === 'account/identity-unverified');
   auth.currentUser = null;
   await assert.rejects(service.readAccountSummary(), error => error.code === 'account/session-changed');
   assert.deepEqual(calls, []);
@@ -222,6 +229,7 @@ test('delayed owner A results are refused after identity switch or logout', asyn
     const visible = [];
     service.onAuthChanged(value => visible.push(value));
     const pending = service.readAccountSummary();
+    await new Promise(resolve => setImmediate(resolve)); // Keep the delayed-document regression beyond the fresh-token boundary.
     if (action === 'switch') { auth.currentUser = {...auth.currentUser, uid: 'synthetic-subject-b'}; notify(); }
     else { await service.signOut(); assert.equal(visible.at(-1), null); }
     gate.resolve({exists: () => true, data: () => ({displayName: 'Stale Owner A'})});
@@ -236,6 +244,7 @@ test('Google pending hides the previous account and rejects stale reads until th
   const visible = [];
   service.onAuthChanged(value => visible.push(value));
   const oldRead = service.readAccountSummary();
+  await new Promise(resolve => setImmediate(resolve));
   const signingIn = service.signInGoogle();
   assert.equal(visible.at(-1), null, 'hide account details immediately while Google choice is pending');
   await assert.rejects(service.readAccountSummary(), error => error.code === 'account/session-changed');

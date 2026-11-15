@@ -6,6 +6,7 @@ import Stripe from 'stripe';
 import {CheckoutError,hash,PREVIEW_ORIGIN} from './engine';
 import {readPreviewFacts,subjectRef,parseWebhookConfig} from './preview-runtime';
 import {PREVIEW_SYNC_EVENT_TYPES} from './subscription-sync';
+import {authorizePreviewIdentity} from './auth-policy';
 import {createPreviewPortalEngine} from './portal-engine';
 
 const credentials=defineSecret('HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS');
@@ -42,8 +43,7 @@ export const createPreviewStripeCustomerPortalSession=onRequest({region:'us-cent
     const token=await getAuth().verifyIdToken(bearer.slice(7),true);
     if(!validUid(token.uid))throw new CheckoutError('unauthenticated');
     const user=await getAuth().getUser(token.uid);
-    if(user.disabled || !user.email || user.uid!==token.uid)throw new CheckoutError('unauthenticated');
-    if(token.email_verified!==true || !user.emailVerified)throw new CheckoutError('email_unverified');
+    const identity=authorizePreviewIdentity(token,user);
     const facts=await readPreviewFacts(user.uid);if(!facts.appAccountExists)throw new CheckoutError('app_account_required');
     const keys=JSON.parse(credentials.value());const config=JSON.parse(portalConfig.value());
     if(typeof keys.secretKey!=='string' || !keys.secretKey.startsWith('sk_test_') || !/^bpc_[A-Za-z0-9]+$/.test(config.configurationId))throw new CheckoutError('portal_configuration_invalid');
@@ -51,7 +51,7 @@ export const createPreviewStripeCustomerPortalSession=onRequest({region:'us-cent
     const stripe=new Stripe(keys.secretKey,{apiVersion:'2025-02-24.acacia',maxNetworkRetries:1,timeout:15000,telemetry:false});
     const engine=createPreviewPortalEngine({stripe,store:{read:async subject=>(await subjectRef(subject).get()).data()||{}},readFacts:readPreviewFacts,now:()=>new Date(),priceId:price.value().trim(),configurationId:config.configurationId,allowedWebhook:{id:wh.endpointId,url:wh.endpointUrl,events:PREVIEW_SYNC_EVENT_TYPES}});
     await reservePreviewPortalRequest(user.uid);
-    res.json(await engine.create({uid:user.uid,emailVerified:user.emailVerified,email:user.email}));
+    res.json(await engine.create(identity));
   }catch(error){
     // Never serialize SDK errors, bearer tokens, Portal URLs or billing identifiers.
     const raw=(error as any)?.code;

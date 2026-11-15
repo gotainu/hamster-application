@@ -230,3 +230,21 @@ for(const [name,change] of [['URL',{url:'https://untrusted.invalid'}],['ID',{id:
 test('Task5 binds verified Firebase UID using only preview-specific metadata',async()=>{const f=fixture();const {session,state}=await f.opened();const c=[...f.customers.values()][0];assert.equal(c.metadata.previewFirebaseUid,OWNER.uid);assert.equal(session.metadata.previewFirebaseUid,OWNER.uid);assert.equal(state.previewFirebaseUid,OWNER.uid);assert.equal(session.metadata.firebaseUid,undefined);assert.equal(session.client_reference_id,undefined);});
 test('Task5 safely binds a legacy hash-only Test Customer without duplicating it',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);const c=[...f.customers.values()][0];delete c.metadata.previewFirebaseUid;await f.create(await f.review());assert.equal(f.customers.size,1);assert.equal(c.metadata.previewFirebaseUid,OWNER.uid);});
 test('Task5 mismatched Firebase UID metadata is refused',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);[...f.customers.values()][0].metadata.previewFirebaseUid=OTHER.uid;await rejectsCode(()=>f.review(),'customer_unresolved');});
+
+test('confirmed no-email Apple UID creates the same scoped Test Checkout without an email attribute',async()=>{
+  const f=fixture();const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+  const before=copy(identity);const x=await f.opened(identity);
+  assert.equal(x.quote.amount,550);assert.equal(f.calls.sessionCreate[0].params.line_items[0].quantity,1);
+  const sent=f.calls.customerCreate[0].params;assert.equal(Object.hasOwn(sent,'email'),false);
+  assert.equal(sent.metadata.previewFirebaseUid,OWNER.uid);assert.equal(sent.metadata.previewSubjectHash,f.subject(identity));
+  assert.deepEqual(identity,before);assert.equal(x.result.testMode,true);
+});
+test('Apple provider confirmation preserves exact preexisting trial end without extension or reset',async()=>{
+  const f=fixture();const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+  const original={appAccountExists:true,billing:missing(),trial:trial(),nickname:'合成',maskedEmail:'未設定'};
+  f.facts.set(OWNER.uid,original);const before=copy(original);const x=await f.opened(identity);
+  assert.equal(x.quote.billing.kind,'trial');assert.equal(f.calls.sessionCreate[0].params.subscription_data.trial_end,Math.ceil(original.trial.data.endsAt.getTime()/1000));assert.deepEqual(original,before);
+});
+for(const authBasis of [undefined,'verified_email','custom'])test('Checkout unverified non-Apple identity cannot create Customer: '+String(authBasis),async()=>{
+  const f=fixture();await rejectsCode(()=>f.review({uid:OWNER.uid,emailVerified:false,authBasis}),'email_unverified');assert.equal(f.calls.customerCreate.length,0);assert.equal(f.calls.sessionCreate.length,0);
+});

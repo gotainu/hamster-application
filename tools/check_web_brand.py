@@ -246,7 +246,7 @@ def main():
     check('original Firebase config unchanged', (ROOT/path).read_bytes()==baseline(path))
     auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
     auth_entry=(PUBLIC/'assets/account.mjs').read_text()
-    check('Apple addition retains explicit disabled capability and SDK Popup','appleSignInEnabled = false' in auth_service and 'appleSignInEnabled: false' in auth_entry and "new sdk.OAuthProvider('apple.com')" in auth_service and 'sdk.signInWithPopup(auth, provider)' in auth_service)
+    check('Apple service defaults off and configured entry explicitly opts in to SDK Popup','appleSignInEnabled = false' in auth_service and 'appleSignInEnabled: true' in auth_entry and 'appleSignInEnabled: false' not in auth_entry and "new sdk.OAuthProvider('apple.com')" in auth_service and 'sdk.signInWithPopup(auth, provider)' in auth_service)
     for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
         check('existing brand unchanged for Checkout ' + path, (ROOT / path).read_bytes() == baseline(path, CHECKOUT_BASE))
     account_css=(PUBLIC/'assets/account.css').read_text()
@@ -256,6 +256,8 @@ def main():
     check('Apple full button is the unchanged official ja_JP PNG',apple.get('source','').startswith('https://appleid.cdn-apple.com/appleid/button?') and 'locale=ja_JP' in apple.get('source','') and apple.get('source_sha256')==apple.get('output_sha256')=='d89d74eefcf88d09c3207351cef5290dedc2e2d71f08c8bf45a6b41e7d88d25a' and sha256(apple_image.read_bytes()).hexdigest()==apple['source_sha256'])
     check('Apple graphic preserves official size and accessible wording',apple.get('width')==780 and apple.get('height')==162 and 'alt="Appleでサインイン"' in (PUBLIC/'account/index.html').read_text())
     check('Apple touch target stays 54px and graphic retains aspect ratio','width: 100%; min-height: 54px' in account_css and 'width: min(100%, 260px); height: auto' in account_css)
+    check('Apple association checkbox has a 64px label and separate 22px control','min-height: 64px' in account_css and '.account-card .apple-linking-choice input[type="checkbox"]' in account_css and 'flex: 0 0 22px' in account_css)
+    check('Apple association notice keeps accessible colors and forced-color fallback','Appleログインの前に' in (PUBLIC/'account/index.html').read_text() and '.apple-linking-notice h2' in account_css and '.apple-linking-notice p' in account_css and '@media (forced-colors: active) { .apple-linking-notice' in account_css)
     presentation_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs', 'checkout-model.mjs', 'checkout-view.mjs'))
     check('presentation has no business writer, custom storage or direct payment transport', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch|fetchRequest)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|api\.stripe|cloudfunctions\.net|run\.app', presentation_code))
     for filename in ('screen-record.png', 'screen-changes.png', 'screen-ai.png', 'screen-environment.png'):

@@ -158,3 +158,18 @@ test('policy result has approved non-sensitive fields only', () => {
   assert.doesNotMatch(JSON.stringify(result), /cus_|sub_|price_|synthetic-owner|email|token/i);
   assert.equal(result.unitAmount, 550); assert.equal(result.currency, 'jpy'); assert.equal(result.interval, 'month');
 });
+
+// authBasis is produced only by the Preview HTTP boundary after revoked-token
+// verification and exact same-UID Apple binding checks, never by request bodies.
+test('server-confirmed Apple identity keeps false emailVerified and approved 550JPY policy',()=>{
+  const identity=Object.freeze({uid:'synthetic-owner',emailVerified:false,authBasis:'apple_provider'});
+  immediate({identity});assert.equal(identity.emailVerified,false);
+});
+for(const [name,identity] of [
+ ['unconfirmed false',{uid:'synthetic-owner',emailVerified:false}],
+ ['verified-email false',{uid:'synthetic-owner',emailVerified:false,authBasis:'verified_email'}],
+ ['unknown basis',{uid:'synthetic-owner',emailVerified:true,authBasis:'custom'}],
+ ['Apple missing flag',{uid:'synthetic-owner',authBasis:'apple_provider'}],
+ ['Apple string flag',{uid:'synthetic-owner',emailVerified:'false',authBasis:'apple_provider'}],
+])test('identity confirmation rejects '+name,()=>rejected({identity},'email_unverified'));
+test('confirmed Apple still requires an existing application pet profile',()=>rejected({identity:{uid:'synthetic-owner',emailVerified:false,authBasis:'apple_provider'},appAccountExists:false},'app_account_required'));

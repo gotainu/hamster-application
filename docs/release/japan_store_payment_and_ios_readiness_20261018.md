@@ -1,6 +1,59 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-15 戦略C・タスク7：Apple Webログイン（Web実装準備／一般有効化保留・本人設定と安全方式判断待ち）
+## 2026-11-15 戦略C・タスク8：Apple Webログイン有効化（実装・実UID一致確認済み／実購入E2E保留）
+
+準備コミット `94571d9a71af` は本人承認済みで改変しない。事前明示同意付きのFirebase標準trusted-provider連携を許容し、独自メール比較によるUID統合・別UIDへのコピーをしない方針で実装した。1メール1アカウント、既存メール／Google、UID基準のCustomer・Subscription・Webhook／billing構造は維持。実Appleログイン・UID一致は確認した一方、本人アカウントのpetガードで実購入E2Eは保留であり、全要件完了とは扱わない。
+
+### 設定・同意・認証方式
+
+| 項目 | 最終結果 |
+| --- | --- |
+| Services ID／Primary | `com.gotainu.hamster.web` を本人のRegister後に確認し、既存HamCare Primary App IDへ関連付けて保存。既存Bundle ID・Team・native設定を維持。 |
+| Domain／Return URL | 固定 `hamster-breeding-app.firebaseapp.com`／`https://hamster-breeding-app.firebaseapp.com/__/auth/handler` を確認概要からSave。固定handlerでの実Chrome Appleログイン成功で経路を確認。一時Preview URLのApple登録・live Hosting公開なし。 |
+| Key／Firebase | 既存Sign in with Appleキーを再利用し、新規作成／失効／置換なし。本人がFirebaseへ鍵を直接入力・保存し、Service／Team／Key参照・秘密鍵設定の一致を値非表示で確認。Key ID・秘密値・個人UID等を本書／Gitへ保存しない。 |
+| 明示同意 | 標準仕様の既存アカウント関連付け、非公開メール中継、独自統合／コピーなしを事前説明。未同意ではUI／serviceとも開始不可。取消・ログアウト等で同意を消去、公式Appleボタンを維持。 |
+| Popup／Redirect | 現cross-origin Previewでは標準SDK Popup。同一origin固定authDomain＋モバイルSafari＋短期同意状態が回復可能な場合だけRedirectを選択。マーカーは15分の非秘密同意情報だけでSDK state／nonce／CSRFの代用にしない。実Safari OAuth／Redirectは未確認。 |
+
+### 実Appleログイン・本人UIDの比較
+
+- 最初のメールexact1件lookupは一致0件だったが、その入力元はiPhone Apple ID設定だったと本人確認できた。HamCare未登録の証明とは扱わず、追加メール探索・全Auth一覧取得へ広げなかった。全Auth一覧は自動承認レビューが本人以外の個人情報取得として拒否し、コマンド未実行・取得0。
+- 本人がiPhoneの表示と既存Firebase Auth UID全文一致を確認し、非公開画面へUIDを直接入力。localId exact1件で既存Apple bindingを確認し、salt付き仮名証跡を準備した。その後、実Chrome Appleログイン済みWeb SDKと比較し、**projectMatch=true／appleProvider=true／uidMatch=true** を確認。nativeとWebが同じUIDで、メール状態は **emailPresent=false／emailVerified=false** のまま。実UID・メール・Apple subject・private入口／proof値は文書／ログへ転載しない。
+- 初回比較器のrecency=falseは、最終の静的診断で日時有効・未来ではない・15分超過と確認した。日時不正・Apple認証失敗・UID不一致とは扱わず、有効な通常Firebase sessionへ新しい15分制限を導入しない。
+- nativeのscope未指定経路とemailなし時のUID表示は限定読取りで確認したが、メール未取得の原因は断定しない。Webはemail／name scopeを要求したが、今回メールは正規フローでも補完されなかった。Auth管理編集・メール補完・Flutter変更は行わない。
+
+### メールなしAppleのPreview限定互換
+
+- `preview-functions/src/auth-policy.ts` はAdmin `verifyIdToken(...,true)` 後、token UIDと同じ有効Admin User・現在providerがApple・tokenのApple subject1件とAdmin provider binding1件の厳密一致から別`authBasis`を作る。実emailVerified=falseをtrueへ偽装しない。メール／Googleは従来のtokenとAdmin両側のverified条件を維持し、Google sessionへAppleがlink済みというだけでは例外にしない。
+- フロントもfresh SDK tokenのproject／issuer／UID／current provider／subject bindingを検証し、同UIDでもUserオブジェクト入替・logout・遅延結果は破棄する。transportは401だけ1回再検証し、ネットワーク／業務エラー／不明な決済結果は再送しない。authBasis・UID・メールはHTTP bodyへ渡さず、サーバーが独立検証する。
+- 未検証メールはStripeへ渡さず、Customer作成時はemail属性を省略。UID対応表・既存Customer再利用・Test 550円月額・元trial終了・Webhook／署名・lease・固定returnを維持する。本人認証の確認と有料権限の付与を混同せず、本番User.emailVerified・業務データは変更しない。
+
+### 限定動作結果と実購入E2Eの保留
+
+- 最終Previewをhard reloadしても再ログイン不要でaccount panelへ進み、メール確認未完了／読取り不能パネルでは止まらなくなった。一方、main_pet未登録案内とplan無効は維持された。
+- 実read-only billing APIは認証拒否ではなく`app_account_required`で停止し、Apple本人確認を通過した後の既存petガードが働いた。Stripe／Firestore writerは呼ばない。Native `PetProfileRepo`とWebの正本は同じ `users/{uid}/pet_profiles/main_pet` であり、別collectionへのパスずれは確認できなかった。この本人UIDのmain_pet登録は確認できず、理由を推測せずデータ作成／ガード回避をしない。
+- このため、**Apple経由の実Embedded決済・Webhook反映・Portal往復は未実施で保留**。既存の課金経路検証や今回の合成テストを、この実購入E2EのPASSへ読み替えない。実メール共有／非公開メールの別ケース、実同メールGoogle／Apple連携、実Safari OAuth、実スクリーンリーダーも未確認。同メール連携の証拠はEmulatorに限る。
+
+### 検証・Preview配備・本番保護
+
+- frontend316／backend445／policy91／Apple Auth・Firestore Emulator25／旧Auth Emulator15のruntime計**892件PASS**。静的LP84／account142／brand165の計**391件PASS**、TypeScript／`git diff --check` PASS。非公開照合helperのオフライン24件PASSは別枠で扱う。
+- 同じchannel `web-first-task1`、最終Preview version **`268f5115e3afec45`**、期限 **2026-11-22 15:37 JST**。新identity moduleを含む公開35 resourceのSHA／安全ヘッダー一致、除外6経路404を確認。Apple entry=true・同意必須、既存メール／Googleとブランド表示を維持する。
+- 更新対象は既存Preview Checkout／Portalの2 FunctionsだけでAPIからACTIVEを確認。他55 Functions（Task5 Webhookを含む）のstate／updateTimeは不変。CLIはcleanup policy未設定の後処理警告により終了1だったが、対象2件の配備成功・API ACTIVEを区別して記録し、cleanup設定は変更しない。Functions resource全体のhash一致までは主張しない。
+- live Hosting、Auth policy・Authorized domain、元アプリHEAD・dirty10件SHA・全2,120行status、無関係な保護12ファイルSHAは保持。承認済みApple Provider設定以外の本番認証方針・署名・Rules・ストア設定を変更しない。
+- 今回の新Auth作成・業務を含む本番Firestore／Stripe書込み・既存契約変更は0。新規Appleは専用Emulatorで検証し、既存Auth onCreateによるjourney書込みを迂回しない。private helperの個別readと、Authユーザー作成／本番業務writeを区別する。
+
+### Private Email Relayと次の確認
+
+FirebaseはDEFAULT送信・SMTPなし・custom domain未開始、確認／再設定／変更通知のsender local partはnoreply。既定Firebase送信元と必要な公開サポート送信元を、Apple DeveloperのServices → Sign in with Apple for Email Communication → Email Sourcesへ個別登録し、SPF／DKIMを確認する手順を整理した。[Apple公式手順](https://developer.apple.com/help/account/capabilities/configure-private-email-relay-service/)、[Firebase公式Apple設定](https://firebase.google.com/docs/auth/ios/apple)
+
+登録・配送試験は未実施。Stripe領収書／契約通知の実From・Return-Path／Dashboard設定も未確認で、推測による登録や大量のメール送信をしない。ログインとメール到達は別結果とする。実購入E2Eの再開には、本人の既存main_pet登録状態を通常経路で確認し、承認範囲内のテストアカウント条件を整える必要がある。今回データを新規作成したりガードを回避したりはしない。
+
+### 保存して停止
+
+今回の実装・設定・実Appleログイン・native↔Web UID一致確認を `feat(web): enable Sign in with Apple` の1コミットへ保存予定。実購入E2Eと未確認ケースは残件として維持し、全要件完了とはしない。コミット成立と最終hashはGit履歴・完了報告を参照する。準備コミットの改変／squash、main merge／push、live公開、本番課金・契約変更、Flutterアプリ変更を行わず、保存後停止する。
+
+## 2026-11-15 戦略C・タスク7：Apple Webログイン準備（94571d9a71af・本人承認済み）
+
+本人の追加指示で準備コミットを承認済み。以下の標準自動linkの扱い・停止条件は当時の履歴であり、現在は先頭のタスク8の新方針・確認結果を優先する。
 
 本人承認済みタスク6 `a2e73511ecef` から同じ専用ブランチ・PreviewでApple Webログインを準備。既存メール／Google・プラン・Embedded・Webhook・Portalは維持する。一方、Apple Developer設定と同一メール自動link／Auth新規作成時の本番書込みに未解決事項があり、一般有効化しない。今回分を `feat(web): add Sign in with Apple` の1コミットへ保存し、本人の設定完了返答後の読取り・表示確認結果も同じコミットへ含めて停止する。実Apple成功や全要件完了とは扱わない。
 

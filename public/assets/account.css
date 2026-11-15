@@ -115,3 +115,13 @@
 .account-shell .apple-button:disabled { opacity: 1; cursor: not-allowed; }
 .account-shell .apple-button:focus-visible { outline: 3px solid var(--hamcare-accent-cyan, #79e2dd); outline-offset: 4px; }
 @media (forced-colors: active) { .account-shell .apple-button { background: Canvas; color: CanvasText; border: 1px solid CanvasText; } .account-shell .apple-button img { forced-color-adjust: none; } }
+
+/* Apple association consent is separate from the email/Google login form. */
+.apple-linking-notice { margin-top: 24px; padding: 18px; border: 1px solid var(--hamcare-border, rgba(255,255,255,.2)); border-radius: 14px; background: var(--hamcare-bg-deep, #181a20); }
+.apple-linking-notice h2 { margin: 0; color: var(--hamcare-text-primary, #fff); font-size: 1rem; line-height: 1.8; }
+.apple-linking-notice p { margin-top: 12px; color: var(--hamcare-text-secondary, #c5cbd4); font-size: .875rem; line-height: 1.9; overflow-wrap: anywhere; }
+.account-card .apple-linking-choice { display: flex; align-items: flex-start; gap: 12px; min-height: 64px; margin-top: 18px; padding: 12px; border: 1px solid #8390a6; border-radius: 12px; color: var(--hamcare-text-primary, #fff); font-size: .875rem; line-height: 1.9; cursor: pointer; }
+.account-card .apple-linking-choice input[type="checkbox"] { flex: 0 0 22px; width: 22px; height: 22px; min-width: 22px; min-height: 22px; margin: 3px 0 0; padding: 0; border-radius: 4px; accent-color: var(--hamcare-accent-cyan, #79e2dd); }
+.apple-linking-choice > span { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .apple-linking-notice { padding: 16px 12px; } }
+@media (forced-colors: active) { .apple-linking-notice, .account-card .apple-linking-choice { background: Canvas; color: CanvasText; border-color: CanvasText; } .apple-linking-notice h2, .apple-linking-notice p { color: CanvasText; } .account-card .apple-linking-choice input[type="checkbox"] { appearance: auto; accent-color: auto; forced-color-adjust: auto; } }

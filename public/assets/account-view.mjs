@@ -1,3 +1,4 @@
+import { isVerifiedAccountIdentity } from './account-identity.mjs';
 import { createCheckoutController, clearPreviewBilling, renderPreviewBilling } from './checkout-view.mjs';
 import { projectPreviewBilling, projectPreviewPortalSession, portalErrorMessage } from './checkout-model.mjs';
 import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
@@ -10,6 +11,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   const form = element('email-form');
   const email = element('email');
   const password = element('password');
+  const appleConsent = element('apple-linking-consent');
   const error = element('auth-error');
   const status = element('auth-status');
   let epoch = 0;
@@ -39,6 +41,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   function clearPersonal() {
     currentSummary = null;
+    resetAppleConsent();
     previewRead++;
     portalOpening = false;
     previewReading = false;
@@ -79,10 +82,21 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     busy = value;
     element('email-fields').disabled = value;
     for (const id of ['google-signin', 'refresh-account', 'check-verification']) element(id).disabled = value;
-    element('apple-signin').disabled = value || service.appleSignInEnabled !== true;
+    updateAppleControl();
     element('review-plan').disabled = value || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
     form.setAttribute('aria-busy', String(value));
     status.textContent = message;
+  }
+
+  function updateAppleControl() {
+    const unavailable = busy || loggingOut || signInPending || service.appleSignInEnabled !== true;
+    appleConsent.disabled = unavailable;
+    element('apple-signin').disabled = unavailable || appleConsent.checked !== true;
+  }
+  function resetAppleConsent() {
+    appleConsent.checked = false;
+    appleConsent.removeAttribute('aria-invalid');
+    updateAppleControl();
   }
 
   function resetPassword() {
@@ -140,7 +154,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     }
   }
   async function refreshPreviewBilling({ fromPortal = false } = {}) {
-    if (!checkoutService?.getPreviewBilling || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || destroyed) return;
+    if (!checkoutService?.getPreviewBilling || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || destroyed) return;
     const request = ++previewRead;
     const generation = epoch;
     previewReading = true;
@@ -150,7 +164,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     for (const prefix of previewPrefixes) { clearPreviewBilling(prefix, 'Preview契約状態を確認しています。'); element(prefix + '-refresh').disabled = true; }
     try {
       const raw = await checkoutService.getPreviewBilling();
-      if (destroyed || generation !== epoch || request !== previewRead || !currentUser?.emailVerified) return;
+      if (destroyed || generation !== epoch || request !== previewRead || !isVerifiedAccountIdentity(currentUser)) return;
       const model = projectPreviewBilling(raw);
       for (const prefix of previewPrefixes) renderPreviewBilling(prefix, model);
       renderPortal(model);
@@ -174,7 +188,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     renderPortal(model);
   }
   async function openPortal() {
-    if (busy || portalOpening || !checkoutService?.createPreviewPortalSession || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || !previewModel?.portalManageable || destroyed) return;
+    if (busy || portalOpening || !checkoutService?.createPreviewPortalSession || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || !previewModel?.portalManageable || destroyed) return;
     const generation = epoch;
     const currentBillingRead = previewRead;
     portalOpening = true;
@@ -183,7 +197,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     element('account-portal-status').textContent = 'Stripeの安全な契約管理画面を準備しています。';
     try {
       const response = await checkoutService.createPreviewPortalSession();
-      if (destroyed || generation !== epoch || currentBillingRead !== previewRead || !currentUser?.emailVerified || !previewModel?.portalManageable) return;
+      if (destroyed || generation !== epoch || currentBillingRead !== previewRead || !isVerifiedAccountIdentity(currentUser) || !previewModel?.portalManageable) return;
       const url = projectPreviewPortalSession(response);
       // Never put this short-lived destination in DOM, browser storage or logs.
       window.location.assign(url);
@@ -210,7 +224,13 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       setPanel('login-panel', focus && !signInPending ? 'login-title' : null);
       return;
     }
-    if (!user.emailVerified) {
+    if (!isVerifiedAccountIdentity(user)) {
+      if (user.identityCheckFailed === true || user.maskedEmail === '未設定') {
+        setBusy(false);
+        setPanel('login-panel', focus ? 'login-title' : null);
+        showError(service.safeError({code: 'account/identity-unverified'}));
+        return;
+      }
       element('verification-email').textContent = user.maskedEmail || 'メールアドレスを確認してください';
       setBusy(false);
       setPanel('verification-panel', focus ? 'verification-title' : null);
@@ -222,7 +242,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     setPanel('loading-panel');
     try {
       const summary = await service.readAccountSummary();
-      if (destroyed || request !== epoch || !currentUser || !currentUser.emailVerified) return;
+      if (destroyed || request !== epoch || !currentUser || !isVerifiedAccountIdentity(currentUser)) return;
       currentSummary = summary;
       element('account-nickname').textContent = summary.nickname || '未設定';
       element('account-email').textContent = summary.maskedEmail || user.maskedEmail || '確認できませんでした';
@@ -291,7 +311,23 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   const onGoogle = () => { void signIn(() => service.signInGoogle()); };
   element('google-signin').addEventListener('click', onGoogle);
-  const onApple = () => { if (service.appleSignInEnabled === true) void signIn(() => service.signInApple()); };
+  const onAppleConsent = () => { appleConsent.removeAttribute('aria-invalid'); updateAppleControl(); };
+  appleConsent.addEventListener('change', onAppleConsent);
+  const onApple = () => {
+    if (busy || loggingOut || signInPending || service.appleSignInEnabled !== true) return;
+    if (appleConsent.checked !== true) {
+      appleConsent.setAttribute('aria-invalid', 'true');
+      showError('Appleログインの関連付けについて確認し、同意してください。');
+      appleConsent.focus();
+      return;
+    }
+    // A fresh explicit choice is required for every attempt. Never persist it or
+    // place it in an OAuth URL; the service also requires this strict boolean.
+    void signIn(async () => {
+      try { await service.signInApple({linkingConsent: true}); }
+      finally { resetAppleConsent(); }
+    });
+  };
   element('apple-signin').addEventListener('click', onApple);
   if (service.appleSignInEnabled === true) element('apple-signin-note').textContent = 'HamCareアプリで使用したAppleアカウントを選んでください。別のAppleアカウントでは新しいログイン情報が作成される場合がありますが、体験・契約は自動で開始しません。';
   const onToggle = () => {
@@ -347,19 +383,19 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('check-verification').addEventListener('click', onVerify);
 
   const onPlan = () => {
-    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true) return;
+    if (busy || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true) return;
     // Re-read the same UID-scoped documents; do not rely on stale account text.
     void renderUser(currentUser, { focus: true, plan: true });
   };
   element('review-plan').addEventListener('click', onPlan);
   const onBack = () => {
-    if (!currentUser?.emailVerified || currentUser.isNewUser) return;
+    if (!isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser) return;
     setPanel('account-panel', 'confirm-title');
   };
   element('back-to-account').addEventListener('click', onBack);
   const onPlanChoice = () => {
     const option = element('premium-monthly');
-    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+    if (busy || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
       option.checked = false;
       return;
     }
@@ -372,14 +408,14 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   };
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
-  if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
-  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && currentSummary?.appAccountExists === true && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
+  if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (isVerifiedAccountIdentity(currentUser)) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
+  const onCheckout = () => { if (!busy && isVerifiedAccountIdentity(currentUser) && !currentUser.isNewUser && currentSummary?.appAccountExists === true && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
   element('plan-checkout').addEventListener('click', onCheckout);
   const onPortal = () => { void openPortal(); };
   element('account-portal-open').addEventListener('click', onPortal);
-  const onPreviewRefresh = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser) void refreshPreviewBilling(); };
+  const onPreviewRefresh = () => { if (!busy && isVerifiedAccountIdentity(currentUser) && !currentUser.isNewUser) void refreshPreviewBilling(); };
   for (const prefix of previewPrefixes) element(prefix + '-refresh').addEventListener('click', onPreviewRefresh);
-  const onPopState = () => { if (!element('checkout-panel').hidden && currentUser?.emailVerified) void checkout?.resume(); };
+  const onPopState = () => { if (!element('checkout-panel').hidden && isVerifiedAccountIdentity(currentUser)) void checkout?.resume(); };
   window.addEventListener('popstate', onPopState);
 
   const onPageHide = () => {
@@ -435,6 +471,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     form.removeEventListener('submit', onSubmit);
     element('google-signin').removeEventListener('click', onGoogle);
     element('apple-signin').removeEventListener('click', onApple);
+    appleConsent.removeEventListener('change', onAppleConsent);
     element('toggle-password').removeEventListener('click', onToggle);
     element('logout').removeEventListener('click', onLogout);
     element('refresh-account').removeEventListener('click', onRefresh);

@@ -307,3 +307,11 @@ for(const [name,value] of [['retention',{type:'coupon_offer',coupon_offer:{coupo
 test('explicit null retention is compatible with no retention offer',async()=>{
   const f=fixture();f.options.config.features.subscription_cancel.retention=null;await f.create();
 });
+
+test('same bound no-email Apple identity can manage Test subscription while false flag stays false',async()=>{
+  const f=fixture();const identity=Object.freeze({...OWNER,emailVerified:false,authBasis:'apple_provider'});
+  const before=copy(f.options);const result=await f.create(identity);assert.equal(result.testMode,true);assert.equal(identity.emailVerified,false);assert.deepEqual(f.options,before);assert.deepEqual(f.calls.store,[SUBJECT]);
+});
+for(const authBasis of [undefined,'verified_email','custom'])test('Portal unverified non-Apple identity rejects '+String(authBasis),async()=>{
+  const f=fixture();await rejects(f,'email_unverified',{...OWNER,emailVerified:false,authBasis});assert.equal(f.calls.facts.length,0);assert.equal(f.calls.store.length,0);
+});

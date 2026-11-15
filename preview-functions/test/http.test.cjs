@@ -21,3 +21,15 @@ test('annual and arbitrary plan keys are rejected',async()=>{for(const planKey o
 test('GET, wrong content type, query credentials and oversized body are rejected',async()=>{for(const extra of [{method:'GET'},{is:()=>false},{query:{idToken:'synthetic'}},{rawBody:Buffer.alloc(2049)}]){verifyCalls=0;const r=await run(request(extra));assert.equal(r.value.code,'request_invalid');assert.equal(verifyCalls,0);}});
 test('unverified emails and disabled users are rejected before backend initialization',async()=>{for(const disabled of [false,true]){auth.verifyIdToken=async()=>({uid:'synthetic-a',email_verified:false});auth.getUser=async()=>({uid:'synthetic-a',email:'synthetic@example.test',emailVerified:false,disabled});const r=await run(request());assert.equal(r.value.code,disabled?'unauthenticated':'email_unverified');}});
 test('all data responses retain no-store and no-referrer',async()=>{const r=await run(request({get:k=>k==='Origin'?origin:undefined}));assert.equal(r.headers['X-Content-Type-Options'],'nosniff');assert.equal(r.headers['Referrer-Policy'],'no-referrer');assert.match(r.headers['Cache-Control'],/no-store/);});
+
+test('Checkout HTTP accepts exact no-email Apple identity only after revoked-token verification and still requires app profile',async()=>{
+  const runtime=require('../lib/preview-functions/src/preview-runtime');const original=runtime.readPreviewFacts;
+  const user={uid:'synthetic-apple-owner',disabled:false,emailVerified:false,providerData:[{providerId:'apple.com',uid:'synthetic-apple-subject'}]};const before=structuredClone(user);let verifiedRevocation,readUid;
+  auth.verifyIdToken=async(_token,revoked)=>{verifiedRevocation=revoked;return {uid:user.uid,email_verified:false,firebase:{sign_in_provider:'apple.com',identities:{'apple.com':['synthetic-apple-subject']}}};};auth.getUser=async()=>user;
+  runtime.readPreviewFacts=async uid=>{readUid=uid;return {appAccountExists:false};};
+  try{const r=await run(request({path:'/billing'}));assert.equal(r.value.code,'app_account_required');assert.equal(verifiedRevocation,true);assert.equal(readUid,user.uid);assert.deepEqual(user,before);assert.doesNotMatch(JSON.stringify(r.value),/synthetic|apple|uid|email/);}finally{runtime.readPreviewFacts=original;}
+});
+test('Checkout HTTP never accepts authentication evidence from request bodies',async()=>{
+  let calls=0;auth.verifyIdToken=async()=>{calls++;throw Error('must not authenticate');};
+  for(const operation of ['review','session','status','cancel','billing'])for(const field of ['authBasis','emailVerified','identityVerified','authenticationBasis']){const r=await run(request({path:'/'+operation,body:{planKey:'premium_monthly',[field]:'apple_provider'}}));assert.equal(r.statusCode,400);}assert.equal(calls,0);
+});

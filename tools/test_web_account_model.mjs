@@ -24,7 +24,7 @@ for(const [code,expected] of [['account/apple-setup-required',/設定確認中/]
   assert.match(message,expected);assert.doesNotMatch(message,/synthetic-private|token|privaterelay|account\//);
 });
 for(const code of ['auth/account-exists-with-different-credential','auth/credential-already-in-use'])test('provider collision '+code+' directs the original app method rather than merging',()=>{
-  assert.match(safeAuthError({code}),/アプリ.*ログイン方法/);assert.match(safeAuthError({code}),/自動統合は行いません/);
+  assert.match(safeAuthError({code}),/アプリ.*ログイン方法/);assert.match(safeAuthError({code}),/独自のアカウント統合は行いません/);
 });
 for(const [name,pet,expected] of [['found',{kind:'found'},true],['missing',{kind:'missing'},false],['denied',{kind:'denied'},null],
   ['unavailable',{kind:'unavailable'},null],['absent',undefined,null],['malformed',{kind:'other'},null]])test('app existence '+name+' controls plan-selection hint without granting entitlement',()=>{
@@ -36,4 +36,11 @@ for(const [name,pet,expected] of [['found',{kind:'found'},true],['missing',{kind
 test('existing paid app billing still uses management route even when app profile exists',()=>{
   const data=docs({kind:'found'});data.billing={kind:'found',data:{plan:'paid',status:'active'}};
   const summary=summarizeAccount(user,data);assert.equal(summary.planReview.route,'manage');assert.equal(summary.planReview.canSelectPlan,false);
+});
+
+for(const [code,pattern] of [['account/apple-consent-required',/関連付け.*同意/],['account/apple-redirect-unavailable',/安全に戻れません/],
+  ['auth/operation-not-allowed',/ログイン設定/],['auth/invalid-oauth-client-id',/ログイン設定/],
+  ['auth/unauthorized-domain',/ログイン設定/],['auth/missing-or-invalid-nonce',/ログイン情報/],['auth/invalid-auth-event',/ログイン情報/]])test('Apple setup/consent/return failure remains safe Japanese '+code,()=>{
+  const message=safeAuthError({code,message:'private-token synthetic-subject',customData:{email:user.email,uid:user.uid}});
+  assert.match(message,pattern);assert.doesNotMatch(message,/private-token|synthetic|appleid|auth\/|account\//);
 });

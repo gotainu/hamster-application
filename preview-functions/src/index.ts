@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 import {CheckoutError,createPreviewEngine,hash,PREVIEW_ORIGIN,PreviewStore,RecordData} from './engine';
 import {readPreviewFacts,parseWebhookConfig} from './preview-runtime';
 import {readPreviewBilling} from './billing-view';
+import {authorizePreviewIdentity, validPreviewUid} from './auth-policy';
 import {PREVIEW_SYNC_EVENT_TYPES} from './subscription-sync';
 export {stripePreviewWebhook} from './webhook';
 export {createPreviewStripeCustomerPortalSession} from './portal';
@@ -33,7 +34,7 @@ const store: PreviewStore={
     });
   },
 };
-function maskEmail(value:string):string {const [name,domain]=value.split('@');return domain?name.slice(0,2)+'***@'+domain:'未設定';}
+function maskEmail(value?:string):string {if(typeof value!=='string')return '未設定';const [name,domain]=value.split('@');return domain?name.slice(0,2)+'***@'+domain:'未設定';}
 const allowedErrors=new Set(['unauthenticated','email_unverified','app_account_required','plan_not_allowed','billing_unresolved','existing_subscription','already_subscribed','subscription_unresolved','trial_unresolved','trial_invalid','trial_too_short','server_clock_invalid','test_mode_required','test_configuration_invalid','price_mismatch','customer_unresolved','confirmation_required','review_expired','processing','preview_limit','checkout_unresolved','session_expired','test_webhook_unresolved']);
 
 export const createPreviewStripeCheckoutSession=onRequest({region:'us-central1',secrets:[credentials,price,webhook],maxInstances:2,concurrency:10,timeoutSeconds:60,memory:'256MiB',invoker:'public',cors:false},async(req,res)=>{
@@ -50,18 +51,17 @@ export const createPreviewStripeCheckoutSession=onRequest({region:'us-central1',
   try {
     const bearer=req.get('Authorization');if(!bearer?.startsWith('Bearer ')||bearer.length>8192)throw new CheckoutError('unauthenticated');
     const token=await getAuth().verifyIdToken(bearer.slice(7),true);
+    if(!validPreviewUid(token.uid))throw new CheckoutError('unauthenticated');
     const user=await getAuth().getUser(token.uid);
-    if(user.disabled||!user.email)throw new CheckoutError('unauthenticated');
-    if(token.email_verified!==true||!user.emailVerified)throw new CheckoutError('email_unverified');
+    const identity=authorizePreviewIdentity(token,user);
     if(operation==='billing'){const facts=await readPreviewFacts(user.uid);if(!facts.appAccountExists)throw new CheckoutError('app_account_required');res.json(await readPreviewBilling(user.uid));return;}
     const config=JSON.parse(credentials.value());
     if(typeof config.secretKey!=='string'||!config.secretKey.startsWith('sk_test_')||typeof config.publishableKey!=='string'||!config.publishableKey.startsWith('pk_test_'))throw new CheckoutError('test_configuration_invalid');
     const stripe=new Stripe(config.secretKey,{apiVersion:'2025-02-24.acacia',maxNetworkRetries:1,timeout:20000,telemetry:false});
     const wh=parseWebhookConfig(webhook.value());
     const engine=createPreviewEngine({stripe,store,priceId:price.value().trim(),publishableKey:config.publishableKey,allowedWebhook:{id:wh.endpointId,url:wh.endpointUrl,events:PREVIEW_SYNC_EVENT_TYPES},now:()=>new Date(),readFacts:async uid=>{
-      const facts=await readPreviewFacts(uid);return {...facts,maskedEmail:maskEmail(user.email!)};
+      const facts=await readPreviewFacts(uid);return {...facts,maskedEmail:maskEmail(identity.email)};
     }});
-    const identity={uid:user.uid,emailVerified:user.emailVerified,email:user.email};
     // Read-only auth/account verification applies to every operation, including status/cancel.
     if(operation==='review')res.json(await engine.review(identity,body.planKey));
     else if(operation==='session')res.json(await engine.create(identity,body));
