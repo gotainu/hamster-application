@@ -1,4 +1,5 @@
 import { PREMIUM_MONTHLY } from './plan-model.mjs';
+import { confirmsMissingEmailReview } from './checkout-service.mjs';
 
 const fail = () => { throw { code: 'preview/invalid-response' }; };
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -8,10 +9,16 @@ const dateLabel = value => new Intl.DateTimeFormat('ja-JP', {
 }).format(new Date(value)) + '（日本時間）';
 
 /** Validate only server-provided quote facts. Never infer access or accept browser prices. */
-export function projectCheckoutReview(raw) {
+export function projectCheckoutReview(raw, verifyMissingEmailReview) {
   if (!record(raw) || raw.testMode !== true || raw.planKey !== PREMIUM_MONTHLY.key || raw.amount !== 550 || String(raw.currency).toLowerCase() !== 'jpy' || raw.interval !== 'month') fail();
   if (typeof raw.reviewToken !== 'string' || !/^[A-Za-z0-9_-]{16,512}$/.test(raw.reviewToken)) fail();
-  if (!record(raw.account) || typeof raw.account.maskedEmail !== 'string' || !/^[^@\s]{1,2}\*{3}@[^@\s]+\.[^@\s]+$/.test(raw.account.maskedEmail)) fail();
+  if (!record(raw.account) || typeof raw.account.maskedEmail !== 'string') fail();
+  const maskedEmail = /^[^@\s]{1,2}\*{3}@[^@\s]+\.[^@\s]+$/.test(raw.account.maskedEmail);
+  // A bare display string is not evidence. Only the transport's exact response
+  // object, checked against the current Apple identity and own profiles, qualifies.
+  const verifiedMissingEmail = raw.account.maskedEmail === '未設定' &&
+    confirmsMissingEmailReview(raw, verifyMissingEmailReview);
+  if (!maskedEmail && !verifiedMissingEmail) fail();
   const fixture = raw.testDataSource === 'preview_fixture';
   if (raw.testDataSource !== undefined && !['app', 'preview_fixture'].includes(raw.testDataSource)) fail();
   const billing = raw.billing;

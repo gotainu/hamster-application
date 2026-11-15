@@ -18,11 +18,19 @@ def baseline(path, revision=AUTH_BASE):
     return subprocess.check_output(['git','show',f'{revision}:{path}'],cwd=ROOT)
 
 def auth_entry_without_checkout(source):
-    """Only the reviewed Task 4 mount/return integration may change Auth entry."""
+    """Only scoped Checkout mounting and the exact own-profile reader may differ."""
     return (source
         .replace('appleSignInEnabled: true, ', '')
         .replace("import { createPreviewCheckoutService } from './checkout-service.mjs';\n", '')
         .replace('  const checkoutService = createPreviewCheckoutService({auth});\n', '')
+        .replace("""  const checkoutService = createPreviewCheckoutService({auth, readOwnProfiles: async uid => {
+    const [owner, pet] = await Promise.all([
+      dbSDK.getDoc(dbSDK.doc(db, 'users', uid, 'owner_profiles', 'main')),
+      dbSDK.getDoc(dbSDK.doc(db, 'users', uid, 'pet_profiles', 'main_pet')),
+    ]);
+    return {ownerExists: owner.exists(), petExists: pet.exists()};
+  }});
+""", '')
         .replace("  const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';\n", '')
         .replace("  if (resumeCheckout) history.replaceState(null, '', '/account/');\n", '')
         .replace('await mountAccountPage(service, {checkoutService, resumeCheckout});', 'await mountAccountPage(service);'))
@@ -95,7 +103,7 @@ def main():
     check('Redirect is limited to same-origin mobile Safari with recoverable consent state',all(value in auth_service for value in ('redirectStateAvailable !== true',"page.protocol !== 'https:'",'page.origin !== `https://${authDomain}`',"return ios && safari ? 'redirect' : 'popup'",'sdk.getRedirectResult(auth)','sdk.signInWithRedirect(auth, provider)')))
     check('Task7 does not change Preview CSP or hosting configuration',(ROOT/'firebase.preview.json').read_bytes()==baseline('firebase.preview.json',APPLE_BASE))
     entry=(PUBLIC/'assets/account.mjs').read_text()
-    check('Auth entry unchanged except reviewed Checkout mount and explicit Apple opt-in',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
+    check('Auth entry unchanged except scoped Checkout profile reads, mount and Apple opt-in',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
     check('configured Apple provider is explicitly enabled only at the public entry','appleSignInEnabled: true' in entry and 'appleSignInEnabled: false' not in entry and entry.count('appleSignInEnabled:')==1)
     apple=next((a for t,a in nodes if t=='button' and a.get('id')=='apple-signin'),{})
     check('Apple button is a disabled official local image with safe explanation',apple.get('type')=='button' and 'disabled' in apple and 'apple-signin-note' in apple.get('aria-describedby','').split() and any(t=='img' and a.get('src')=='/assets/landing/apple-sign-in-ja.png' and a.get('alt')=='Appleでサインイン' for t,a in nodes))

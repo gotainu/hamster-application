@@ -18,7 +18,13 @@ try {
   auth.languageCode = 'ja';
   const db = dbSDK.getFirestore(app);
   const service = createAccountService({ auth, db, appleSignInEnabled: true, sdk: { ...authSDK, getDoc: dbSDK.getDoc, doc: dbSDK.doc } });
-  const checkoutService = createPreviewCheckoutService({auth});
+  const checkoutService = createPreviewCheckoutService({auth, readOwnProfiles: async uid => {
+    const [owner, pet] = await Promise.all([
+      dbSDK.getDoc(dbSDK.doc(db, 'users', uid, 'owner_profiles', 'main')),
+      dbSDK.getDoc(dbSDK.doc(db, 'users', uid, 'pet_profiles', 'main_pet')),
+    ]);
+    return {ownerExists: owner.exists(), petExists: pet.exists()};
+  }});
   const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';
   if (resumeCheckout) history.replaceState(null, '', '/account/');
   await mountAccountPage(service, {checkoutService, resumeCheckout});

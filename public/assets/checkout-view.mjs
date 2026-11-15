@@ -204,7 +204,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     try {
       const response = await service.reviewPreviewCheckout();
       if (!current(generation)) return;
-      review = projectCheckoutReview(response);
+      review = projectCheckoutReview(response, service.isVerifiedMissingEmailReview);
       renderReview(review);
       setPhase('review', '内容と規約をご確認ください。まだテスト決済は開始していません。');
       el('checkout-title').focus();

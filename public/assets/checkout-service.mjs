@@ -4,10 +4,15 @@ import { projectAccountIdentity, isVerifiedAccountIdentity } from './account-ide
 // prices, trial dates and arbitrary return destinations are never inputs.
 export const PREVIEW_CHECKOUT_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCheckoutSession';
 export const PREVIEW_PORTAL_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCustomerPortalSession';
-export function createPreviewCheckoutService({auth, fetchRequest = globalThis.fetch, endpoint = PREVIEW_CHECKOUT_ENDPOINT}) {
+const missingEmailVerifiers = new WeakSet();
+export function confirmsMissingEmailReview(value, verifier) {
+  return typeof verifier === 'function' && missingEmailVerifiers.has(verifier) && verifier(value) === true;
+}
+export function createPreviewCheckoutService({auth, readOwnProfiles, fetchRequest = globalThis.fetch, endpoint = PREVIEW_CHECKOUT_ENDPOINT}) {
   if (endpoint !== PREVIEW_CHECKOUT_ENDPOINT) throw new Error('test_configuration_invalid');
   const pending = new Set();
   let generation = 0;
+  let missingEmailReviews = new WeakMap();
   async function request(operation, extra = {}, portal = false) {
     const started = generation;
     const user = auth.currentUser;
@@ -39,6 +44,19 @@ export function createPreviewCheckoutService({auth, fetchRequest = globalThis.fe
         const value = await response.json();
         requireIdentity();
         if (!response.ok) throw {code:typeof value?.code==='string'?value.code:'service_unavailable'};
+        if (operation === 'review' && value?.account?.maskedEmail === '未設定') {
+          const identity = projectAccountIdentity(user, tokenResult, projectId);
+          if (identity.authenticationBasis !== 'apple_provider' || typeof readOwnProfiles !== 'function') throw {code:'invalid_response'};
+          // Firestore Lite reads only this captured UID. No profile contents,
+          // identifiers or token are added to the response or its display model.
+          let profiles;
+          try { profiles = await readOwnProfiles(uid); }
+          catch { requireIdentity(); throw {code:'app_account_required'}; }
+          requireIdentity();
+          if (profiles?.ownerExists !== true || profiles?.petExists !== true) throw {code:'app_account_required'};
+          const appleSubject = user.providerData.find(item => item.providerId === 'apple.com').uid;
+          missingEmailReviews.set(value, {user, uid, appleSubject, generation: started});
+        }
         return value;
       }
     } catch (cause) {
@@ -49,13 +67,26 @@ export function createPreviewCheckoutService({auth, fetchRequest = globalThis.fe
       throw cause;
     } finally { pending.delete(controller); }
   }
-  return {
+  const service = {
     reviewPreviewCheckout:()=>request('review'),
+    isVerifiedMissingEmailReview(value) {
+      const proof = missingEmailReviews.get(value);
+      const providers = auth.currentUser?.providerData;
+      const apple = Array.isArray(providers) ? providers.filter(item => item?.providerId === 'apple.com') : [];
+      // Object provenance is local preflight, never a replacement for server
+      // authorization. Clones, cleared sessions and changed users cannot reuse it.
+      return !!proof && proof.generation === generation && proof.user === auth.currentUser &&
+        proof.uid === auth.currentUser?.uid && value?.account?.maskedEmail === '未設定' &&
+        Array.isArray(providers) && providers.every(item => item !== null && typeof item === 'object' && !Array.isArray(item) && typeof item.providerId === 'string') &&
+        apple.length === 1 && apple[0].uid === proof.appleSubject;
+    },
     createPreviewCheckout:({reviewToken,termsAccepted})=>request('session',{reviewToken,termsAccepted}),
     getPreviewCheckoutStatus:()=>request('status'),
     getPreviewBilling:()=>request('billing'),
     createPreviewPortalSession:()=>request(null, {}, true),
     cancelPreviewCheckout:()=>request('cancel'),
-    clear(){generation++;for(const controller of pending)controller.abort();pending.clear();},
+    clear(){generation++;missingEmailReviews=new WeakMap();for(const controller of pending)controller.abort();pending.clear();},
   };
+  missingEmailVerifiers.add(service.isVerifiedMissingEmailReview);
+  return service;
 }

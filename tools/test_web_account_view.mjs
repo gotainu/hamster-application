@@ -331,3 +331,101 @@ test('Apple consent is cleared on logout and pagehide without changing email or 
 test('Apple consent checkbox is required, outside the unchanged email form and disabled by the setup gate',async()=>{
  const h=await setup();assert.equal(h.el('apple-linking-consent').disabled,true);assert.match(html,/<input id="apple-linking-consent"[^>]+type="checkbox"[^>]+required disabled/);const form=html.match(/<form[^>]+id="email-form"[^>]*>[\s\S]*?<\/form>/)[0];assert.doesNotMatch(form,/apple-linking-consent/);h.cleanup();
 });
+
+// UI-only race regressions. These never change Popup/Redirect routing or make a
+// real authentication request; fresh identity evidence is a synthetic service event.
+const verifiedApple = h => ({...h.user,emailVerified:false,identityVerified:true,authenticationBasis:'apple_provider',maskedEmail:'未設定',methods:['Apple']});
+function pendingApple(h, pending) {
+ h.service.safeError=safeAuthError;
+ h.service.signInApple=async options=>{assert.deepEqual(options,{linkingConsent:true});h.calls.apple++;return pending.promise;};
+ agreeApple(h);h.el('apple-signin').dispatch('click');
+}
+test('current verified Apple account read wins over a late Popup-blocked notification from that attempt',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);
+ h.summary.maskedEmail='未設定';h.summary.nickname='今回のアカウント';h.emit(verifiedApple(h));await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('account-nickname').textContent,'今回のアカウント');assert.equal(h.el('account-email').textContent,'未設定');
+ // The fresh account is visible before the original operation settles; another
+ // click still cannot start a concurrent authentication operation.
+ h.el('google-signin').dispatch('click');assert.equal(h.calls.google,0);
+ pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.el('auth-error').hidden,true);assert.equal(h.el('account-panel').hidden,false);assert.equal(h.calls.reads,1);h.cleanup();
+});
+test('a Popup error shown first clears only after the same current Apple account read succeeds',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred(),read=deferred();h.service.readAccountSummary=()=>{h.calls.reads++;return read.promise;};pendingApple(h,pending);
+ h.emit(verifiedApple(h));pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);assert.equal(h.el('account-panel').hidden,true);
+ read.resolve({...h.summary,maskedEmail:'未設定',nickname:'再確認したアカウント'});await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('account-nickname').textContent,'再確認したアカウント');assert.equal(h.el('auth-error').hidden,true);h.cleanup();
+});
+test('real Popup blocking with no confirmed identity remains a recoverable error',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.el('login-panel').hidden,false);assert.equal(h.calls.reads,0);assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);h.cleanup();
+});
+test('failed current-account read cannot turn a Popup rejection into authentication success',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred(),read=deferred();h.service.readAccountSummary=()=>read.promise;pendingApple(h,pending);
+ h.service.safeError=cause=>cause?.code==='synthetic/read-failed'?'アカウントの読取を完了できませんでした。':safeAuthError(cause);
+ h.emit(verifiedApple(h));pending.reject({code:'auth/popup-blocked'});await flush();read.reject({code:'synthetic/read-failed'});await flush();
+ assert.equal(h.el('account-panel').hidden,true);assert.equal(h.el('loading-panel').hidden,false);assert.equal(h.el('auth-error').hidden,false);assert.equal(h.el('auth-error').textContent,'アカウントの読取を完了できませんでした。');h.cleanup();
+});
+test('partial, unknown, missing or newly registered app-account results cannot suppress Popup blocking',async()=>{
+ for(const condition of ['partial','unknown','missing','new-user']){
+  const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);
+  if(condition==='partial')h.summary.unavailableFields=['プロフィール'];
+  if(condition==='unknown')h.summary.appAccountExists=null;
+  if(condition==='missing')h.summary.appAccountExists=false;
+  h.emit({...verifiedApple(h),isNewUser:condition==='new-user'});await flush();pending.reject({code:'auth/popup-blocked'});await flush();
+  assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);h.cleanup();
+ }
+});
+test('current Apple account success does not suppress cancellation, network or provider-conflict errors',async()=>{
+ for(const code of ['auth/popup-closed-by-user','auth/cancelled-popup-request','auth/network-request-failed','auth/account-exists-with-different-credential']){
+  const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);h.emit(verifiedApple(h));await flush();pending.reject({code});await flush();
+  assert.equal(h.el('auth-error').hidden,false);assert.equal(h.el('auth-error').textContent,safeAuthError({code}));h.cleanup();
+ }
+});
+test('non-Popup errors shown before the current Apple read are not cleared by that read',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred(),read=deferred();h.service.readAccountSummary=()=>read.promise;pendingApple(h,pending);h.emit(verifiedApple(h));
+ pending.reject({code:'auth/network-request-failed'});await flush();read.resolve(h.summary);await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/通信に失敗/);h.cleanup();
+});
+test('an unverified Apple-labelled event cannot suppress a real Popup-blocked error',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);h.emit({...verifiedApple(h),identityVerified:false,authenticationBasis:null});await flush();
+ pending.reject({code:'auth/popup-blocked'});await flush();assert.equal(h.calls.reads,0);assert.equal(h.el('account-panel').hidden,true);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);h.cleanup();
+});
+test('a replacement authenticated user with identical display fields invalidates the prior Popup attempt',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);const first=verifiedApple(h);h.emit(first);await flush();
+ // Reference identity, not nickname or masked-email equality, controls this boundary.
+ h.summary.nickname='次のアカウント';h.emit({...first});await flush();pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.calls.reads,2);assert.equal(h.el('account-nickname').textContent,'次のアカウント');assert.equal(h.el('auth-error').hidden,true);h.cleanup();
+});
+test('logout or destruction prevents a late Popup failure from writing an obsolete auth error',async()=>{
+ for(const finish of ['logout','destroy']){
+  const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);
+  if(finish==='logout')await h.el('logout').dispatch('click');else h.cleanup();
+  const before=h.el('auth-error').textContent;pending.reject({code:'auth/popup-blocked'});await flush();assert.equal(h.el('auth-error').textContent,before);assert.equal(h.el('auth-error').hidden,true);
+  if(finish==='logout')h.cleanup();
+ }
+});
+test('a subsequent explicit attempt keeps its own real error when an older attempt rejects later',async()=>{
+ const h=await setup({appleSignInEnabled:true}),old=deferred();pendingApple(h,old);await h.el('logout').dispatch('click');
+ const next=deferred();pendingApple(h,next);next.reject({code:'auth/network-request-failed'});await flush();assert.match(h.el('auth-error').textContent,/通信に失敗/);
+ old.reject({code:'auth/popup-blocked'});await flush();assert.match(h.el('auth-error').textContent,/通信に失敗/);h.cleanup();
+});
+test('pagehide invalidates a Popup attempt before a restored page rechecks authentication',async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);h.emit(verifiedApple(h));await flush();h.windowListeners.get('pagehide')();
+ await h.windowListeners.get('pageshow')({persisted:true});await flush();pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.calls.reload,1);assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('auth-error').hidden,true);h.cleanup();
+});
+
+test("a late Popup rejection cannot overwrite this current attempt's earlier account-read error",async()=>{
+ const h=await setup({appleSignInEnabled:true}),pending=deferred();pendingApple(h,pending);
+ h.service.safeError=cause=>cause?.code==='synthetic/read-failed'?'アカウントの読取を完了できませんでした。':safeAuthError(cause);
+ h.service.readAccountSummary=async()=>{throw {code:'synthetic/read-failed'};};h.emit(verifiedApple(h));await flush();
+ assert.equal(h.el('auth-error').textContent,'アカウントの読取を完了できませんでした。');pending.reject({code:'auth/popup-blocked'});await flush();
+ assert.equal(h.el('account-panel').hidden,true);assert.equal(h.el('loading-panel').hidden,false);assert.equal(h.el('auth-error').hidden,false);assert.equal(h.el('auth-error').textContent,'アカウントの読取を完了できませんでした。');h.cleanup();
+});
+
+test('Google Popup blocking is not reclassified by the Apple-only notification rule',async()=>{
+ const h=await setup(),pending=deferred();h.service.safeError=safeAuthError;h.service.signInGoogle=()=>pending.promise;h.el('google-signin').dispatch('click');h.emit({...h.user,methods:['Google']});await flush();
+ pending.reject({code:'auth/popup-blocked'});await flush();assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);h.cleanup();
+});

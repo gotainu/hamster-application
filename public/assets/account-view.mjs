@@ -20,6 +20,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   let busy = true;
   let loggingOut = false;
   let signInPending = false;
+  let signInAttempt = null;
+  let errorGeneration = 0;
   let unsubscribe = () => {};
   let destroyed = false;
   let checkout = null;
@@ -66,6 +68,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   }
 
   function clearError() {
+    errorGeneration++;
     error.textContent = '';
     error.hidden = true;
     email.removeAttribute('aria-invalid');
@@ -73,6 +76,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   }
 
   function showError(message) {
+    errorGeneration++;
     error.textContent = message;
     error.hidden = false;
     error.focus();
@@ -213,6 +217,13 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   async function renderUser(user, { focus = false, plan = false } = {}) {
     const request = ++epoch;
+    let attempt = signInAttempt;
+    if (attempt?.candidateUser && attempt.candidateUser !== user) {
+      signInAttempt = null;
+      signInPending = false;
+      attempt = null;
+    }
+    if (attempt && isVerifiedAccountIdentity(user)) attempt.candidateUser = user;
     currentUser = user;
     clearPersonal();
     clearError();
@@ -244,6 +255,16 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       const summary = await service.readAccountSummary();
       if (destroyed || request !== epoch || !currentUser || !isVerifiedAccountIdentity(currentUser)) return;
       currentSummary = summary;
+      // A late Popup rejection must not overwrite this attempt's freshly
+      // verified identity and successful current-account read. No names or
+      // masked emails are used as identity evidence.
+      if (attempt?.kind === 'apple' && signInAttempt === attempt && currentUser === user &&
+          user.authenticationBasis === 'apple_provider' && !user.isNewUser && summary.appAccountExists === true &&
+          Array.isArray(summary.unavailableFields) && summary.unavailableFields.length === 0) {
+        attempt.confirmedUser = user;
+        attempt.confirmedEpoch = request;
+        if (attempt.popupErrorGeneration === errorGeneration) clearError();
+      }
       element('account-nickname').textContent = summary.nickname || '未設定';
       element('account-email').textContent = summary.maskedEmail || user.maskedEmail || '確認できませんでした';
       element('account-method').textContent = (summary.methods || user.methods || []).join('・') || '確認できませんでした';
@@ -275,22 +296,34 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       element('loading-copy').textContent = '安全のため、アカウント情報を表示していません。再読込するか、ログアウトしてからやり直してください。';
       setPanel('loading-panel');
       showError(service.safeError(cause));
+      if (attempt && signInAttempt === attempt && currentUser === user) attempt.readErrorGeneration = errorGeneration;
     }
   }
 
-  async function signIn(action) {
+  async function signIn(action, kind = 'other') {
     if (busy || loggingOut || signInPending) return;
+    const attempt = {kind, candidateUser: null, confirmedUser: null, confirmedEpoch: null, popupErrorGeneration: null, readErrorGeneration: null};
+    signInAttempt = attempt;
     signInPending = true;
     clearError();
     setBusy(true, 'ログインしています。');
     try {
       await action();
     } catch (cause) {
-      showError(service.safeError(cause));
+      if (destroyed || loggingOut || signInAttempt !== attempt) return;
+      const confirmedCurrent = attempt.kind === 'apple' && attempt.confirmedUser === currentUser &&
+        attempt.confirmedEpoch === epoch && isVerifiedAccountIdentity(currentUser);
+      const currentReadError = attempt.kind === 'apple' && attempt.readErrorGeneration === errorGeneration;
+      if (cause?.code !== 'auth/popup-blocked' || (!confirmedCurrent && !currentReadError)) {
+        showError(service.safeError(cause));
+        if (cause?.code === 'auth/popup-blocked') attempt.popupErrorGeneration = errorGeneration;
+      }
     } finally {
-      signInPending = false;
-      resetPassword();
-      if (!destroyed && !currentUser) setBusy(false);
+      if (signInAttempt === attempt) {
+        signInPending = false;
+        resetPassword();
+        if (!destroyed && !currentUser) setBusy(false);
+      }
     }
   }
 
@@ -326,7 +359,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     void signIn(async () => {
       try { await service.signInApple({linkingConsent: true}); }
       finally { resetAppleConsent(); }
-    });
+    }, 'apple');
   };
   element('apple-signin').addEventListener('click', onApple);
   if (service.appleSignInEnabled === true) element('apple-signin-note').textContent = 'HamCareアプリで使用したAppleアカウントを選んでください。別のAppleアカウントでは新しいログイン情報が作成される場合がありますが、体験・契約は自動で開始しません。';
@@ -341,6 +374,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   const onLogout = async () => {
     if (loggingOut) return;
     loggingOut = true;
+    signInAttempt = null;
+    signInPending = false;
     ++epoch;
     currentUser = null;
     clearPersonal();
@@ -419,6 +454,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   window.addEventListener('popstate', onPopState);
 
   const onPageHide = () => {
+    signInAttempt = null;
+    signInPending = false;
     ++epoch;
     clearPersonal();
     resetPassword();
@@ -457,6 +494,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   return () => {
     destroyed = true;
+    signInAttempt = null;
+    signInPending = false;
     checkout?.destroy();
     checkoutService?.clear();
     element('plan-checkout').removeEventListener('click', onCheckout);

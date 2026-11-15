@@ -1,6 +1,7 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCheckoutController } from '../public/assets/checkout-view.mjs';
+import { createPreviewCheckoutService, PREVIEW_CHECKOUT_ENDPOINT } from '../public/assets/checkout-service.mjs';
 
 const originalDocument = globalThis.document;
 afterEach(() => { globalThis.document = originalDocument; });
@@ -52,6 +53,44 @@ test('opening only reviews server facts; consent is required before any Stripe c
   assert.equal(x.elements['checkout-start'].disabled,true); assert.equal(x.elements['checkout-account-email'].textContent,'te***@example.test');
   x.elements['checkout-start'].event(); await settle(); assert.equal(x.calls.create.length,0);
 });
+function appleTransport(profiles = {ownerExists:true,petExists:true}) {
+  const calls=[];const user={uid:'synthetic-owner',email:null,emailVerified:false,providerData:[{providerId:'apple.com',uid:'synthetic-apple-subject'}]};
+  user.getIdTokenResult=async()=>({token:'synthetic-auth-header-only',signInProvider:'apple.com',claims:{aud:'demo-hamcare-no-email',iss:'https://securetoken.google.com/demo-hamcare-no-email',sub:user.uid,email_verified:false,firebase:{sign_in_provider:'apple.com',identities:{'apple.com':['synthetic-apple-subject']}}}});
+  const auth={app:{options:{projectId:'demo-hamcare-no-email'}},currentUser:user};
+  const service=createPreviewCheckoutService({auth,readOwnProfiles:async uid=>{assert.equal(uid,'synthetic-owner');return profiles;},fetchRequest:async(url,options)=>{
+    calls.push({url,options});return {ok:true,status:200,json:async()=>url.endsWith('/review')?{...quote(),account:{nickname:'テスト',maskedEmail:'未設定'}}:session()};
+  }});
+  return {service,calls,auth};
+}
+test('verified Apple without email reaches review while consent still gates Session creation', async () => {
+  const transport=appleTransport(),x=setup({service:transport.service});await x.controller.open();
+  assert.equal(x.elements['checkout-account-email'].textContent,'未設定');assert.equal(x.elements['checkout-account-name'].textContent,'テスト');
+  assert.equal(x.elements['checkout-error'].hidden,true);assert.equal(x.elements['checkout-start'].disabled,true);
+  x.elements['checkout-start'].event();await settle();assert.equal(transport.calls.length,1);assert.equal(x.calls.loads.length,0);
+  x.consent();assert.equal(x.elements['checkout-start'].disabled,false);assert.equal(transport.calls.length,1);
+  x.elements['checkout-start'].event();x.elements['checkout-start'].event();await settle();
+  const created=transport.calls.filter(c=>c.url===PREVIEW_CHECKOUT_ENDPOINT+'/session');assert.equal(created.length,1);
+  assert.deepEqual(Object.keys(JSON.parse(created[0].options.body)).sort(),['planKey','reviewToken','termsAccepted']);
+  const visible=Object.values(x.elements).map(e=>e.textContent).join(' ');
+  assert.doesNotMatch(visible,/synthetic-owner|synthetic-apple|synthetic-auth|opaque_fixture|cs_test|pk_test/);
+  assert.ok(transport.calls.every(c=>!c.url.includes('synthetic-')));assert.equal(transport.auth.currentUser.email,null);
+});
+test('invented missing-email display never enables review or loads Stripe', async () => {
+  const x=setup({service:{async reviewPreviewCheckout(){return {...quote(),account:{nickname:'Test',maskedEmail:'未設定'}};}}});
+  await x.controller.open();x.consent();x.elements['checkout-start'].event();await settle();
+  assert.equal(x.elements['checkout-error'].hidden,false);assert.equal(x.elements['checkout-start'].disabled,true);assert.equal(x.calls.create.length,0);assert.equal(x.calls.loads.length,0);
+});
+test('cloning a verified server review loses its missing-email provenance', async () => {
+  const t=appleTransport(),x=setup({service:{...t.service,async reviewPreviewCheckout(){return {...await t.service.reviewPreviewCheckout()};}}});
+  await x.controller.open();assert.equal(x.elements['checkout-error'].hidden,false);assert.equal(x.elements['checkout-start'].disabled,true);
+  assert.ok(t.calls.every(c=>c.url.endsWith('/review')));assert.equal(x.calls.loads.length,0);
+});
+for(const [label,profiles] of [['owner absent',{ownerExists:false,petExists:true}],['pet absent',{ownerExists:true,petExists:false}],['new empty account',{ownerExists:false,petExists:false}]]){
+  test('email-less Apple '+label+' cannot reach confirmation',async()=>{
+    const t=appleTransport(profiles),x=setup({service:t.service});await x.controller.open();x.consent();x.elements['checkout-start'].event();await settle();
+    assert.equal(x.elements['checkout-error'].hidden,false);assert.equal(x.elements['checkout-start'].disabled,true);assert.ok(t.calls.every(c=>c.url.endsWith('/review')));assert.equal(x.calls.loads.length,0);
+  });
+}
 test('double clicks send a single allowlisted request and mount Stripe once', async () => {
   const pending = deferred(); const x = setup({ service: { async createPreviewCheckout(body) { x.calls.create.push(body); return pending.promise; } } });
   await x.controller.open(); x.consent(); x.elements['checkout-start'].event(); x.elements['checkout-start'].event();

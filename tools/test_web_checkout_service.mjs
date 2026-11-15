@@ -1,10 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createPreviewCheckoutService,PREVIEW_CHECKOUT_ENDPOINT,PREVIEW_PORTAL_ENDPOINT} from '../public/assets/checkout-service.mjs';
+import {projectCheckoutReview} from '../public/assets/checkout-model.mjs';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
 const PROJECT='demo-hamcare-web-apple-task8';
 function tokenResult(user,provider='password',token='synthetic-auth-header-only') { return {token,signInProvider:provider,claims:{aud:PROJECT,iss:'https://securetoken.google.com/'+PROJECT,sub:user.uid,email_verified:user.emailVerified===true,firebase:{sign_in_provider:provider,identities:{'apple.com':['synthetic-apple-subject']}}}}; }
 function harness(){const calls=[];const user={uid:'synthetic-user-a',email:'synthetic@example.test',emailVerified:true,providerData:[{providerId:'password'}]};const tokenCalls=[];user.getIdTokenResult=async force=>{tokenCalls.push(force);return tokenResult(user);};const auth={app:{options:{projectId:PROJECT}},currentUser:user};const fetchRequest=async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({testMode:true})};};return {auth,calls,fetchRequest,tokenCalls};}
+const reviewQuote = maskedEmail => ({testMode:true,planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:'synthetic_review_proof_12345',account:{nickname:'テスト',maskedEmail},billing:{kind:'immediate',cardRegistrationAt:'2026-11-15T01:00:00Z',firstChargeAt:'2026-11-15T01:00:00Z',firstChargeAmount:550,trialEndsAt:null}});
+function appleReviewHarness() {
+ const h=harness(),user=h.auth.currentUser;user.email=null;user.emailVerified=false;user.providerData=[{providerId:'apple.com',uid:'synthetic-apple-subject'}];
+ user.getIdTokenResult=async force=>{h.tokenCalls.push(force);return tokenResult(user,'apple.com');};
+ h.profileReads=[];h.readOwnProfiles=async uid=>{h.profileReads.push(uid);return {ownerExists:true,petExists:true};};
+ h.fetchRequest=async(url,options)=>{h.calls.push({url,options});return {ok:true,status:200,json:async()=>reviewQuote('未設定')};};return h;
+}
 test('all operations use exact endpoint, POST Authorization and only allowlisted business key',async()=>{const h=harness();const service=createPreviewCheckoutService(h);await service.reviewPreviewCheckout();await service.createPreviewCheckout({reviewToken:'synthetic-review-proof',termsAccepted:true,uid:'untrusted',priceId:'untrusted',trial_end:1});await service.getPreviewCheckoutStatus();await service.cancelPreviewCheckout();await service.getPreviewBilling();assert.equal(h.calls.length,5);for(const {url,options} of h.calls){assert.ok(url.startsWith(PREVIEW_CHECKOUT_ENDPOINT+'/'));assert.ok(!url.includes('synthetic-auth'));assert.equal(options.method,'POST');assert.equal(options.credentials,'omit');assert.equal(options.cache,'no-store');assert.equal(options.headers.Authorization,'Bearer synthetic-auth-header-only');assert.equal(JSON.parse(options.body).planKey,'premium_monthly');assert.doesNotMatch(options.body,/synthetic-user|untrusted|priceId|trial_end|amount/);}assert.deepEqual(Object.keys(JSON.parse(h.calls[1].options.body)).sort(),['planKey','reviewToken','termsAccepted']);});
 test('unverified and empty sessions never send a request',async()=>{for(const currentUser of [null,{uid:'synthetic',emailVerified:false}]){const h=harness();h.auth.currentUser=currentUser;await assert.rejects(createPreviewCheckoutService(h).reviewPreviewCheckout(),e=>e.code==='unauthenticated');assert.equal(h.calls.length,0);}});
 test('switching identities while token refresh is pending prevents submission',async()=>{const h=harness(),wait=deferred();h.auth.currentUser.getIdTokenResult=()=>wait.promise;const pending=createPreviewCheckoutService(h).reviewPreviewCheckout();h.auth.currentUser={uid:'synthetic-user-b',emailVerified:true};wait.resolve('synthetic-token');await assert.rejects(pending,e=>e.code==='session_changed');assert.equal(h.calls.length,0);});
@@ -63,4 +71,78 @@ test('unknown mutation or business failure is never retried',async()=>{
 });
 test('same-UID replacement SDK user also invalidates the in-flight response',async()=>{
  const h=harness(),wait=deferred();h.fetchRequest=()=>wait.promise;const pending=createPreviewCheckoutService(h).getPreviewBilling();await Promise.resolve();h.auth.currentUser={...h.auth.currentUser};wait.resolve({ok:true,json:async()=>({private:'not-returned'})});await assert.rejects(pending,e=>e.code==='session_changed');
+});
+
+test('server-declared unavailable Apple email is accepted only with current own owner and pet reads',async()=>{
+ const h=appleReviewHarness(),service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();
+ assert.deepEqual(h.profileReads,['synthetic-user-a']);assert.equal(service.isVerifiedMissingEmailReview(raw),true);
+ const model=projectCheckoutReview(raw,service.isVerifiedMissingEmailReview);assert.equal(model.maskedEmail,'未設定');
+ assert.doesNotMatch(JSON.stringify(model),/synthetic-user|synthetic-apple|synthetic-auth|apple-e2e@/);
+ assert.equal(h.calls.length,1);assert.equal(h.calls[0].url,PREVIEW_CHECKOUT_ENDPOINT+'/review');
+ assert.deepEqual(JSON.parse(h.calls[0].options.body),{planKey:'premium_monthly'});assert.equal(h.auth.currentUser.email,null);
+});
+test('unavailable server email also covers an Apple email omitted because it is unverified',async()=>{
+ const h=appleReviewHarness();h.auth.currentUser.email='synthetic-unverified@example.test';
+ const service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();
+ assert.equal(projectCheckoutReview(raw,service.isVerifiedMissingEmailReview).maskedEmail,'未設定');
+ assert.equal(h.auth.currentUser.email,'synthetic-unverified@example.test');assert.equal(h.auth.currentUser.emailVerified,false);
+});
+test('a locally invented missing-email response cannot borrow another response or service proof',async()=>{
+ const h=appleReviewHarness(),service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();
+ for(const other of [{...raw},JSON.parse(JSON.stringify(raw)),reviewQuote('未設定')]){
+  assert.equal(service.isVerifiedMissingEmailReview(other),false);assert.throws(()=>projectCheckoutReview(other,service.isVerifiedMissingEmailReview));
+ }
+ const otherService=createPreviewCheckoutService(h);assert.equal(otherService.isVerifiedMissingEmailReview(raw),false);
+ service.clear();assert.equal(service.isVerifiedMissingEmailReview(raw),false);assert.throws(()=>projectCheckoutReview(raw,service.isVerifiedMissingEmailReview));
+});
+for(const [label,profiles] of [['missing owner',{ownerExists:false,petExists:true}],['missing pet',{ownerExists:true,petExists:false}],['new empty UID',{ownerExists:false,petExists:false}],['unresolved read',null]]){
+ test('missing email cannot pass review for '+label,async()=>{
+  const h=appleReviewHarness();h.readOwnProfiles=async()=>profiles;
+  await assert.rejects(createPreviewCheckoutService(h).reviewPreviewCheckout(),e=>e.code==='app_account_required');
+  assert.ok(h.calls.every(c=>!c.url.endsWith('/session')));
+ });
+}
+test('missing profile reader and denied reads fail closed',async()=>{
+ for(const reader of [undefined,async()=>{throw {code:'permission-denied',message:'private'};}]){
+  const h=appleReviewHarness();h.readOwnProfiles=reader;
+  await assert.rejects(createPreviewCheckoutService(h).reviewPreviewCheckout(),e=>['invalid_response','app_account_required'].includes(e.code));
+ }
+});
+for(const change of ['logout','different UID','same UID replacement','same object UID','Apple subject','clear']){
+ test('pending own-profile read rejects '+change,async()=>{
+  const h=appleReviewHarness(),wait=deferred();let entered;const reading=new Promise(r=>{entered=r;});
+  h.readOwnProfiles=async()=>{entered();return wait.promise;};const service=createPreviewCheckoutService(h),pending=service.reviewPreviewCheckout();await reading;
+  if(change==='logout')h.auth.currentUser=null;
+  if(change==='different UID')h.auth.currentUser={...h.auth.currentUser,uid:'synthetic-user-b'};
+  if(change==='same UID replacement')h.auth.currentUser={...h.auth.currentUser};
+  if(change==='same object UID')h.auth.currentUser.uid='synthetic-user-b';
+  if(change==='Apple subject')h.auth.currentUser.providerData=[{providerId:'apple.com',uid:'different-subject'}];
+  if(change==='clear')service.clear();
+  wait.resolve({ownerExists:true,petExists:true});await assert.rejects(pending,e=>e.code==='session_changed');
+ });
+}
+test('proof is rejected after replacement or in-place UID change even after review returned',async()=>{
+ for(const replace of [false,true]){const h=appleReviewHarness(),service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();
+  if(replace)h.auth.currentUser={...h.auth.currentUser};else h.auth.currentUser.uid='synthetic-user-b';
+  assert.equal(service.isVerifiedMissingEmailReview(raw),false);
+ }
+});
+test('returned response proof also rejects a changed or removed Apple binding',async()=>{
+ for(const providers of [undefined,null,[],[{providerId:'google.com',uid:'synthetic-google'}],[{providerId:'apple.com',uid:'different-subject'}],[null],[Object.assign([],{providerId:'apple.com',uid:'synthetic-apple-subject'})],[{providerId:'apple.com',uid:'synthetic-apple-subject'},{providerId:'apple.com',uid:'synthetic-apple-subject'}]]){
+  const h=appleReviewHarness(),service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();h.auth.currentUser.providerData=providers;
+  assert.equal(service.isVerifiedMissingEmailReview(raw),false);assert.throws(()=>projectCheckoutReview(raw,service.isVerifiedMissingEmailReview));
+ }
+});
+test('unavailable email cannot become an exception for verified password or Google sessions',async()=>{
+ for(const provider of ['password','google.com']){const h=harness();h.auth.currentUser.providerData=[{providerId:provider}];h.auth.currentUser.getIdTokenResult=async()=>tokenResult(h.auth.currentUser,provider);let reads=0;
+  h.readOwnProfiles=async()=>{reads++;return {ownerExists:true,petExists:true};};h.fetchRequest=async()=>({ok:true,json:async()=>reviewQuote('未設定')});
+  await assert.rejects(createPreviewCheckoutService(h).reviewPreviewCheckout(),e=>e.code==='invalid_response');assert.equal(reads,0);
+ }
+});
+test('existing password, Google and Apple masked-email reviews need no missing-email exception',async()=>{
+ for(const provider of ['password','google.com','apple.com']){
+  const h=provider==='apple.com'?appleReviewHarness():harness();h.auth.currentUser.getIdTokenResult=async()=>tokenResult(h.auth.currentUser,provider);
+  h.fetchRequest=async()=>({ok:true,json:async()=>reviewQuote('go***@example.com')});let reads=0;h.readOwnProfiles=async()=>{reads++;throw Error('must not read');};
+  const service=createPreviewCheckoutService(h),raw=await service.reviewPreviewCheckout();assert.equal(projectCheckoutReview(raw,service.isVerifiedMissingEmailReview).maskedEmail,'go***@example.com');assert.equal(reads,0);
+ }
 });

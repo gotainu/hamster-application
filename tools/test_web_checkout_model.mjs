@@ -38,6 +38,19 @@ test('review token must be opaque and full account emails are never accepted for
   for (const token of ['', 'short', 'https://example.test/?uid=hidden']) rejects(() => projectCheckoutReview({ ...quote(), reviewToken: token }));
   rejects(() => projectCheckoutReview({ ...quote(), account: { nickname: 'Test', maskedEmail: 'private@example.test' } }));
 });
+test('normal go mask remains accepted without a missing-email exception', () => {
+  const raw = {...quote(), account: {nickname: 'Test', maskedEmail: 'go***@example.com'}};
+  assert.equal(projectCheckoutReview(raw).maskedEmail, 'go***@example.com');
+});
+test('missing email rejects a bare string, boolean or locally invented verifier', () => {
+  const raw = {...quote(), account: {nickname: 'Test', maskedEmail: '未設定'}};
+  for (const proof of [undefined, null, true, false, () => false, () => true, value => value === raw]) rejects(() => projectCheckoutReview(raw, proof));
+});
+test('missing-email provenance never permits empty, raw or identifier-like display values', () => {
+  for (const maskedEmail of ['', ' ', '\t\n', 'unknown', 'synthetic_firebase_uid_123', 'synthetic.apple.subject', ' 未設定', '未設定 ', 'private@example.test', null, false]) {
+    rejects(() => projectCheckoutReview({...quote(), account: {nickname: 'Test', maskedEmail}}, () => true));
+  }
+});
 test('projection excludes unknown identifiers and retains only safe display fields', () => {
   const raw = { ...quote(), uid: 'private_uid_fixture', customerId: 'cus_private_fixture', idToken: 'private_token_fixture' };
   const safe = JSON.stringify(projectCheckoutReview(raw));

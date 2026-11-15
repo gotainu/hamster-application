@@ -4,6 +4,19 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-apple-missing-email-review-fix-20261115:start -->
+## 2026-11-15 戦略C・Appleメール未設定の契約確認修正（実装・実Preview限定確認完了／決済E2Eは次の本人承認待ち）
+
+- **対象と保護**：承認済み `c4c767ab9360`／`feature/web-first-stripe-checkout` を維持。開始時の未コミット文書2件は内容指紋を保存して保護し、本文を改変せず今回の記録を別節へ追加。既存E2E節・管理行の未コミット差分を今回のコミットへ混ぜない。main操作、Flutter／Apple設定／認証サービス／サーバー認可・契約ガード・Stripe Customer／Subscription／Webhookの変更なし。
+- **原因と表示契約**：正規Appleのサーバー応答「未設定」を `projectCheckoutReview` の伏字メール必須条件が拒否していた。APIの固定値を維持し、null／hasEmail等への広範変更はしない。現在の本人確認済みAppleセッション、captured User／UID／generation、同じUIDのowner／main_petのserver-read、サーバーが返した正確な固定値、応答objectそのものが揃った場合だけservice内WeakMapで記録する。modelはmodule内で登録されたservice verifierだけを受け付け、裸の固定値・独自のtrue判定・複製応答は拒否。切替・clear・Apple subject変更／欠損／重複後も無効。証跡はメモリのみで、Tokenを保存せず、UID／subjectを画面・URL・ログへ追加しない。通常の正規伏字メールの経路は維持。
+- **メールの意味**：契約主体・Customer解決は従来どおりUID。サーバーが未確認のAppleメールを省略した場合も正規の「未設定」応答として扱い、Auth.email／emailVerifiedを書き換えない。架空メールへの補完・Stripe連絡先のFirebase逆同期なし。今回Customerメール処理の変更・Customer／Session／Subscription作成は0。
+- **一瞬のログイン案内**：本人はLINE内ブラウザで開いた事象と説明しており、実Safari原因を断定しない。コード上にあった正常読取後の遅いpopup-blocked通知の競合だけをUI側で最小修正。同じApple試行のfresh本人確認＋成功した現在アカウント読取だけで古いPopup通知を抑制／消去し、取消・通信・provider衝突・読取失敗は維持。logout／pagehide／破棄／別ユーザーの古い結果を無効化。Popup→Redirect fallbackは存在せず追加しない。現cross-origin PreviewはPopupを維持し、同origin固定authDomain時だけRedirectとする既存選択条件も不変。[Firebase Apple公式](https://firebase.google.com/docs/auth/web/apple)はmobileでRedirect推奨だが、[cross-origin storageの公式対策](https://firebase.google.com/docs/auth/web/redirect-best-practices)を満たす必要があり、この小修正で認証ドメイン・Apple設定を変更しない。
+- **限定検証**：frontend全357件（今回新規41件）・既存Preview policy91件、計448 runtime PASS。静的account142／brand165／LP84の391件PASS、TypeScript noEmit・JavaScript構文・diffチェックPASS。正規go伏字、正規Apple未設定のreview表示、同意前Session0／同意後1回は合成テストで確認。空／空白／任意文字列／UID風／生メール／未認証／空UID／owner-pet欠損／別UID／clone／失効証跡を拒否。既存メール・Google・Apple正常経路を維持。全テストはmock／オフラインで実Firestore・Stripe書込みなし。初回のdefault Node／functions側TypeScript探索失敗は、更新・installせず既存Node22と既存preview依存のコマンド限定参照で解決した環境要因として分ける。
+- **Previewと本番保護**：同じchannel `web-first-task1` へ最終 **2026-11-15 19:30 JST**、version **`f506c3ce46d86608`**、期限 **2026-11-22 19:30 JST**。公開35ファイルSHA／安全ヘッダー一致、除外6経路404。live version `2365135bf558c278` と既存57 Functionsの状態／更新日時は不変。Functions・Rules・Auth設定のデプロイなし。
+- **実Preview限定確認**：本人が「本人用Preview見積り1件の保存だけ許可する」と追加承認。既存Apple Webセッションを維持したChromeで最終Previewを再読込し、同じ本人アカウント・ニックネーム・メール未設定・pet未登録案内なし、月額550円／税抜500円とプラン選択を確認した。reviewボタンを1回だけ押し、サーバーの正規応答と本人UID配下owner／petの読取りを通過して、最終契約確認にニックネーム・「未設定」・550円の即時請求表示が出ることを確認。20:04 JSTに識別子を含まない検証記録を保存し、以前の「申込内容を安全に確認できませんでした」は出なかった。確認用チェックを付けるとStripe開始ボタンが有効化されることだけを確認し、開始ボタンは押さずチェックを外してdisabledへ戻した。新たなApple再認証・Safari実機最終review／Stripe決済E2Eは再開していない。
+- **書込みと停止**：追加承認された期限3分のPreview見積り1文書保存だけを実施（review操作1回）。本番業務プロフィール・体験・billingへの書込み0、Stripe書込み0、Customer／Session／Subscription作成0、既存契約変更0。総Firestore書込みを0とは記録せず、隔離Preview見積り1件を明確に例外計上する。期限切れ見積りの削除や再発行は行わない。今回の修正コード・回帰テスト・本節だけを `fix(web): allow verified Apple accounts without email` の1コミットへ保存する。成立と最終hashはGit履歴・完了報告を参照。本人の修正版採用承認後に、Safari実機の決済／Webhook／Portal等のE2Eを再開できる準備までとし、今回の承認で自動再開しない。
+<!-- hamcare-apple-missing-email-review-fix-20261115:end -->
+
 <!-- hamcare-web-first-task8-20261115:start -->
 ## 2026-11-15 戦略C・タスク8：Apple Webログイン有効化（実装・実UID一致確認済み／実購入E2E保留）
 
