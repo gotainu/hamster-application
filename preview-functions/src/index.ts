@@ -9,6 +9,7 @@ import {readPreviewFacts,parseWebhookConfig} from './preview-runtime';
 import {readPreviewBilling} from './billing-view';
 import {PREVIEW_SYNC_EVENT_TYPES} from './subscription-sync';
 export {stripePreviewWebhook} from './webhook';
+export {createPreviewStripeCustomerPortalSession} from './portal';
 
 initializeApp();
 const credentials=defineSecret('HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS');

@@ -1,5 +1,5 @@
 import { createCheckoutController, clearPreviewBilling, renderPreviewBilling } from './checkout-view.mjs';
-import { projectPreviewBilling } from './checkout-model.mjs';
+import { projectPreviewBilling, projectPreviewPortalSession, portalErrorMessage } from './checkout-model.mjs';
 import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
@@ -21,8 +21,14 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   let unsubscribe = () => {};
   let destroyed = false;
   let checkout = null;
-  let resumePending = resumeCheckout;
+  let portalReturnPending = window.location?.pathname === '/account/' && new URLSearchParams(window.location?.search || '').get('portal') === 'return';
+  if (portalReturnPending) window.history?.replaceState(null, '', '/account/');
+  let resumePending = resumeCheckout && !portalReturnPending;
   let previewRead = 0;
+  let previewModel = null;
+  let previewReading = false;
+  let portalOpening = false;
+  const portalFields = { plan: 'planLabel', amount: 'amountLabel', state: 'statusLabel', 'next-charge': 'nextChargeLabel', cancel: 'cancelLabel', 'period-end': 'periodEndLabel', access: 'accessLabel', 'synced-at': 'syncedAtLabel' };
   const previewPrefixes = ['account-preview', 'plan-preview'];
 
   function setPanel(id, heading) {
@@ -34,6 +40,11 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   function clearPersonal() {
     currentSummary = null;
     previewRead++;
+    portalOpening = false;
+    previewReading = false;
+    clearPortal();
+    element('account-portal-return-status').textContent = '';
+    element('account-portal-return-status').hidden = true;
     for (const prefix of previewPrefixes) { clearPreviewBilling(prefix); element(prefix + '-refresh').disabled = true; }
     checkout?.clear();
     checkoutService?.clear();
@@ -98,26 +109,89 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     }
   }
 
-  async function refreshPreviewBilling() {
+  function clearPortal() {
+    previewModel = null;
+    element('account-portal-panel').hidden = true;
+    element('account-portal-open').hidden = true;
+    element('account-portal-open').disabled = true;
+    element('account-portal-status').textContent = '';
+    for (const suffix of Object.keys(portalFields)) element('account-portal-' + suffix).textContent = '';
+  }
+  function renderPortal(model) {
+    previewModel = model;
+    element('account-portal-panel').hidden = !model.managementCardVisible;
+    element('account-portal-open').hidden = !model.portalManageable;
+    element('account-portal-open').disabled = !model.portalManageable || portalOpening;
+    for (const [suffix, key] of Object.entries(portalFields)) element('account-portal-' + suffix).textContent = model.managementCardVisible ? model[key] : '';
+    if (model.portalManageable) {
+      // Existing Preview contracts are managed through Stripe, never a second Checkout.
+      element('plan-fields').disabled = true;
+      element('premium-monthly').checked = false;
+      element('plan-checkout').disabled = true;
+      if (!element('plan-panel').hidden) {
+        element('plan-route-title').textContent = '登録済みのPreview契約を管理してください';
+        element('plan-route-detail').textContent = '新しい申し込みは行いません。アカウント確認へ戻り、支払方法・請求・解約を管理してください。';
+      }
+    } else if (currentSummary && !element('plan-panel').hidden) {
+      renderPlan(currentSummary);
+    }
+  }
+  async function refreshPreviewBilling({ fromPortal = false } = {}) {
     if (!checkoutService?.getPreviewBilling || !currentUser?.emailVerified || currentUser.isNewUser || destroyed) return;
     const request = ++previewRead;
     const generation = epoch;
+    previewReading = true;
+    clearPortal();
+    const returnStatus = element('account-portal-return-status');
+    if (fromPortal) { returnStatus.hidden = false; returnStatus.textContent = 'Stripeの契約管理画面から戻りました。契約状態を再確認しています。'; }
     for (const prefix of previewPrefixes) { clearPreviewBilling(prefix, 'Preview契約状態を確認しています。'); element(prefix + '-refresh').disabled = true; }
     try {
       const raw = await checkoutService.getPreviewBilling();
       if (destroyed || generation !== epoch || request !== previewRead || !currentUser?.emailVerified) return;
       const model = projectPreviewBilling(raw);
       for (const prefix of previewPrefixes) renderPreviewBilling(prefix, model);
+      renderPortal(model);
+      if (fromPortal) returnStatus.textContent = 'Stripeの契約管理画面から戻りました。最新の契約状態を読み直しました。反映待ちの場合は、時間をおいて再確認してください。';
     } catch {
       if (destroyed || generation !== epoch || request !== previewRead) return;
       for (const prefix of previewPrefixes) clearPreviewBilling(prefix, 'Preview契約状態を確認できません。時間をおいて再確認するか、サポートへお問い合わせください。');
+      if (fromPortal) returnStatus.textContent = 'Stripeの契約管理画面から戻りましたが、契約状態を確認できませんでした。時間をおいて再確認してください。';
     } finally {
-      if (!destroyed && generation === epoch && request === previewRead) for (const prefix of previewPrefixes) element(prefix + '-refresh').disabled = false;
+      if (!destroyed && generation === epoch && request === previewRead) {
+        previewReading = false;
+        for (const prefix of previewPrefixes) element(prefix + '-refresh').disabled = false;
+        if (fromPortal) { portalReturnPending = false; returnStatus.focus(); }
+      }
     }
   }
   function acceptPreviewBilling(model) {
     previewRead++;
+    previewReading = false;
     for (const prefix of previewPrefixes) { renderPreviewBilling(prefix, model); element(prefix + '-refresh').disabled = false; }
+    renderPortal(model);
+  }
+  async function openPortal() {
+    if (busy || portalOpening || !checkoutService?.createPreviewPortalSession || !currentUser?.emailVerified || currentUser.isNewUser || !previewModel?.portalManageable || destroyed) return;
+    const generation = epoch;
+    const currentBillingRead = previewRead;
+    portalOpening = true;
+    let navigating = false;
+    element('account-portal-open').disabled = true;
+    element('account-portal-status').textContent = 'Stripeの安全な契約管理画面を準備しています。';
+    try {
+      const response = await checkoutService.createPreviewPortalSession();
+      if (destroyed || generation !== epoch || currentBillingRead !== previewRead || !currentUser?.emailVerified || !previewModel?.portalManageable) return;
+      const url = projectPreviewPortalSession(response);
+      // Never put this short-lived destination in DOM, browser storage or logs.
+      window.location.assign(url);
+      navigating = true;
+    } catch (cause) {
+      if (destroyed || generation !== epoch || currentBillingRead !== previewRead) return;
+      element('account-portal-status').textContent = portalErrorMessage(cause);
+      element('account-portal-status').focus();
+    } finally {
+      if (!destroyed && generation === epoch && !navigating) { portalOpening = false; element('account-portal-open').disabled = !previewModel?.portalManageable; }
+    }
   }
 
   async function renderUser(user, { focus = false, plan = false } = {}) {
@@ -164,7 +238,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       } else {
         setPanel('account-panel', focus ? 'confirm-title' : null);
         if (resumePending && checkout && !user.isNewUser) { resumePending = false; void checkout.resume(); }
-        else if (!user.isNewUser) void refreshPreviewBilling();
+        else if (!user.isNewUser) void refreshPreviewBilling({ fromPortal: portalReturnPending });
       }
     } catch (cause) {
       if (destroyed || request !== epoch) return;
@@ -274,7 +348,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('back-to-account').addEventListener('click', onBack);
   const onPlanChoice = () => {
     const option = element('premium-monthly');
-    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
       option.checked = false;
       return;
     }
@@ -288,8 +362,10 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
   if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
-  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
+  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
   element('plan-checkout').addEventListener('click', onCheckout);
+  const onPortal = () => { void openPortal(); };
+  element('account-portal-open').addEventListener('click', onPortal);
   const onPreviewRefresh = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser) void refreshPreviewBilling(); };
   for (const prefix of previewPrefixes) element(prefix + '-refresh').addEventListener('click', onPreviewRefresh);
   const onPopState = () => { if (!element('checkout-panel').hidden && currentUser?.emailVerified) void checkout?.resume(); };
@@ -307,10 +383,17 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   };
   const onPageShow = async (event) => {
     if (!event.persisted || destroyed) return;
+    // A restored page must not retain a disabled Portal action or its old result,
+    // even when pagehide was not observed. Auth reload emits the current user;
+    // renderUser then re-reads billing with the same guards as a Portal return.
+    portalReturnPending = true;
+    resumePending = false;
+    onPageHide();
+    const request = epoch;
     try {
       await service.reloadUser();
     } catch (cause) {
-      if (!destroyed) showError(service.safeError(cause));
+      if (!destroyed && request === epoch) showError(service.safeError(cause));
     }
   };
   window.addEventListener('pagehide', onPageHide);
@@ -330,6 +413,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     checkout?.destroy();
     checkoutService?.clear();
     element('plan-checkout').removeEventListener('click', onCheckout);
+    element('account-portal-open').removeEventListener('click', onPortal);
     for (const prefix of previewPrefixes) element(prefix + '-refresh').removeEventListener('click', onPreviewRefresh);
     window.removeEventListener('popstate', onPopState);
     ++epoch;

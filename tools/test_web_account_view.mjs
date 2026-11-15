@@ -16,21 +16,22 @@ class Element {
 }
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function setup({checkoutService=null}={}) {
+async function setup({checkoutService=null,search='',pathname='/account/'}={}) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
   nodes.get('premium-monthly').value='premium_monthly';
   nodes.get('premium-monthly').checked=false;
   nodes.get('plan-checkout').disabled=true;
   const windowListeners=new Map();
   globalThis.document={getElementById:id=>nodes.get(id)};
-  globalThis.window={addEventListener:(name,fn)=>windowListeners.set(name,fn),removeEventListener:name=>windowListeners.delete(name)};
+  const navigation=[],replaced=[];
+  globalThis.window={location:{pathname,search,assign:url=>navigation.push(url)},history:{replaceState:(...args)=>replaced.push(args)},addEventListener:(name,fn)=>windowListeners.set(name,fn),removeEventListener:name=>windowListeners.delete(name)};
   let callback;
   const calls={reads:0,email:0,google:0,signOut:0,reload:0};
   const user={emailVerified:true,maskedEmail:'sa***@example.invalid',methods:['メール/パスワード'],isNewUser:false};
   const summary={nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
   const service={ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
   const cleanup=await mountAccountPage(service,{checkoutService});
-  return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners};
+  return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners,navigation,replaced,nodes};
 }
 test('initial login and empty form guard',async()=>{
  const h=await setup();assert.equal(h.el('login-panel').hidden,false);let stopped=false;
@@ -145,4 +146,48 @@ test('logout clears Preview billing and ignores an in-flight read',async()=>{
 test('Preview read failure is unavailable rather than no-contract or paid success',async()=>{
  const h=await setup({checkoutService:previewService(async()=>{throw new Error('private server response');})});h.emit(h.user);await flush();
  assert.equal(h.el('account-preview-details').hidden,true);assert.match(h.el('account-preview-status').textContent,/確認できません/);assert.doesNotMatch(h.el('account-preview-status').textContent,/private|未契約|登録が完了/);assert.equal(h.el('account-preview-refresh').disabled,false);assert.equal(h.el('account-billing').textContent,'未契約');h.cleanup();
+});
+
+
+function manageableBilling(status='active') {const raw=previewBilling(status);raw.billing.portalManageable=true;return raw;}
+function portalService(read=async()=>manageableBilling()) {return {getPreviewBilling:read,createPreviewPortalSession:async()=>({testMode:true,url:'https://billing.stripe.com/p/session/test_syntheticFresh'}),clear(){}};}
+test('contract management card shows required server fields and only manageable contracts receive a button',async()=>{
+ for(const status of ['trialing','active','past_due','unpaid','paused','incomplete']){const h=await setup({checkoutService:portalService(async()=>manageableBilling(status))});h.emit(h.user);await flush();assert.equal(h.el('account-portal-panel').hidden,false);assert.equal(h.el('account-portal-open').hidden,false);assert.equal(h.el('account-portal-open').disabled,false);assert.match(h.el('account-portal-amount').textContent,/550円/);assert.match(h.el('account-portal-period-end').textContent,/日本時間/);assert.match(h.el('account-portal-synced-at').textContent,/日本時間/);if(status==='past_due')assert.match(h.el('account-portal-access').textContent,/お支払い方法の確認が必要/);h.cleanup();}
+ for(const status of ['canceled','incomplete_expired','unknown']){const h=await setup({checkoutService:portalService(async()=>manageableBilling(status))});h.emit(h.user);await flush();assert.equal(h.el('account-portal-open').hidden,true);assert.equal(h.el('account-portal-open').disabled,true);h.cleanup();}
+});
+test('Portal open is explicit, duplicate-click safe and never persists its opaque destination in DOM',async()=>{
+ const wait=deferred();let portals=0;const service=portalService();service.createPreviewPortalSession=()=>{portals++;return wait.promise;};const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('account-portal-open').dispatch('click');h.el('account-portal-open').dispatch('click');assert.equal(portals,1);assert.equal(h.el('account-portal-open').disabled,true);assert.match(h.el('account-portal-status').textContent,/準備しています/);wait.resolve({testMode:true,url:'https://billing.stripe.com/p/session/test_syntheticFresh'});await flush();assert.deepEqual(h.navigation,['https://billing.stripe.com/p/session/test_syntheticFresh']);assert.equal(h.el('account-portal-open').disabled,true);h.el('account-portal-open').dispatch('click');assert.equal(portals,1);assert.doesNotMatch(JSON.stringify([...h.nodes.values()].map(n=>[n.textContent,n.value,n.attrs])),/test_syntheticFresh|billing\.stripe\.com/);assert.equal(h.calls.email,0);assert.equal(h.calls.google,0);h.cleanup();
+});
+test('Portal rejects untrusted destination and displays safe recoverable error',async()=>{
+ const service=portalService();service.createPreviewPortalSession=async()=>({testMode:true,url:'https://evil.invalid/private_destination'});const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('account-portal-open').dispatch('click');await flush();assert.equal(h.navigation.length,0);assert.match(h.el('account-portal-status').textContent,/安全に契約管理画面を開けません/);assert.doesNotMatch(h.el('account-portal-status').textContent,/private_destination|evil/);assert.equal(h.el('account-portal-open').disabled,false);assert.equal(globalThis.focused,'account-portal-status');h.cleanup();
+});
+test('Portal creation result is ignored after logout, UID change and pagehide',async()=>{
+ for(const change of ['logout','uid','pagehide']){const wait=deferred();const service=portalService();service.createPreviewPortalSession=()=>wait.promise;const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('account-portal-open').dispatch('click');if(change==='logout')await h.el('logout').dispatch('click');if(change==='uid'){h.emit({...h.user,maskedEmail:'b***@example.invalid'});await flush();}if(change==='pagehide')h.windowListeners.get('pagehide')();wait.resolve({testMode:true,url:'https://billing.stripe.com/p/session/test_neverUsed'});await flush();assert.equal(h.navigation.length,0);assert.doesNotMatch(h.el('account-portal-status').textContent,/test_neverUsed/);if(change!=='uid'){assert.equal(h.el('account-portal-panel').hidden,true);assert.equal(h.el('account-portal-plan').textContent,'');}h.cleanup();}
+});
+test('refresh during Portal creation invalidates the old navigation result',async()=>{
+ const wait=deferred();const service=portalService();service.createPreviewPortalSession=()=>wait.promise;const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('account-portal-open').dispatch('click');h.el('account-preview-refresh').dispatch('click');await flush();wait.resolve({testMode:true,url:'https://billing.stripe.com/p/session/test_neverUsed'});await flush();assert.equal(h.navigation.length,0);assert.equal(h.el('account-portal-open').disabled,false);h.cleanup();
+});
+test('Portal return strips the query and refreshes current UID billing without creating any session',async()=>{
+ let reads=0,portals=0;const service=portalService(async()=>{reads++;const raw=manageableBilling();raw.billing.cancelAtPeriodEnd=true;raw.billing.nextChargeAt=null;return raw;});service.createPreviewPortalSession=async()=>{portals++;throw new Error('not expected');};const h=await setup({checkoutService:service,search:'?portal=return&unexpected=discarded'});assert.deepEqual(h.replaced,[[null,'','/account/']]);h.emit(h.user);await flush();assert.equal(reads,1);assert.equal(portals,0);assert.equal(h.navigation.length,0);assert.equal(h.el('account-portal-return-status').hidden,false);assert.match(h.el('account-portal-return-status').textContent,/最新の契約状態を読み直しました/);assert.equal(globalThis.focused,'account-portal-return-status');assert.equal(h.el('account-portal-cancel').textContent,'期間末に解約予定');assert.equal(h.el('account-portal-open').hidden,false);h.cleanup();
+});
+test('Portal return failure and canceled state never infer success or enable management',async()=>{
+ const h=await setup({checkoutService:portalService(async()=>{throw new Error('sensitive');}),search:'?portal=return'});h.emit(h.user);await flush();assert.match(h.el('account-portal-return-status').textContent,/確認できませんでした/);assert.equal(h.el('account-portal-open').hidden,true);assert.equal(h.navigation.length,0);h.cleanup();
+ const canceled=await setup({checkoutService:portalService(async()=>manageableBilling('canceled')),search:'?portal=return'});canceled.emit(canceled.user);await flush();assert.equal(canceled.el('account-portal-state').textContent,'解約済み');assert.equal(canceled.el('account-portal-open').hidden,true);canceled.cleanup();
+});
+test('unverified, new and missing Preview accounts cannot issue Portal sessions',async()=>{
+ let portals=0;const service=portalService(async()=>({testMode:true,syncState:'none',billing:null}));service.createPreviewPortalSession=async()=>{portals++;};const h=await setup({checkoutService:service});for(const user of [{...h.user,emailVerified:false},{...h.user,isNewUser:true},h.user]){h.emit(user);await flush();h.el('account-portal-open').dispatch('click');await flush();}assert.equal(portals,0);assert.equal(h.navigation.length,0);h.cleanup();
+});
+test('past_due Preview contract cannot create a duplicate Checkout through plan selection',async()=>{
+ let checkouts=0;const service=portalService(async()=>manageableBilling('past_due'));service.reviewPreviewCheckout=async()=>{checkouts++;};const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('review-plan').dispatch('click');await flush();assert.equal(h.el('plan-fields').disabled,true);h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');h.el('plan-checkout').dispatch('click');await flush();assert.equal(h.el('premium-monthly').checked,false);assert.equal(h.el('plan-checkout').disabled,true);assert.equal(checkouts,0);assert.match(h.el('plan-route-detail').textContent,/新しい申し込みは行いません/);h.cleanup();
+});
+
+test('plan choice stays disabled while its Preview contract read is pending',async()=>{
+ const wait=deferred();let reads=0,checkouts=0;const service=portalService(async()=>++reads===1?manageableBilling('past_due'):wait.promise);service.reviewPreviewCheckout=async()=>{checkouts++;};const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('review-plan').dispatch('click');await flush();h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');h.el('plan-checkout').dispatch('click');assert.equal(h.el('premium-monthly').checked,false);assert.equal(checkouts,0);wait.resolve(manageableBilling('past_due'));await flush();assert.equal(h.el('plan-fields').disabled,true);h.cleanup();
+});
+
+test('persisted Portal return clears stale opening state, refreshes billing and issues only a fresh Session',async()=>{
+ let reads=0,portals=0;const service=portalService(async()=>{reads++;const raw=manageableBilling();raw.billing.cancelAtPeriodEnd=reads>1;return raw;});service.createPreviewPortalSession=async()=>({testMode:true,url:'https://billing.stripe.com/p/session/test_syntheticFresh'+(++portals)});const h=await setup({checkoutService:service});h.emit(h.user);await flush();h.el('account-portal-open').dispatch('click');await flush();assert.equal(portals,1);assert.equal(h.el('account-portal-open').disabled,true);assert.equal(reads,1);
+ // Simulate a cached document returning without relying on a prior pagehide.
+ await h.windowListeners.get('pageshow')({persisted:true});await flush();assert.equal(h.calls.reload,1);assert.equal(reads,2);assert.equal(h.el('account-portal-open').disabled,false);assert.equal(h.el('account-portal-cancel').textContent,'期間末に解約予定');assert.match(h.el('account-portal-return-status').textContent,/最新の契約状態を読み直しました/);assert.equal(globalThis.focused,'account-portal-return-status');assert.equal(h.navigation.length,1);
+ h.el('account-portal-open').dispatch('click');await flush();assert.equal(portals,2);assert.deepEqual(h.navigation,['https://billing.stripe.com/p/session/test_syntheticFresh1','https://billing.stripe.com/p/session/test_syntheticFresh2']);assert.doesNotMatch(JSON.stringify([...h.nodes.values()].map(n=>[n.textContent,n.value,n.attrs])),/test_syntheticFresh/);h.cleanup();assert.equal(h.windowListeners.has('pageshow'),false);
 });

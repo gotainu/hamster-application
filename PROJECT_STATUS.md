@@ -1,11 +1,29 @@
 # Hamster Care プロジェクト状況
 
-最終更新: 2026-11-14
+最終更新: 2026-11-15
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-first-task6-20261115:start -->
+## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（実装・Test Preview検証完了／保存後に本人承認待ち）
+
+- **承認・範囲**：本人承認済みタスク5 `283a8114e524` を起点に、同じ `feature/web-first-stripe-checkout`／専用worktreeでタスク6だけを実装。LP・Firebase Web認証・プラン確認・Embedded・Preview Webhook／billing同期を維持し、本人ログインからTest契約の支払方法・請求履歴・期間末解約を管理する。今回分を `feat(web): add subscription management portal` の1コミットへ保存後停止し、次工程は本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
+- **専用設定・機能**：Test ModeにPreview専用Portal Configurationを作成。支払方法更新・請求履歴・期間末解約・任意の標準6理由を有効化し、customer update（メール・氏名・電話・住所・税ID等）、プラン／価格／数量変更、Promotion Code、即時解約、新規契約・追加商品、pause・共有ログインを無効化した。解約はat_period_end／prorationなし。理由未回答でも実際に解約予約が成立することを確認。共有の事業者名・ロゴ・色等は本番保護のため変更せず、専用headline・Privacy・規約だけを設定した。
+- **Function・UID認可**：別名 `createPreviewStripeCustomerPortalSession` を追加。Admin検証済みID Token・メール確認・本人UIDから隔離対応表とTest Customerを解決し、最新Subscription・Price・専用Configuration・Webhook設定を再照合する。本文は空objectだけ、Customer／Subscription ID・UID・メール・任意return URLは受け取らない。正常管理対象はtrialing／active／past_due等に限定し、未契約・取得不能・別UID・Live Customerは拒否。Task4のUID未保存の終端履歴2件は、同Customer・scope・subject hash・Priceが一致しUIDフィールド自体がない場合だけ読み取り許容し、管理対象化・補完・移行はしない。
+- **保存・復帰・表示**：Portal URLは毎回新規作成し、DOM／独自ストレージ／Firestore／アプリログへ保存しない。固定の同Preview `/account/?portal=return` に復帰し、ログインを維持してPreview billingを再読込み。管理カードは状態・550円月額・請求予定・解約予定・期間末・利用状態・同期時刻を示し、管理中契約から新Checkoutを作成させない。発行回数だけを隔離namespaceの専用counterへ保存し、3秒間隔・10分20回・1日80回を上限とする。ブラウザBackの復元時も待機状態を解除し、最新billingを取得する回帰条件を追加した。
+- **623件の限定検証**：backend383件、frontend140件、既存policy84件、Emulator16件の計**623件PASS**。静的はLP84／account113／brand157の計**354件PASS**、strict TypeScript compile／`git diff --check` PASS。認証拒否・空UID／別UID・Test/Live・設定／戻り先・同時操作・URL非保存・quota・状態・復元・ログアウト等を検証し、既存依存・SDKは更新していない。
+- **本人Webの実操作**：実UIDでFirebaseログイン→Portalへ進み、正常Testカードへの変更、理由未回答の期間末解約予約→期間末までの権限mirror維持→予約取消を確認。固定returnで最新billingを再読込み、Tab／EnterでPortalへ進め、ログアウト後に管理カードを隠すことを確認した。本人の本番業務4文書SHAは不変。支払方法はSubscriptionのdefaultを優先し、未設定時にCustomerのinvoice defaultを使う順序と、実Invoiceで使用された方法を照合した。カードの詳細をHamCare側へ複製せず、本番契約・体験・権限を書き換えない。
+- **別Clock fixtureの実操作**：実UIDのWeb操作とは別に、Auth Emulator UIDとengineを使う専用Clock fixture2件で3D Secure・拒否・変更取消を検証。新しい支払方法が初回550円と翌月550円で使われたことを確認。失敗ケースは同じSubscriptionのpast_due→カード変更後active／550円paidへ回復し、新Checkout・重複契約を作らない。成功ケースはPortalで期間末解約予約→Clock期間終了後canceled／mirror=falseを確認した。成功側Event9件×2の重複18回、失敗側9件×2の重複14回・回復4件で、最新正本を読み直してもcanceledを維持した。
+- **プラットフォームの制約**：未使用Portal URLが5分で失効することを実確認。利用開始後はStripe側で最終操作から1時間以内の期限となり、Firebaseログアウトと同時に既発行のStripe画面を失効させるAPIはない。新発行拒否・画面消去と、既に開いたStripeセッションの寿命を区別し、利用終了時にStripe画面も閉じる案内を表示した。locale=jaでも一部Billing／Reasonの英語表示があり、Stripe DOMを上書きしていない。
+- **表示・未確認**：Chrome360／390／430／768／1440pxの目視で横はみ出しなし。Safari実ブラウザはdesktopと390pxのログイン画面だけを確認し、Safariの認証後Portal往復／物理Android・iOS／実スクリーンリーダーをPASSへ含めない。Portalの請求履歴では本人の0円／過去550円、成功Clockの0円／初回550円／翌月550円、失敗Clockの550円失敗→同じInvoiceの支払い済み表示を確認。Clockの将来日時は仮想時刻であり、実経過月・本番請求とは扱わない。返金／void／uncollectibleの実表示は未確認。
+- **Preview・本番保護**：同じ既存Previewの最終version **`94a1f8464397f250`**、期限 **2026-11-22 10:40 JST**。追加Portal Functionと既存Preview申込Functionの2対象だけを配備しACTIVE、Task5 Webhookは再配備せずstate／updateTime不変。本番54Functions・live Hosting・Auth許可設定、保護13ファイルSHA、元アプリHEAD・dirty10件SHA・全2,120行のstatusは不変。専用Portal設定Secret1件を追加し既定runtime SAだけに権限付与、本番Stripe・Customer／Subscription・業務billing／体験／テスター権限変更0。Preview namespaceへの書込みはあるため、Firestore全体の書込み0とは記録しない。
+- **観測と後始末・停止**：旧い非公開検証helperがTest用Portal／Invoice URLを一時出力したため、後続の観測器を全面マスクへ修正した。本体のserver／アプリログ・Firestore・GitへURLを保存しない検査と区別し、ツール履歴の出力も0とは主張しない。最終監査でCustomer5件を保持、Clock4件すべてready、Subscription10件すべてcanceled／有効0・open Checkout0・有効fixture0を確認。Invoiceはpaid15件（550円paid7件）／open1件で、元Task5の550円失敗証拠を保持。receipt53件は全processed、retryable／processing／error0。本人の真正イベントでsubject_busyだった2件は原bytesと新しい署名で各1回再送し200へ回復、canceled／mirror=falseを維持した。DB直接編集による回復は行っていない。main merge／push・live公開・本番課金／billing・Flutter／ストア変更は行わず、1コミット後に本人承認を待つ。
+<!-- hamcare-web-first-task6-20261115:end -->
+
 <!-- hamcare-web-first-task5-20261114:start -->
-## 2026-11-14 戦略C・タスク5：Preview専用Webhook・契約状態同期（実装・Test Preview検証完了／保存後に本人承認待ち）
+## 2026-11-14 戦略C・タスク5：Preview専用Webhook・契約状態同期（283a8114e524・本人承認済み）
+
+本人のタスク6指示で `283a8114e524` を承認済み。以下はタスク5実施時の検証・未確認の履歴であり、最新の作業・停止点は先頭のタスク6節を優先する。
 
 - **承認・範囲**：本人承認済みタスク4 `b94eb7a5f2c0` から、同じ `feature/web-first-stripe-checkout`／専用worktreeでタスク5だけを実装。既存LP・Web認証・プラン確認・Embedded Checkoutを維持し、Stripe Test Subscription→署名検証済みWebhook→隔離billing→Web反映確認を接続した。今回分を `feat(billing): sync preview Stripe subscriptions by Firebase UID` の独立1コミットへ保存した後に停止し、タスク6は本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
 - **Webhook・Secret境界**：別名 `stripePreviewWebhook` と既存Preview申込Functionの専用2関数を配備済み。raw bytes・署名・署名時刻・Content-Type・Test Modeを検証し、登録先と処理対象は `checkout.session.completed`、`customer.subscription.created/updated/deleted`、`invoice.paid`、`invoice.payment_failed` の6イベントで一致させた。Test credentials／Price／Webhook設定の専用Secret3件だけを参照し、Webhook URL・署名Secret・カード情報をGit／HTML／JavaScript／Firestore／ログへ保存しない。本番Webhook・Functions・Secretを流用しない。
@@ -1136,7 +1154,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-14）**：本人承認済みタスク4 `b94eb7a5f2c0` に続き、タスク5のPreview専用Webhook／隔離billing同期を実装・検証済み。runtime395件／静的347件PASS、実Embedded3ケース・別専用CustomerのTest Clock初回／更新550円・期間末解約・支払失敗past_due、真正Event逆順2巡と重複不変、Chrome5幅／再確認／再読込／ログアウトを確認。本番54Functions state／updateTime・live／Auth・保護11ファイル・元アプリdirty10件／全statusは不変。本番Stripe／業務billing・trial・権限変更0、Preview namespaceには実書込みあり。最終Preview版bd3f9a9e5afe22f2・期限11/21 21:41 JST。今回分を1コミットへ保存後停止し、タスク6 Portalは本人承認後。実unpaid／物理Android／Safari／読み上げ等の未確認は先頭節で区別する。
+- **最新作業（2026-11-15）**：本人承認済みタスク5 `283a8114e524` に続き、タスク6のPreview専用Customer Portalを実装・Test Preview検証完了。runtime623／静的354PASS、本人Webでカード更新・理由未回答の解約予約／取消・固定復帰・再同期・ログアウトを確認。別Auth Emulator／engineのClock2 fixtureで3DS・拒否・取消、新PMの初回／翌月550円、past_dueから同契約の回復、期間終了canceled／権限mirror=false、真正Event再送の不変を確認した。本人本番4文書・本番54Functions／Task5 Webhook／live／Auth・保護13ファイル・元アプリ差分は不変。最終Preview版94a1f8464397f250・期限11/22 10:40 JST。本番業務書込0／Preview書込あり。最終receipt53件すべてprocessed、エラー等0。全Test契約10件canceled・有効0／open Checkout0／有効fixture0を確認。既発行Portalはlogout即時失効不可、Safari認証後往復／物理端末等は未確認。今回分1コミット保存後に停止し、次工程は本人承認後。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1239,7 +1257,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク5実装・Test Preview検証完了／保存後に本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | 署名検証Test Webhook6イベント・Admin UID連鎖・隔離billing／receipt原子同期・有限再確認を接続。runtime395／静的347PASS、実Embedded3ケース・別CustomerのClock初回／更新550円・期間末解約・past_due mirror=false、真正Event逆順2巡と重複不変を確認。本番業務書込0／Preview書込あり、本番54Functions state／updateTime・live／Auth・元アプリ不変。Preview版bd3f9a9e5afe22f2、11/21 21:41 JST期限。Task6 Portal未実装・本人承認後。 |
+| `WEB-01` | タスク6実装・Test Preview検証完了／保存後に本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | UID認可のTest専用Portal、カード更新・請求履歴・期間末解約／取消を接続。runtime623／静的354PASS。本人Web往復、別Clock fixtureの新PM初回／翌月550円・past_due回復・期間末canceled、再送不変を確認。本番54Functions／Webhook／live／Auth／元アプリ不変。Preview版94a1f8464397f250、11/22 10:40 JST期限。最終receipt53件全processed、Test契約10件canceled・有効0。logoutによる既発行URL即時失効不可等は先頭節参照。1コミット後停止。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

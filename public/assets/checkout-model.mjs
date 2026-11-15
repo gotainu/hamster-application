@@ -97,7 +97,8 @@ export function projectPreviewBilling(raw) {
     state: raw.syncState, outcome: 'pending', title: '支払い情報を確認しています', copy: `Webhookによる契約状態の反映を待っています。${disclaimer}`,
     statusLabel: '反映待ち', planLabel: '未確認', amountLabel: '未確認', firstChargeLabel: '未記録', nextChargeLabel: '予定を確認できません',
     periodStartLabel: '未記録', periodEndLabel: '未記録', trialEndLabel: '未記録', cancelLabel: '未確認', syncedAtLabel: '未記録', entitlementLabel: '未確認',
-    managementNotice: '契約管理画面は次の開発タスクで実装します。',
+    portalManageable: false, managementCardVisible: false, accessLabel: '利用状態は確認できません',
+    managementNotice: '管理可能なPreview契約は、アカウント確認画面から支払方法・請求・期間末解約を管理できます。',
   };
   if (raw.syncState === 'none') return Object.freeze({...empty, outcome: 'none', title: 'Preview契約の反映記録はありません', copy: `同期されたテスト契約の記録はありません。未契約や支払い完了とは断定していません。${disclaimer}`, statusLabel: '反映記録なし'});
   if (raw.syncState === 'unavailable') return Object.freeze({...empty, outcome: 'unknown', title: 'Preview契約状態を確認できません', copy: `時間をおいて再確認するか、サポートへお問い合わせください。${disclaimer}`, statusLabel: '確認できません'});
@@ -117,6 +118,9 @@ export function projectPreviewBilling(raw) {
     periodStartLabel: date(billing.currentPeriodStart), periodEndLabel: date(billing.currentPeriodEnd), trialEndLabel: date(billing.trialEnd),
     cancelLabel: billing.cancelAtPeriodEnd ? '期間末に解約予定' : '期間末の解約予定なし', syncedAtLabel: date(billing.syncedAt),
     entitlementLabel: billing.entitlementMirror === true ? '有効として保存（Preview限定）' : billing.entitlementMirror === false ? '無効として保存（Preview限定）' : '確認できません',
+    portalManageable: billing.portalManageable === true && ['trialing', 'active', 'past_due', 'unpaid', 'paused', 'incomplete'].includes(billing.status),
+    managementCardVisible: Boolean(statuses[billing.status]),
+    accessLabel: ['past_due', 'unpaid'].includes(billing.status) ? 'お支払い方法の確認が必要です。' : ['active', 'trialing'].includes(billing.status) && billing.entitlementMirror === true ? '現在の契約期間終了まで利用可能（Preview限定）' : '現在の利用可否は確認が必要です。',
     title: 'Preview契約状態の反映を確認しました', copy: fixtureNote + disclaimer,
   };
   if (billing.status === 'trialing' && billing.entitlementMirror === true) {
@@ -132,4 +136,28 @@ export function projectPreviewBilling(raw) {
     result.outcome = 'unknown'; result.title = 'Preview契約状態を確認できません';
   }
   return Object.freeze(result);
+}
+
+
+/** Only the newly issued, dedicated Test Mode Portal destination may navigate. */
+export function projectPreviewPortalSession(raw) {
+  if (!record(raw) || raw.testMode !== true || typeof raw.url !== 'string' || raw.url.length > 2048 || !/^[\x21-\x7e]+$/.test(raw.url)) fail();
+  let url;
+  try { url = new URL(raw.url); } catch { fail(); }
+  const pathSession = /^\/p\/session\/test_[A-Za-z0-9_-]+$/.test(url.pathname) && !url.search;
+  const querySession = url.pathname === '/p/session' && [...url.searchParams.keys()].length === 1 && /^test_[A-Za-z0-9_-]+$/.test(url.searchParams.get('secret') || '') && url.search === '?secret=' + url.searchParams.get('secret');
+  if (url.origin !== 'https://billing.stripe.com' || url.username || url.password || url.port || url.hash || (!pathSession && !querySession) || url.href !== raw.url) fail();
+  return raw.url;
+}
+
+export function portalErrorMessage(error) {
+  const code = typeof error?.code === 'string' ? error.code.split('/').pop().replaceAll('-', '_') : '';
+  switch (code) {
+    case 'unauthenticated': case 'session_changed': case 'auth_required': return 'ログイン状態が変わりました。アカウントを確認し直してください。';
+    case 'email_unverified': return 'メールアドレスを確認してから、もう一度お試しください。';
+    case 'portal_not_available': case 'subscription_not_manageable': case 'customer_missing': case 'customer_not_found': return '管理できるテスト契約を確認できません。契約状態を再確認してください。';
+    case 'network_error': case 'network_request_failed': case 'unavailable': return '契約管理画面へ接続できませんでした。通信を確認してから、もう一度お試しください。';
+    case 'too_many_requests': case 'resource_exhausted': return '操作が続いています。少し時間をおいてからお試しください。';
+    default: return '安全に契約管理画面を開けませんでした。契約状態を再確認するか、サポートへお問い合わせください。';
+  }
 }

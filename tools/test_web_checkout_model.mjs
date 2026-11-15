@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, projectPreviewBilling, checkoutErrorMessage } from '../public/assets/checkout-model.mjs';
+import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, projectPreviewBilling, projectPreviewPortalSession, portalErrorMessage, checkoutErrorMessage } from '../public/assets/checkout-model.mjs';
 
 const quote = () => ({
   testMode: true, planKey: 'premium_monthly', amount: 550, currency: 'jpy', interval: 'month', reviewToken: 'opaque_fixture_review_token_12345',
@@ -130,11 +130,33 @@ test('mirror rejects Live, foreign plans, wrong total and missing verified sync 
 });
 test('mirror projection excludes identifiers and displays server dates without fabricating next charge', () => {
   const raw=mirrored();Object.assign(raw.billing,{uid:'private_uid_fixture',stripeCustomerId:'cus_private_fixture',subscriptionId:'sub_private_fixture',nextChargeAt:null,cancelAtPeriodEnd:true});
-  const model=projectPreviewBilling(raw);assert.equal(model.cancelLabel,'期間末に解約予定');assert.equal(model.nextChargeLabel,'予定を確認できません');assert.doesNotMatch(JSON.stringify(model),/private_uid_fixture|cus_private_fixture|sub_private_fixture/);assert.match(model.managementNotice,/次の開発タスク/);
+  const model=projectPreviewBilling(raw);assert.equal(model.cancelLabel,'期間末に解約予定');assert.equal(model.nextChargeLabel,'予定を確認できません');assert.doesNotMatch(JSON.stringify(model),/private_uid_fixture|cus_private_fixture|sub_private_fixture/);assert.match(model.managementNotice,/アカウント確認画面/);
 });
 test('trialing sync confirms the original first-charge date and labels isolated test fixtures', () => {
   const raw=mirrored('trialing');Object.assign(raw.billing,{trialEnd:'2026-11-30T01:00:00Z',firstChargeAt:'2026-11-30T01:00:00Z',entitlementMirror:true,testDataSource:'preview_fixture'});
   const model=projectPreviewBilling(raw);assert.equal(model.outcome,'trialing');assert.match(model.title,/カード登録が完了/);assert.match(model.copy,/Preview専用のテストデータ/);assert.match(model.copy,/本番の体験状態は変更しません/);
   assert.match(projectCheckoutReview({...trial(),testDataSource:'preview_fixture'}).trialNote,/Preview専用の体験データ/);
   raw.billing.firstChargeAt='2026-11-29T01:00:00Z';rejects(()=>projectPreviewBilling(raw));
+});
+
+
+test('Portal eligibility is a server hint restricted to known manageable contract states',()=>{
+ for(const status of ['trialing','active','past_due','unpaid','paused','incomplete']){
+  const raw=mirrored(status);raw.billing.portalManageable=true;assert.equal(projectPreviewBilling(raw).portalManageable,true);
+  raw.billing.portalManageable=false;assert.equal(projectPreviewBilling(raw).portalManageable,false);
+ }
+ for(const status of ['canceled','incomplete_expired','unknown']){const raw=mirrored(status);raw.billing.portalManageable=true;assert.equal(projectPreviewBilling(raw).portalManageable,false);}
+ for(const syncState of ['none','pending','unavailable']){const raw=mirrored();raw.syncState=syncState;raw.billing.portalManageable=true;assert.equal(projectPreviewBilling(raw).portalManageable,false);}
+ const due=mirrored('past_due');due.billing.portalManageable=true;assert.match(projectPreviewBilling(due).accessLabel,/お支払い方法の確認が必要/);assert.doesNotMatch(projectPreviewBilling(due).accessLabel,/利用可能/);
+});
+test('Portal navigation accepts only exact newly issued Stripe Test session formats',()=>{
+ for(const url of ['https://billing.stripe.com/p/session/test_syntheticSessionA','https://billing.stripe.com/p/session?secret=test_syntheticSessionB'])assert.equal(projectPreviewPortalSession({testMode:true,url}),url);
+ const invalid=['http://billing.stripe.com/p/session/test_fake','https://billing.stripe.com/login/test_fake','https://billing.stripe.com/p/session/live_fake','https://billing.stripe.com/p/session/test_fake?extra=1','https://billing.stripe.com/p/session?secret=live_fake','https://billing.stripe.com/p/session?secret=test_fake&other=1','https://billing.stripe.com/p/session?secret=test_fake&secret=test_second','https://billing.stripe.com/p/session?other=test_fake','https://billing.stripe.com/p/session/test_fake#fragment','https://billing.stripe.com.evil.invalid/p/session/test_fake','https://evil.invalid/p/session/test_fake','https://user:pass@billing.stripe.com/p/session/test_fake','https://billing.stripe.com:443/p/session/test_fake','https://billing.stripe.com/p/session/%74est_fake','https://billing.stripe.com/p/session?secret=test_%66ake','https://billing.stripe.com/p/session/test_fake\n'];
+ for(const url of invalid)rejects(()=>projectPreviewPortalSession({testMode:true,url}));
+ rejects(()=>projectPreviewPortalSession({testMode:false,url:'https://billing.stripe.com/p/session/test_fake'}));rejects(()=>projectPreviewPortalSession({testMode:true,url:null}));
+});
+test('Portal errors never echo identifiers, opaque URLs or internal codes',()=>{
+ for(const code of ['unauthenticated','session_changed','portal_not_available','customer_missing','network_error','unknown_private_code']){
+  const copy=portalErrorMessage({code,message:'https://billing.stripe.com/p/session/test_private cus_private user_private'});assert.doesNotMatch(copy,/test_private|cus_private|user_private|unknown_private_code|https:/);
+ }
 });

@@ -1,6 +1,44 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-14 戦略C・タスク5：Preview専用Webhook・契約状態同期（実装・Test Preview検証完了／保存後に本人承認待ち）
+## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（実装・Test Preview検証完了／保存後に本人承認待ち）
+
+本人承認済みタスク5 `283a8114e524` を起点に、同じ専用ブランチ／Hosting PreviewへTest専用Customer Portalを追加。既存LP・認証・プラン確認・Embedded・Webhook／隔離billingを維持した。今回分を `feat(web): add subscription management portal` の1コミットへ保存した後に停止し、次工程は本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
+
+### 実装・有効機能・認可
+
+| 項目 | タスク6の実装と証拠 |
+| --- | --- |
+| 専用設定 | Test Modeの非default・Preview専用Configuration。支払方法更新・請求履歴・期間末解約・任意の標準6理由を有効化。Customer Updateの全情報、プラン／価格／数量／Promotion Code、即時解約、新規契約・追加商品、pause・共有ログインは無効。at_period_end／prorationなし。解約理由未回答のまま予約できることを実画面で確認した。 |
+| ブランド | 専用headline・Privacy・規約だけを設定。事業者名・ロゴ・色・サポート等の共有設定を本番保護のため変更しない。locale=jaでも一部Billing／Reasonの英語が残るが、Stripe提供文言やDOMを不正に上書きしない。 |
+| Function | 別名 `createPreviewStripeCustomerPortalSession`。Adminで失効・UID・メール確認等を検証し、空objectのPOSTだけを受け取る。UID／メール／Customer／Subscription ID・金額・任意return URLをクライアント入力から採用しない。Origin・JSON・サイズ・パス・queryも制限する。 |
+| UID・Test分離 | 本人UIDのhashから既存Preview Customer対応を取得し、Customer metadata・最新Subscription・Price・専用Configuration・Webhook設定を確認。Live／他UID／未契約／取得不能は拒否。メール検索・Customer作成・本番契約管理はしない。Task4の終端履歴2件だけはUID field欠損かつ同Customer／scope／hash／Priceが一致する場合に読み取り許容し、管理対象化や履歴補完は行わない。 |
+| 管理対象 | trialing／active／past_due等の管理可能な契約だけにボタンを表示。past_dueは支払方法の確認を案内し、新Checkoutや重複Subscriptionを作成しない。管理可否と有料権限は別であり、支払確認が必要な状態へ新しい猶予を付けない。 |
+| 復帰 | 同じPreview originの固定 `/account/?portal=return` へ戻り、既存ログインと最新Preview billingの再読込みを確認する。URLを任意指定できず、Open Redirectを防ぐ。ブラウザBackでの復元時も待機解除・最新状態取得を行う。 |
+| 保存・発行上限 | Sessionは操作ごとに新規作成。Portal URL・カード詳細をDOM／独自永続化／Firestore／本体ログへ保存しない。隔離namespaceの専用counterに回数だけを保存し、3秒間隔・10分20回／1日80回で制限。Checkout quotaやアプリ体験・利用枠とは分離する。 |
+| 利用者への案内 | Stripeでカード変更・請求履歴・期間末解約ができること、有効な契約は期間末まで利用できること、自動返金ではないこと、HamCareがカード情報を保存しないことを説明。解約理由の自由記述に個人情報を書かない案内と、管理終了時にStripe画面も閉じる案内を表示する。 |
+
+### 限定検証・実操作と限界
+
+- **runtime623件PASS**：backend383、frontend140、既存policy84、Emulator16。認証／UID／設定／固定復帰先／Test/Live／quota／状態／多重操作・URL非保存・BFCache復元・ログアウト等を検証。静的はLP84／account113／brand157の**354件PASS**、strict TypeScript compile／`git diff --check` PASS。既存依存・SDKは更新しない。
+- **本人Webの実操作**：Firebaseログイン→Portal、正常Testカード変更、理由未回答の期間末解約予約→期間末までの権限mirror維持→予約取消、固定returnで最新billing表示を確認。Tab／EnterでPortalへ進み、ログアウト後に管理カードを消すことを確認した。本人の本番業務4文書SHAは前後一致。支払方法はSubscriptionのdefaultを優先し、未設定ならCustomerのinvoice defaultを使う順序と、実Invoiceで使われた方法を照合した。実UIDの値・個人の日時は記録しない。
+- **別Clock fixtureの実操作**：実UIDのWeb E2Eと別に、Auth Emulator UID＋engineの専用Clock fixture2件で3D Secure・拒否・変更取消を検証。新PMが初回550円と翌月550円に使われたことを確認。失敗側は同Subscriptionのpast_due→カード更新後active／550円paidへ回復し、新Checkoutを作らない。成功側はPortal解約予約→Clock期間終了canceled／mirror=falseを確認した。
+- **真正Event再送**：成功側9件を2巡して重複18回・回復0、失敗側9件を2巡して重複14回・回復4。最新正本の再取得後もcanceledを維持。最終監査ではreceipt53件すべてprocessed、retryable／processing／error0。本人の真正イベントでsubject_busyだった2件も原bytes・新署名で各1回再送して200へ回復し、canceled／mirror=falseを維持。DB直接編集による回復は行わない。
+- **Portalの実請求履歴**：本人の0円／過去550円、成功Clockの0円／初回550円／翌月550円を一覧で確認。失敗Clockでは0円Invoiceと550円の失敗表示を確認し、カード更新後に同じ550円Invoiceが支払い済みへ変わったことを確認した。将来日時はClockの仮想時間で、実請求・実経過月とは扱わない。返金／void／uncollectibleは新たに作成せず、実表示未確認として区別する。
+- **URL寿命の制約**：未使用Session URLの5分失効を実確認。利用開始後はStripe側の最終操作から1時間以内に失効する仕様で、HamCare／Firebaseログアウト時に既発行Sessionを即時失効するAPIはない。ログアウト後の新発行拒否・本体表示消去と、既に開いたStripe画面の寿命を分けて記録する。
+- **表示確認**：Chrome360／390／430／768／1440pxで目視・横はみ出しなし。Safari実ブラウザはdesktop／390pxのログイン画面だけを確認。Safari認証後Portal往復・物理Android／iOS・実スクリーンリーダーは未確認で、全実機PASSとは記録しない。
+- **非公開観測の是正**：旧検証helperがTest Portal／Invoice URLを一時出力したため、後続観測器を全面マスクへ修正。本体のserver／アプリログ、Firestore、GitへURLを保存しない検査と区別し、ツール履歴にも一切出力なしとは主張しない。本書へ実URL・識別子は転載しない。
+
+### Preview・本番保護・後始末・停止
+
+- 同じ既存Preview・channel `web-first-task1`、最終version **`94a1f8464397f250`**、期限 **2026-11-22 10:40 JST**。新Portal Functionと既存Preview申込Functionの2対象だけを配備してACTIVEを確認。Task5 Webhookは再配備せず、state／updateTimeは不変。
+- 本番54 Functionsのstate／updateTime、live Hosting release SHA／version、Auth許可ドメイン4件、保護13ファイルSHA、元アプリHEAD・dirty10件SHA・全2,120行のstatusは開始時と一致。Portal設定専用Secretを追加して既定runtime SAだけへ権限付与し、本番Secret・共有brandingを変更しない。
+- 本番Stripe・Customer／Subscription・業務billing／体験／既存テスター権限への変更0。本番業務と異なるPreview namespaceにはcounter・同期等の書込みがあり、Firestore全体の書込み0とは記録しない。
+- 最終監査でTest Customer5件、readyのTest Clock4件を保持、Subscription10件すべてcanceled・有効0、open Checkout0、有効fixture0を確認。Invoiceはpaid15件（550円paid7件）とopen1件で、元Task5の550円失敗証拠を保持。receipt53件は全processed、retryable／processing／error0。Webhook／専用設定／Secretは再利用・遅延通知確認のため保持する。
+- Task6だけを指定メッセージで1コミットに保存し、本人承認まで停止。main merge／push、live Hosting、本番Stripe／billing、Flutter／ストア変更は行わない。
+
+## 2026-11-14 戦略C・タスク5：Preview専用Webhook・契約状態同期（283a8114e524・本人承認済み）
+
+本人のタスク6指示で上記コミットを承認済み。以下はタスク5実施時の検証・未確認の履歴であり、最新の作業・停止点は先頭のタスク6節を優先する。
 
 本人承認済みタスク4 `b94eb7a5f2c0` を起点に、同じ専用ブランチ／Hosting Previewでタスク5だけを実装した。本番アプリの権限は変更せず、Test Subscriptionの最新状態を署名検証済みWebhookから隔離billingへ同期し、同一申込の反映完了をWebで確認する。今回分を `feat(billing): sync preview Stripe subscriptions by Firebase UID` の1コミットに保存した後で停止し、Task6 Customer Portalは本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
 

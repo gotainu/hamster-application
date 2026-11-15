@@ -112,7 +112,29 @@
             <div><dt>サーバーのPreview権限保存状態</dt><dd id="account-preview-entitlement"></dd></div>
           </dl>
           <button class="quiet-button" id="account-preview-refresh" type="button" disabled>Preview契約状態を再確認する</button>
-          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+          <p class="help-copy">管理可能なPreview契約は、アカウント確認画面から支払方法・請求・期間末解約を管理できます。</p>
+        </section>
+
+        <p id="account-portal-return-status" class="account-notice" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
+        <section class="preview-billing-card portal-management-card" id="account-portal-panel" aria-labelledby="account-portal-title" hidden>
+          <h2 id="account-portal-title">契約を管理する</h2>
+          <p class="help-copy">Stripe Test Mode専用の管理画面です。本番の契約・HamCareアプリの利用権限は変更しません。</p>
+          <dl class="account-summary preview-billing-details">
+            <div><dt>現在のプラン</dt><dd id="account-portal-plan"></dd></div>
+            <div><dt>月額料金</dt><dd id="account-portal-amount"></dd></div>
+            <div><dt>現在の契約状態</dt><dd id="account-portal-state"></dd></div>
+            <div><dt>次回請求日</dt><dd id="account-portal-next-charge"></dd></div>
+            <div><dt>期間末解約予定</dt><dd id="account-portal-cancel"></dd></div>
+            <div><dt>現在の契約期間の終了</dt><dd id="account-portal-period-end"></dd></div>
+            <div><dt>現在の利用状態</dt><dd id="account-portal-access"></dd></div>
+            <div><dt>最終同期日時</dt><dd id="account-portal-synced-at"></dd></div>
+          </dl>
+          <p>Stripeの安全な契約管理画面へ移動します。登録カードの変更、請求履歴の確認、期間末での解約ができます。</p>
+          <p class="help-copy">有効な契約は、解約手続き後も現在の契約期間が終了するまで利用できます。自動で返金される手続きではありません。お支払いに確認が必要な場合は、現在の利用状態をご確認ください。</p>
+          <p class="help-copy">HamCareがカード番号やセキュリティコードを保存することはありません。解約理由に自由記述欄がある場合、個人情報は書かないでください。</p>
+          <p class="help-copy">契約管理を終えたらStripeの画面も閉じてください。HamCareからログアウトしても、開いた管理画面は一定時間有効です。</p>
+          <p id="account-portal-status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+          <button class="button primary full-width" type="button" id="account-portal-open" hidden disabled>支払方法・請求・解約を管理する</button>
         </section>
 
         <p class="help-copy">サーバーに保存されている状態と終了日を表示しています。実際の利用可否はHamCareアプリで確認してください。</p>
@@ -183,14 +205,14 @@
             <div><dt>サーバーのPreview権限保存状態</dt><dd id="plan-preview-entitlement"></dd></div>
           </dl>
           <button class="quiet-button" id="plan-preview-refresh" type="button" disabled>Preview契約状態を再確認する</button>
-          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+          <p class="help-copy">管理可能なPreview契約は、アカウント確認画面から支払方法・請求・期間末解約を管理できます。</p>
         </section>
 
               <div class="plan-management" id="plan-management" hidden>
                 <h3>契約管理の確認方法</h3>
                 <p>HamCareアプリの「アプリの設定 → 利用プラン → プランを管理する」からご確認ください。操作できない場合はサポートへお問い合わせください。</p>
                 <a class="text-link" href="https://hamster-breeding-app.web.app/support/">サポートを確認する <span aria-hidden="true">→</span></a>
-                <p class="help-copy">このPreviewでは契約管理画面を作成したり、既存契約の解約・変更を行ったりしません。</p>
+                <p class="help-copy">このPreviewから本番契約の解約・変更は行いません。テスト契約はアカウント確認画面から管理できます。</p>
               </div>
             </section>
           </div>
@@ -281,7 +303,7 @@
             <div><dt>最終同期日時</dt><dd id="checkout-preview-synced-at"></dd></div>
             <div><dt>サーバーのPreview権限保存状態</dt><dd id="checkout-preview-entitlement"></dd></div>
           </dl>
-          <p class="help-copy">契約管理画面は次の開発タスクで実装します。この欄から契約管理画面を開くことはできません。</p>
+          <p class="help-copy">管理可能なPreview契約は、アカウント確認画面から支払方法・請求・期間末解約を管理できます。</p>
         </section>
         <div class="checkout-actions"><button class="quiet-button" id="checkout-refresh" type="button">支払い操作の状態を再確認する</button><button class="button secondary full-width" id="checkout-back" type="button">プラン確認へ戻る</button><button class="quiet-button" id="checkout-cancel" type="button">テスト申込をキャンセルする</button></div>
         <p class="help-copy">本番契約の作成・変更や、アプリへの権限反映は行いません。</p>

@@ -61,3 +61,11 @@
 .preview-billing-details dd { font-size: .9375rem; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .preview-billing-card { padding: 18px 14px; } .preview-billing-card .quiet-button { width: 100%; } }
 @media (forced-colors: active) { .preview-billing-card { background: Canvas; color: CanvasText; border-color: CanvasText; } .preview-billing-card h2, .preview-billing-card h3, .preview-billing-card > [role="status"] { color: CanvasText; } }
+
+/* Portal is an explicit authenticated navigation, never a persistent shared URL. */
+.portal-management-card > p { margin-block: 16px; line-height: 1.9; overflow-wrap: anywhere; }
+.portal-management-card .button { min-height: 54px; margin-top: 18px; white-space: normal; }
+#account-portal-status { color: var(--hamcare-text-secondary, #c5cbd4); font-size: .9375rem; }
+#account-portal-status:focus, #account-portal-return-status:focus { outline: 3px solid var(--hamcare-accent-cyan, #79e2dd); outline-offset: 4px; }
+.portal-management-card .button:disabled { background: var(--hamcare-bg-surface, #232635); color: var(--hamcare-text-secondary, #c5cbd4); border-color: #8390a6; cursor: wait; box-shadow: none; }
+@media (forced-colors: active) { #account-portal-status { color: CanvasText; } .portal-management-card .button:disabled { background: Canvas; color: GrayText; border-color: GrayText; } }

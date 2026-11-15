@@ -11,6 +11,7 @@ PUBLIC = ROOT / 'public'
 AUTH_BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
 CHECKOUT_BASE = '98f3fb8a6cd8a3fdcee91149ea3a72f2fe404b9a'
 CHECKOUT_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCheckoutSession'
+PORTAL_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCustomerPortalSession'
 
 def baseline(path, revision=AUTH_BASE):
     return subprocess.check_output(['git','show',f'{revision}:{path}'],cwd=ROOT)
@@ -79,10 +80,10 @@ def main():
     check('pure plan projection has no SDK or credential access',not re.search(r'\b(?:import|document|window|navigator|auth|sdk)\b|idToken|getIdToken|accessToken|refreshToken|firebaseUid',plan_model))
     check('plan choice itself sends no request', 'const onPlanChoice' in plan_view and not re.search(r'\b(?:fetch|createPreviewCheckout|reviewPreviewCheckout)\s*\(',plan_view.split('const onPlanChoice',1)[1].split("element('premium-monthly').addEventListener",1)[0]))
     checkout_service=(PUBLIC/'assets/checkout-service.mjs').read_text()
-    check('fixed isolated backend endpoint',CHECKOUT_ENDPOINT in checkout_service and 'endpoint !== PREVIEW_CHECKOUT_ENDPOINT' in checkout_service and checkout_service.count('.cloudfunctions.net/')==1)
-    check('only five defined backend operations', all(value in checkout_service for value in ("request('review')","request('session'","request('status')","request('cancel')","request('billing')")))
-    check('bearer POST is not a URL credential',all(value in checkout_service for value in ("getIdToken()","'Authorization':'Bearer '+token","method:'POST'","credentials:'omit'","cache:'no-store'","referrerPolicy:'no-referrer'")) and re.search(r"fetchRequest\(endpoint\s*\+\s*['\"]/['\"]\s*\+\s*operation\s*,",checkout_service) is not None and not re.search(r'URLSearchParams|encodeURIComponent\(token',checkout_service))
-    check('Checkout request body is allowlisted plan plus confirmation only',"body:JSON.stringify({planKey:'premium_monthly',...extra})" in checkout_service and 'request(\'session\',{reviewToken,termsAccepted})' in checkout_service)
+    check('only two fixed isolated backend endpoints',CHECKOUT_ENDPOINT in checkout_service and PORTAL_ENDPOINT in checkout_service and 'endpoint !== PREVIEW_CHECKOUT_ENDPOINT' in checkout_service and checkout_service.count('.cloudfunctions.net/')==2)
+    check('only five Checkout operations and dedicated empty Portal operation', all(value in checkout_service for value in ("request('review')","request('session'","request('status')","request('cancel')","request('billing')","createPreviewPortalSession:()=>request(null, {}, true)")))
+    check('bearer POST is not a URL credential',all(value in checkout_service for value in ("getIdToken()","'Authorization':'Bearer '+token","method:'POST'","credentials:'omit'","cache:'no-store'","referrerPolicy:'no-referrer'","fetchRequest(portal ? PREVIEW_PORTAL_ENDPOINT : endpoint+'/'+operation")) and not re.search(r'URLSearchParams|encodeURIComponent\(token',checkout_service))
+    check('Checkout body is allowlisted confirmation and Portal body is empty',"body:JSON.stringify(portal ? {} : {planKey:'premium_monthly',...extra})" in checkout_service and 'request(\'session\',{reviewToken,termsAccepted})' in checkout_service)
     check('Checkout responses guard identity generation and abort on clear',all(value in checkout_service for value in ('started !== generation','auth.currentUser?.uid !== uid','new AbortController()','generation++','controller.abort()')))
     checkout_view=(PUBLIC/'assets/checkout-view.mjs').read_text()
     check('Stripe.js loads directly from approved SDK origin',"https://js.stripe.com/v3/" in checkout_view and 'initEmbeddedCheckout' in checkout_view and not re.search(r'api\.stripe|checkout\.stripe',checkout_service+checkout_view))
@@ -119,7 +120,15 @@ def main():
         check('production billing/Auth source unchanged '+path,(ROOT/path).read_bytes()==baseline(path,CHECKOUT_BASE))
     backend=(ROOT/'preview-functions/src/index.ts').read_text()
     engine=(ROOT/'preview-functions/src/engine.ts').read_text()
-    check('Preview uses only dedicated Test secrets',set(re.findall(r"defineSecret\('([^']+)'\)",backend))=={'HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS','HAMCARE_PREVIEW_STRIPE_TEST_PRICE','HAMCARE_PREVIEW_STRIPE_WEBHOOK_CONFIG'})
+    portal=(ROOT/'preview-functions/src/portal.ts').read_text()
+    portal_engine=(ROOT/'preview-functions/src/portal-engine.ts').read_text()
+    check('Preview uses only dedicated Test secrets',set(re.findall(r"defineSecret\('([^']+)'\)",backend+portal))=={'HAMCARE_PREVIEW_STRIPE_TEST_CREDENTIALS','HAMCARE_PREVIEW_STRIPE_TEST_PRICE','HAMCARE_PREVIEW_STRIPE_WEBHOOK_CONFIG','HAMCARE_PREVIEW_STRIPE_PORTAL_CONFIG'})
+    check('Portal verifies Firebase ID token and UID before issuance',all(value in portal for value in ('verifyIdToken(bearer.slice(7),true)','getUser(token.uid)','user.uid!==token.uid','token.email_verified!==true','!user.emailVerified')))
+    check('Portal HTTP rejects identifiers and arbitrary redirects',all(value in portal for value in ("req.get('Origin')!==PREVIEW_ORIGIN","req.is('application/json')",'Object.keys(req.query).length','Object.keys(req.body).length','req.rawBody.length>512')))
+    check('Portal resolves Customer from UID without email search or creation',all(value in portal_engine for value in ('hash(uid)','stored.previewFirebaseUid !== uid','customers.retrieve(customerId)','verifyBinding(customer.metadata')) and not re.search(r'customers\.(search|create|update)|subscriptions\.(create|update|cancel)|billingPortal\.configurations\.(create|update)',portal_engine))
+    check('Portal is Test mode and fixed configuration and return only',all(value in portal_engine for value in ("value.livemode !== false","configuration: d.configurationId","return_url: PREVIEW_PORTAL_RETURN_URL","locale: 'ja'","'/account/?portal=return'")))
+    check('Portal disables identity and plan editing and immediate cancellation',all(value in portal_engine for value in ("f.customer_update?.enabled !== false","f.subscription_update?.enabled !== false","f.subscription_cancel.mode !== 'at_period_end'","f.subscription_cancel.proration_behavior !== 'none'","config.login_page?.enabled !== false")))
+    check('Portal has no logging, URL persistence or billing mutation',not re.search(r'console\s*\.|logger\s*\.|sessionStorage|localStorage|\.set\(|\.update\(',portal_engine) and 'tx.set(rate,' in portal and not re.search(r'\.doc\([\"\']subscription[\"\']\).*\.set',portal))
     webhook=(ROOT/'preview-functions/src/webhook.ts').read_text()
     verification=(ROOT/'preview-functions/src/webhook-verification.ts').read_text()
     sync=(ROOT/'preview-functions/src/subscription-sync.ts').read_text()
