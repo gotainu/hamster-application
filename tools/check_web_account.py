@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC = ROOT / 'public'
 AUTH_BASE = 'd969c1955e2861a8eea4a3a4b5a101561532b7b3'
 CHECKOUT_BASE = '98f3fb8a6cd8a3fdcee91149ea3a72f2fe404b9a'
+APPLE_BASE = 'a2e73511ecef6c3d82aef396fa83fb7286e889a4'
 CHECKOUT_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCheckoutSession'
 PORTAL_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/createPreviewStripeCustomerPortalSession'
 
@@ -19,6 +20,7 @@ def baseline(path, revision=AUTH_BASE):
 def auth_entry_without_checkout(source):
     """Only the reviewed Task 4 mount/return integration may change Auth entry."""
     return (source
+        .replace('appleSignInEnabled: false, ', '')
         .replace("import { createPreviewCheckoutService } from './checkout-service.mjs';\n", '')
         .replace('  const checkoutService = createPreviewCheckoutService({auth});\n', '')
         .replace("  const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';\n", '')
@@ -50,7 +52,7 @@ def main():
             resource=a.get('src',a.get('href',''))
             if resource.startswith('/'):check('resource exists '+resource,(PUBLIC/resource.lstrip('/')).is_file())
     check('errors are announced',any(a.get('role')=='alert' for _,a in nodes))
-    check('loading and safe guidance exist','準備中' in html and 'Apple' in html and 'ログアウト' in html)
+    check('loading and safe guidance exist','Appleログインは設定確認中' in html and 'Apple' in html and 'ログアウト' in html)
     check('no custom card controls or signup form',not re.search(r'type=["\'](?:tel|number)["\']|createUserWithEmailAndPassword|card-number|CVC',html))
     check('only original inputs and consent checkbox', {(a.get('id'),a.get('type')) for t,a in nodes if t=='input'} == {('email','email'),('password','password'),('premium-monthly','radio'),('checkout-terms','checkbox')})
     check('only original login form', [a.get('id') for t,a in nodes if t=='form']==['email-form'])
@@ -70,15 +72,31 @@ def main():
     check('read-only Firestore Lite', 'firebase-firestore-lite.js' in code and 'sdk.getDoc(' in code)
     projections='\n'.join((PUBLIC/'assets'/name).read_text() for name in ('account-model.mjs','plan-model.mjs'))
     check('no timestamp-based Web entitlement decision',not re.search(r'Date\.now|isPaid|canUsePaidFeatures|isActiveAt|isInitialTrialActive',projections))
-    for path in ['public/assets/firebase-web-config.mjs','public/assets/account-service.mjs']:
-        before=baseline(path)
-        check('protected Auth/config unchanged '+path,(ROOT/path).read_bytes()==before)
+    config_path='public/assets/firebase-web-config.mjs'
+    check('protected Firebase project/config unchanged',(ROOT/config_path).read_bytes()==baseline(config_path))
+    auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
+    # Task7 deliberately extends the reviewed service. Keep its transport/API and
+    # fixed UID-read surface explicit instead of silently freezing a new baseline.
+    allowed_sdk={'OAuthProvider','GoogleAuthProvider','signOut','signInWithPopup','getAdditionalUserInfo','onAuthStateChanged','setPersistence','signInWithEmailAndPassword','reload','getIdToken','getDoc','doc'}
+    check('Auth SDK surface has only existing methods and standard Apple provider',set(re.findall(r'sdk\.([A-Za-z]+)\s*\(',auth_service))==allowed_sdk)
+    check('Apple capability defaults off and is strictly opt-in',all(value in auth_service for value in ('appleSignInEnabled = false','appleSignInEnabled === true',"kind === 'apple' && !appleEnabled","new sdk.OAuthProvider('apple.com')",'sdk.signInWithPopup(auth, provider)')))
+    path_source=re.search(r'const paths = (.*?);',auth_service)
+    fixed_paths=dict((key,(collection,document)) for key,collection,document in re.findall(r"(\w+): \['([^']+)', '([^']+)'\]",path_source[1] if path_source else ''))
+    check('only four current-UID account documents are read',fixed_paths=={'owner':('owner_profiles','main'),'billing':('billing','subscription'),'trial':('feature_access','initial_trial_v2'),'pet':('pet_profiles','main_pet')} and "sdk.doc(db, 'users', uid, collection, document)" in auth_service)
+    check('pet registration exposes existence only',"name === 'pet' ? {kind: 'found'}" in auth_service)
+    check('social and email reads retain UID/epoch/logout guards',all(value in auth_service for value in ('socialPending','emailPending','startedBeforeLogout !== logoutGeneration','auth.currentUser?.uid !== uid','epoch !== generation','!user.emailVerified')))
+    check('Apple identity must match the SDK current UID',all(value in auth_service for value in ('result.user.uid !== auth.currentUser.uid','!hasAppleProvider(result.user)','!hasAppleProvider(auth.currentUser)')))
+    check('Task7 does not change Preview CSP or hosting configuration',(ROOT/'firebase.preview.json').read_bytes()==baseline('firebase.preview.json',APPLE_BASE))
     entry=(PUBLIC/'assets/account.mjs').read_text()
-    check('Auth entry unchanged except exact Checkout mount integration',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
+    check('Auth entry unchanged except reviewed Checkout mount and disabled Apple capability',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
+    check('Apple is not generally enabled by the public entry','appleSignInEnabled: false' in entry and 'appleSignInEnabled: true' not in entry)
+    apple=next((a for t,a in nodes if t=='button' and a.get('id')=='apple-signin'),{})
+    check('Apple button is a disabled official local image with safe explanation',apple.get('type')=='button' and 'disabled' in apple and apple.get('aria-describedby')=='apple-signin-note' and any(t=='img' and a.get('src')=='/assets/landing/apple-sign-in-ja.png' and a.get('alt')=='Appleでサインイン' for t,a in nodes))
     plan_model=(PUBLIC/'assets/plan-model.mjs').read_text()
     plan_view=(PUBLIC/'assets/account-view.mjs').read_text()
     check('pure plan projection has no SDK or credential access',not re.search(r'\b(?:import|document|window|navigator|auth|sdk)\b|idToken|getIdToken|accessToken|refreshToken|firebaseUid',plan_model))
     check('plan choice itself sends no request', 'const onPlanChoice' in plan_view and not re.search(r'\b(?:fetch|createPreviewCheckout|reviewPreviewCheckout)\s*\(',plan_view.split('const onPlanChoice',1)[1].split("element('premium-monthly').addEventListener",1)[0]))
+    check('unregistered or unreadable app account cannot enter contracts',plan_view.count('currentSummary?.appAccountExists !== true')>=3 and 'currentSummary?.appAccountExists === true' in plan_view and 'summary.appAccountExists === true' in plan_view)
     checkout_service=(PUBLIC/'assets/checkout-service.mjs').read_text()
     check('only two fixed isolated backend endpoints',CHECKOUT_ENDPOINT in checkout_service and PORTAL_ENDPOINT in checkout_service and 'endpoint !== PREVIEW_CHECKOUT_ENDPOINT' in checkout_service and checkout_service.count('.cloudfunctions.net/')==2)
     check('only five Checkout operations and dedicated empty Portal operation', all(value in checkout_service for value in ("request('review')","request('session'","request('status')","request('cancel')","request('billing')","createPreviewPortalSession:()=>request(null, {}, true)")))

@@ -207,6 +207,17 @@
       "height": 204,
       "mode": "RGBA",
       "notes": "Official Google sign-in branding asset, downloaded unchanged; not taken from app or recolored."
+    },
+    {
+      "file": "apple-sign-in-ja.png",
+      "source": "https://appleid.cdn-apple.com/appleid/button?height=54&width=260&color=white&border=true&type=sign-in&border_radius=12&scale=3&locale=ja_JP",
+      "source_sha256": "d89d74eefcf88d09c3207351cef5290dedc2e2d71f08c8bf45a6b41e7d88d25a",
+      "output_sha256": "d89d74eefcf88d09c3207351cef5290dedc2e2d71f08c8bf45a6b41e7d88d25a",
+      "bytes": 12180,
+      "width": 780,
+      "height": 162,
+      "mode": "RGBA",
+      "notes": "Official Apple center-aligned ja_JP Sign in with Apple full button; raw PNG copied unchanged from Apple CDN. No custom Apple drawing, recoloring, cropping, or text substitution."
     }
   ],
   "icon_verification": {

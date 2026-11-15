@@ -58,6 +58,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     element('plan-selection-status').textContent = 'プランはまだ選択していません。';
     element('unavailable-fields').hidden = true;
     element('new-google-note').hidden = true;
+    element('account-registration-note').hidden = true;
+    element('account-registration-note').textContent = '';
   }
 
   function clearError() {
@@ -77,7 +79,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     busy = value;
     element('email-fields').disabled = value;
     for (const id of ['google-signin', 'refresh-account', 'check-verification']) element(id).disabled = value;
-    element('review-plan').disabled = value || Boolean(currentUser?.isNewUser);
+    element('apple-signin').disabled = value || service.appleSignInEnabled !== true;
+    element('review-plan').disabled = value || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
     form.setAttribute('aria-busy', String(value));
     status.textContent = message;
   }
@@ -137,7 +140,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     }
   }
   async function refreshPreviewBilling({ fromPortal = false } = {}) {
-    if (!checkoutService?.getPreviewBilling || !currentUser?.emailVerified || currentUser.isNewUser || destroyed) return;
+    if (!checkoutService?.getPreviewBilling || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || destroyed) return;
     const request = ++previewRead;
     const generation = epoch;
     previewReading = true;
@@ -171,7 +174,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     renderPortal(model);
   }
   async function openPortal() {
-    if (busy || portalOpening || !checkoutService?.createPreviewPortalSession || !currentUser?.emailVerified || currentUser.isNewUser || !previewModel?.portalManageable || destroyed) return;
+    if (busy || portalOpening || !checkoutService?.createPreviewPortalSession || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || !previewModel?.portalManageable || destroyed) return;
     const generation = epoch;
     const currentBillingRead = previewRead;
     portalOpening = true;
@@ -230,15 +233,20 @@ export async function mountAccountPage(service, { checkoutService = null, resume
       element('unavailable-fields').textContent = unavailable.length ? `${unavailable.join('・')}を読み取れませんでした。利用可能・未契約とは判定していません。` : '';
       element('unavailable-fields').hidden = unavailable.length === 0;
       element('new-google-note').hidden = !user.isNewUser;
+      const registration = element('account-registration-note');
+      registration.hidden = summary.appAccountExists === true;
+      registration.textContent = summary.appAccountExists === true ? '' : summary.appAccountExists === false
+        ? 'このログイン情報に対応するHamCareアプリのペット登録を確認できませんでした。アプリで普段使用しているアカウントか確認してください。ここでは登録・契約・体験を開始しません。'
+        : 'HamCareアカウントの登録状態を読み取れないため、プラン確認と契約管理を停止しています。時間をおいて表示内容を再確認してください。';
       setBusy(false);
-      if (plan && !user.isNewUser) {
+      if (plan && !user.isNewUser && summary.appAccountExists === true) {
         renderPlan(summary);
         setPanel('plan-panel', 'plan-title');
         void refreshPreviewBilling();
       } else {
         setPanel('account-panel', focus ? 'confirm-title' : null);
-        if (resumePending && checkout && !user.isNewUser) { resumePending = false; void checkout.resume(); }
-        else if (!user.isNewUser) void refreshPreviewBilling({ fromPortal: portalReturnPending });
+        if (resumePending && checkout && !user.isNewUser && summary.appAccountExists === true) { resumePending = false; void checkout.resume(); }
+        else if (!user.isNewUser && summary.appAccountExists === true) void refreshPreviewBilling({ fromPortal: portalReturnPending });
       }
     } catch (cause) {
       if (destroyed || request !== epoch) return;
@@ -283,6 +291,9 @@ export async function mountAccountPage(service, { checkoutService = null, resume
 
   const onGoogle = () => { void signIn(() => service.signInGoogle()); };
   element('google-signin').addEventListener('click', onGoogle);
+  const onApple = () => { if (service.appleSignInEnabled === true) void signIn(() => service.signInApple()); };
+  element('apple-signin').addEventListener('click', onApple);
+  if (service.appleSignInEnabled === true) element('apple-signin-note').textContent = 'HamCareアプリで使用したAppleアカウントを選んでください。別のAppleアカウントでは新しいログイン情報が作成される場合がありますが、体験・契約は自動で開始しません。';
   const onToggle = () => {
     const visible = password.type === 'password';
     password.type = visible ? 'text' : 'password';
@@ -336,7 +347,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('check-verification').addEventListener('click', onVerify);
 
   const onPlan = () => {
-    if (busy || !currentUser?.emailVerified || currentUser.isNewUser) return;
+    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true) return;
     // Re-read the same UID-scoped documents; do not rely on stale account text.
     void renderUser(currentUser, { focus: true, plan: true });
   };
@@ -348,7 +359,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('back-to-account').addEventListener('click', onBack);
   const onPlanChoice = () => {
     const option = element('premium-monthly');
-    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+    if (busy || !currentUser?.emailVerified || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
       option.checked = false;
       return;
     }
@@ -362,7 +373,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
   if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (currentUser?.emailVerified) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
-  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
+  const onCheckout = () => { if (!busy && currentUser?.emailVerified && !currentUser.isNewUser && currentSummary?.appAccountExists === true && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
   element('plan-checkout').addEventListener('click', onCheckout);
   const onPortal = () => { void openPortal(); };
   element('account-portal-open').addEventListener('click', onPortal);
@@ -423,6 +434,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     unsubscribe();
     form.removeEventListener('submit', onSubmit);
     element('google-signin').removeEventListener('click', onGoogle);
+    element('apple-signin').removeEventListener('click', onApple);
     element('toggle-password').removeEventListener('click', onToggle);
     element('logout').removeEventListener('click', onLogout);
     element('refresh-account').removeEventListener('click', onRefresh);

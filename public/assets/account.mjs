@@ -17,7 +17,7 @@ try {
   const auth = authSDK.initializeAuth(app, { persistence: authSDK.browserSessionPersistence, popupRedirectResolver: authSDK.browserPopupRedirectResolver });
   auth.languageCode = 'ja';
   const db = dbSDK.getFirestore(app);
-  const service = createAccountService({ auth, db, sdk: { ...authSDK, getDoc: dbSDK.getDoc, doc: dbSDK.doc } });
+  const service = createAccountService({ auth, db, appleSignInEnabled: false, sdk: { ...authSDK, getDoc: dbSDK.getDoc, doc: dbSDK.doc } });
   const checkoutService = createPreviewCheckoutService({auth});
   const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';
   if (resumeCheckout) history.replaceState(null, '', '/account/');

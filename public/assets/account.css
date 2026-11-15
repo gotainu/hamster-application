@@ -108,3 +108,10 @@
   .account-card input:focus-visible, .account-shell button:focus-visible, .account-shell summary:focus-visible { outline: 3px solid Highlight; box-shadow: none; }
   .account-card input[aria-invalid="true"] { border: 2px dashed CanvasText; }
 }
+
+/* Official Apple full-button PNG, displayed without redrawing or recoloring. */
+.account-shell .apple-button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; margin: 18px auto 0; padding: 0; border: 0; border-radius: 12px; background: #fff; box-shadow: none; }
+.account-shell .apple-button img { display: block; width: min(100%, 260px); height: auto; border-radius: 12px; }
+.account-shell .apple-button:disabled { opacity: 1; cursor: not-allowed; }
+.account-shell .apple-button:focus-visible { outline: 3px solid var(--hamcare-accent-cyan, #79e2dd); outline-offset: 4px; }
+@media (forced-colors: active) { .account-shell .apple-button { background: Canvas; color: CanvasText; border: 1px solid CanvasText; } .account-shell .apple-button img { forced-color-adjust: none; } }

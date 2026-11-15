@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Offline brand checks; contrast arithmetic is not a browser AA audit.
 
-The d969c19 baseline guards Auth providers and original functional controls.
+The d969c19 baseline guards original functional controls. Task7 adds a gated
+Apple provider surface; its API and data boundaries are checked separately.
 Task 3 replaced the pending plan panel; Task 4 adds an isolated Test Checkout.
 Payment runtime/security checks live in check_web_account.py. Emulator and
 browser tests remain separate.
@@ -241,11 +242,20 @@ def main():
             check('four actual feature screenshots retained', set(feature_images) == {'/assets/landing/screen-' + item + '.png' for item in ('record', 'changes', 'ai', 'environment')})
             check('actual Home with visible example note', 'class="home-screen"' in html and '実際のHome画面例' in html and 'テスト用プロフィール' in html)
 
-    protected = ['public/assets/firebase-web-config.mjs', 'public/assets/account-service.mjs']
-    for path in protected:
-        check('original Auth service/config unchanged ' + path, (ROOT / path).read_bytes() == baseline(path))
-    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/account.css', 'public/assets/plan.css']:
+    path='public/assets/firebase-web-config.mjs'
+    check('original Firebase config unchanged', (ROOT/path).read_bytes()==baseline(path))
+    auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
+    auth_entry=(PUBLIC/'assets/account.mjs').read_text()
+    check('Apple addition retains explicit disabled capability and SDK Popup','appleSignInEnabled = false' in auth_service and 'appleSignInEnabled: false' in auth_entry and "new sdk.OAuthProvider('apple.com')" in auth_service and 'sdk.signInWithPopup(auth, provider)' in auth_service)
+    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
         check('existing brand unchanged for Checkout ' + path, (ROOT / path).read_bytes() == baseline(path, CHECKOUT_BASE))
+    account_css=(PUBLIC/'assets/account.css').read_text()
+    check('existing account brand unchanged except appended official Apple button',account_css.split('\n/* Official Apple full-button PNG, displayed without redrawing or recoloring. */',1)[0].encode()==baseline('public/assets/account.css',CHECKOUT_BASE))
+    apple=entries.get('apple-sign-in-ja.png',{})
+    apple_image=ASSETS/'apple-sign-in-ja.png'
+    check('Apple full button is the unchanged official ja_JP PNG',apple.get('source','').startswith('https://appleid.cdn-apple.com/appleid/button?') and 'locale=ja_JP' in apple.get('source','') and apple.get('source_sha256')==apple.get('output_sha256')=='d89d74eefcf88d09c3207351cef5290dedc2e2d71f08c8bf45a6b41e7d88d25a' and sha256(apple_image.read_bytes()).hexdigest()==apple['source_sha256'])
+    check('Apple graphic preserves official size and accessible wording',apple.get('width')==780 and apple.get('height')==162 and 'alt="Appleでサインイン"' in (PUBLIC/'account/index.html').read_text())
+    check('Apple touch target stays 54px and graphic retains aspect ratio','width: 100%; min-height: 54px' in account_css and 'width: min(100%, 260px); height: auto' in account_css)
     presentation_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs', 'checkout-model.mjs', 'checkout-view.mjs'))
     check('presentation has no business writer, custom storage or direct payment transport', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch|fetchRequest)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|api\.stripe|cloudfunctions\.net|run\.app', presentation_code))
     for filename in ('screen-record.png', 'screen-changes.png', 'screen-ai.png', 'screen-environment.png'):

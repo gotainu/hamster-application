@@ -1,6 +1,42 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
-## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（実装・Test Preview検証完了／保存後に本人承認待ち）
+## 2026-11-15 戦略C・タスク7：Apple Webログイン（Web実装準備／一般有効化保留・本人設定と安全方式判断待ち）
+
+本人承認済みタスク6 `a2e73511ecef` から同じ専用ブランチ・PreviewでApple Webログインを準備。既存メール／Google・プラン・Embedded・Webhook・Portalは維持する。一方、Apple Developer設定と同一メール自動link／Auth新規作成時の本番書込みに未解決事項があり、一般有効化しない。今回分を `feat(web): add Sign in with Apple` の1コミットへ保存し、本人の設定完了返答後の読取り・表示確認結果も同じコミットへ含めて停止する。実Apple成功や全要件完了とは扱わない。
+
+### 既存Apple構成・必要な本人設定
+
+| 項目 | 確認済みの事実／未実施 |
+| --- | --- |
+| native iOS | 既存 `AppleAuthProvider` による通常Appleログインは過去の本人確認済み。既存Bundle ID `com.gotainu.hamster`／Team `3SA77V3SM7`を維持し、Flutter・署名は変更しない。本人操作後のApple設定ダイアログで既存App IDの「Enable as a primary App ID」選択済みを確認し、変更せずCancelした。 |
+| Firebase Provider | API読取りでApple enabled=true、Web client IDなし・OAuth Key設定なし。nativeの成功とWeb未設定を区別し、native設定不良と断定しない。Key ID・Private Key・認証コード等は取得／文書保存しない。 |
+| Apple Developer | 当初Access Unavailableだったが、本人から最新PLA同意・ログイン完了の返答を受け、設定画面へのアクセス復旧を確認。既存Sign in with Appleキー1件が既存App IDへ関連付いている。Downloadは無効、既存秘密鍵の保管先・利用可否は未確認。Key ID・秘密値を記録せず、削除・置換・再発行・設定保存はしない。 |
+| Service ID | Services IDs一覧がGetting Startedで登録0件と確認。**`com.gotainu.hamster.web` は未作成の提案値**で、確認済みの既存Primary App IDへ関連付ける案。実登録や設定変更はしない。 |
+| メール中継 | Sign in with Apple for Email CommunicationのEmail SourcesはNo result found、登録0件。必要な送信元の登録・到達検証は未実施で、ログイン成功やrelay配信成功とは扱わない。 |
+| Domains・Return URL | 現authDomainの固定 `hamster-breeding-app.firebaseapp.com` と標準web.appホストをWeb Domains案にし、Return URLは **`https://hamster-breeding-app.firebaseapp.com/__/auth/handler`** へ固定する案。既存HandlerはHTTP200。Appleへ一時Previewドメインを恒久登録しない。 |
+| Preview／本番の関係 | Firebaseで既存許可済みのPreview domainは保持。標準固定Handlerを使うためのlive Hosting公開は不要で、今回実施しない。本番も固定Handlerを使う案とし、Preview終了時に一時許可だけを削除する。既存固定ドメインを削除しない。 |
+
+### 実装準備と安全上の停止条件
+
+- Apple公式日本語PNGを無加工で表示する準備と、Firebase標準SDKのOAuthProvider／Popup、email・name scope、日本語の取消／衝突／失敗案内を追加した。`appleSignInEnabled` はfalse、通常UIはdisabled／設定確認中を維持する。UIの公開flagはFirebase全体のセキュリティ制御ではなく、一般有効化が安全になったとは主張しない。
+- OAuthのstate／nonceは標準SDKへ委ねる設計で、実Appleフローでは未確認。Apple subject・UID・token・codeを独自保存／URL露出しない。実アカウント値や秘密はGitへ記録しない。
+- アカウント確認は同じ本人UIDの既存3文書に `pet_profiles/main_pet` 存在確認を加える4文書読取り。アプリ登録済みの存在が確認できなければ、プラン・契約へ進めない。新UIDへ他UIDのプロフィール・ペット・体験・契約をコピー／移行しない。メールをStripe紐付けの正本にしない。
+- **同一メールの自動linkは未解決**：Firebaseのtrusted Apple providerでは同一メールの既存別providerへ自動linkする場合があり、アプリにlinkWith呼出しがないだけでは防げない。Emulatorでも既存password UIDへlinkされる挙動を観測した。統合防止のPASSではなく、一般有効化を妨げる制約として記録する。globalの重複メール許可設定は変更しない。
+- **新Auth作成による本番書込みも未解決**：既存 `analyticsAccountRegistered` はAuthのonCreateから本番journey文書を保存する。Apple新規ユーザーを無条件で作る経路は本番Firestore書込み0要件を満たせない。既存triggerやRulesを変更して迂回せず、新規Auth実作成は行わない。
+- **次の案は未実装**：Apple provider identityをサーバーで照合し、既存Firebase UIDにだけ認証する限定方式を提案する。メール比較・新Auth作成・UID統合を行わない設計を別途検証し、本人判断後に進める段階。設定同意後に通常Popupを開放するだけで完了とはしない。
+
+### 検証・未確認・停止
+
+- frontend197件、backend383件、既存policy84件、既存Stripe pure unit21件、既存Auth Emulator15件、専用Apple Auth／Firestore Emulator19件の計**719件PASS**。静的はLP84／account124／brand163の**371件PASS**、strict TypeScript／`git diff --check` PASS。
+- Apple Emulatorは明示的なPopup stubから実Emulator credential交換を使い、合成Apple subject→seed UID、公開／非公開メール形、2回目のname／email欠落、異subject別UID、新UIDにmain_petがない場合の契約拒否、変更していない本番RulesのcrossUID／billing書込み拒否、ログアウトを確認した。実Apple OAuth／署名／state／nonce／iOS実UID一致を確認した代用にはしない。
+- 既存Auth Emulatorは専用Task2 projectへ再起動後に15件PASS。初回9失敗はTask7 default projectとTask2 fixtureの不一致であり、差分コードの失敗とは区別。合成同一メールの自動linkは観測結果で、防止成功として数えない。
+- 同じchannelのPreview version **`354b4f1c6ac4c40f`**、期限 **2026-11-22 11:43 JST**。公開34ファイルのSHA／安全ヘッダー一致、除外6経路404を確認。live version `2365135bf558c278`・Firebase Apple Provider／Auth project configの前後hash一致、既存57Functionsの状態／更新日時不変を最終照合した。元アプリHEAD・dirty10ファイルhash・未追跡を含む全2,120行のstatus、保護8ファイル、Preview設定も不変。
+- 本人のMac解除後、Safari Responsive Design Modeの360×844／390×844で実スクリーンショットを目視し、無効Appleボタンと設定待ち説明の文字切れ／横はみ出しがないことを確認。物理iOS Safariの確認とは区別する。公式PNG自体の寸法・内容・出典SHAは確認した。実Appleの既存／新規ユーザー・メール公開／非公開・再ログイン・取消・Safari／モバイルChromeのOAuth、native iOS↔Web UID一致、Apple経由のEmbedded／Webhook／Portal往復は未確認。既存native本人確認、既存課金経路の検証と混同しない。
+- 今回の実Appleログイン・新規本番Auth作成・本番Firestore／Stripe書込み0。Apple／Firebase設定変更、既存契約／テスター権限変更、Flutter／ストア・live Hosting公開は行わない。本人のPLA／Macロック待ちは解消。Service ID登録・Primary関連付け・固定Return URL・既存秘密鍵の安全な利用確認とFirebase Web設定、必要なメール中継設定、および自動linkを防ぐ安全方式の判断が残る。同じ1コミットへ確認結果を保存後に停止。物理端末E2E・本番切替へ進まない。
+
+## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（a2e73511ecef・本人承認済み）
+
+本人のタスク7指示で上記コミットを承認済み。以下はタスク6実施時の検証・制約の履歴であり、現在の作業・停止点は先頭のタスク7節を優先する。
 
 本人承認済みタスク5 `283a8114e524` を起点に、同じ専用ブランチ／Hosting PreviewへTest専用Customer Portalを追加。既存LP・認証・プラン確認・Embedded・Webhook／隔離billingを維持した。今回分を `feat(web): add subscription management portal` の1コミットへ保存した後に停止し、次工程は本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
 

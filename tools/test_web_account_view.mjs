@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { mountAccountPage } from '../public/assets/account-view.mjs';
+import { safeAuthError } from '../public/assets/account-model.mjs';
 import { projectPlanReview } from '../public/assets/plan-model.mjs';
 const html = await readFile(new URL('../public/account/index.html', import.meta.url), 'utf8');
 class Element {
@@ -16,7 +17,7 @@ class Element {
 }
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function setup({checkoutService=null,search='',pathname='/account/'}={}) {
+async function setup({checkoutService=null,search='',pathname='/account/',appleSignInEnabled=false}={}) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
   nodes.get('premium-monthly').value='premium_monthly';
   nodes.get('premium-monthly').checked=false;
@@ -26,10 +27,10 @@ async function setup({checkoutService=null,search='',pathname='/account/'}={}) {
   const navigation=[],replaced=[];
   globalThis.window={location:{pathname,search,assign:url=>navigation.push(url)},history:{replaceState:(...args)=>replaced.push(args)},addEventListener:(name,fn)=>windowListeners.set(name,fn),removeEventListener:name=>windowListeners.delete(name)};
   let callback;
-  const calls={reads:0,email:0,google:0,signOut:0,reload:0};
+  const calls={reads:0,email:0,google:0,apple:0,signOut:0,reload:0};
   const user={emailVerified:true,maskedEmail:'sa***@example.invalid',methods:['メール/パスワード'],isNewUser:false};
-  const summary={nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
-  const service={ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
+  const summary={appAccountExists:true,nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
+  const service={appleSignInEnabled,signInApple:async()=>{calls.apple++;callback({...user,methods:['Apple']});},ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
   const cleanup=await mountAccountPage(service,{checkoutService});
   return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners,navigation,replaced,nodes};
 }
@@ -190,4 +191,23 @@ test('persisted Portal return clears stale opening state, refreshes billing and 
  // Simulate a cached document returning without relying on a prior pagehide.
  await h.windowListeners.get('pageshow')({persisted:true});await flush();assert.equal(h.calls.reload,1);assert.equal(reads,2);assert.equal(h.el('account-portal-open').disabled,false);assert.equal(h.el('account-portal-cancel').textContent,'期間末に解約予定');assert.match(h.el('account-portal-return-status').textContent,/最新の契約状態を読み直しました/);assert.equal(globalThis.focused,'account-portal-return-status');assert.equal(h.navigation.length,1);
  h.el('account-portal-open').dispatch('click');await flush();assert.equal(portals,2);assert.deepEqual(h.navigation,['https://billing.stripe.com/p/session/test_syntheticFresh1','https://billing.stripe.com/p/session/test_syntheticFresh2']);assert.doesNotMatch(JSON.stringify([...h.nodes.values()].map(n=>[n.textContent,n.value,n.attrs])),/test_syntheticFresh/);h.cleanup();assert.equal(h.windowListeners.has('pageshow'),false);
+});
+
+test('Apple is visibly gated off until explicit capability is enabled',async()=>{
+ const h=await setup();assert.equal(h.el('apple-signin').disabled,true);h.el('apple-signin').dispatch('click');await flush();assert.equal(h.calls.apple,0);assert.equal(h.calls.reads,0);assert.match(html,/Appleログインは設定確認中/);assert.match(html,/alt="Appleでサインイン"/);h.el('google-signin').dispatch('click');await flush();assert.equal(h.calls.google,1);h.cleanup();
+});
+test('enabled Apple capability uses existing account view and preserves its registered profile',async()=>{
+ const h=await setup({appleSignInEnabled:true});h.summary.methods=['Apple'];assert.equal(h.el('apple-signin').disabled,false);h.el('apple-signin').dispatch('click');await flush();assert.equal(h.calls.apple,1);assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('account-method').textContent,'Apple');assert.equal(h.el('account-nickname').textContent,h.summary.nickname);assert.equal(h.el('review-plan').disabled,false);h.cleanup();
+});
+test('pending Apple sign-in blocks duplicate Apple, Google and email actions',async()=>{
+ const wait=deferred();const h=await setup({appleSignInEnabled:true});h.service.signInApple=()=>{h.calls.apple++;return wait.promise;};h.el('apple-signin').dispatch('click');h.el('apple-signin').dispatch('click');h.el('google-signin').dispatch('click');h.el('email').value='synthetic@example.invalid';h.el('password').value='synthetic-only';h.el('email-form').dispatch('submit',{preventDefault(){}});assert.equal(h.calls.apple,1);assert.equal(h.calls.google,0);assert.equal(h.calls.email,0);assert.equal(h.el('apple-signin').disabled,true);wait.resolve();await flush();assert.equal(h.el('apple-signin').disabled,false);h.cleanup();
+});
+test('Apple cancellation, failure and provider conflict remain safe recoverable login errors',async()=>{
+ for(const code of ['auth/popup-closed-by-user','auth/network-request-failed','auth/account-exists-with-different-credential']){const h=await setup({appleSignInEnabled:true});h.service.safeError=safeAuthError;h.service.signInApple=async()=>{h.calls.apple++;throw {code,message:'private_subject_code_token'};};h.el('apple-signin').dispatch('click');await flush();assert.equal(h.el('account-panel').hidden,true);assert.equal(h.calls.reads,0);assert.equal(h.el('auth-error').hidden,false);assert.doesNotMatch(h.el('auth-error').textContent,/private_subject_code_token|auth\//);if(code.includes('different-credential'))assert.match(h.el('auth-error').textContent,/ログイン方法/);assert.equal(h.el('apple-signin').disabled,false);h.cleanup();}
+});
+test('logout while Apple sign-in is pending clears UI and does not restore a late completed action',async()=>{
+ const wait=deferred();const h=await setup({appleSignInEnabled:true});h.service.signInApple=()=>{h.calls.apple++;return wait.promise;};h.el('apple-signin').dispatch('click');await h.el('logout').dispatch('click');wait.resolve();await flush();assert.equal(h.el('login-panel').hidden,false);assert.equal(h.el('account-email').textContent,'');assert.equal(h.calls.reads,0);assert.equal(h.calls.signOut,1);h.cleanup();assert.equal(h.el('apple-signin').listeners.has('click'),false);
+});
+test('new Apple or empty/unreadable app account cannot enter plan, Checkout, Preview billing or Portal',async()=>{
+ for(const appAccountExists of [false,null]){let billingReads=0,portals=0,checkouts=0;const service=portalService(async()=>{billingReads++;return manageableBilling();});service.createPreviewPortalSession=async()=>{portals++;};service.reviewPreviewCheckout=async()=>{checkouts++;};const h=await setup({checkoutService:service,appleSignInEnabled:true});h.summary.appAccountExists=appAccountExists;h.summary.methods=['Apple'];h.emit({...h.user,methods:['Apple'],isNewUser:appAccountExists===false});await flush();assert.equal(h.el('review-plan').disabled,true);h.el('review-plan').dispatch('click');h.el('account-preview-refresh').dispatch('click');h.el('account-portal-open').dispatch('click');h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');h.el('plan-checkout').dispatch('click');await flush();assert.equal(h.el('plan-panel').hidden,true);assert.equal(billingReads,0);assert.equal(portals,0);assert.equal(checkouts,0);assert.equal(h.el('account-registration-note').hidden,false);assert.match(h.el('account-registration-note').textContent,/確認|停止/);h.cleanup();}
 });

@@ -4,8 +4,25 @@
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
+<!-- hamcare-web-first-task7-20261115:start -->
+## 2026-11-15 戦略C・タスク7：Apple Webログイン（Web実装準備／一般有効化保留・本人設定と安全方式判断待ち）
+
+- **承認・範囲**：本人承認済みタスク6 `a2e73511ecef` から同じ `feature/web-first-stripe-checkout`／専用worktreeを継続。Appleボタン・標準SDKの認証コード・日本語の中止／エラー案内と同UIDのアカウント読取りを準備した。既存メール／Google・プラン／Embedded／Webhook／Portalは維持するが、Apple実認証と要件の安全性は成立していないため**一般有効化は保留**。今回分は `feat(web): add Sign in with Apple` の1コミットへ保存。本人の設定完了返答後は読取りと最終表示確認だけを再開し、確認結果の文書追記を同じ1コミットへ含めて停止する。物理端末E2E・本番切替へ進まず、最終ハッシュはGit履歴と完了報告で確認する。
+- **既存構成・本人操作**：native iOSの既存 `AppleAuthProvider` とBundle ID `com.gotainu.hamster`／Team `3SA77V3SM7`を維持。最初はAccess Unavailableだったが、本人から最新PLA同意・ログイン完了の返答を受け、設定画面へのアクセス復旧を確認した。App ID設定ダイアログでは「Enable as a primary App ID」が選択済みで、変更せずCancelした。既存Sign in with Appleキー1件がこのApp IDへ関連付いていることを確認したが、秘密鍵ファイルの保管先・利用可否は未確認で、Key ID・秘密値は記録しない。Services IDs一覧はGetting Started表示で登録0件、Email SourcesもNo result foundで0件。**`com.gotainu.hamster.web` は未作成の提案値**。前回Firebase APIで確認したApple provider enabled=true／Web client ID・OAuth Key未設定は維持し、今回Apple／Firebaseの設定は変更していない。
+- **固定ドメイン案**：既存のauthDomain `hamster-breeding-app.firebaseapp.com` を維持し、既存Firebase OAuth Handler **`https://hamster-breeding-app.firebaseapp.com/__/auth/handler`** のHTTP200を確認。Service IDを既存Primary Appに関連付け、Web Domainsはこの固定firebaseapp.comと標準web.appのホストを候補として本人に提示する段階で、未登録。Appleへ一時Preview URLを恒久登録しない。Firebaseで許可済みの既存Preview Auth domainは維持し、固定Handlerを使うためのlive Hosting公開は不要。最終本番も固定Handlerを使う案とし、Preview期限後は追加した一時許可だけを撤去する。
+- **Web実装と無効状態**：Apple公式の日本語ボタンPNGを無加工で使用。標準Firebase SDK PopupとOAuthProviderのApple・email／name scopeを準備し、state／nonceの実装はSDKへ委ねるが、実フローの検証済みとはしない。通常UI／サービスの `appleSignInEnabled` はfalse、準備中の説明とdisabled表示を維持する。これは通常のアプリ経路を止める公開設定であり、Firebaseプロジェクト全体のセキュリティ境界ではない。ログイン方式Appleの表示、個人情報消去・遅延応答破棄・取消／衝突の日本語案内を用意した。自動link・UID間コピー・Auth削除は実装しない。
+- **アカウント存在ガード**：本人UIDの従来3文書にserver-only `pet_profiles/main_pet` の存在読取りを加え、既存アプリのアカウント判定と揃えた。新しい空UIDやpet未作成・読取り不能ならプラン確認／契約へ進めず、別UIDのデータを読まない。Firestore Rules・本番Functions・既存課金経路は変更せず、メールをStripe紐付けの正本へ使わない。
+- **有効化を妨げる2条件**：Firebaseは信頼済みApple providerの同一メールで既存別providerへ自動linkする場合があり、アプリがlinkWith APIを呼ばないだけでは防止できない。合成Emulatorでも同一メールの既存password UIDへlinkされる挙動を観測したため、統合防止PASSとは扱わない。また既存 `analyticsAccountRegistered` はAuthユーザー作成時に本番のjourney文書を書き込むため、新規Appleログインを無条件に許可すると今回の本番Firestore書込み0要件を満たせない。globalの重複メール設定や既存Auth triggerを変更せず、未解決を隠して有効化しない。
+- **次の安全方式案（未実装）**：メール比較を使わず、サーバーでApple provider identityから既存Firebase UIDだけを照合し、新規Auth作成を行わない限定ログインを検討する。現時点では設計提案・本人判断待ちであり、実装済み／認証安全性確認済みとはしない。Apple設定の本人操作と、この方式が要件を満たすことの検証を経てから有効化を判断する。
+- **検証結果と環境差**：frontend197件、backend383件、既存policy84件、既存Stripe pure unit21件、既存Auth Emulator15件、専用Apple Auth／Firestore Emulator19件の計**719件PASS**。Apple Emulatorは合成provider subject・seed UID・公開／非公開メール形・2回目プロフィール欠落・新空UIDの拒否・本番Rulesによる別UID読取／billing書込拒否・ログアウトを確認した。Popupは明示stubで、実Apple OAuth・暗号state／nonce・iOSとWebの実UID一致の代用ではない。同一メールの自動linkは制約の観測であり、防止の成功ではない。既存Auth Emulatorは専用Task2 projectへ再起動して15件PASS。初回9失敗はTask7 default projectにTask2 fixtureを接続した環境不一致で、コード差分の失敗と区別する。
+- **静的・Preview**：LP84／account124／brand163の計**371件PASS**、strict TypeScript／`git diff --check` PASS。既存同channelのPreview version **`354b4f1c6ac4c40f`**、期限 **2026-11-22 11:43 JST**。公開34ファイルのSHA／安全ヘッダー一致・除外6経路404を確認。live version `2365135bf558c278`・Firebase Apple Provider／Auth project configの前後hash一致、既存57Functionsの状態／更新日時不変を最終照合した。本人のMac解除後、Safari Responsive Design Modeの360×844／390×844で実スクリーンショットを開き、無効Appleボタン・設定待ち説明の文字切れ／横はみ出しがないことを確認した。物理iOS Safariや実OAuthの成功とは区別する。元アプリのdirty10件／全2,120行のstatusを開始時に保存・維持し、Flutter／署名／ストア・本番Stripe／契約／課金権限を変更しない。
+- **未確認・停止**：native iOS↔Webの実UID一致、実Appleのメール公開／非公開・再認証・取消・実state／nonce、Apple経由の契約／Portal往復は未確認。実Appleログイン・新規本番Auth作成・本番Firestore／Stripe書込みは今回実行していない。PLA／Macロック待ちは解消した。残る設定はService ID新規登録・既存Primaryとの関連付け・固定ドメイン／Return URL・既存秘密鍵の安全な利用確認とFirebase Web設定、必要なメール中継送信元登録であり、既存設定の削除・置換や鍵の無断再発行は行わない。UI準備を全要件完了へ読み替えず、1コミット後に本人設定と安全方式判断を待つ。
+<!-- hamcare-web-first-task7-20261115:end -->
+
 <!-- hamcare-web-first-task6-20261115:start -->
-## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（実装・Test Preview検証完了／保存後に本人承認待ち）
+## 2026-11-15 戦略C・タスク6：Preview用Customer Portal（a2e73511ecef・本人承認済み）
+
+本人のタスク7指示で `a2e73511ecef` を承認済み。以下はタスク6実施時の検証・制約の履歴であり、最新の作業・停止点は先頭のタスク7節を優先する。
 
 - **承認・範囲**：本人承認済みタスク5 `283a8114e524` を起点に、同じ `feature/web-first-stripe-checkout`／専用worktreeでタスク6だけを実装。LP・Firebase Web認証・プラン確認・Embedded・Preview Webhook／billing同期を維持し、本人ログインからTest契約の支払方法・請求履歴・期間末解約を管理する。今回分を `feat(web): add subscription management portal` の1コミットへ保存後停止し、次工程は本人承認後とする。コミットの成立・ハッシュはGit履歴と完了報告で確認する。
 - **専用設定・機能**：Test ModeにPreview専用Portal Configurationを作成。支払方法更新・請求履歴・期間末解約・任意の標準6理由を有効化し、customer update（メール・氏名・電話・住所・税ID等）、プラン／価格／数量変更、Promotion Code、即時解約、新規契約・追加商品、pause・共有ログインを無効化した。解約はat_period_end／prorationなし。理由未回答でも実際に解約予約が成立することを確認。共有の事業者名・ロゴ・色等は本番保護のため変更せず、専用headline・Privacy・規約だけを設定した。
@@ -1154,7 +1171,7 @@
 
 ## 現在地
 
-- **最新作業（2026-11-15）**：本人承認済みタスク5 `283a8114e524` に続き、タスク6のPreview専用Customer Portalを実装・Test Preview検証完了。runtime623／静的354PASS、本人Webでカード更新・理由未回答の解約予約／取消・固定復帰・再同期・ログアウトを確認。別Auth Emulator／engineのClock2 fixtureで3DS・拒否・取消、新PMの初回／翌月550円、past_dueから同契約の回復、期間終了canceled／権限mirror=false、真正Event再送の不変を確認した。本人本番4文書・本番54Functions／Task5 Webhook／live／Auth・保護13ファイル・元アプリ差分は不変。最終Preview版94a1f8464397f250・期限11/22 10:40 JST。本番業務書込0／Preview書込あり。最終receipt53件すべてprocessed、エラー等0。全Test契約10件canceled・有効0／open Checkout0／有効fixture0を確認。既発行Portalはlogout即時失効不可、Safari認証後往復／物理端末等は未確認。今回分1コミット保存後に停止し、次工程は本人承認後。
+- **最新作業（2026-11-15）**：本人承認済みTask6 `a2e73511ecef` に続き、Task7 Apple WebログインのUI／標準SDKコードと合成検証を準備。一般有効化はfalseのまま、本人のApple PLA同意・設定アクセス復旧を確認し、Service ID／Firebase Web設定と安全方式判断待ち。Firebaseの同一メール自動linkとAuth作成時journey書込みがあり、linkWith不使用やUI無効だけで要件解決とは扱わない。既存Apple identityから既存UIDだけ照合するサーバー方式は未実装の提案。frontend197／backend383／policy84／Stripe pure21／既存Auth Emulator15／Apple Emulator19の計719、静的371PASS。Apple Provider／Auth project config、live、57Functions状態／更新日時の不変を照合済み。Safari360／390pxは実スクリーンショットで無効ボタン・説明の切れ／横はみ出しなし。既存Primary App ID・関連Appleキー1件、Service ID／Email Sources登録0件を読取り確認。Preview版354b4f1c6ac4c40f、11/22 11:43 JST期限。実AppleOAuth／iOS↔Web UID／実relay・Apple課金経路は未確認、本番Auth新規作成／Firestore／Stripe書込み0。1コミット後停止し、物理端末E2E・本番切替には進まない。
 
 - フェーズ: 日本限定・iOS／Android同時公開準備。`REL-02`のPlay Alphaは本人承認の既存14変更を2026-10-27 11:09 JSTに審査送信。2026-10-27 11:19 JSTに送信ID1「公開」を本人確認済み（今回もConsoleで読取照合）。製品版一般公開・必要人数／期間の達成とは区別する。通常登録・カードなし0円契約・通常権限同期・Android有料gate・審査アクセス保存PASS、`REL-03`の既存実機／Play更新／DeviceCheck PASSは維持し再実施しない。旧Case22954972のscope外回答を受け、本人承認のApp Review新問い合わせを2026-10-27 11:46:34 JSTに送信。受付公式完了画面と11:48:45 JST受信の受付メールで番号一致を確認／新Case103009817213、決済判断は回答待ち。
 - RC4切替の現在の最優先（2026-11-09）: 旧版互換P1は本人判断で非ブロッキングとして閉じた。後続の微修正反映版1.0.1/code5・build5は署名済み成果物生成・整合確認済み。Play既存Alpha code5と掲載名Ham Careは保存済み、日本／本人1名を維持し、未送信2変更・履歴ID1〜3のまま。本人から「押した」との回答後に読込み完了まで待って再読したが、未送信2変更・履歴ID1〜3のままで送信受付未確認、原因未特定。残る操作はConsole受付の再確認と承認済み2変更の送信のみで、追加の本人クリック待ちとはしない。iOSは11/9 11:09 JST Delivery完了・ASC処理完了、本人の明示承認後に輸出申告Save済みで、既存本人実機確認グループ1Tester/4Buildsのbuild5 Testing・90日を確認済み。両Consoleの日本語名は正確にHam Careで保存表示を確認。端末4→5の更新・保持確認は未実施。既存code4/build4本人確認と限定114PASS／既存2FAIL・analyze57新規0を維持し、同じAI／認証等を再試験しない。外部追加・招待・連絡、main merge／push・サーバー反映・製品版公開は行わず、Apple Case103009817213の回答待ちを維持する。以下の募集準備欄は従来の記録として保持する。
@@ -1257,7 +1274,7 @@
 
 | ID | 状態 | 内容 | 次の確認・作業 |
 |---|---|---|---|
-| `WEB-01` | タスク6実装・Test Preview検証完了／保存後に本人承認待ち | Webファースト戦略C・公式LPから独自申込画面へ | UID認可のTest専用Portal、カード更新・請求履歴・期間末解約／取消を接続。runtime623／静的354PASS。本人Web往復、別Clock fixtureの新PM初回／翌月550円・past_due回復・期間末canceled、再送不変を確認。本番54Functions／Webhook／live／Auth／元アプリ不変。Preview版94a1f8464397f250、11/22 10:40 JST期限。最終receipt53件全processed、Test契約10件canceled・有効0。logoutによる既発行URL即時失効不可等は先頭節参照。1コミット後停止。 |
+| `WEB-01` | タスク7 Web実装準備／一般有効化保留・本人設定と安全方式判断待ち | Webファースト戦略C・公式LPから独自申込画面へ | Task6承認a2e735。Apple公式ボタン・標準SDK Popupコード・同UID4文書存在ガードを準備し通常UIは無効。同一メール自動link／Auth作成journey書込みは未解決、既存Apple identity限定サーバー方式は提案のみ。計719件／静的371PASS。実AppleOAuth／iOS UID一致／実relay未確認。Preview版354b4f1c6ac4c40f・11/22 11:43 JST期限。本人PLA待ちは解消、Primary／既存Appleキーを確認。Service ID・Email Sources登録0件。Apple設定と安全方式判断待ち、同じ1コミットへ確認結果を保存して停止。 |
 | `SEC-04` | 完了 | Stripe契約状態の競合・再同期修正 | 運用監視 |
 | `SEC-03` | 完了 | iOS App Check用の明示的署名設定 | Development／Distribution署名整合とRelease DeviceCheckサーバー計測はPASS。個体callback/tokenの直接未観測は限界として保持し、設定や認証を作り直さない |
 | `SEC-02` | 完了 | Android Play Integrity / App Check確認 | 公開後の強制適用は監視して判断 |

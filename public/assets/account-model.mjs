@@ -9,8 +9,9 @@ export function maskEmail(email) {
 }
 
 export function loginMethods(providerData = []) {
-  const labels = { password: 'メールアドレス／パスワード', 'google.com': 'Google', 'apple.com': 'Apple（Webログイン準備中）' };
-  const methods = [...new Set(providerData.map(item => labels[item?.providerId]).filter(Boolean))];
+  const labels = { password: 'メールアドレス／パスワード', 'google.com': 'Google', 'apple.com': 'Apple' };
+  const items = Array.isArray(providerData) ? providerData : [];
+  const methods = [...new Set(items.map(item => labels[item?.providerId]).filter(Boolean))];
   return methods.length ? methods : ['確認できません'];
 }
 
@@ -23,11 +24,16 @@ export function safeAuthError(error) {
     case 'auth/account-exists-with-different-credential':
     case 'auth/credential-already-in-use': return 'HamCareアプリで使用したログイン方法を選択してください。アカウントの自動統合は行いません。';
     case 'auth/popup-closed-by-user':
-    case 'auth/cancelled-popup-request': return 'Googleログインを中止しました。必要な場合にもう一度お試しください。';
+    case 'auth/cancelled-popup-request': return 'ログインを中止しました。必要な場合にもう一度お試しください。';
     case 'auth/popup-blocked': return 'ログイン画面を開けませんでした。ブラウザのポップアップ設定を確認し、ChromeやSafariから直接開いてお試しください。';
     case 'auth/network-request-failed': return '通信に失敗しました。接続を確認してからもう一度お試しください。';
     case 'auth/too-many-requests': return '操作が続いているため、少し時間をおいてからお試しください。';
     case 'auth/web-storage-unsupported': return 'このブラウザでは安全にログイン状態を保持できません。ChromeやSafariから直接開いてお試しください。';
+    case 'account/apple-setup-required': return 'AppleでのWebログインは設定確認中です。HamCareアプリで普段使用しているログイン方法を選択してください。';
+    case 'account/apple-identity-invalid': return 'Appleでのログインを確認できませんでした。HamCareアプリで普段使用しているログイン方法を選択してください。';
+    case 'account/signin-in-progress': return 'ログインまたはログアウトの処理中です。完了してからもう一度お試しください。';
+    case 'account/app-account-required': return '先にHamCareアプリでアカウントとペット情報を準備してください。';
+    case 'account/app-account-unavailable': return 'HamCareアプリの登録状態を確認できませんでした。通信を確認して再読込してください。';
     case 'account/session-changed': return 'ログイン状態が変わりました。アカウントを確認し直してください。';
     default: return '現在ログインできません。時間をおいてお試しいただくか、サポートへお問い合わせください。';
   }
@@ -73,11 +79,14 @@ export function summarizeAccount(user, docs) {
       trialLabel += `／AI相談の保存済み利用回数：${data.aiRequestUsed}回（上限${data.aiRequestLimit}回）`;
     }
   }
+  const appAccountExists = docs?.pet?.kind === 'found' ? true : docs?.pet?.kind === 'missing' ? false : null;
+  const planReview = projectPlanReview(docs?.billing);
   return {
+    appAccountExists,
     nickname: ownerOK ? typeof nickname === 'string' && nickname.trim() ? nickname.trim() : '未設定' : unavailable,
     maskedEmail: maskEmail(user?.email),
     methods: loginMethods(user?.providerData),
     billingLabel, trialLabel, unavailableFields,
-    planReview: projectPlanReview(docs?.billing),
+    planReview: {...planReview, canSelectPlan: appAccountExists === true && planReview.canSelectPlan},
   };
 }

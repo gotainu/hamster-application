@@ -193,13 +193,14 @@ test('service chooses Firebase session persistence once before Auth readiness', 
   assert.deepEqual(calls, ['session-persistence', 'auth-ready']);
 });
 
-test('service reads only the three fixed documents belonging to the signed-in UID', async () => {
+test('service reads only the four fixed documents belonging to the signed-in UID', async () => {
   const {service, calls} = fakeService();
   const summary = await service.readAccountSummary();
   assert.deepEqual(calls.sort(), [
     'users/synthetic-subject-a/billing/subscription',
     'users/synthetic-subject-a/feature_access/initial_trial_v2',
     'users/synthetic-subject-a/owner_profiles/main',
+    'users/synthetic-subject-a/pet_profiles/main_pet',
   ]);
   assert.equal(summary.nickname, 'Owner A');
   noPrivateFields(summary);
