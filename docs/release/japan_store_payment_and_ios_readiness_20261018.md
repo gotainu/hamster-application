@@ -1,5 +1,52 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+<!-- hamcare-private-relay-audit-20261116:start -->
+## 2026-11-16 Apple Private Email Relay：送信元2件登録済み／配送は本人用宛先待ち
+
+- **方針の保存**：`0d761c3f1876`（`docs(release): record contact email and accessibility policy`）で、指定4文書だけを保存。旧一時worktreeが存在しなかったため、コミット済み `f66f019052ad` と同じ専用ブランチから `/private/tmp/hamcare-web-relay-20261116` を復元し、失われた未コミット差分そのものを回収済みとはせず、本人の確定指示から方針を反映した。元アプリのdirty／未追跡素材は作業対象外。
+- **Apple登録の実結果**：本人の確定直前承認後、個別送信元 `noreply@hamster-breeding-app.firebaseapp.com` と `gotainu@gmail.com` の2件を登録。`Email Source Registration Complete` の2アドレス／0ドメインと、その後の一覧で両方の緑SPFチェックを確認。初回はセッション期限切れで未登録、再読込後に同じ承認済み2件だけを登録した。`gmail.com`／`stripe.com`等の第三者ドメイン全体、未使用ドメインは登録せず、既存登録の削除・App ID／Service ID／Key・DNS変更0。
+- **配送を止めた理由**：本人から「今はない」と回答があり、本人所有のAppleリレー配送先がない。前回のApple E2EはAuthメール未設定であり、Relayありのユーザーと混同しない。Firebase／サポート／Stripeの今回メール送信は0通、転送・迷惑メール・返信・バウンスは未検証で、配送PASS・バウンスなしとは記録しない。他ユーザー、新規本番アカウント、架空のRelay宛先、Appleへのパスワード方式追加で代替しない。
+- **コード・限定検証**：両Relayドメインは現行の表示／認証設計で受理可能。`account-model.mjs:maskEmail`／`checkout-model.mjs:projectCheckoutReview` に旧ドメインだけのallowlistはなく、`account-identity.mjs:projectAccountIdentity`／`auth-policy.ts:authorizePreviewIdentity` は署名検証済みFirebase UIDと現在Apple provider subject一致を正本にする。`privaterelay.appleid.com`／`private.icloud.com`各4項目（表示・review、正規Apple、別UID拒否、binding欠損拒否）の合成8チェックPASS。既存account-model／account-identity／checkout-model計82件PASS。既存Node22を使用しSDK・依存更新0、コード差分0。ドメインだけでメール確認済み・認証済みとは判定しない。
+- **保護・Preview**：既存Preview `/account/` HTTP200／no-storeを確認し、デプロイ0。今回本番Stripe／Customer／Subscription／Firestore billing／既存契約／Authユーザー／体験／テスター権限の変更0、Stripe Test書込み0、Flutter／live Hosting／購入CTA／main merge・push・ストア操作0。Apple送信元登録だけが外部設定変更。メール未設定の本人Preview購入ガード・UID正本は保持。
+- **判断・次工程**：送信元登録は完了、実配送は未完了で本番公開前の残件。連絡用メール補完フローの設計・独立Preview実装へは別承認で進められるが、今回実装しない。VoiceOver追加対応は非ブロッキングのまま。実配送を未確認のまま本番切替準備完了／公開可とは判断しない。詳細な送信元・代替設計・根拠は[戦略Cリリース記録](japan_store_payment_and_ios_readiness_20261018.md#relay-sender-inventory-20261116)を参照。
+<!-- hamcare-private-relay-audit-20261116:end -->
+
+<a id="relay-sender-inventory-20261116"></a>
+### 実送信元の棚卸し・配送結果（2026-11-16）
+
+| 対象・分類 | 現設定・ヘッダー根拠 | 今回の配送確認 |
+|---|---|---|
+| Firebase Auth・個別登録可能（分類2） | Console Authentication→Templatesで確認／再設定／変更のFromはいずれも `noreply@hamster-breeding-app.firebaseapp.com`、Reply-To表示 `noreply`、送信者名未指定、英語テンプレート。Custom SMTP=false。2026-10-27の本人既存受信確認メールではReturn-Pathも同アドレス、SPF PASS、DKIM PASS `d=firebaseapp.com`／selector `20251104`。Gmail原文のDMARC要約はFAILであり、隠さずRelay実証と区別する。 | 本人Relay宛先なし・送信0。確認リンク先は既存 `https://hamster-breeding-app.firebaseapp.com/__/auth/action`。実Relay宛て本文／期限／リンク作動／転送／迷惑メール／バウンスは未確認。 |
+| HamCareサポート・個別登録可能（分類2） | 公開support／privacy／termsおよびアプリ問い合わせは `gotainu@gmail.com`。本人Gmailからの既存送信Fromも一致。独自サポートドメイン／自動返信実装は検出せず。自己宛送信コピーにReturn-Path／SPF／DKIM認証ヘッダーは表示されず、この実envelope／DKIMは未確認。公開SPFは存在し、Apple登録後のSPF表示は緑。 | 本人Relay宛先なし・送信0。返信可能性／迷惑メール／転送／バウンスは未確認。 |
+| Stripe・第三者ドメインで登録対象外（分類3） | Dashboardのgota sandbox／Test Mode→Business→Customer emailsは `stripe.com` がSending、独自メールドメインなし、言語English、Successful payments／Refundsの自動領収書OFF。Subscriptions and emailsではtrial終了前／更新前／カード期限／決済失敗メールOFF、finalized invoice／credit note送信ON。これらはTest設定の読取りであり、本番同値とは推定しない。本番設定・実Testメールの完全なFrom／envelope／DKIMは未照合。Support返信先と実送信元は別。 | 本人Relay宛先なし・手動送信も0。未着・Relay拒否・迷惑メール・バウンスのいずれとも判定しない。Test支払は自動領収書を送信しない。Dashboard成功支払の手動Send receiptは配送候補だが、本人用Test Customerの既存支払だけを使う。Test invoice send APIの200／invoice.sentは実メール配送ではない。 |
+| Functions独自メール・フォーム通知・将来の契約通知（分類4） | 現リポジトリにSMTP／nodemailer／メール配信ESP／Functions独自送信は未検出。既存健康通知はFCM。フォームの設定だけで取引通知が送信済みとは扱わない。契約完了／解約／支払失敗のHamCare独自重要メールは未実装。 | 未使用の送信元は登録・送信しない。新送信機能は今回は作らない。 |
+| HamCare所有ドメイン（分類1） | 今回確認した範囲で独自メール送信ドメインはなし。Firebase標準プロジェクトホストとGmailは個別登録を利用。 | DNS変更案を確定・適用する必要はなかった。 |
+
+公開DNS読取りではFirebase標準ホストとgmail.comの両方に `v=spf1 redirect=_spf.google.com` を確認。Firebase受信メールのDKIM有効と、Apple登録のSPFチェック、実Relay配送成功はそれぞれ別の証拠である。Google管理のDMARC／DKIMをHamCare所有として書き換えない。実UID／Token／Relay宛先・個人メール・カード情報・生メール本文はGitへ保存しない。公開運営送信元と匿名化した状態だけを本表へ記録する。
+
+### Firebaseで現在利用するメール
+
+- `lib/screens/auth.dart:_sendVerificationIfNeeded` は新規ユーザーでメールがあり未確認の場合に `sendEmailVerification()`。`_showPasswordResetDialog` は `sendPasswordResetEmail()`。既存Apple専用へパスワード方式を加えない。
+- メール変更テンプレートは存在するが、`verifyBeforeUpdateEmail`／`updateEmail`／メールリンクログインの実装は現コードにない。MFA通知テンプレートを、現在アプリが使用している通知と混同しない。今回不要なAuthデータ変更や追加メールを発生させない。
+
+### メール未設定Cの補完・重要通知の後続設計案（未実装）
+
+- A：Auth確認済み通常メール／B：Apple由来リレーを正式な連絡先にし、追加実メールを要求しない。C：AuthにもRelayにもメールがないユーザーだけ、本番有料登録前に受信可能な連絡先を補完。既存PreviewのC許可を維持する。
+- 保存候補 `users/{uid}/contact_channels/primary`：email、source（auth_verified／apple_relay／user_supplied）、verifiedAt、version。pendingと有効な確認済み連絡先を分離。Firebase Authメール・Apple provider・UID・Stripe Customer対応表へ逆同期せず、メール一致による統合・契約判定・権限付与をしない。
+- 同UID認証・必要な再認証後、登録済みHamCare管理下送信元から確認メールを送る。短期限・1回限りopaque tokenはserverでhash保存、期限・試行回数・再送制限と同UID bindingを検証。URLへUID／Firebase ID Tokenを入れず、本人read・server-only writeのRulesを後続で用意し、clientからverified自己申告は拒否する。確認済み反映後に本番契約へ進む。今回はモデル／Rules／UI／送信機能を実装しない。
+- Stripe領収書がRelayへ安定配送できない場合は、所有・SPF／DKIM認証済みかつApple登録済みのHamCare送信元を使うtransactional mail基盤から、契約確認・解約・支払失敗・重要通知を別途配送する。UID単位のoutbox／idempotencyで重複を防ぎ、Stripeメールだけに依存しない。ESP選定・DNS案・実装は後続承認とし、今回は追加しない。
+- 再開条件：本人所有で同じHamCare Appleチームに対応する有効Relay宛先を用意し、転送が有効であることを本人確認。各必要メールを最大1通ずつ、送信・Apple転送・実受信・迷惑メール・実ヘッダー・バウンス・サポート返信を別々に検証する。Apple専用に不要なパスワードを追加しない。実受信できた場合だけ配送PASSへ更新する。
+
+### 公式一次資料
+
+- [Appleの送信元登録とSPF／DKIM要件](https://developer.apple.com/help/account/capabilities/configure-private-email-relay-service/)
+- [Appleの新リレードメイン追加告知（2026-08-24）](https://developer.apple.com/news/?id=1ptvdtcm)
+- [Firebase Apple認証・標準送信元登録](https://firebase.google.com/docs/auth/web/apple)
+- [Firebaseメールアクションリンク（生成と送信の分離）](https://firebase.google.com/docs/auth/admin/email-action-links)
+- [Stripe領収書・Test receipts](https://docs.stripe.com/receipts)
+- [Stripe Send invoice：Test Modeではメール未送信](https://docs.stripe.com/api/invoices/send)
+- [Stripeカスタムメールドメイン](https://docs.stripe.com/get-started/account/email-domain)
+
 <!-- hamcare-contact-accessibility-policy-20261116:start -->
 ## 2026-11-16 戦略C・本番切替前の確定方針
 

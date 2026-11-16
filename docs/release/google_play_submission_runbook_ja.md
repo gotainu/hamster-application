@@ -1,5 +1,16 @@
 # Hamster Care Google Play登録手順
 
+<!-- hamcare-private-relay-audit-20261116:start -->
+## 2026-11-16 Apple Private Email Relay：送信元2件登録済み／配送は本人用宛先待ち
+
+- **方針の保存**：`0d761c3f1876`（`docs(release): record contact email and accessibility policy`）で、指定4文書だけを保存。旧一時worktreeが存在しなかったため、コミット済み `f66f019052ad` と同じ専用ブランチから `/private/tmp/hamcare-web-relay-20261116` を復元し、失われた未コミット差分そのものを回収済みとはせず、本人の確定指示から方針を反映した。元アプリのdirty／未追跡素材は作業対象外。
+- **Apple登録の実結果**：本人の確定直前承認後、個別送信元 `noreply@hamster-breeding-app.firebaseapp.com` と `gotainu@gmail.com` の2件を登録。`Email Source Registration Complete` の2アドレス／0ドメインと、その後の一覧で両方の緑SPFチェックを確認。初回はセッション期限切れで未登録、再読込後に同じ承認済み2件だけを登録した。`gmail.com`／`stripe.com`等の第三者ドメイン全体、未使用ドメインは登録せず、既存登録の削除・App ID／Service ID／Key・DNS変更0。
+- **配送を止めた理由**：本人から「今はない」と回答があり、本人所有のAppleリレー配送先がない。前回のApple E2EはAuthメール未設定であり、Relayありのユーザーと混同しない。Firebase／サポート／Stripeの今回メール送信は0通、転送・迷惑メール・返信・バウンスは未検証で、配送PASS・バウンスなしとは記録しない。他ユーザー、新規本番アカウント、架空のRelay宛先、Appleへのパスワード方式追加で代替しない。
+- **コード・限定検証**：両Relayドメインは現行の表示／認証設計で受理可能。`account-model.mjs:maskEmail`／`checkout-model.mjs:projectCheckoutReview` に旧ドメインだけのallowlistはなく、`account-identity.mjs:projectAccountIdentity`／`auth-policy.ts:authorizePreviewIdentity` は署名検証済みFirebase UIDと現在Apple provider subject一致を正本にする。`privaterelay.appleid.com`／`private.icloud.com`各4項目（表示・review、正規Apple、別UID拒否、binding欠損拒否）の合成8チェックPASS。既存account-model／account-identity／checkout-model計82件PASS。既存Node22を使用しSDK・依存更新0、コード差分0。ドメインだけでメール確認済み・認証済みとは判定しない。
+- **保護・Preview**：既存Preview `/account/` HTTP200／no-storeを確認し、デプロイ0。今回本番Stripe／Customer／Subscription／Firestore billing／既存契約／Authユーザー／体験／テスター権限の変更0、Stripe Test書込み0、Flutter／live Hosting／購入CTA／main merge・push・ストア操作0。Apple送信元登録だけが外部設定変更。メール未設定の本人Preview購入ガード・UID正本は保持。
+- **判断・次工程**：送信元登録は完了、実配送は未完了で本番公開前の残件。連絡用メール補完フローの設計・独立Preview実装へは別承認で進められるが、今回実装しない。VoiceOver追加対応は非ブロッキングのまま。実配送を未確認のまま本番切替準備完了／公開可とは判断しない。詳細な送信元・代替設計・根拠は[戦略Cリリース記録](japan_store_payment_and_ios_readiness_20261018.md#relay-sender-inventory-20261116)を参照。
+<!-- hamcare-private-relay-audit-20261116:end -->
+
 <!-- hamcare-contact-accessibility-policy-20261116:start -->
 ## 2026-11-16 戦略C・本番切替前の確定方針
 
