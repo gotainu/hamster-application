@@ -1,0 +1,140 @@
+{
+  "baseline": "9e2b26ce36f577c683688f20b4bb4860d4e88aae",
+  "scan": "git ls-files / git ls-tree (1067 tracked paths). Requested rg --json -i scan plus UTF-8 git-blob numeric supplement; binary ignored; source text not persisted in inventory.",
+  "regex": "500\\s*円|[¥￥]\\s*500|JPY\\s*500|550\\s*円|[¥￥]\\s*550|Premium|プレミアム|月額|Subscription|有料プラン",
+  "matched_lines": 1268,
+  "matched_files": 183,
+  "counts": {
+    "A": 14,
+    "B": 5,
+    "C": 1228,
+    "D": 21
+  },
+  "categories": {
+    "A": "今回の550円・正式名・戦略Cの公開前文面へ整合する候補",
+    "B": "税抜500円補助表示を維持",
+    "C": "既存Preview・過去記録・テスト・技術参照・既存Live保持",
+    "D": "Flutter旧購入導線または旧料金。後続作業で整理、今回編集禁止"
+  },
+  "a_rows": [
+    {
+      "file": "docs/release/store_listing_ja.md",
+      "line": 46,
+      "reason": "購入前のアプリ内料金表示を前提とした公開前原稿を戦略Cへ整合",
+      "flag": ""
+    },
+    {
+      "file": "docs/release/store_listing_ja.md",
+      "line": 48,
+      "reason": "500円審査補足と既存登録履歴が同一行。履歴を保持し草案だけ分離整合",
+      "flag": "審査補足と10月のストア保存事実が同じ行。事実は改変せず草案分離が必要"
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 53,
+      "reason": "方針A/B再検討文を確定済み戦略Cの草案へ更新",
+      "flag": ""
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 61,
+      "reason": "旧500円とアプリ購入導線の審査文案をWeb550円将来版へ整合",
+      "flag": ""
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 90,
+      "reason": "購入導線を含む英語審査文案を将来版戦略Cとして区別",
+      "flag": ""
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 102,
+      "reason": "アプリ購入CTAを前提とした審査草案を将来版戦略Cへ整合",
+      "flag": ""
+    },
+    {
+      "file": "public/account/index.html",
+      "line": 260,
+      "reason": "公開前原稿の500円対550円差分説明を更新（Live課金500円は別途維持）",
+      "flag": ""
+    },
+    {
+      "file": "public/account/index.html",
+      "line": 298,
+      "reason": "公開前原稿の500円対550円差分説明を更新（Live課金500円は別途維持）",
+      "flag": ""
+    },
+    {
+      "file": "public/commercial-transactions/index.html",
+      "line": 45,
+      "reason": "旧英語商品名を正式HamCareプレミアムへ整合",
+      "flag": ""
+    },
+    {
+      "file": "public/commercial-transactions/index.html",
+      "line": 47,
+      "reason": "現行特商法の税込500円を正式月額550円の公開前原稿へ整合",
+      "flag": ""
+    },
+    {
+      "file": "public/terms/index.html",
+      "line": 76,
+      "reason": "現行規約の税込500円を正式月額550円の公開前原稿へ整合",
+      "flag": ""
+    },
+    {
+      "file": "store_assets/metadata/app_store/ja/description.txt",
+      "line": 19,
+      "reason": "購入前のアプリ内料金表示を前提とした公開前原稿を戦略Cへ整合",
+      "flag": ""
+    },
+    {
+      "file": "store_assets/metadata/app_store/ja/review_notes.txt",
+      "line": 5,
+      "reason": "旧500円とアプリ購入導線をWeb550円の将来提出草案へ整合",
+      "flag": ""
+    },
+    {
+      "file": "store_assets/metadata/google_play/ja-JP/full_description.txt",
+      "line": 19,
+      "reason": "購入前のアプリ内料金表示を前提とした公開前原稿を戦略Cへ整合",
+      "flag": ""
+    }
+  ],
+  "flags": [
+    {
+      "file": "docs/release/store_listing_ja.md",
+      "line": 48,
+      "category": "A",
+      "flag": "審査補足と10月のストア保存事実が同じ行。事実は改変せず草案分離が必要"
+    },
+    {
+      "file": "docs/release/store_listing_ja.md",
+      "line": 77,
+      "category": "C",
+      "flag": "利用プラン画面のスクリーンショット説明。Flutter後続変更後に採否を判断"
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 98,
+      "category": "C",
+      "flag": "保護する既存審査用500円契約と料金記述が同じ段落。契約事実を保持し将来550円と区別"
+    },
+    {
+      "file": "docs/release/store_review_notes_ja.md",
+      "line": 108,
+      "category": "C",
+      "flag": "アカウント削除時の既存契約管理は購入CTAと異なる。Flutter後続タスクで表現を確認"
+    },
+    {
+      "file": "lib/screens/settings.dart",
+      "line": 129,
+      "category": "D",
+      "flag": "アカウント削除時の既存契約管理経路。管理機能まで削除することは未確定"
+    }
+  ],
+  "requested_term_lines": 1171,
+  "additional_bare_numeric_lines": 97,
+  "additional_regex": "(?<![0-9])(?:500|550)(?![0-9])"
+}

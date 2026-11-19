@@ -110,6 +110,9 @@ test('arbitrary client plan keys are never accepted or sent',async()=>{
 });
 test('plan HTML includes account, all contract terms, legal links and no purchase form',()=>{
  for (const text of ['請求周期','自動更新','サービス開始時期','次回請求','解約方法','解約期限','返金','税抜500円','550','特定商取引法に基づく表記','本番公開前','月額500円（税込）']) assert.ok(html.includes(text),text);
+ const review = html.split('<div id="checkout-review">')[1].split('<div id="checkout-payment"')[0];
+ for (const text of ['次回以降も月額550円（税込）','現在の契約期間が終了する前','Stripe Customer Portal','解約手続き後も、現在の契約期間が終了するまではHamCareプレミアムをご利用いただけます。','カード番号・有効期限・CVC','HamCareでは受け取り・保存を行いません。']) assert.ok(review.includes(text),text);
+ assert.doesNotMatch(html,/初回決済日を基準|次回更新前にアプリの利用プランから|アプリの「利用プラン」から契約管理/);
  assert.match(html,/<button[^>]+id="plan-checkout"[^>]+disabled>/);assert.match(html,/<input[^>]+id="premium-monthly"[^>]+value="premium_monthly"/);assert.equal([...html.matchAll(/<form\b/g)].length,1);assert.doesNotMatch(html,/<iframe|card-number|price_[A-Za-z0-9]+/);
 });
 

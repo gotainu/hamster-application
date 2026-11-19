@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-pricing-legal-20261119:start -->
+## 2026-11-19 戦略C：料金・法務の改定案整合（未公開・本番切替不可）
+
+- **範囲**：本人が `9e2b26ce36f5` の連絡先Preview・両実機確認を承認。専用 `feature/web-first-stripe-checkout` の同じ承認済みHEADから、表示文言・法務改定案・未提出原稿・記録だけを更新。消失した一時worktreeはプロジェクト内の永続worktreeへ復元し、元アプリのdirtyを混ぜない。今回のコミットは `docs(web): align pricing and subscription terms` 1件のみ。
+- **確定料金**：HamCare プレミアム、主表示「月額550円（税込）」、補助「税抜500円」、10％前提、月額1種類。LP/FAQ・プラン/確認/Portal周辺・規約/特商法/Support・提出草案を整合。旧Live500円・既存契約・日付付き履歴・テスト拒否値は保持。全件台帳は指定語1,171行＋数値補足97行＝183ファイル/1,268行、A14/B5/C1,228/D21、本文・個人情報を転記しない。
+- **契約条件**：既存体験中は本日0円・元体験終了日時に550円、未開始/終了済みは本日550円、新しい体験・延長・リセットなし。残48時間＋1分未満は既存の拒否ガードを維持し、終了後の申込案内を明記。解約しない限り1か月ごと550円、実際のStripe周期/日時を使用。Web Customer Portalで期間末解約、指定の期間末まで利用できる文へ統一。機能ロジック変更0。
+- **実Live読取**：2026-11-19 20:59 JST、Stripe GETだけで確認。Live Price500 JPY/month・**exclusive**、Test550 JPY/month・**inclusive**。Live Tax設定はactiveだが直近expired Sessionはautomatic_tax=false/total500/tax0であり、全既存請求へ一般化しない。Live既定Portalは氏名/メール/住所/電話変更が有効、Test専用は無効。Webhookの地域/API版/受信invoiceイベントにも差があり、次工程の分離した切替計画へ。今回は本番設定を変更しない。
+- **法務の未確定**：返金は既存特商法案と例外を参照し、本人判断候補A/Bを監査書へ。氏名・住所・電話の請求開示方式の実運用、責任者、税務/証憑、サポート、提供遅延対応を本人確認。PrivacyにUID正本、Relay、独立連絡先の用途非広告・Auth逆同期なし、Stripeのみカード処理、token hashを追加。15分は使用期限で削除期限ではない。独立連絡先の保存期間・期限切れ/退会時削除連携・本番メール基盤・Relay配送は残件。
+- **検証**：再実行frontend443/backend514/policy91＝runtime1,048 PASS、TypeScript build PASS。静的LP84/account171/brand177＝432 PASS、関連HTMLローカル75参照解決、公開法務4 URL/既存Preview accountはHEAD全て200。ローカル実HTML/View/CSS＋合成データの17レイアウト（360/390/768/1280を含む）横はみ出し0。既存Safari決済/Portalと両実機連絡先PASSを再利用し、新しい実決済・メール送信・VoiceOver専用試験なし。今回Emulator68/旧Stripe pure21を再実行数へ足さない。
+- **保護と判断**：本番Stripe/billing/既存契約/テスター権限の変更0、Firestore API呼出0。Flutter/Functions/Rules/SDK/lock/Apple/ストア設定変更なし、Preview/live Hosting/Functionsデプロイ0、main merge/push0。現在のPreviewは前回配信のまま、法務改定案は未公開でリンク先の旧条件とは注意表示で区別。ストア原稿はFlutter購入CTA撤去待ちで未提出・提出不可。法務/税務と実際の最終申込確定段階、保持削除運用等を確定後に本番切替準備を進める。詳細は [料金・法務監査](docs/release/pricing_legal_alignment_20261119.md)。本工程完了後は停止する。
+<!-- hamcare-pricing-legal-20261119:end -->
+
 <!-- hamcare-billing-contact-20261119:start -->
 ## 2026-11-19 戦略C：確認済み連絡用メールのPreview補完
 

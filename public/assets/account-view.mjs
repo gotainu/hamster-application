@@ -136,7 +136,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     if (!review.canSelectPlan) {
       element('plan-selected-name').textContent = '現在の契約の確認を優先します';
       element('plan-selected-amount').textContent = '上記は新規プランの参考価格です';
-      element('plan-selection-status').textContent = 'プラン選択はできません。現在の契約をアプリまたはサポートで確認してください。';
+      element('plan-selection-status').textContent = 'プラン選択はできません。Webの契約管理の案内またはサポートで現在の契約を確認してください。';
     }
   }
 

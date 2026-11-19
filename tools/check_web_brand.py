@@ -265,7 +265,14 @@ def main():
     auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
     auth_entry=(PUBLIC/'assets/account.mjs').read_text()
     check('Apple service defaults off and configured entry explicitly opts in to SDK Popup','appleSignInEnabled = false' in auth_service and 'appleSignInEnabled: true' in auth_entry and 'appleSignInEnabled: false' not in auth_entry and "new sdk.OAuthProvider('apple.com')" in auth_service and 'sdk.signInWithPopup(auth, provider)' in auth_service)
-    for path in ['public/index.html', 'public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
+    # Pricing/legal copy may change without replacing the approved brand.
+    # Only the price paragraph's inline span arrangement/accessible name may
+    # change; all other markup, links, controls, classes and media stay fixed.
+    def landing_structure(source):
+        source = re.sub(r'<p class="price"(?: aria-label="月額550円（税込）")?>.*?</p>', '<p class="price"></p>', source, flags=re.S)
+        return re.sub(r'(?<=>)[^<]*(?=<)', '', source)
+    check('landing copy retains approved brand markup', landing_structure((PUBLIC/'index.html').read_text()) == landing_structure(baseline('public/index.html', CHECKOUT_BASE).decode()))
+    for path in ['public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
         check('existing brand unchanged for Checkout ' + path, (ROOT / path).read_bytes() == baseline(path, CHECKOUT_BASE))
     account_css=(PUBLIC/'assets/account.css').read_text()
     check('existing account brand unchanged except appended official Apple button',account_css.split('\n/* Official Apple full-button PNG, displayed without redrawing or recoloring. */',1)[0].encode()==baseline('public/assets/account.css',CHECKOUT_BASE))

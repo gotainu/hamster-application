@@ -14,11 +14,13 @@ test('verified immediate quote displays the fixed tax-inclusive total and immedi
   const model = projectCheckoutReview(quote());
   assert.equal(model.nickname, 'テスト'); assert.equal(model.maskedEmail, 'te***@example.test');
   assert.equal(model.amountLabel, '月額550円（税込）／税抜500円'); assert.equal(model.firstChargeLabel, '申込時（即時）');
+  assert.match(model.trialNote, /本日の請求：550円（税込）/u);
   assert.match(model.trialNote, /新たな21日体験が始まることはありません/);
 });
 test('trial quote displays the original server end date and never starts another trial', () => {
   const model = projectCheckoutReview(trial());
   assert.match(model.firstChargeLabel, /2026年11月30日/); assert.match(model.firstChargeLabel, /10:00/);
+  assert.match(model.trialNote, /本日の請求：0円/); assert.match(model.trialNote, /初回550円（税込）/u);
   assert.match(model.trialNote, /それまでは請求されません/); assert.match(model.trialNote, /延長・リセット/);
 });
 test('price mismatch 500 or 605, live mode, foreign currency and other plans fail closed', () => {

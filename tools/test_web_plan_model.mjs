@@ -50,7 +50,10 @@ test('writer-shaped canceled history is reviewable without claiming cancellation
 });
 
 test('saved active and trialing paid records route to existing contract management', () => {
-  for (const status of ['active', 'trialing']) assertRoute(saved('paid', status), 'manage');
+  for (const status of ['active', 'trialing']) {
+    const state = assertRoute(saved('paid', status), 'manage');
+    assert.match(state.detail, /Webの契約管理/); assert.match(state.detail, /本番契約を変更しません/);
+  }
 });
 
 test('scheduled cancellation keeps an active subscription out of a duplicate plan flow', () => {

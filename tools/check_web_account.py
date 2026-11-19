@@ -67,7 +67,8 @@ def main():
             if resource.startswith('/'):check('resource exists '+resource,(PUBLIC/resource.lstrip('/')).is_file())
     check('errors are announced',any(a.get('role')=='alert' for _,a in nodes))
     check('loading and safe guidance exist','Appleログインは設定確認中' in html and 'Apple' in html and 'ログアウト' in html)
-    check('no custom card controls or signup form',not re.search(r'type=["\'](?:tel|number)["\']|createUserWithEmailAndPassword|card-number|CVC',html))
+    # Card-processing explanations may name CVC; payment controls must never collect it.
+    check('no custom card controls or signup form',not re.search(r'type=["\'](?:tel|number)["\']|createUserWithEmailAndPassword|card-number',html) and not any(re.search(r'cc-number|cc-exp|cc-csc|cvc',json.dumps(a),re.I) for t,a in nodes if t in {'input','select','textarea'}))
     check('only original inputs and scoped Checkout/Apple consent checkboxes', {(a.get('id'),a.get('type')) for t,a in nodes if t=='input'} == {('email','email'),('password','password'),('premium-monthly','radio'),('checkout-terms','checkbox'),('apple-linking-consent','checkbox')})
     check('only original login form', [a.get('id') for t,a in nodes if t=='form']==['email-form'])
     scripts=sorted((PUBLIC/'assets').glob('account*.mjs'))+sorted((PUBLIC/'assets').glob('plan*.mjs'))+sorted((PUBLIC/'assets').glob('checkout*.mjs'))+sorted((PUBLIC/'assets').glob('billing-contact*.mjs'))+[PUBLIC/'assets/firebase-web-config.mjs']

@@ -1,5 +1,23 @@
 # ストア掲載メタデータ
 
+<!-- hamcare-pricing-metadata-draft-20261119:start -->
+## 2026-11-19 現在の原稿は未提出・ストア反映不可
+
+今回更新した次のtxtは、戦略Cの**将来版の公開前草案**です。Console保存・審査提出・一般公開は行っていません。
+
+- `app_store/ja/description.txt`
+- `app_store/ja/review_notes.txt`
+- `google_play/ja-JP/full_description.txt`
+
+正式商品名はHamCare プレミアム、月額550円（税込）／税抜500円、1か月ごとの自動更新です。アプリ外の公式Webで申込み、アプリは同じアカウントの既存利用状態を反映する構成を想定しています。
+
+**現在配信中のFlutterには旧月額500円表示・有料登録ボタン・外部Stripe Checkoutへの購入CTAが残っています。購入CTA撤去待ちのため、この草案を提出できません。** 今回Flutter・既存Live価格・契約・テスター権限・ストア設定を変更していません。購入CTA撤去後の配布候補との照合、法務と料金の最終確認、適用要件の照合、本人の別承認が完了するまでストアへ貼り付けません。
+
+公開用txtに内部の注意事項を混ぜず、本READMEと `docs/release/store_listing_ja.md`／`store_review_notes_ja.md`／`google_play_submission_runbook_ja.md` で未提出状態を管理します。以下の2026-10-25記録は当時の保存済み原稿の履歴であり、今回のtxtが既に保存・配信済みであることを示しません。
+<!-- hamcare-pricing-metadata-draft-20261119:end -->
+
+## 旧原稿の保存履歴・共通メタデータ
+
 原稿の内容は既存 `docs/release/store_listing_ja.md` を正とし、両ストアdescription.txtを保存済み説明へ同期した。21日・最大20件・体験終了後の有料範囲を含む。10/25にApp Store ConnectとGoogle Playの説明保存を確認。Android初版の最低OSは本人決定でAndroid7.0／API24以降（現AAB manifestと一致）。審査送信・アプリ公開は別工程。
 
 更新日: 2026-10-25

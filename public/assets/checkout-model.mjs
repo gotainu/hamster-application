@@ -38,9 +38,9 @@ export function projectCheckoutReview(raw, verifyMissingEmailReview) {
     firstChargeLabel: billing.kind === 'trial' ? dateLabel(billing.firstChargeAt) : '申込時（即時）',
     firstChargeAmountLabel: '550円（税込）',
     trialNote: (fixture ? 'Preview専用のテストデータを使用しています。本番の体験状態は変更しません。' : '') + (billing.kind === 'trial'
-      ? fixture ? '本日カードをご登録いただくテストです。最初の550円の請求は、Preview専用の体験データに記録した終了日時の予定です。それまでは請求されません。本番の体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
-        : '本日カードをご登録いただきます。最初の550円の請求は、現在の体験終了日時に行われる予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
-      : '申し込み時に550円（税込）をお支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。'),
+      ? fixture ? '本日カードをご登録いただくテストです。本日の請求：0円。初回550円（税込）は、上記の初回請求予定日（Preview専用の体験データに記録した終了日時）に請求される予定です。それまでは請求されません。本番の体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+        : '本日カードをご登録いただきます。本日の請求：0円。初回550円（税込）は、上記の初回請求予定日（現在の体験終了日時）に請求される予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+      : '本日の請求：550円（税込）。申し込み時に即時お支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。'),
   });
 }
 
@@ -76,10 +76,10 @@ export function checkoutErrorMessage(error) {
     case 'auth_required': case 'unauthenticated': case 'session_changed': return 'ログイン状態が変わりました。アカウントを確認し直してください。';
     case 'email_unverified': return 'メールアドレスの確認が完了していません。HamCareアプリで確認してからお試しください。';
     case 'app_account_required': return 'HamCareアプリで使用している既存アカウントでログインしてください。';
-    case 'already_subscribed': case 'subscription_exists': case 'existing_subscription': return '有効な契約があるため、新しい申込は行いません。HamCareアプリで現在の契約をご確認ください。';
+    case 'already_subscribed': case 'subscription_exists': case 'existing_subscription': return '有効な契約があるため、新しい申込は行いません。Webのアカウント確認へ戻り、契約管理の案内をご確認ください。';
     case 'trial_unavailable': case 'trial_invalid': case 'trial_unresolved': return '体験状態を確認できませんでした。時間をおいて再度お試しいただくか、サポートへお問い合わせください。';
     case 'trial_too_short': return '現在の体験終了日を変更せずにカード登録できる期限を過ぎています。体験終了後に再度お試しください。';
-    case 'billing_unresolved': return '現在の契約状態を確認できませんでした。新しい申込は行わず、HamCareアプリまたはサポートでご確認ください。';
+    case 'billing_unresolved': return '現在の契約状態を確認できませんでした。新しい申込は行わず、Webの契約管理の案内またはサポートでご確認ください。';
     case 'test_webhook_unresolved': return '以前のテスト決済の状態を確認できないため、新しい申込を止めています。状況を再確認するか、サポートへお問い合わせください。';
     case 'processing': return '前の申込処理を確認しています。新しい申込を繰り返さず、支払い状況を再確認してください。';
     case 'preview_limit': return 'Previewのテスト利用上限に達しています。新しい申込は行わず、サポートへお問い合わせください。';

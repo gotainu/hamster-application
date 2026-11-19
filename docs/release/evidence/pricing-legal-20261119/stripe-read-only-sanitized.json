@@ -1,0 +1,261 @@
+{
+  "checked_at_utc": "2026-11-19T11:59:23.848401+00:00",
+  "live_price": {
+    "livemode": true,
+    "active": true,
+    "unit_amount": 500,
+    "currency": "jpy",
+    "tax_behavior": "exclusive",
+    "type": "recurring",
+    "interval": "month",
+    "interval_count": 1,
+    "product": {
+      "name": "Hamster Care Premium Plan",
+      "active": true,
+      "livemode": true,
+      "tax_code": null
+    },
+    "audit_error_http": null
+  },
+  "test_price": {
+    "livemode": false,
+    "active": true,
+    "unit_amount": 550,
+    "currency": "jpy",
+    "tax_behavior": "inclusive",
+    "type": "recurring",
+    "interval": "month",
+    "interval_count": 1,
+    "product": {
+      "name": "HamCare プレミアム（Previewテスト専用）",
+      "active": true,
+      "livemode": false,
+      "tax_code": null
+    },
+    "audit_error_http": null
+  },
+  "live_default_portal": [
+    {
+      "livemode": true,
+      "is_default": true,
+      "active": true,
+      "features": {
+        "customer_update": {
+          "allowed_updates": [
+            "name",
+            "email",
+            "address",
+            "phone"
+          ],
+          "enabled": true
+        },
+        "invoice_history": {
+          "enabled": true
+        },
+        "payment_method_update": {
+          "enabled": true,
+          "payment_method_configuration": null
+        },
+        "subscription_cancel": {
+          "cancellation_reason": {
+            "enabled": true,
+            "feedback_options": [],
+            "options": [
+              "too_expensive",
+              "switched_service",
+              "unused",
+              "other"
+            ]
+          },
+          "enabled": true,
+          "mode": "at_period_end",
+          "proration_behavior": "none"
+        },
+        "subscription_update": {
+          "billing_cycle_anchor": "unchanged",
+          "default_allowed_updates": [],
+          "enabled": false,
+          "proration_behavior": "none",
+          "schedule_at_period_end": {
+            "conditions": []
+          },
+          "trial_update_behavior": "end_trial"
+        }
+      },
+      "return_origin": "",
+      "audit_error_http": null
+    }
+  ],
+  "live_portal_list_error": null,
+  "live_portal_has_more": false,
+  "test_portal": {
+    "livemode": false,
+    "is_default": false,
+    "active": true,
+    "features": {
+      "customer_update": {
+        "allowed_updates": [],
+        "enabled": false
+      },
+      "invoice_history": {
+        "enabled": true
+      },
+      "payment_method_update": {
+        "enabled": true,
+        "payment_method_configuration": null
+      },
+      "subscription_cancel": {
+        "cancellation_reason": {
+          "enabled": true,
+          "feedback_options": [],
+          "options": [
+            "too_expensive",
+            "unused",
+            "missing_features",
+            "too_complex",
+            "switched_service",
+            "other"
+          ]
+        },
+        "enabled": true,
+        "mode": "at_period_end",
+        "proration_behavior": "none"
+      },
+      "subscription_update": {
+        "billing_cycle_anchor": "unchanged",
+        "default_allowed_updates": [],
+        "enabled": false,
+        "proration_behavior": "none",
+        "schedule_at_period_end": {
+          "conditions": []
+        },
+        "trial_update_behavior": "end_trial"
+      }
+    },
+    "return_origin": "hamster-breeding-app--web-first-task1-lco08m60.web.app",
+    "audit_error_http": null
+  },
+  "live_webhooks": {
+    "has_more": false,
+    "hamcare_endpoints": [
+      {
+        "livemode": true,
+        "status": "enabled",
+        "api_version": "2026-05-27.dahlia",
+        "endpoint_host": "asia-northeast1-hamster-breeding-app.cloudfunctions.net",
+        "endpoint_function": "stripeWebhook",
+        "enabled_events": [
+          "checkout.session.completed",
+          "customer.subscription.deleted",
+          "customer.subscription.updated",
+          "invoice.payment_failed",
+          "invoice.payment_succeeded"
+        ]
+      }
+    ]
+  },
+  "test_webhooks": {
+    "has_more": false,
+    "hamcare_endpoints": [
+      {
+        "livemode": false,
+        "status": "enabled",
+        "api_version": "2025-02-24.acacia",
+        "endpoint_host": "us-central1-hamster-breeding-app.cloudfunctions.net",
+        "endpoint_function": "stripePreviewWebhook",
+        "enabled_events": [
+          "checkout.session.completed",
+          "customer.subscription.created",
+          "customer.subscription.updated",
+          "customer.subscription.deleted",
+          "invoice.paid",
+          "invoice.payment_failed"
+        ]
+      },
+      {
+        "livemode": false,
+        "status": "disabled",
+        "api_version": "2026-05-27.dahlia",
+        "endpoint_host": "asia-northeast1-hamster-breeding-app.cloudfunctions.net",
+        "endpoint_function": "stripeWebhook",
+        "enabled_events": [
+          "checkout.session.completed",
+          "customer.subscription.created",
+          "customer.subscription.deleted",
+          "customer.subscription.updated",
+          "invoice.payment_failed",
+          "invoice.payment_succeeded"
+        ]
+      }
+    ]
+  },
+  "live_tax_settings": {
+    "livemode": true,
+    "status": "active",
+    "defaults": {
+      "provider": "stripe",
+      "tax_behavior": "exclusive",
+      "tax_code": null
+    },
+    "audit_error_http": null
+  },
+  "latest_live_session_sample": [
+    {
+      "livemode": true,
+      "mode": "subscription",
+      "status": "expired",
+      "created": 1794955585,
+      "currency": "jpy",
+      "amount_subtotal": 500,
+      "amount_total": 500,
+      "automatic_tax": {
+        "address_collection_precision": null,
+        "enabled": false,
+        "liability": null,
+        "provider": null,
+        "status": null
+      },
+      "total_details": {
+        "amount_discount": 0,
+        "amount_shipping": 0,
+        "amount_tax": 0
+      }
+    }
+  ],
+  "latest_live_session_sample_error": null,
+  "stripe_api_calls": [
+    {
+      "method": "GET",
+      "resource": "prices"
+    },
+    {
+      "method": "GET",
+      "resource": "prices"
+    },
+    {
+      "method": "GET",
+      "resource": "billing_portal"
+    },
+    {
+      "method": "GET",
+      "resource": "billing_portal"
+    },
+    {
+      "method": "GET",
+      "resource": "webhook_endpoints"
+    },
+    {
+      "method": "GET",
+      "resource": "webhook_endpoints"
+    },
+    {
+      "method": "GET",
+      "resource": "tax"
+    },
+    {
+      "method": "GET",
+      "resource": "checkout"
+    }
+  ],
+  "write_calls": 0
+}

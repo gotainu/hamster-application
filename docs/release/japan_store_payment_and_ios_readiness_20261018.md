@@ -1,5 +1,19 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+<!-- hamcare-pricing-legal-20261119:start -->
+## 2026-11-19 料金・法務改定案：550円方針とLive差分（本番切替・提出は未実施）
+
+本節を現在の料金・提出準備状態とし、以下の日付付きの旧500円、旧導線、Apple回答待ち等は当時の記録として保持する。詳細・全件台帳・本人判断候補は [料金・法務監査](pricing_legal_alignment_20261119.md) を正本とする。
+
+- **正式方針**：HamCare プレミアム、主表示「月額550円（税込）」、補助税抜500円・10％前提、月額1種類。既存体験中は本日0円/元終了日時に初回550円、未開始/終了済みは即時550円。新体験/延長/リセットなし。残48時間＋1分未満を止める現行ガードは維持し、終了後申込の案内を文面に加えた。実Stripe周期で月次更新、Portalで期間末解約、指定の現在期間末まで利用可能な文へ統一。
+- **監査/編集**：承認済み9e2bから同じfeatureブランチを復元し、本文転記なしの全1,268行をA14/B5/C1,228/D21へ分類。Web表示、法務改定案、提出草案を更新し履歴を保持。Flutter/Functionsロジックは変更しない。返金の特商法原文を保持し例外参照を揃えたが、返金候補A/B、事業者開示方法/責任者、税務、サポート/提供遅延条件は本人判断待ち。住所・電話等を転記しない。
+- **Live実読取**：2026-11-19 20:59 JST、GETのみ。Live Product旧名、500 JPY/月・tax_behavior=exclusive。Preview550 JPY/月・inclusive。Live Tax設定activeとSession自動税を区別し、直近expired Sessionはautomatic_tax=false/total500/tax0。Live既定Portalの顧客氏名/メール/住所/電話変更は有効、Testは無効。WebhookはLive asia-northeast1/API2026-05-27.dahlia/invoice.payment_succeeded、Preview us-central1/API2025-02-24.acacia/invoice.paid等の差がある。既存500円Price/契約は今回変更せず、本番用550円・税・Portal・Webhookの計画を別工程へ。
+- **Privacy/連絡先**：Firebase UIDが正本、確認済み通常メール/Apple Relayは追加入力不要、メールなしだけ独立連絡先を確認。実メール必須化・Auth逆同期なし。Stripeのみカード処理、連絡先用途非広告、確認token hashと保存を記載。15分は使用期限で、独立連絡先/期限切れpending/送信記録の保持期限や退会時削除連携は未確定。本番送信基盤・Relay配送・外部処理の法的整理を本番前に確認する。
+- **検査**：frontend443/backend514/policy91＝runtime1,048 PASS、build、静的432、diff check PASS。ローカル7 HTMLの75参照解決、公開4法務と既存Preview accountはHEAD200。実HTML/View/CSS＋合成データの360/390等17レイアウトで横はみ出し0。過去のSafari Test決済/Webhook/Portal/解約・連絡先両実機PASSを再利用し、今回の実Safari再決済やVoiceOver追加確認とは記録しない。今回Emulator68/旧Stripe pure21は再実行していない。
+- **非公開境界**：法務は改定案（未公開）。Preview配信設定で法務ページは除外のまま、既存Liveの法務リンクを保持し旧500円との差異を明示。今回はPreview/live Hosting/Functions配備0。実際の申込確定ボタンがあるEmbedded Checkout段階の表示と訂正可能性は、最終法務版とともに再照合する。新価格の独自確認画面だけで適法性PASSとはしない。
+- **提出/保護**：Apple22954972はscope外、103009817213は回答済み「事前承認なし。実提出後に審査判断」。Webファースト説明はCTA撤去後の将来草案で、現配信Flutterには購入CTA/旧500円が残るため提出不可。VoiceOver専用追加対応は非ブロッキングを維持。本番Stripe/billing/既存契約/テスター権限変更0、Firestore呼出0、Flutter/Apple/ストア/依存更新0、main merge/push0。今回は表示・法務整理で停止する。
+<!-- hamcare-pricing-legal-20261119:end -->
+
 <!-- hamcare-billing-contact-20261119:start -->
 ## 2026-11-19 独立した確認済み連絡用メール（Preview限定）
 
