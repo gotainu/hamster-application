@@ -102,6 +102,13 @@
           <div><dt>現在の契約状態</dt><dd id="account-billing"></dd></div>
           <div><dt>21日体験の状態</dt><dd id="account-trial"></dd></div>
         </dl>
+        <section class="account-notice" id="account-contact-panel" aria-labelledby="account-contact-title" hidden>
+          <h2 id="account-contact-title">連絡用メール</h2>
+          <p id="account-contact-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="masked-address" id="account-contact-email"></p>
+          <a class="text-link" href="/account/contact/" id="account-contact-link">連絡用メールを確認する</a>
+          <p class="help-copy">ログイン用メールとは別の連絡先を確認する場合も、契約主体はFirebase UIDのままです。個人の実メールの追加や、メールによるアカウント統合は要求しません。</p>
+        </section>
         <section class="preview-billing-card" id="account-preview-panel" aria-labelledby="account-preview-title">
           <h2 id="account-preview-title">Preview契約の反映状況</h2>
           <p class="help-copy">この欄はテスト用契約の反映状況です。本番の契約状態とは別に表示し、HamCareアプリの本番利用権限は変更しません。</p>

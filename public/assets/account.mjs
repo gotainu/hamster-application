@@ -3,6 +3,7 @@ import { firebaseConfig } from './firebase-web-config.mjs';
 import { createAccountService } from './account-service.mjs';
 import { mountAccountPage } from './account-view.mjs';
 import { safeAuthError } from './account-model.mjs';
+import { createBillingContactService } from './billing-contact-service.mjs';
 
 try {
   // Pin the existing project SDK version. No Analytics or custom credential storage.
@@ -26,8 +27,10 @@ try {
     return {ownerExists: owner.exists(), petExists: pet.exists()};
   }});
   const resumeCheckout = new URLSearchParams(location.search).get('checkout') === 'return';
-  if (resumeCheckout) history.replaceState(null, '', '/account/');
-  await mountAccountPage(service, {checkoutService, resumeCheckout});
+  const contactReturn = new URLSearchParams(location.search).get('contact') === 'verified';
+  if (resumeCheckout || contactReturn) history.replaceState(null, '', '/account/');
+  const contactService = createBillingContactService({auth});
+  await mountAccountPage(service, {checkoutService, contactService, resumeCheckout});
 } catch (error) {
   // Never print Firebase errors, identifiers, addresses, or tokens.
   document.getElementById('loading-title').textContent = '現在ログインできません';

@@ -1,5 +1,16 @@
 # Hamster Care Google Play登録手順
 
+<!-- hamcare-billing-contact-20261119:start -->
+## 2026-11-19 Preview連絡先確認：公開前の確認項目
+
+- 確認済み通常メール(A)／確認済みApple Relay両ドメイン(B)は追加入力なし。Auth/provider双方にメールがない(C)だけ独立連絡先を確認し、新規Preview申込前にverified必須。未確認／不正メールをCに読み替えない。個人の実メールは必須にしない。
+- 正本はFirebase UID。`preview_billing_contacts/{uid}` と専用送信枠だけを使用し、Auth・本番billing・契約・体験を更新しない。原本の直接clientアクセスは現Rulesで拒否、状態は認証済み本人向けHTTP投影。別Rulesファイルは未配備の候補。
+- Preview限定の管理Gmail送信を本人承認。新送信専用OAuth/`gmail.send`のみ、UID/宛先各1件許可リスト、5回/日/人・全体10回/日。個人Gmailを本番自動送信へ採用しない。15分・一度限り・ハッシュ保存・固定fragment URL・別UID拒否・CSRF・再送抑止を検証。
+- 新規Customerへ確認済み連絡先は渡せるが、既存Customerメールの自動置換なし。UID所有者と既存Portal管理は維持。未確認Cを新規購入させず、既存契約の管理を閉鎖しない。
+- 自動backend514/frontend443/Emulator68、静的LP84/account171/brand177 PASS。本人Appleメールなし→管理Gmailへ確認メール1通→本人確認→サーバーverified/used hash1→月額550円の契約確認→戻るを実ChromeでPASS。本番4文書/Auth email/provider不変、Stripe書込み0。本人Relay宛先なしのためRelay実配送は未確認。2026-11-19の本人回答「両方とも表示・入力に問題なし」により、iPhone Safari／Android Chromeでの連絡先画面の文字切れ・横はみ出し・キーボードによる隠れは本人確認PASS。実機寸法・OS版・画像は未採取で、追加の決済／Portal検証とは区別する。詳細は戦略Cリリース記録の同日節へ。
+- 公開前に本番送信基盤・Relay配送・法務料金550円整合を確認。VoiceOver専用追加開発は初回公開非ブロッキング、Apple Caseは「回答済み：事前承認なし。実提出後に審査判断」を維持する。公開・本番課金切替は別承認。
+<!-- hamcare-billing-contact-20261119:end -->
+
 <!-- hamcare-private-relay-audit-20261116:start -->
 ## 2026-11-16 Apple Private Email Relay：送信元2件登録済み／配送は本人用宛先待ち
 

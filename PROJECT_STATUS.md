@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-billing-contact-20261119:start -->
+## 2026-11-19 戦略C：確認済み連絡用メールのPreview補完
+
+- **範囲**：専用 `feature/web-first-stripe-checkout`、開始HEAD `ffd0a02a8e70` を維持。Authメールなし本人Appleアカウント用の独立連絡先確認を追加。前節の「メール未設定でも新規Preview申込可能」は今回の新規申込ガードで更新し、既存契約管理は維持する。本番公開・本番自動メール送信の承認ではない。
+- **正本と分類**：サーバーで現在のFirebase署名／失効／UID／provider bindingと既存petを再確認。A＝Auth両側で確認済み通常メール、B＝現在Apple認証かつ確認済みRelay（`privaterelay.appleid.com`／`private.icloud.com`）、C＝Authにもproviderにもメールがない状態。A/Bは追加入力なし。未確認メール・不正値はCへ丸めず拒否する。連絡先は契約主体・アカウント統合のキーにせず、Firebase UIDを正本として維持。
+- **保存・ガード**：`preview_billing_contacts/{uid}` に独立保存、送信共通枠は `preview_billing_contact_delivery_limits/{UTC日}`。Auth/provider・本番users・billing・体験を更新しない。未確認Cはreview見積り／Customer／Checkout Sessionより前に拒否し、確認後も作成直前に再読取。既存UIDに紐づくPreview Portal管理は阻害しない。連絡先変更中は旧確認済みメールを維持し、新しい確認完了時だけ置換する。
+- **確認と配送**：32byteランダム・15分・UID/宛先binding・ハッシュのみ保存・一度限り。固定 `/account/contact/#token=...` のfragmentをSDK読込前に消去し、同一認証UIDの明示POSTだけで確認。厳密Origin/Bearer/JSON、60秒間隔・3回/時・5回/日/人・全体10回/日、未知結果の自動再送なし。本人がPreview専用Gmail利用、Gmail API有効化／新しい送信専用Desktop OAuthクライアント追加と `gmail.send` のみの認可を承認・実操作済み。送信元はApple登録済み管理アドレス。送信先／対象UIDは専用Secret内の各1件のハッシュ許可リストだけ。既存Googleログインクライアント・同意画面・Apple設定は変更しない。
+- **検証の現在地**：backend514、frontend443、Emulator68（新Contact Store9/Rules3、既存Auth15/Apple25/Preview Store16）PASS。既存申込policy91/Stripe pure21もPASSでruntime計1,137件。静的LP84/account171/brand177、構文14、TypeScript build、diff check PASS。Emulatorは専用demo projectのみで停止済み。Preview用2 FunctionsはACTIVE、他56 Functionsとlive版 `2365135bf558c278` は不変。同じPreview最終版 `b9d352cc8225b204`（期限2026-11-26 20:02 JST）へ反映し、新規公開9resourceのSHA／安全ヘッダー一致、認証なし401・異Origin403・preflight204を確認。本物HTML/View/CSS＋合成AppleのIAB fixtureで5幅の横はみ出しなし、390pxのpending/complete/errorと入力エラー/Tab/focusを確認（実端末・実配送と区別）。本人Apple→管理Gmailへの確認メール1通→本人リンク確認→対象UIDのverified/source/used hash1→月額550円のサーバー契約確認→戻るまで実ChromeでPASS。Stripeへ進む/同意/新規Session/決済0。本人用Preview見積り1件の通常更新のみ別記し、Auth email/providerと本番4文書不変・送信予約1を最終readで照合。詳細は戦略Cリリース記録の同日節へ。
+- **実機表示の本人確認（追加）**：2026-11-19、連絡先ページのiPhone Safari／Android Chromeでの文字切れ・横はみ出し・入力時のキーボードによる隠れを確認する依頼に、本人から「両方とも表示・入力に問題なし」と回答。両端末の表示・入力を本人確認PASSとする。合成5幅の実測とは別の根拠で、実機寸法・OS版・実機キャプチャは未採取。Stripe決済／Portal／Relay配送の追加検証やVoiceOver確認には広げない。
+- **残件**：本人Relay宛先がないためRelay実配送は未確認。個人の実メールを取得するために別アカウントを作らない。GmailはPreviewだけで、本番の送信基盤・Relay配送・法務550円整合を公開前に確認する。VoiceOver専用追加開発・再試験は初回非ブロッキングのまま。
+<!-- hamcare-billing-contact-20261119:end -->
+
 <!-- hamcare-private-relay-audit-20261116:start -->
 ## 2026-11-16 Apple Private Email Relay：送信元2件登録済み／配送は本人用宛先待ち
 
@@ -25,7 +37,7 @@
 - **保護範囲**：本方針整理により本番Stripe、live Hosting、Flutter、既存契約、現在の体験、テスター権限を変更しない。公開・本番切替は別指示とする。
 <!-- hamcare-contact-accessibility-policy-20261116:end -->
 
-最終更新: 2026-11-16
+最終更新: 2026-11-19
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 

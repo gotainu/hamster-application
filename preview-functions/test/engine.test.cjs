@@ -231,20 +231,66 @@ test('Task5 binds verified Firebase UID using only preview-specific metadata',as
 test('Task5 safely binds a legacy hash-only Test Customer without duplicating it',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);const c=[...f.customers.values()][0];delete c.metadata.previewFirebaseUid;await f.create(await f.review());assert.equal(f.customers.size,1);assert.equal(c.metadata.previewFirebaseUid,OWNER.uid);});
 test('Task5 mismatched Firebase UID metadata is refused',async()=>{const f=fixture();await f.opened();await f.engine.cancel(OWNER);[...f.customers.values()][0].metadata.previewFirebaseUid=OTHER.uid;await rejectsCode(()=>f.review(),'customer_unresolved');});
 
-test('confirmed no-email Apple UID creates the same scoped Test Checkout without an email attribute',async()=>{
-  const f=fixture();const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+test('no-email Apple UID requires a verified supplemental contact before scoped Test Checkout',async()=>{
+  const f=fixture({requireBillingContact:async identity=>{assert.equal(identity.uid,OWNER.uid);return {email:'billing-verified@example.test',source:'user_supplied'};}});const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
   const before=copy(identity);const x=await f.opened(identity);
   assert.equal(x.quote.amount,550);assert.equal(f.calls.sessionCreate[0].params.line_items[0].quantity,1);
-  const sent=f.calls.customerCreate[0].params;assert.equal(Object.hasOwn(sent,'email'),false);
+  const sent=f.calls.customerCreate[0].params;assert.equal(sent.email,'billing-verified@example.test');assert.equal(x.quote.account.maskedEmail,'bi***@example.test');
   assert.equal(sent.metadata.previewFirebaseUid,OWNER.uid);assert.equal(sent.metadata.previewSubjectHash,f.subject(identity));
   assert.deepEqual(identity,before);assert.equal(x.result.testMode,true);
 });
-test('Apple provider confirmation preserves exact preexisting trial end without extension or reset',async()=>{
-  const f=fixture();const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+test('Apple verified supplemental contact preserves exact preexisting trial end without extension or reset',async()=>{
+  const f=fixture({requireBillingContact:async()=>({email:'billing-verified@example.test',source:'user_supplied'})});const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
   const original={appAccountExists:true,billing:missing(),trial:trial(),nickname:'合成',maskedEmail:'未設定'};
   f.facts.set(OWNER.uid,original);const before=copy(original);const x=await f.opened(identity);
   assert.equal(x.quote.billing.kind,'trial');assert.equal(f.calls.sessionCreate[0].params.subscription_data.trial_end,Math.ceil(original.trial.data.endsAt.getTime()/1000));assert.deepEqual(original,before);
 });
 for(const authBasis of [undefined,'verified_email','custom'])test('Checkout unverified non-Apple identity cannot create Customer: '+String(authBasis),async()=>{
   const f=fixture();await rejectsCode(()=>f.review({uid:OWNER.uid,emailVerified:false,authBasis}),'email_unverified');assert.equal(f.calls.customerCreate.length,0);assert.equal(f.calls.sessionCreate.length,0);
+});
+
+
+// Preview contact gate is independent of the UID-based Stripe ownership model.
+test('category C without contact proof blocks review and create before Stripe or Preview quote writes',async()=>{
+  const f=fixture(),identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+  await rejectsCode(()=>f.review(identity),'contact_verification_required');
+  await rejectsCode(()=>f.create({reviewToken:'synthetic-unverified-contact-review'},identity),'contact_verification_required');
+  assert.equal(f.calls.facts.length,0);assert.equal(f.calls.price.length,0);assert.equal(f.calls.customerSearch.length,0);assert.equal(f.calls.customerCreate.length,0);assert.equal(f.calls.sessionCreate.length,0);assert.equal(f.store.states.size,0);assert.equal(f.store.reservations.size,0);
+});
+test('revoked supplemental contact after review is rechecked before creating Customer or Session',async()=>{
+  let verified=true;const seen=[];
+  const f=fixture({requireBillingContact:async identity=>{seen.push(identity.uid);if(!verified)throw {code:'contact_verification_required'};return {email:'verified-contact@example.test',source:'user_supplied'};}});
+  const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'},before=copy(identity);
+  const quote=await f.review(identity);verified=false;
+  await rejectsCode(()=>f.create(quote,identity),'contact_verification_required');
+  assert.deepEqual(seen,[OWNER.uid,OWNER.uid]);assert.equal(f.calls.customerCreate.length,0);assert.equal(f.calls.sessionCreate.length,0);assert.equal(f.store.reservations.size,0);assert.deepEqual(identity,before);
+});
+test('invalid server supplemental email cannot unlock any Stripe creation',async()=>{
+  for(const email of ['',undefined,'not-an-email','synthetic@','x\r\n@example.test']) {
+    const f=fixture({requireBillingContact:async()=>({email,source:'user_supplied'})});const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'};
+    await rejectsCode(()=>f.review(identity),'contact_verification_required');
+    assert.equal(f.calls.price.length,0);assert.equal(f.calls.customerCreate.length,0);assert.equal(f.calls.sessionCreate.length,0);assert.equal(f.store.states.size,0);
+  }
+});
+test('verified contact changes keep the same UID-bound Customer and never search by email',async()=>{
+  let email='old-contact@example.test';const f=fixture({requireBillingContact:async()=>({email,source:'user_supplied'})});
+  const identity={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'},before=copy(identity);
+  const first=await f.opened(identity);const customerId=first.session.customer;
+  await f.engine.cancel(identity);email='new-contact@private.icloud.com';const second=await f.opened(identity);
+  assert.equal(second.quote.account.maskedEmail,'ne***@private.icloud.com');assert.equal(second.session.customer,customerId);assert.equal(f.customers.size,1);assert.equal(f.calls.customerCreate.length,1);
+  const customer=f.customers.get(customerId);assert.equal(customer.metadata.previewFirebaseUid,identity.uid);assert.equal(customer.metadata.previewSubjectHash,f.subject(identity));
+  assert.ok(f.calls.customerSearch.every(query=>query.query.includes("metadata['previewSubjectHash']")));
+  assert.doesNotMatch(JSON.stringify(f.calls.customerSearch),/old-contact|new-contact|@|email/);
+  assert.equal(second.session.metadata.previewFirebaseUid,identity.uid);assert.deepEqual(identity,before);
+});
+test('two verified contacts with the same address still produce distinct UID-owned Customers',async()=>{
+  const email='shared-contact@privaterelay.appleid.com';const f=fixture({requireBillingContact:async()=>({email,source:'user_supplied'})});
+  const first={uid:OWNER.uid,emailVerified:false,authBasis:'apple_provider'},second={uid:OTHER.uid,emailVerified:false,authBasis:'apple_provider'};
+  await f.opened(first);await f.opened(second);assert.equal(f.customers.size,2);
+  assert.deepEqual(new Set([...f.customers.values()].map(customer=>customer.metadata.previewFirebaseUid)),new Set([OWNER.uid,OTHER.uid]));
+  assert.ok([...f.customers.values()].every(customer=>customer.email===email));assert.doesNotMatch(JSON.stringify(f.calls.customerSearch),/@|shared-contact|email/);
+});
+for(const providerDomain of ['privaterelay.appleid.com','private.icloud.com'])test('verified Apple '+providerDomain+' keeps the existing direct-contact checkout path',async()=>{
+  const f=fixture();const identity={uid:OWNER.uid,emailVerified:true,email:'synthetic@'+providerDomain,authBasis:'apple_provider'};
+  const before=copy(identity);const result=await f.opened(identity);assert.equal(result.quote.account.maskedEmail,'sy***@'+providerDomain);assert.equal(f.calls.customerCreate[0].params.email,identity.email);assert.deepEqual(identity,before);
 });

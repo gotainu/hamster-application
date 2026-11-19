@@ -17,7 +17,7 @@ class Element {
 }
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function setup({checkoutService=null,search='',pathname='/account/',appleSignInEnabled=false}={}) {
+async function setup({checkoutService=null,contactService=null,search='',pathname='/account/',appleSignInEnabled=false}={}) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
   nodes.get('premium-monthly').value='premium_monthly';
   nodes.get('premium-monthly').checked=false;
@@ -31,7 +31,7 @@ async function setup({checkoutService=null,search='',pathname='/account/',appleS
   const user={emailVerified:true,identityVerified:true,authenticationBasis:'verified_email',maskedEmail:'sa***@example.invalid',methods:['メール/パスワード'],isNewUser:false};
   const summary={appAccountExists:true,nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
   const service={appleSignInEnabled,signInApple:async options=>{assert.deepEqual(options,{linkingConsent:true});calls.apple++;callback({...user,methods:['Apple']});},ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
-  const cleanup=await mountAccountPage(service,{checkoutService});
+  const cleanup=await mountAccountPage(service,{checkoutService,contactService});
   return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners,navigation,replaced,nodes};
 }
 test('initial login and empty form guard',async()=>{
@@ -428,4 +428,74 @@ test("a late Popup rejection cannot overwrite this current attempt's earlier acc
 test('Google Popup blocking is not reclassified by the Apple-only notification rule',async()=>{
  const h=await setup(),pending=deferred();h.service.safeError=safeAuthError;h.service.signInGoogle=()=>pending.promise;h.el('google-signin').dispatch('click');h.emit({...h.user,methods:['Google']});await flush();
  pending.reject({code:'auth/popup-blocked'});await flush();assert.equal(h.el('auth-error').hidden,false);assert.match(h.el('auth-error').textContent,/ログイン画面を開けません/);h.cleanup();
+});
+
+function contactState({category='missing',source=null,verified=false,maskedEmail=null,pendingMaskedEmail=null,deliveryState=null}={}) {
+ return {testMode:true,state:verified?'verified':pendingMaskedEmail?'pending':'missing',category,source,maskedEmail,pendingMaskedEmail,canCheckout:verified,resendAfter:null,expiresAt:null,deliveryState};
+}
+function contactHarness(initial=contactState()) {
+ let value=initial;const calls={status:0,clear:0};
+ const service={getStatus:async()=>{calls.status++;return value;},clear:()=>calls.clear++};
+ return {service,calls,set:next=>value=next};
+}
+function syntheticCheckoutReview() {
+ return {testMode:true,planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:'synthetic_review_contact_12345',account:{nickname:'Synthetic',maskedEmail:'co***@example.test'},billing:{kind:'immediate',cardRegistrationAt:'2026-11-19T09:00:00Z',firstChargeAt:'2026-11-19T09:00:00Z',firstChargeAmount:550,trialEndsAt:null}};
+}
+test('contact card is separate from Auth email and does not redirect merely on login',async()=>{
+ const contact=contactHarness(contactState({verified:true,source:'user_supplied',maskedEmail:'co***@example.test'}));
+ const h=await setup({contactService:contact.service});h.emit(h.user);await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('account-contact-panel').hidden,false);
+ assert.equal(h.el('account-email').textContent,h.summary.maskedEmail);assert.equal(h.el('account-contact-email').textContent,'co***@example.test');
+ assert.deepEqual(h.navigation,[]);assert.equal(contact.calls.status,1);h.cleanup();
+});
+for(const item of [contactState({category:'normal',source:'auth_verified',verified:true,maskedEmail:'no***@example.test'}),contactState({category:'apple_relay',source:'apple_provider',verified:true,maskedEmail:'re***@privaterelay.appleid.com'}),contactState({category:'apple_relay',source:'apple_provider',verified:true,maskedEmail:'re***@private.icloud.com'})])test('verified '+item.maskedEmail+' proceeds to plan without extra email input',async()=>{
+ const contact=contactHarness(item);const h=await setup({contactService:contact.service});h.emit(h.user);await flush();
+ await h.el('review-plan').dispatch('click');await flush();assert.equal(h.el('plan-panel').hidden,false);assert.deepEqual(h.navigation,[]);assert.equal(contact.calls.status,2);assert.equal(h.calls.reads,2);h.cleanup();
+});
+test('missing contact redirects only when new plan is requested and before checkout',async()=>{
+ const contact=contactHarness();let reviews=0;const checkout=portalService(async()=>({testMode:true,syncState:'none',billing:null}));checkout.reviewPreviewCheckout=async()=>{reviews++;return syntheticCheckoutReview();};
+ const h=await setup({contactService:contact.service,checkoutService:checkout});h.summary.maskedEmail='未設定';h.emit({...h.user,emailVerified:false,authenticationBasis:'apple_provider',maskedEmail:'未設定'});await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.deepEqual(h.navigation,[]);await h.el('review-plan').dispatch('click');await flush();
+ assert.deepEqual(h.navigation,['/account/contact/']);assert.equal(h.el('plan-panel').hidden,true);assert.equal(reviews,0);assert.equal(h.calls.reads,1);h.cleanup();
+});
+test('contact API failure leaves account and existing Portal usable while denying new purchase',async()=>{
+ const contact=contactHarness();contact.service.getStatus=async()=>{contact.calls.status++;throw {code:'contact_mail_unavailable',details:'private-uid'};};let portals=0;
+ const checkout=portalService();checkout.createPreviewPortalSession=async()=>{portals++;return{testMode:true,url:'https://billing.stripe.com/p/session/test_syntheticContactFailure'};};
+ const h=await setup({contactService:contact.service,checkoutService:checkout});h.emit(h.user);await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.match(h.el('account-contact-status').textContent,/既存契約の管理/);assert.equal(h.el('account-portal-open').disabled,false);
+ await h.el('account-portal-open').dispatch('click');await flush();assert.equal(portals,1);assert.equal(h.navigation[0],'https://billing.stripe.com/p/session/test_syntheticContactFailure');h.cleanup();
+});
+test('contact API failure prevents plan transition but does not replace account by error screen',async()=>{
+ const contact=contactHarness();contact.service.getStatus=async()=>{throw{code:'service_unavailable'};};const h=await setup({contactService:contact.service});h.emit(h.user);await flush();await h.el('review-plan').dispatch('click');await flush();
+ assert.equal(h.el('account-panel').hidden,false);assert.equal(h.el('plan-panel').hidden,true);assert.equal(h.navigation.length,0);assert.equal(h.el('auth-error').hidden,false);h.cleanup();
+});
+test('fresh contact status is checked again before opening checkout review',async()=>{
+ const contact=contactHarness(contactState({verified:true,source:'user_supplied',maskedEmail:'co***@example.test'}));let reviews=0;
+ const checkout=portalService(async()=>({testMode:true,syncState:'none',billing:null}));checkout.reviewPreviewCheckout=async()=>{reviews++;return syntheticCheckoutReview();};
+ const h=await setup({contactService:contact.service,checkoutService:checkout});h.emit(h.user);await flush();await h.el('review-plan').dispatch('click');await flush();
+ h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');contact.set(contactState());await h.el('plan-checkout').dispatch('click');await flush();
+ assert.equal(reviews,0);assert.deepEqual(h.navigation,['/account/contact/']);assert.equal(contact.calls.status,3);h.cleanup();
+});
+test('verified supplied contact can open checkout review and never overwrites Auth display',async()=>{
+ const contact=contactHarness(contactState({verified:true,source:'user_supplied',maskedEmail:'co***@example.test'}));let reviews=0;
+ const checkout=portalService(async()=>({testMode:true,syncState:'none',billing:null}));checkout.reviewPreviewCheckout=async()=>{reviews++;return syntheticCheckoutReview();};
+ const h=await setup({contactService:contact.service,checkoutService:checkout});h.emit(h.user);await flush();await h.el('review-plan').dispatch('click');await flush();
+ h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');await h.el('plan-checkout').dispatch('click');await flush();
+ assert.equal(reviews,1);assert.equal(h.el('checkout-panel').hidden,false);assert.equal(h.el('plan-email').textContent,h.summary.maskedEmail);assert.equal(h.el('checkout-account-email').textContent,'co***@example.test');h.cleanup();
+});
+test('contact state changing during account switch cannot navigate or reveal old address',async()=>{
+ const contact=contactHarness(contactState({verified:true,source:'user_supplied',maskedEmail:'aa***@example.test'}));const h=await setup({contactService:contact.service});h.emit(h.user);await flush();
+ const old=deferred();contact.service.getStatus=()=>old.promise;const plan=h.el('review-plan').dispatch('click');
+ contact.service.getStatus=async()=>contactState({verified:true,source:'user_supplied',maskedEmail:'bb***@example.test'});h.emit({...h.user,maskedEmail:'other***@example.test'});await flush();old.resolve(contactState());await plan;await flush();
+ assert.equal(h.navigation.length,0);assert.equal(h.el('account-contact-email').textContent,'bb***@example.test');assert.equal(h.el('plan-panel').hidden,true);h.cleanup();
+});
+test('contact checks are double click safe and revoked by logout/pagehide',async()=>{
+ for(const change of ['logout','pagehide']){
+  const contact=contactHarness(contactState({verified:true,source:'user_supplied',maskedEmail:'co***@example.test'}));const h=await setup({contactService:contact.service});h.emit(h.user);await flush();
+  const old=deferred();contact.service.getStatus=()=>{contact.calls.status++;return old.promise;};const first=h.el('review-plan').dispatch('click');h.el('review-plan').dispatch('click');assert.equal(contact.calls.status,2);
+  if(change==='logout')await h.el('logout').dispatch('click');else h.windowListeners.get('pagehide')();old.resolve(contactState());await first;await flush();assert.equal(h.navigation.length,0);assert.equal(h.el('account-contact-email').textContent,'');assert.ok(contact.calls.clear>0);h.cleanup();
+ }
+});
+test('pending contact with uncertain delivery is not shown as sent on account card',async()=>{
+ const contact=contactHarness(contactState({pendingMaskedEmail:'pe***@example.test',deliveryState:'uncertain'}));const h=await setup({contactService:contact.service});h.emit(h.user);await flush();assert.match(h.el('account-contact-status').textContent,/送信結果を確認/);assert.doesNotMatch(h.el('account-contact-status').textContent,/リンクから確認/);h.cleanup();
 });

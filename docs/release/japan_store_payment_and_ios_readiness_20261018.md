@@ -1,5 +1,53 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+<!-- hamcare-billing-contact-20261119:start -->
+## 2026-11-19 独立した確認済み連絡用メール（Preview限定）
+
+### 正本・分類・既存ガード
+
+`preview-functions/src/billing-contact.ts:classifyBillingEmail` が、`authorizePreviewIdentity` の署名検証済みFirebase UIDと現在Admin Userの一致／無効化／Apple bindingを前提に分類する。Aは通常確認済み、Bは確認済みApple Relay（両ドメイン）、CはAuthとprovider双方にメールがない場合だけ。メールがあるが未確認／不正の状態をCへ読み替えず、新規申込を拒否する。A/Bは追加入力不要。既存Authメールを変更せず、入力した連絡先と同メールの別Authユーザーが存在しても統合・ログイン方式追加・Customer所有者変更を行わない。
+
+`engine.ts` のreviewとSession作成で、fresh `requirePreviewBillingContact` が既存アカウント・petを含め再確認し、C未確認ならStripe API・見積り保存・Customer／Session作成より前に停止する。作成までに連絡先が変化しても前のUI表示を信用しない。既存のUIDに対応する管理可能なPreview契約のPortalは連絡先補完で閉鎖しない。新規Customerメールには確認済み連絡先を使用できるが、Customer解決はUIDハッシュmetadataで行い、メールによる検索を追加しない。**既存Customerのemail属性は自動更新しない**。今後の領収書・通知先切替は明示同期設計が必要で、今回の連絡先確認成功とStripe既存Customerメール更新を混同しない。
+
+### 保存・トークン・セキュリティ
+
+原本は隔離namespace `preview_billing_contacts/{uid}`、用途 `billing_contact_preview`。確認済みemail/verified/verificationStatus/verifiedAt/source、purpose/schemaVersion/createdAt/updatedAt、requestedAt/lastRequestedAtを保存する。確認中はpendingへemail/tokenHash/createdAt/expiresAt/sentAt/deliveryStateを保存し、APIのverificationSentAtはpending.sentAtから投影する。確認トークンは32byte安全乱数、15分、UID+宛先+tokenのSHA-256、1回使用。平文token／Firebase ID Token／Apple subject／パスワードは保存しない。used履歴はハッシュだけを最大10件保存。変更先が未確認／配送失敗でも旧verifiedメールを保持し、新確認のtransaction時にのみ切替。
+
+固定Preview URL `/account/contact/#token=...` はUID・メールを含まず、fragmentはSDK import前に `history.replaceState` で除去し、tokenはメモリだけに保持する。ログイン中の別アカウントへ切り替わると破棄。同じ認証UIDによる明示確認POSTだけが消費する。既存Popup方式を維持し、Redirectや永続token保存を追加しない。
+
+新 `previewBillingContactEmail` はPOST status/request/confirm、固定Origin、失効確認付きBearer、JSONのみ、URL queryなし・2KiB制限。Cookie等の周辺認証に依存しない。状態は本人認証下のHTTPだけでマスク投影する。**既存Firestore Rulesは変更・配備しない**。現在のdefault denyでraw連絡先とhashの直接client読書きは全拒否。別ファイル `firestore.contact-preview.rules` は本人だけの安全なstatus投影getを許可する将来候補であり、現在serverはstatus mirrorを書かず、候補Rulesを本番へ配備したとは扱わない。候補自体も全write・他UID・一覧・原本を拒否し、原本項目が混入したstatusも拒否する。
+
+### Preview Gmailの限定認可・送信制限
+
+Firebase標準確認メールは独立したbilling contactの検証へ転用できないため、本人が既存管理GmailのPreview限定利用を承認。本人承認でGmail APIだけを有効化し、新Desktop OAuthクライアント `HamCare Preview Billing Contact Mail` を追加。既存クライアント／Branding／Audience／Data Accessを変更せず、PKCE/state付きloopback認可で本人が `gmail.send` だけ許可。秘密値はGit・チャット・公開ログへ出さず、新専用 `HAMCARE_PREVIEW_CONTACT_MAIL_CONFIG` に保存する。
+
+FromとGmail API mailboxはApple登録済み管理アドレスへ固定。対象UID／受信先の各1件ハッシュ許可リストを送信前に検証。1人60秒間隔・3回/時・5回/UTC日、全体10回/UTC日。予算予約は未知結果でも戻さず、自動補充・自動再送なし。メールAPI timeout／不明結果は期限まで再送を止め、画面に成功と偽表示しない。再送失敗時は過去の成功表示を消し、読み取りだけで新状態を再確認する。
+
+これはアプリ側の送信制限であり、Googleの権限自体が宛先制限を保証するわけではない。[Gmailの最小scope](https://developers.google.com/workspace/gmail/api/auth/scopes) と [Desktop PKCE/loopback](https://developers.google.com/identity/protocols/oauth2/native-app) に従う。Google External/Testing設定の場合は `gmail.send` refresh tokenが7日で失効し得るため、既存ログインの公開設定を変えて回避せず、必要時に本人の再認可を行う。[失効条件](https://developers.google.com/identity/protocols/oauth2#expiration)。本番自動送信に個人Gmailを採用した決定ではない。
+
+### 実行済み検証と未確認の区別
+
+- backend514/514（Contact HTTP21を含む）、frontend443/443、既存申込policy91/Stripe pure21 PASS。下記Emulator68と合わせruntime計1,137件。JS構文14/14、TypeScript build、diff check PASS。既存依存を指定して再利用し、SDK／lockfile更新0。
+- 実Firestore Emulator Contact Store9、候補Rules3、既存account Auth/Firestore15、Apple25、Preview Store/Portal16、計68 PASS。専用demo project/一時portのみ、終了後listener0。実transactionの二重送信/二重消費、再起動、期限切れ、別UID、同メール別UID非統合、置換時旧メール保持、本番相当fixture指紋不変を確認した。実メールや実Apple配送の証明ではない。
+- 静的LP84/account171/brand177 PASS。新画面も現行白輪郭アイコン／星空／すりガラス／フォーカス／labelを維持し、法務リンクは除外Preview内の404ではなく既存live文書へ固定する。
+- 本人用Relay宛先は依然なし。両Relay形式の受理・形式だけではverifiedにしないテストはPASSだが、Relayを通したFirebase／HamCare／Stripe／サポートの実配送・返信・バウンス確認は未実施。
+- Preview配備：`previewBillingContactEmail` 新規と `createPreviewStripeCheckoutSession` 更新だけがACTIVE、既存他56 Functionsのstate/updateTime/serviceConfig一致。live版 `2365135bf558c278` は不変。同じ `web-first-task1` 最終版 `b9d352cc8225b204`、期限2026-11-26 20:02 JST。公開9resourceのローカルSHA一致、account no-store/no-referrer/nosniff、API認証なし401・異Origin403・preflight204を確認。初回CLI分析は古いHomebrew NodeのICU不在で未配備、既存Node22のPATH限定で再実行して成功。配備後の旧build image cleanup警告は本体成功と区別し、無関係なRegistry設定は変更しない。
+- 置換メールの配送表示を最小修正：旧verified連絡先を保持したまま変更先がfailed/uncertainになっても、その配送状態を契約可否と独立して投影する。HTTP公開DTOやストレージ・契約ガードは変更せず、回帰2件を追加してbackend514 PASS。Preview contact Functionだけを再更新し配備成功。Contact Store9/Rules3も最新buildで再PASS。
+- 同じ確認済み連絡先の再入力でサーバーが正規verified応答を返す場合、frontendは編集終了して「すでに確認済み／送信は行っていません」と表示する。pending情報を含まない正規user_supplied状態だけを厳密許可し、missing/malformed応答は引き続き拒否。回帰1件追加、frontend443 PASS。
+- 5幅の表示は、本物HTML/View/CSSを用いるlocalhostの合成fixtureでIAB内検証。360/390/430/768/1440pxすべてdocument/body scrollWidth=clientWidth、個人情報なしの全画面画像を保存して360/1440の目視確認。390pxでpending/complete/errorを別表示・目視し、空入力で日本語alert/aria-invalid=true/inputへのfocus、Tabで送信buttonへ移動・3px solid focusを確認。外部connect禁止・合成Apple・実API/Firestore/メール0であり、実配送の証拠としない。一時server停止・IAB viewport reset済み。この合成試験自体を実機の証拠とはせず、追加の本人確認は次項へ分けて記録する。
+- **実Gmail配送・本人確認PASS**：本人所有の既存メールなしAppleアカウントで、Chromeの正しい登録画面から管理Gmail宛に確認メールを1通だけ送信。送信済みUIと19:58 JSTの対象Preview pending/共通送信予約1を照合。本人が今回の件名のメールを受信し、確認リンクと明示確認操作を完了。20:08 JSTのexact readで対象UID一致、verified=true/source=user_supplied/verifiedAtあり/許可宛先一致/pending削除/used token hash1/送信予約1を確認。Authメールは未設定のまま、provider/UID不変、本番owner/pet/billing/trialの4文書は開始時と完全一致。Googleの送信認可通知だけでは確認完了とせず、アプリ表示とサーバー原本の一致を根拠にした。Relay経由の配送試験とは区別する。
+- **実プラン復帰PASS**：アカウント画面でログインメール「未設定」と別欄のマスク済み確認連絡先が共存。同じAppleアカウントで月額550円/税抜500円を選択し、サーバーreviewを通して契約確認画面へ到達。本人用Preview見積り1件を通常更新したが、同意チェックは未選択、Stripeへ進むボタンは押さず、Customer/Session/Subscription作成・決済は0。プラン→アカウント→連絡先確認へ戻り、最終の「連絡用メールを確認済みです」を個人情報なしで保存。20:11 JSTのfinal readでもverified保持/送信1/used hash1/Authと本番4文書不変を確認した。最終viewの公開SHA一致、2対象Functions ACTIVE・他56不変・live不変も最終照合。
+- **実機表示の本人確認PASS（2026-11-19追記）**：iPhone Safari／Android Chromeで連絡先ページを開き、文字切れ・横はみ出し・入力欄がソフトキーボードで隠れないかを確認する依頼に、本人から「両方とも表示・入力に問題なし」と回答。依頼範囲の表示・入力を両実機で本人確認PASSとする。確認済みの場合は連絡先変更画面で入力欄に触れるだけとし、送信・購入を押さない手順を案内した。根拠は本人回答であり、合成5幅の実測やエージェントの直接目視とは区別する。実機寸法・端末／OS版・実機画像は未採取。モバイルでのStripe決済／PortalやRelay配送の追加E2Eまで確認済みとはしない。専用VoiceOver追加試験は確定方針どおり行わない。
+
+### 検証時の診断出力について
+
+メールリンクの表示形式を調べた際、確認トークンの一部分がツール診断へ出た。完全なトークンやUIDは出力せず、この文書にも値を転載しない。以後は一致有無・長さだけの診断へ切り替え、保持した本文/リンク変数も消去した。本人が確認を完了し、原本のused hash1/pending削除で当該リンクが使用済み・再利用不可であることを確認した。アプリ/サーバーにtokenをログ出力する処理は追加していない。この運用上の不備を「一切の診断露出なし」とは記録しない。
+
+### 次工程と保護
+
+本番Stripe・本番billing・既存契約・外部テスター権限・Auth email/provider・Flutter・live Hosting・既存Apple設定を変更しない。確認済み連絡先の補完が成立しても、本番公開可の判断ではない。Relay本人宛先が確保できた後の配送確認、本番送信基盤、法務／550円／事業者表示整合を独立した次工程とする。VoiceOver専用追加作業は非ブロッキング。今回変更だけを1 feature commitにし、main merge/pushせず停止する。
+<!-- hamcare-billing-contact-20261119:end -->
+
 <!-- hamcare-private-relay-audit-20261116:start -->
 ## 2026-11-16 Apple Private Email Relay：送信元2件登録済み／配送は本人用宛先待ち
 

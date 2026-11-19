@@ -1,0 +1,70 @@
+rules_version = '2';
+
+// Emulator/isolated Preview candidate only. Do not deploy this standalone file
+// over the production Rules. The current HTTPS API reads through Admin SDK;
+// production's existing default-deny keeps every raw contact record private.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function maskedEmail(value) {
+      return value == null || (value is string
+        && value.size() <= 254
+        && value.matches('^[^@\\s]{1,2}\\*{3}@[A-Za-z0-9.-]+\\.[A-Za-z]{2,63}$'));
+    }
+
+    function optionalTime(value) {
+      return value == null || value is timestamp || (value is string
+        && value.size() <= 35
+        && value.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.+-]+Z?$'));
+    }
+
+    // Defensive projection validation prevents a server-side mirror mistake
+    // from exposing plain addresses, token hashes, provider identities or UID.
+    function safeStatus(data) {
+      return data.keys().hasOnly([
+          'testMode', 'state', 'category', 'maskedEmail', 'pendingMaskedEmail',
+          'canCheckout', 'source', 'resendAfter', 'expiresAt', 'verifiedAt',
+          'updatedAt', 'verificationStatus', 'deliveryState'
+        ])
+        && data.keys().hasAll([
+          'testMode', 'state', 'category', 'maskedEmail', 'pendingMaskedEmail',
+          'canCheckout', 'source', 'resendAfter', 'expiresAt'
+        ])
+        && data.testMode == true
+        && data.state in ['verified', 'missing', 'pending', 'invalid',
+          'unverified', 'sending', 'send_failed', 'used', 'expired', 'already_verified']
+        && data.category in ['normal', 'apple_relay', 'missing', 'unverified', 'invalid']
+        && maskedEmail(data.maskedEmail)
+        && maskedEmail(data.pendingMaskedEmail)
+        && data.canCheckout is bool
+        && (data.source == null || data.source in ['auth_verified', 'apple_relay', 'user_supplied'])
+        && optionalTime(data.resendAfter)
+        && optionalTime(data.expiresAt)
+        && (!('verifiedAt' in data) || optionalTime(data.verifiedAt))
+        && (!('updatedAt' in data) || optionalTime(data.updatedAt))
+        && (!('deliveryState' in data) || data.deliveryState == null
+          || data.deliveryState in ['sent', 'failed', 'uncertain'])
+        && (!('verificationStatus' in data) || data.verificationStatus in [
+          'missing', 'pending', 'sending', 'sent', 'failed', 'verified', 'expired', 'used'
+        ]);
+    }
+
+    match /preview_billing_contacts/{uid} {
+      allow read, write: if false;
+      match /status/current {
+        allow get: if owner(uid) && safeStatus(resource.data);
+        allow list, write: if false;
+      }
+      match /{nested=**} {
+        allow read, write: if false;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

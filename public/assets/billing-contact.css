@@ -1,0 +1,12 @@
+.contact-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.contact-actions > button { flex: 1 1 180px; }
+#contact-login-submit, #contact-send, #contact-reload-auth, #contact-confirm, #contact-plan-return, #contact-blocked-refresh { margin-top: 24px; }
+#contact-change { width: 100%; margin-top: 16px; }
+.contact-back { margin-top: 20px; text-align: center; }
+.contact-back a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 12px; }
+#contact-confirm-account, #contact-active-note, #contact-pending-note, #contact-blocked-copy { overflow-wrap: anywhere; }
+#contact-status:empty { display: none; }
+#contact-login-panel input, #contact-editor-panel input { max-width: 100%; }
+#contact-resend-note { min-height: 1.9em; }
+.contact-actions button, #contact-change, #contact-confirm { min-height: 48px; }
+@media (max-width: 430px) { .contact-actions { flex-direction: column; } .contact-actions > button { flex-basis: auto; width: 100%; } }

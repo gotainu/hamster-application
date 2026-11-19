@@ -1,6 +1,7 @@
 import {createHash, randomUUID} from 'crypto';
 import Stripe from 'stripe';
-import {assessPreviewCheckout} from '../../functions/src/previewCheckoutPolicy';
+import {normalizeBillingEmail,maskBillingEmail} from './billing-contact';
+import {assessPreviewCheckout,isPreviewIdentityConfirmed} from '../../functions/src/previewCheckoutPolicy';
 
 export const SCOPE = 'hamcare-checkout-preview-task4';
 export const PREVIEW_ORIGIN = 'https://hamster-breeding-app--web-first-task1-lco08m60.web.app';
@@ -17,6 +18,8 @@ export interface AppFacts { appAccountExists: boolean; billing: any; trial: any;
 export interface EngineDependencies {
   stripe: Stripe; store: PreviewStore; priceId: string; publishableKey: string;
   readFacts(uid: string): Promise<AppFacts>; now(): Date;
+  /** Server-only verified contact lookup; never request-body email. */
+  requireBillingContact?(identity:Identity):Promise<{email:string;source?:string}>;
   allowedWebhook?: {id:string;url:string;events:readonly string[]};
 }
 function fail(code: string): never { throw new CheckoutError(code); }
@@ -60,14 +63,14 @@ export function createPreviewEngine(d: EngineDependencies) {
     if (!stored.customerId) return null;
     const c = await d.stripe.customers.retrieve(stored.customerId); ownCustomer(c, subject); return c;
   }
-  async function getCustomer(identity: Identity, subject: string): Promise<Stripe.Customer> {
+  async function getCustomer(identity: Identity, subject: string, billingEmail:string): Promise<Stripe.Customer> {
     const stored = await d.store.read(subject);
     if(stored.previewFirebaseUid && stored.previewFirebaseUid!==identity.uid) fail('customer_unresolved');
     const known = await knownCustomer(subject, stored);
     const matches = known ? {data:[known],has_more:false} : await d.stripe.customers.search({query:`metadata['previewScope']:'${SCOPE}' AND metadata['previewSubjectHash']:'${subject}'`,limit:2});
     if (matches.has_more || matches.data.length > 1) fail('customer_unresolved');
     let customer = known || matches.data[0];
-    if (!customer) customer = await d.stripe.customers.create({...(identity.email ? {email:identity.email}:{}),metadata:{previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
+    if (!customer) customer = await d.stripe.customers.create({email:billingEmail,metadata:{previewScope:SCOPE,previewSubjectHash:subject,previewFirebaseUid:identity.uid}}, {idempotencyKey:`${SCOPE}:customer:${subject}`});
     ownCustomer(customer,subject);
     // Only an Admin-verified owner may bind the previously hash-only Test Customer.
     if(!customer.metadata.previewFirebaseUid)customer=await d.stripe.customers.update(customer.id,{metadata:{...customer.metadata,previewFirebaseUid:identity.uid}});
@@ -130,17 +133,26 @@ export function createPreviewEngine(d: EngineDependencies) {
     }
     return {testMode:true,state:'open',paymentStatus:session.payment_status};
   }
+  async function verifiedContact(identity:Identity) {
+    if(!identity||!isPreviewIdentityConfirmed(identity))fail('email_unverified');
+    const result=d.requireBillingContact?await d.requireBillingContact(identity):identity.emailVerified===true?{email:identity.email}:null;
+    const email=normalizeBillingEmail(result?.email);
+    if(!email)fail('contact_verification_required');
+    return {email};
+  }
   return {
     async review(identity: Identity, planKey: unknown) {
+      const contact=await verifiedContact(identity);
       const subject = hash(identity.uid); const {app,policy} = await facts(identity,planKey);
       const state = await d.store.read(subject); const c = await knownCustomer(subject,state); if (c) await noSubscription(c.id);
       const token = randomUUID(); const now = d.now();
       await d.store.mutate(subject,s=>{if(s.previewFirebaseUid && s.previewFirebaseUid!==identity.uid)fail('customer_unresolved');return {state:{...s,previewFirebaseUid:identity.uid,quote:{tokenHash:hash(token),expiresAt:now.getTime()+180000,policyKey:assessmentKey(policy)}},result:null};});
       const firstCharge = new Date(policy.firstChargeAtSeconds*1000).toISOString();
-      return {testMode:true,testDataSource:app.testDataSource||'app',planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:token,account:{nickname:app.nickname,maskedEmail:app.maskedEmail},billing:{kind:policy.chargeTiming === 'trial_end' ? 'trial':'immediate',cardRegistrationAt:now.toISOString(),firstChargeAt:firstCharge,firstChargeAmount:550,trialEndsAt:policy.trialEndSeconds ? firstCharge:null}};
+      return {testMode:true,testDataSource:app.testDataSource||'app',planKey:'premium_monthly',amount:550,currency:'jpy',interval:'month',reviewToken:token,account:{nickname:app.nickname,maskedEmail:maskBillingEmail(contact.email)},billing:{kind:policy.chargeTiming === 'trial_end' ? 'trial':'immediate',cardRegistrationAt:now.toISOString(),firstChargeAt:firstCharge,firstChargeAmount:550,trialEndsAt:policy.trialEndSeconds ? firstCharge:null}};
     },
     async create(identity: Identity, body: RecordData) {
       if (body.termsAccepted !== true || typeof body.reviewToken !== 'string') fail('confirmation_required');
+      const contact=await verifiedContact(identity);
       const subject=hash(identity.uid); const {policy}=await facts(identity,body.planKey); const now=d.now().getTime(); const lease=randomUUID();
       const reserved=await d.store.mutate(subject,s=>{
         if (!s.quote || s.quote.tokenHash !== hash(body.reviewToken) || s.quote.expiresAt <= now || s.quote.policyKey !== assessmentKey(policy)) fail('review_expired');
@@ -150,7 +162,7 @@ export function createPreviewEngine(d: EngineDependencies) {
         return {state:{...s,attempt},result:{existing:false,attempt}};
       });
       const attempt=reserved.attempt;
-      const customer=await getCustomer(identity,subject);
+      const customer=await getCustomer(identity,subject,contact.email);
       if (reserved.existing) {
         const session=await d.stripe.checkout.sessions.retrieve(attempt.sessionId);
         await checkSession(session,subject,customer.id,attempt);

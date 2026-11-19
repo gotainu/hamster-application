@@ -117,7 +117,7 @@ def main():
     def check(name, condition):
         checks.append((name, bool(condition)))
 
-    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css', 'plan.css', 'checkout.css')}
+    sources = {name: (PUBLIC / 'assets' / name).read_text() for name in ('landing.css', 'brand.css', 'account.css', 'plan.css', 'checkout.css', 'billing-contact.css')}
     rules = {name: list(css_rules(source)) for name, source in sources.items()}
     tokens = {}
     for name in ('landing.css', 'brand.css'):
@@ -242,6 +242,24 @@ def main():
             check('four actual feature screenshots retained', set(feature_images) == {'/assets/landing/screen-' + item + '.png' for item in ('record', 'changes', 'ai', 'environment')})
             check('actual Home with visible example note', 'class="home-screen"' in html and '実際のHome画面例' in html and 'テスト用プロフィール' in html)
 
+    # The contact page is new, so inspect its real markup and inherited theme
+    # rather than replacing the original-page baseline or skipping the page.
+    contact_html=(PUBLIC/'account/contact/index.html').read_text()
+    contact_page=Page(contact_html)
+    contact_links={attrs.get('rel'):attrs for tag,attrs in contact_page.nodes if tag=='link'}
+    check('contact page inherits existing habitat, glass and account controls',all(any(tag=='link' and attrs.get('href')=='/assets/'+name for tag,attrs in contact_page.nodes) for name in ('landing.css','brand.css','account.css','billing-contact.css')) and 'class="account-shell"' in contact_html and 'class="account-card"' in contact_html)
+    check('contact page uses current outline icons',contact_links.get('icon',{}).get('href')=='/assets/landing/favicon-outline-32.png' and contact_links.get('apple-touch-icon',{}).get('href')=='/assets/landing/apple-touch-icon-outline.png' and any(tag=='img' and attrs.get('src')=='/assets/landing/hamcare-mark-outline.png' and all(word in attrs.get('alt','') for word in ('黒','白','輪郭')) for tag,attrs in contact_page.nodes))
+    check('contact page retains approved tagline and local evidenced images','class="brand-tagline">'+CATCHPHRASE in contact_html and all(attrs.get('src','').startswith('/assets/landing/') and attrs.get('src','').rsplit('/',1)[-1] in entries for tag,attrs in contact_page.nodes if tag=='img'))
+    check('contact page excludes rejected white-hamster URLs',all('/assets/landing/'+name not in contact_html for name in rejected))
+    check('contact page image alternatives are intentional',all('alt' in attrs and (attrs['alt']!='' or attrs.get('src')=='/assets/landing/google-g.png') for tag,attrs in contact_page.nodes if tag=='img'))
+    check('contact page uses official Apple button without redraw',any(tag=='img' and attrs.get('src')=='/assets/landing/apple-sign-in-ja.png' and attrs.get('alt')=='Appleでサインイン' and attrs.get('width')=='780' and attrs.get('height')=='162' for tag,attrs in contact_page.nodes))
+    contact_ids={attrs['id'] for _,attrs in contact_page.nodes if 'id' in attrs}
+    check('contact page accessible references resolve',all(value in contact_ids for _,attrs in contact_page.nodes for name in ('for','aria-controls','aria-labelledby','aria-describedby') if name in attrs for value in attrs[name].split()))
+    check('contact page zoom and live regions remain available','user-scalable=no' not in contact_html and 'maximum-scale=1' not in contact_html and any(attrs.get('role')=='alert' for _,attrs in contact_page.nodes) and any(attrs.get('aria-live')=='polite' for _,attrs in contact_page.nodes))
+    check('contact layout keeps narrow-screen wrapping',all(value in sources['billing-contact.css'] for value in ('flex-wrap: wrap','overflow-wrap: anywhere','max-width: 100%','@media (max-width: 430px)')))
+    check('contact CSS does not replace theme colors or backdrop behavior',not re.search(r'#[0-9a-fA-F]{3,8}\b|rgba?\(|(?:background|color|filter|backdrop-filter)\s*:',sources['billing-contact.css']))
+    check('contact extra actions have at least 44px targets',declaration('billing-contact.css','.contact-back a','min-height')=='44px' and declaration('billing-contact.css','.contact-actions button','min-height')=='48px')
+
     path='public/assets/firebase-web-config.mjs'
     check('original Firebase config unchanged', (ROOT/path).read_bytes()==baseline(path))
     auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
@@ -258,15 +276,16 @@ def main():
     check('Apple touch target stays 54px and graphic retains aspect ratio','width: 100%; min-height: 54px' in account_css and 'width: min(100%, 260px); height: auto' in account_css)
     check('Apple association checkbox has a 64px label and separate 22px control','min-height: 64px' in account_css and '.account-card .apple-linking-choice input[type="checkbox"]' in account_css and 'flex: 0 0 22px' in account_css)
     check('Apple association notice keeps accessible colors and forced-color fallback','Appleログインの前に' in (PUBLIC/'account/index.html').read_text() and '.apple-linking-notice h2' in account_css and '.apple-linking-notice p' in account_css and '@media (forced-colors: active) { .apple-linking-notice' in account_css)
-    presentation_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs', 'checkout-model.mjs', 'checkout-view.mjs'))
+    presentation_code = '\n'.join((PUBLIC / 'assets' / name).read_text() for name in ('account-model.mjs', 'account-view.mjs', 'plan-model.mjs', 'checkout-model.mjs', 'checkout-view.mjs', 'billing-contact-model.mjs', 'billing-contact-view.mjs'))
     check('presentation has no business writer, custom storage or direct payment transport', not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|fetch|fetchRequest)\s*\(|localStorage|sessionStorage|\.innerHTML|insertAdjacentHTML|api\.stripe|cloudfunctions\.net|run\.app', presentation_code))
     for filename in ('screen-record.png', 'screen-changes.png', 'screen-ai.png', 'screen-environment.png'):
         check('real screenshot unchanged ' + filename, (ASSETS / filename).read_bytes() == baseline('public/assets/landing/' + filename))
 
     for name, source in sources.items():
         # Checkout reuses the original .account-card input/.button focus styles.
-        focus_source = source + sources['account.css'] if name == 'checkout.css' else source
-        check(name + ' motion/contrast fallback', all(value in source for value in ('prefers-reduced-motion', 'forced-colors')) and 'focus-visible' in focus_source)
+        focus_source = source + sources['account.css'] if name in ('checkout.css','billing-contact.css') else source
+        fallback_source = focus_source + sources['brand.css'] if name == 'billing-contact.css' else source
+        check(name + ' motion/contrast fallback', all(value in fallback_source for value in ('prefers-reduced-motion', 'forced-colors')) and 'focus-visible' in focus_source)
     check('glass has prefixed and unprefixed conditional support', all(value in sources['brand.css'] + sources['account.css'] for value in ('@supports', '-webkit-backdrop-filter', 'backdrop-filter')))
     check('solid fallback before glass', declaration('account.css', '.account-card', 'background').startswith('#') and declaration('account.css', '#account-panel', 'background').startswith('#'))
     for file, selector in [('landing.css', '.button'), ('landing.css', '.site-header nav a'), ('landing.css', '.text-link'), ('account.css', '.quiet-button'), ('account.css', '.account-card input'), ('account.css', '.password-toggle')]:

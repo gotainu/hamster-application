@@ -2,9 +2,10 @@ import { isVerifiedAccountIdentity } from './account-identity.mjs';
 import { createCheckoutController, clearPreviewBilling, renderPreviewBilling } from './checkout-view.mjs';
 import { projectPreviewBilling, projectPreviewPortalSession, portalErrorMessage } from './checkout-model.mjs';
 import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
+import { projectBillingContact, billingContactError } from './billing-contact-model.mjs';
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
-export async function mountAccountPage(service, { checkoutService = null, resumeCheckout = false } = {}) {
+export async function mountAccountPage(service, { checkoutService = null, contactService = null, resumeCheckout = false } = {}) {
   const element = (id) => document.getElementById(id);
   const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel', 'checkout-panel'];
   const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields', 'plan-nickname', 'plan-email', 'plan-method', 'plan-billing', 'plan-trial', 'plan-customer-check', 'plan-checkout-check', 'plan-route-title', 'plan-route-detail'];
@@ -32,6 +33,8 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   let previewModel = null;
   let previewReading = false;
   let portalOpening = false;
+  let contactRead = 0;
+  let contactChecking = false;
   const portalFields = { plan: 'planLabel', amount: 'amountLabel', state: 'statusLabel', 'next-charge': 'nextChargeLabel', cancel: 'cancelLabel', 'period-end': 'periodEndLabel', access: 'accessLabel', 'synced-at': 'syncedAtLabel' };
   const previewPrefixes = ['account-preview', 'plan-preview'];
 
@@ -53,6 +56,13 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     for (const prefix of previewPrefixes) { clearPreviewBilling(prefix); element(prefix + '-refresh').disabled = true; }
     checkout?.clear();
     checkoutService?.clear();
+    contactRead++;
+    contactChecking = false;
+    contactService?.clear();
+    element('account-contact-panel').hidden = true;
+    element('account-contact-status').textContent = '';
+    element('account-contact-email').textContent = '';
+    element('account-contact-link').textContent = '連絡用メールを確認する';
     element('plan-checkout').disabled = true;
     for (const id of personalFields) element(id).textContent = '';
     element('premium-monthly').checked = false;
@@ -87,7 +97,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     element('email-fields').disabled = value;
     for (const id of ['google-signin', 'refresh-account', 'check-verification']) element(id).disabled = value;
     updateAppleControl();
-    element('review-plan').disabled = value || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
+    element('review-plan').disabled = value || contactChecking || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
     form.setAttribute('aria-busy', String(value));
     status.textContent = message;
   }
@@ -137,6 +147,59 @@ export async function mountAccountPage(service, { checkoutService = null, resume
     element('account-portal-open').disabled = true;
     element('account-portal-status').textContent = '';
     for (const suffix of Object.keys(portalFields)) element('account-portal-' + suffix).textContent = '';
+  }
+  function renderContact(model) {
+    element('account-contact-panel').hidden = false;
+    element('account-contact-email').textContent = model.maskedEmail || model.pendingMaskedEmail || '未設定';
+    element('account-contact-status').textContent = model.canCheckout
+      ? model.pendingMaskedEmail ? '確認済みの連絡先を維持しています。変更先のメールは確認待ちです。' : '確認済みの連絡先を利用できます。追加の実メール登録は必要ありません。'
+      : model.state === 'pending'
+        ? model.deliveryState === 'sent' ? '確認メールのリンクから確認を完了してください。'
+          : model.deliveryState === 'failed' ? '確認メールを送信できませんでした。送信設定と再送可能な時刻を確認してください。' : '確認メールの送信結果を確認しています。'
+        : '新規の有料申込前に、確認済みの連絡用メールが必要です。';
+    element('account-contact-link').textContent = model.canCheckout ? model.source === 'user_supplied' ? '連絡用メールを確認・変更する' : '連絡先の確認状態を見る' : '連絡用メールを登録・確認する';
+  }
+  async function refreshContactStatus() {
+    if (!contactService || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || destroyed) return;
+    const request = ++contactRead, generation = epoch, user = currentUser;
+    element('account-contact-panel').hidden = false;
+    element('account-contact-status').textContent = '連絡用メールの状態を確認しています。';
+    try {
+      const model = projectBillingContact(await contactService.getStatus());
+      if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser) return;
+      renderContact(model);
+    } catch {
+      if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser) return;
+      element('account-contact-email').textContent = '';
+      element('account-contact-status').textContent = '連絡用メールの状態を確認できません。新規申込前に再確認してください。既存契約の管理は引き続き利用できます。';
+    }
+  }
+  async function checkContactBeforePurchase() {
+    if (!contactService) return true;
+    if (contactChecking) return false;
+    const request = ++contactRead, generation = epoch, user = currentUser;
+    contactChecking = true;
+    element('review-plan').disabled = true;
+    element('plan-checkout').disabled = true;
+    try {
+      const model = projectBillingContact(await contactService.getStatus());
+      if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser || !isVerifiedAccountIdentity(currentUser)) return false;
+      renderContact(model);
+      if (!model.canCheckout) { window.location.assign('/account/contact/'); return false; }
+      return true;
+    } catch (cause) {
+      if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser) return false;
+      element('account-contact-panel').hidden = false;
+      element('account-contact-status').textContent = '連絡用メールを確認できないため、新規申込を停止しています。既存契約の管理は利用できます。';
+      showError(billingContactError(cause));
+      return false;
+    } finally {
+      if (!destroyed && generation === epoch && request === contactRead && user === currentUser) {
+        contactChecking = false;
+        element('review-plan').disabled = busy || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
+        element('plan-checkout').disabled = !checkout || busy || !element('premium-monthly').checked || previewReading || Boolean(previewModel?.portalManageable) || !currentSummary?.planReview?.canSelectPlan;
+      }
+    }
   }
   function renderPortal(model) {
     previewModel = model;
@@ -286,6 +349,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
         void refreshPreviewBilling();
       } else {
         setPanel('account-panel', focus ? 'confirm-title' : null);
+        if (!user.isNewUser && summary.appAccountExists === true) void refreshContactStatus();
         if (resumePending && checkout && !user.isNewUser && summary.appAccountExists === true) { resumePending = false; void checkout.resume(); }
         else if (!user.isNewUser && summary.appAccountExists === true) void refreshPreviewBilling({ fromPortal: portalReturnPending });
       }
@@ -417,10 +481,15 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   };
   element('check-verification').addEventListener('click', onVerify);
 
-  const onPlan = () => {
-    if (busy || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true) return;
+  const onPlan = async () => {
+    if (busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true) return;
+    if (contactService && previewReading) { status.textContent = '契約状態の確認が終わってからお進みください。'; return; }
+    const generation = epoch, user = currentUser;
+    // Existing Preview contracts remain manageable without a new contact gate.
+    if (contactService && !previewModel?.portalManageable && !(await checkContactBeforePurchase())) return;
+    if (destroyed || generation !== epoch || currentUser !== user) return;
     // Re-read the same UID-scoped documents; do not rely on stale account text.
-    void renderUser(currentUser, { focus: true, plan: true });
+    await renderUser(currentUser, { focus: true, plan: true });
   };
   element('review-plan').addEventListener('click', onPlan);
   const onBack = () => {
@@ -430,7 +499,7 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('back-to-account').addEventListener('click', onBack);
   const onPlanChoice = () => {
     const option = element('premium-monthly');
-    if (busy || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+    if (busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
       option.checked = false;
       return;
     }
@@ -444,7 +513,13 @@ export async function mountAccountPage(service, { checkoutService = null, resume
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
   if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (isVerifiedAccountIdentity(currentUser)) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
-  const onCheckout = () => { if (!busy && isVerifiedAccountIdentity(currentUser) && !currentUser.isNewUser && currentSummary?.appAccountExists === true && !previewReading && !previewModel?.portalManageable && currentSummary?.planReview?.canSelectPlan && element('premium-monthly').checked) void checkout?.open(); };
+  const onCheckout = async () => {
+    if (busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || !element('premium-monthly').checked) return;
+    const generation = epoch, user = currentUser;
+    if (contactService && !(await checkContactBeforePurchase())) return;
+    if (destroyed || generation !== epoch || currentUser !== user || busy || previewReading || previewModel?.portalManageable || !element('premium-monthly').checked) return;
+    void checkout?.open();
+  };
   element('plan-checkout').addEventListener('click', onCheckout);
   const onPortal = () => { void openPortal(); };
   element('account-portal-open').addEventListener('click', onPortal);
