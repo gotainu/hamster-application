@@ -1,5 +1,18 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-production-web-billing-api-20261121:start -->
+## 2026-11-21 戦略C：本番Web課金APIの準備（コード・ローカル試験のみ、未配備）
+
+- **開始点/範囲**：承認済み`4dc423fbcebd`、`feature/web-first-stripe-checkout`の同じ専用worktree。既存3 export名/region/callable transportを維持して安全なLive専用runtimeへ委譲。既存の非課金処理・21日体験・有料判定・Flutterは変更しない。旧subscription同期の純粋モジュールは保持し、旧Portal/Checkoutから直接billingを書いていた入口と旧Secret/defaultへのfallbackを除去した。
+- **共通/分離**：PreviewとLiveはUID/provider・メール分類・固定550円と元体験終了日時の純粋policyを共用。Preview専用Secret、Test Customer/Price、URL、namespace、Webhook、Portal設定は保持。Liveは専用JSON設定、Customer/Session調整文書、event/UID lease、billing保存先を明示。現設定が空でもimport/登録は可能、操作は設定検査を最初に行いAuth/Firestore/Stripeへ進まず「現在お申し込みを受け付けていません。」で停止する。
+- **新規550円/既存500円**：新規は`premium_monthly`から将来のLive550円Priceだけを解決。Test/旧500円へ代替しない。UID metadataと既存billing/対応表でCustomerを解決し、同一UIDのlease・transaction・固定idempotencyで多重Customer/Sessionを防ぐ。結果不明の古い操作を新規作成し直さず照合待ちで停止。既存500円を改価/移行/解約しない。PortalはFirebaseの失効確認済み同一UIDによる管理用認証を新規購入条件から分離し、連絡先未設定/未確認だけでは既存管理を妨げない。Apple provider照合は維持する。
+- **権限正本**：本番契約状態の書込みはLive Webhookのtransactionだけ。raw署名、Live mode、event冪等性、最新Stripe状態、UID/Customer/Subscription、許可Price、元trial_end、snapshot versionを検査。旧500円も同期対象に残し、登録後のプロフィール削除だけで既存契約の支払/解約同期を止めない。通知hookは同じtransactionのoutboxへ重複なく保存するだけで、メール送信は未実装。
+- **影響/配備前提**：現在の配信版/本番設定は未変更。将来配備すると旧アプリの空の購入要求は安全停止し、旧500円画面から550円を勝手に課金しない。旧Portalの空payload/`portalUrl`は維持。専用Live設定一式と旧500円のUID対応、Portal互換性を事前確認せず既存APIだけを切替えてはいけない。WebのLive API接続、Cの本番連絡先確認producer、Gmail本番通知worker、保持削除、実IAM、Live構成/E2E、CTA撤去/ビルド/提出は残件。
+- **根拠**：[API実装・互換性・設定schema](docs/release/production_web_billing_api_20261121.md)、[Rules/IAMローカル監査](docs/release/production_billing_rules_audit_20261121.md)、[未実行Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)。テスト結果は本節の最終検証記録に集約する。本物のLive mode APIは呼ばず、合成依存/専用demo Emulatorだけで検証する。
+- **最終検証**：Node22、既存依存だけでFunctions/Previewのstrict TypeScript build PASS。本番API関連13ファイル581/581 PASS（新規8ファイル463件＋既存policy/Stripe優先度/旧同期/体験5ファイル118件）、Preview既存11ファイル514/514 PASS。Rules専用demo Emulator 2/2 PASS・183アクセス操作、終了/8297閉鎖確認。合計1097テストPASSであり、実Stripe/IAM/配備済Rulesの検証とは区別する。設定欠損時のAuth/DB/Stripe呼出0、UID/Live-Test境界、体験3状態、連絡先A/B/C、未確認メールの既存管理、多重実行/timeout/lease期限、署名/再送/順不同/同期競合、通知hook重複抑止を確認。旧indexのbilling以外の後半処理と有料判定helperは変更せず、差分/保護対象検査を行った。
+- **保護**：実Stripe書込み0、本番Firestore/billing書込み0、既存契約/テスター権限変更0、Secret/IAM/Apple/ストア変更0、Functions/Hosting配備0、main merge/push0。依存/SDK更新なし。メール送信なし。指定の1コミットへ整理後に停止する。
+<!-- hamcare-production-web-billing-api-20261121:end -->
+
 <!-- hamcare-launch-policy-final-20261121:start -->
 ## 2026-11-21 残存方針確定・本番切替Runbook最終化（未実行）
 

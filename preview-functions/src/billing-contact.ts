@@ -1,5 +1,7 @@
 import {createHash, randomBytes, timingSafeEqual} from 'crypto';
 import type {Identity} from './engine';
+import {normalizeBillingEmail, maskBillingEmail, classifyBillingEmail, BillingEmailClassification} from '../../functions/src/webBillingShared';
+export {normalizeBillingEmail, maskBillingEmail, classifyBillingEmail, BillingEmailClassification} from '../../functions/src/webBillingShared';
 
 export const BILLING_CONTACT_NAMESPACE = 'preview_billing_contacts';
 export const BILLING_CONTACT_FROM = 'gotainu@gmail.com';
@@ -17,47 +19,6 @@ const isMillis = (v: unknown): v is number => Number.isSafeInteger(v) && Number(
 const iso = (v: number | null) => v === null ? null : new Date(v).toISOString();
 export class BillingContactError extends Error {constructor(public code: string) {super(code);}}
 const fail = (code: string): never => {throw new BillingContactError(code);};
-
-/** Syntax is not proof of identity or deliverability. Neither relay domain is special here. */
-export function normalizeBillingEmail(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const email = value.trim();
-  if (email.length > 254 || /[^\x21-\x7e]/.test(email)) return null;
-  const parts = email.split('@');
-  if (parts.length !== 2) return null;
-  const [local, domain] = parts;
-  if (!local || local.length > 64 || local.startsWith('.') || local.endsWith('.') || local.includes('..') ||
-      !/^[A-Za-z0-9.!#$%&'*+\-/=?^_`{|}~]+$/.test(local)) return null;
-  if (!domain || domain.length > 253 || !domain.includes('.') || domain.split('.').some(label =>
-      !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(label)) || !/[A-Za-z]{2,}$/.test(domain)) return null;
-  return local + '@' + domain.toLowerCase();
-}
-export function maskBillingEmail(email: string): string {
-  const at = email.lastIndexOf('@');
-  return email.slice(0, Math.min(2, at)) + '***' + email.slice(at);
-}
-const relay = (email: string) => ['privaterelay.appleid.com', 'private.icloud.com'].includes(email.slice(email.lastIndexOf('@') + 1).toLowerCase());
-export interface BillingEmailClassification {kind: 'A'|'B'|'C'|'unverified'|'invalid'; email?: string; source?: 'auth_verified'|'apple_relay';}
-
-/** Identity must already come from authorizePreviewIdentity after Admin token verification. */
-export function classifyBillingEmail(identity: Identity, adminUser: unknown): BillingEmailClassification {
-  if (!object(adminUser) || !validUid(identity?.uid) || adminUser.uid !== identity.uid || adminUser.disabled !== false ||
-      !['verified_email', 'apple_provider'].includes(identity.authBasis || '') || !Array.isArray(adminUser.providerData) ||
-      adminUser.providerData.some((p: unknown) => !object(p) || typeof p.providerId !== 'string')) return {kind:'invalid'};
-  const apple = adminUser.providerData.filter((p: any) => p.providerId === 'apple.com');
-  if (identity.authBasis === 'apple_provider' && (apple.length !== 1 || typeof apple[0].uid !== 'string' || !apple[0].uid || /\s/.test(apple[0].uid))) return {kind:'invalid'};
-  const absent = adminUser.email === undefined || adminUser.email === null || adminUser.email === '';
-  if (absent) {
-    // An existing provider email without verified current-session evidence is not "no email".
-    if (adminUser.providerData.some((p: any) => p.email !== undefined && p.email !== null && p.email !== '')) return {kind:'unverified'};
-    return identity.authBasis === 'apple_provider' && identity.email === undefined ? {kind:'C'} : {kind:'invalid'};
-  }
-  const email = normalizeBillingEmail(adminUser.email);
-  if (!email) return {kind:'invalid'};
-  if (adminUser.emailVerified !== true || identity.emailVerified !== true || normalizeBillingEmail(identity.email) !== email) return {kind:'unverified'};
-  return identity.authBasis === 'apple_provider' && relay(email)
-    ? {kind:'B', email, source:'apple_relay'} : {kind:'A', email, source:'auth_verified'};
-}
 
 export interface BillingContactContext {identity: Identity; adminUser: unknown; appAccountExists: boolean;}
 export type BillingContactState = Record<string, any>;

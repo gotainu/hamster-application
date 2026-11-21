@@ -195,12 +195,11 @@ test('non-conflict write errors propagate without unbounded retries or changed b
   await assert.rejects(sync(store,remote));assert.equal(store.metrics.writeAttempts,1);assert.equal(remote.calls.retrieve.length,1);
   assert.deepEqual(businessState(store.current()),before);
 });
-test('webhook and portal integration passes IDs through the shared sync helper rather than old payloads',()=>{
+test('published billing entrypoints isolate the legacy sync helper and direct billing writes',()=>{
   const source=fs.readFileSync(path.resolve(__dirname,'../src/index.ts'),'utf8');
-  assert.match(source,/syncStripeSubscription/);
-  const createdStart=source.indexOf("case 'customer.subscription.created':"),deletedStart=source.indexOf("case 'customer.subscription.deleted':");
-  assert.ok(createdStart>=0&&deletedStart>createdStart);
-  const createdUpdated=source.slice(createdStart,deletedStart);
-  assert.match(createdUpdated,/subscriptionId:\s*subscription\.id/);
-  assert.doesNotMatch(createdUpdated,/subscription:\s*subscription\b/);
+  const entrypoints=source.slice(0,source.indexOf('function getProjectId()'));
+  assert.match(entrypoints,/webBilling\.checkout\(req\)/);
+  assert.match(entrypoints,/webBilling\.portal\(req\)/);
+  assert.match(entrypoints,/webBilling\.webhook\(req\.rawBody/);
+  assert.doesNotMatch(entrypoints,/syncStripeSubscription|saveStripeSubscriptionToFirestore|resolveStripeCustomer|billingRef\.set\(/);
 });
