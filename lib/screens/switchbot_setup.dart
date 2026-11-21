@@ -65,9 +65,9 @@ class SwitchbotSetupScreen extends StatelessWidget {
             top: false,
             child: PaidFeatureGate(
               featureName: 'SwitchBot連携',
-              lockedTitle: 'SwitchBot連携は有料プランの機能です',
+              lockedTitle: 'SwitchBot連携の利用状況',
               lockedMessage:
-                  '温湿度の自動記録、環境評価、異常検知通知に使うSwitchBot連携は、有料プランで利用できます。',
+                  'このアカウントでは、現在この機能を利用できません。',
               icon: Icons.thermostat_rounded,
               showBackground: false,
               useInitialTrial: true,

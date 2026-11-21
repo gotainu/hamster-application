@@ -5,7 +5,6 @@ import '../services/legacy_first_reports_repo.dart';
 import '../models/legacy_first_report.dart';
 import '../viewmodels/legacy_first_report_view_model.dart';
 import '../theme/app_theme.dart';
-import 'report_continuation_link.dart';
 
 class LegacyFirstReportBody extends StatefulWidget {
   const LegacyFirstReportBody(
@@ -191,8 +190,6 @@ class _LegacyFirstReportBodyState extends State<LegacyFirstReportBody> {
             const SizedBox(height: 8),
             Text('この初回レポートには体重や活動量の数値は保存されていません。',
                 style: AppTheme.dataCaptionStyle(context)),
-            const SizedBox(height: AppTheme.dataContentGap),
-            const ReportContinuationLink(),
           ]),
         );
       });

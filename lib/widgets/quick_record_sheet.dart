@@ -176,9 +176,9 @@ class _QuickRecordSheetState extends State<QuickRecordSheet> {
                                   : PaidFeatureGate(
                                       key: const ValueKey('record-form'),
                                       featureName: '記録',
-                                      lockedTitle: 'クイック記録は有料プランの機能です',
+                                      lockedTitle: 'クイック記録の利用状況',
                                       lockedMessage:
-                                          '走った記録、今日の様子、体重をすばやく入力する機能は、有料プランで利用できます。',
+                                          'このアカウントでは、現在この機能を利用できません。',
                                       icon: Icons.add_circle_outline_rounded,
                                       showBackground: false,
                                       useInitialTrial: true,

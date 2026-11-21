@@ -7,7 +7,6 @@ import '../models/entitlement_snapshot.dart';
 import '../models/feature_trial_access.dart';
 import '../models/initial_trial_gate_state.dart';
 import '../models/initial_trial_access.dart';
-import '../screens/subscription_plan_screen.dart';
 import '../services/billing_status_repo.dart';
 import '../services/feature_trial_repo.dart';
 import '../services/onboarding_state_repo.dart';
@@ -52,7 +51,8 @@ class PaidFeatureGate extends StatefulWidget {
   State<PaidFeatureGate> createState() => _PaidFeatureGateState();
 }
 
-class _PaidFeatureGateState extends State<PaidFeatureGate> {
+class _PaidFeatureGateState extends State<PaidFeatureGate>
+    with WidgetsBindingObserver {
   DateTime _now() => (widget.now ?? DateTime.now)();
   final _expiry = _EntitlementExpiryTimer();
   late BillingStatusRepo _repo;
@@ -64,6 +64,7 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _bindRepo();
   }
 
@@ -91,6 +92,13 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
     }
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      _retryEntitlementRead();
+    }
+  }
+
   void _retryEntitlementRead() {
     setState(() {
       _readVersion++;
@@ -100,6 +108,7 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _expiry.dispose();
     _authSubscription?.cancel();
     super.dispose();
@@ -178,11 +187,12 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
                 return _PaidFeatureLockedView(
                   featureName: widget.featureName,
                   title:
-                      widget.lockedTitle ?? '${widget.featureName}は有料プランの機能です',
+                      widget.lockedTitle ?? '${widget.featureName}の利用状況',
                   message: widget.lockedMessage ??
-                      '無料オンボーディング期間は終了しました。続けるには有料プランをご利用ください。',
+                      'このアカウントでは、現在この機能を利用できません。',
                   icon: widget.icon,
                   showBackground: widget.showBackground,
+                  onRetry: _retryEntitlementRead,
                 );
               },
             );
@@ -190,11 +200,12 @@ class _PaidFeatureGateState extends State<PaidFeatureGate> {
 
           return _PaidFeatureLockedView(
             featureName: widget.featureName,
-            title: widget.lockedTitle ?? '${widget.featureName}は有料プランの機能です',
+            title: widget.lockedTitle ?? '${widget.featureName}の利用状況',
             message: widget.lockedMessage ??
-                'ハムスターの環境管理を継続的に支援するため、この機能は有料プランで利用できます。',
+                'このアカウントでは、現在この機能を利用できません。',
             icon: widget.icon,
             showBackground: widget.showBackground,
+            onRetry: _retryEntitlementRead,
           );
         },
       );
@@ -326,14 +337,23 @@ class _InitialTrialFeatureGateState extends State<_InitialTrialFeatureGate> {
                   starting: _starting,
                   onStart: _start);
             case InitialTrialGateState.locked:
+              final trialEnd = trial?.endsAt;
+              final trialEnded = trial?.status == 'expired' ||
+                  trial?.status == 'ended' ||
+                  (trial?.status == 'active' &&
+                      trialEnd != null &&
+                      !widget.now().isBefore(trialEnd));
               return _PaidFeatureLockedView(
                   featureName: widget.featureName,
                   title:
-                      widget.lockedTitle ?? '${widget.featureName}は有料プランの機能です',
+                      widget.lockedTitle ?? '${widget.featureName}の利用状況',
                   message: widget.lockedMessage ??
-                      '無料体験は終了しています。続けるには有料プランをご利用ください。',
+                      (trialEnded
+                          ? '無料体験は終了しました。このアカウントでは、現在この機能を利用できません。'
+                          : 'このアカウントでは、現在この機能を利用できません。'),
                   icon: widget.icon,
-                  showBackground: widget.showBackground);
+                  showBackground: widget.showBackground,
+                  onRetry: widget.onRetry);
           }
         },
       );
@@ -459,7 +479,7 @@ class _InitialTrialStartView extends StatelessWidget {
   Widget build(BuildContext context) => _PaidFeatureLockedView(
         featureName: featureName,
         title: '$featureNameを無料で試す',
-        message: '「無料体験を始める」を押すと、21日間の体験期間と終了日時を確定します。記録の有無にかかわらず期間は延長されません。',
+        message: '「無料体験を始める」を押すと、21日間の体験期間と終了日時を確定します。カード登録は不要で、自動課金はありません。記録の有無にかかわらず期間は延長されません。',
         icon: icon,
         showBackground: showBackground,
         primaryLabel: starting ? '開始しています…' : '21日間の無料体験を始める',
@@ -538,11 +558,12 @@ class _TrialAwareFeatureGateState extends State<_TrialAwareFeatureGate> {
               }
               return _PaidFeatureLockedView(
                 featureName: widget.featureName,
-                title: widget.lockedTitle ?? '${widget.featureName}は有料プランの機能です',
+                title: widget.lockedTitle ?? '${widget.featureName}の利用状況',
                 message:
-                    widget.lockedMessage ?? '無料体験を使い切りました。続けるには有料プランをご利用ください。',
+                    widget.lockedMessage ?? '無料体験は終了しました。このアカウントでは、現在この機能を利用できません。',
                 icon: widget.icon,
                 showBackground: widget.showBackground,
+                onRetry: widget.onRetry,
               );
             },
           );
@@ -559,6 +580,7 @@ class _PaidFeatureLockedView extends StatelessWidget {
     required this.showBackground,
     this.primaryLabel,
     this.onPrimary,
+    this.onRetry,
     this.trackPaywall = true,
   });
 
@@ -569,15 +591,8 @@ class _PaidFeatureLockedView extends StatelessWidget {
   final bool showBackground;
   final String? primaryLabel;
   final VoidCallback? onPrimary;
+  final VoidCallback? onRetry;
   final bool trackPaywall;
-
-  void _openPlanPage(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SubscriptionPlanScreen(),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -615,15 +630,19 @@ class _PaidFeatureLockedView extends StatelessWidget {
                       height: 1.6,
                     ),
               ),
-              const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onPrimary ?? () => _openPlanPage(context),
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  label: Text(primaryLabel ?? '利用プランを確認する'),
+              if (primaryLabel != null || onRetry != null) ...[
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: primaryLabel != null ? onPrimary : onRetry,
+                    icon: Icon(primaryLabel != null
+                        ? Icons.arrow_forward_rounded
+                        : Icons.refresh_rounded),
+                    label: Text(primaryLabel ?? '利用状況を再確認'),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

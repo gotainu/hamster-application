@@ -19,14 +19,14 @@ class AiAccessFailure implements Exception {
   final int? statusCode;
 
   static const _messages = <String, String>{
-    'trial_not_started': 'AI相談を使うには、無料体験を開始するか利用プランをご確認ください。',
-    'trial_expired': '無料体験の利用期間が終了しています。利用プランをご確認ください。',
-    'trial_limit_reached': '無料体験のAI相談の利用枠を使い切りました。利用プランをご確認ください。',
+    'trial_not_started': '無料体験は未開始です。利用状況をご確認ください。',
+    'trial_expired': '無料体験は終了しました。このアカウントでは、現在AI相談を利用できません。',
+    'trial_limit_reached': '無料体験のAI相談の利用枠を使い切りました。現在AI相談を利用できません。',
     'operator_unavailable': '現在、運営側の利用設定または共通利用枠の確認が必要なため、AI相談を利用できません。',
     'rate_limited': '短時間に送信が集中しています。少し時間をおいて再度お試しください。',
     'auth_required': 'ログイン情報を確認できませんでした。もう一度ログインしてください。',
     'app_check_failed': 'アプリの認証を確認できませんでした。アプリを開き直し、問題が続く場合はお問い合わせください。',
-    'access_required': '無料体験または有料プランの利用状態をご確認ください。',
+    'access_required': 'このアカウントでは、現在AI相談を利用できません。利用状況をご確認ください。',
     'invalid_request': '質問または会話履歴が長すぎるか、形式を確認できませんでした。質問を短くして再度お試しください。',
     'request_pending': '前回の相談の処理結果を確認できていません。再送せず、問題が続く場合はお問い合わせください。',
     'network_unavailable': '通信が途切れ、相談の結果を確認できませんでした。別の相談として送り直さず、接続をご確認ください。',

@@ -39,7 +39,7 @@ void _expectPending() {
   expect(find.text(_loading), findsOneWidget);
   expect(find.textContaining('未契約'), findsNothing);
   expect(find.text(_startTrial), findsNothing);
-  expect(find.text('テスト機能は有料プランの機能です'), findsNothing);
+  expect(find.text('テスト機能の利用状況'), findsNothing);
   expect(find.text('対象機能'), findsNothing);
 }
 
@@ -119,7 +119,7 @@ void main() {
             scenario.allowed ? findsOneWidget : findsNothing);
         expect(find.text(_startTrial), findsNothing);
         if (!scenario.allowed) {
-          expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+          expect(find.textContaining('無料体験は終了しました'), findsOneWidget);
         }
         await tester.pumpWidget(const SizedBox.shrink());
       });
@@ -136,7 +136,7 @@ void main() {
       });
       await tester.pump();
       expect(find.text('対象機能'), findsOneWidget);
-      expect(find.textContaining('無料体験は終了しています'), findsNothing);
+      expect(find.textContaining('無料体験は終了しました'), findsNothing);
       expect(find.text(_startTrial), findsNothing);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -157,7 +157,7 @@ void main() {
       now = end;
       await tester.pump(const Duration(milliseconds: 1));
       expect(find.text('対象機能'), findsNothing);
-      expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+      expect(find.textContaining('無料体験は終了しました'), findsOneWidget);
       expect(fixture.trial().listenCount, listens);
       now = end.add(const Duration(minutes: 1));
       await tester.pump(const Duration(minutes: 1));
@@ -177,7 +177,7 @@ void main() {
       fixture.trial().emit(trial());
       await tester.pump();
       expect(find.text('対象機能'), findsNothing);
-      expect(find.textContaining('無料体験は終了しています'), findsOneWidget);
+      expect(find.textContaining('無料体験は終了しました'), findsOneWidget);
       await tester.pumpWidget(const SizedBox.shrink());
     });
 
@@ -196,7 +196,7 @@ void main() {
       now = end;
       await tester.pump(const Duration(milliseconds: 1));
       expect(find.text('対象機能'), findsNothing);
-      expect(find.text('テスト機能は有料プランの機能です'), findsOneWidget);
+      expect(find.text('テスト機能の利用状況'), findsOneWidget);
       expect(fixture.billing().listenCount, listens);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -251,7 +251,7 @@ void main() {
     await tester.pump();
     expect(find.text(_loading), findsNothing);
     expect(find.textContaining('未契約'), findsNothing);
-    expect(find.text('有料プランを利用中です'), findsOneWidget);
+    expect(find.text('プレミアム利用中です'), findsOneWidget);
   });
 
   testWidgets('expired active subscription is not shown as paid access',
@@ -264,9 +264,9 @@ void main() {
       ),
     });
     await tester.pump();
-    expect(find.text('有料プランを利用中です'), findsNothing);
-    expect(find.text('有料プランの利用期間が終了しました'), findsOneWidget);
-    expect(find.text('プランを管理する'), findsOneWidget);
+    expect(find.text('プレミアム利用中です'), findsNothing);
+    expect(find.text('プレミアムの利用期間が終了しています'), findsOneWidget);
+    expect(find.text('契約管理'), findsOneWidget);
     expect(find.text('月額プランに登録する'), findsNothing);
   });
 
@@ -277,9 +277,9 @@ void main() {
       await tester.pumpWidget(_plan(fixture));
       fixture.billing().emit({..._paid(), 'status': status});
       await tester.pump();
-      expect(find.text('プランを管理する'), findsOneWidget);
+      expect(find.text('契約管理'), findsOneWidget);
       expect(find.text('月額プランに登録する'), findsNothing);
-      expect(find.text('有料プランを利用中です'), findsNothing);
+      expect(find.text('プレミアム利用中です'), findsNothing);
     });
   }
 
@@ -288,10 +288,10 @@ void main() {
     await tester.pumpWidget(_plan(fixture));
     fixture.billing().emit({..._paid(), 'cancelAtPeriodEnd': true});
     await tester.pump();
-    expect(find.text('解約予約済みです'), findsOneWidget);
-    expect(find.text('プランを管理する'), findsOneWidget);
+    expect(find.text('解約予定です'), findsOneWidget);
+    expect(find.text('契約管理'), findsOneWidget);
     expect(find.text('月額プランに登録する'), findsNothing);
-    expect(find.textContaining('現在の請求期間が終了するまでは'), findsOneWidget);
+    expect(find.textContaining('現在の契約期間が終了するまでは'), findsOneWidget);
   });
 
   testWidgets(
@@ -345,7 +345,7 @@ void main() {
     fixture.billing().emit(null);
     await tester.pump();
     expect(find.text(_loading), findsNothing);
-    expect(find.text('有料プランは未契約です'), findsOneWidget);
+    expect(find.text('現在の契約はありません'), findsOneWidget);
   });
 
   testWidgets('trial CTA requires server-confirmed absence in both documents',
@@ -372,11 +372,11 @@ void main() {
       fixture.billing().fail();
       await tester.pump();
       expect(find.text(_unavailable), findsOneWidget);
-      expect(find.text('もう一度確認'), findsOneWidget);
+      expect(find.text(screen == 'plan' ? '利用状況を再確認' : 'もう一度確認'), findsOneWidget);
       expect(find.textContaining('未契約'), findsNothing);
       expect(find.text(_startTrial), findsNothing);
 
-      await tester.tap(find.text('もう一度確認'));
+      await tester.tap(find.text(screen == 'plan' ? '利用状況を再確認' : 'もう一度確認'));
       await tester.pump();
       _expectPending();
       expect(fixture.billing().listenCount, 2);
@@ -384,7 +384,7 @@ void main() {
       await tester.pump();
       expect(find.text(_unavailable), findsNothing);
       expect(
-        find.text(screen == 'plan' ? '有料プランを利用中です' : '対象機能'),
+        find.text(screen == 'plan' ? 'プレミアム利用中です' : '対象機能'),
         findsOneWidget,
       );
     });
@@ -401,8 +401,8 @@ void main() {
       fixture.billing().fail();
       await tester.pump();
       expect(find.text(_unavailable), findsOneWidget);
-      expect(find.text('もう一度確認'), findsOneWidget);
-      expect(find.text('有料プランを利用中です'), findsNothing);
+      expect(find.text(screen == 'plan' ? '利用状況を再確認' : 'もう一度確認'), findsOneWidget);
+      expect(find.text('プレミアム利用中です'), findsNothing);
       expect(find.text('対象機能'), findsNothing);
       expect(find.textContaining('未契約'), findsNothing);
     });
@@ -464,7 +464,7 @@ void main() {
       fixture.billing().emit(_paid());
       await tester.pump();
       expect(
-        find.text(screen == 'plan' ? '有料プランを利用中です' : '対象機能'),
+        find.text(screen == 'plan' ? 'プレミアム利用中です' : '対象機能'),
         findsOneWidget,
       );
 
@@ -475,11 +475,11 @@ void main() {
       fixture.billing('user-b').emit(null, fromCache: true);
       await tester.pump();
       _expectPending();
-      expect(find.text('有料プランを利用中です'), findsNothing);
+      expect(find.text('プレミアム利用中です'), findsNothing);
       fixture.billing('user-b').emit(_paid());
       await tester.pump();
       expect(
-        find.text(screen == 'plan' ? '有料プランを利用中です' : '対象機能'),
+        find.text(screen == 'plan' ? 'プレミアム利用中です' : '対象機能'),
         findsOneWidget,
       );
     });
@@ -518,6 +518,89 @@ void main() {
     fixture.auth.switchUser(null);
     await tester.pump();
     _expectPending();
+  });
+
+  testWidgets('unstarted trial without start permission stays neutral, not expired',
+      (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: PaidFeatureGate(
+        billingRepo: fixture.repo,
+        featureName: 'テスト機能',
+        useInitialTrial: true,
+        child: _child,
+      )),
+    ));
+    fixture.billing().emit(null);
+    await tester.pump();
+    fixture.trial().emit(null);
+    await tester.pump();
+    expect(find.text('このアカウントでは、現在この機能を利用できません。'), findsOneWidget);
+    expect(find.textContaining('無料体験は終了'), findsNothing);
+    expect(find.text(_startTrial), findsNothing);
+    expect(find.text('対象機能'), findsNothing);
+  });
+
+  testWidgets('locked retry only rechecks this UID and never opens another route',
+      (tester) async {
+    await tester.pumpWidget(_gate(fixture));
+    fixture.billing().emit(null);
+    await tester.pump();
+    expect(find.text('このアカウントでは、現在この機能を利用できません。'), findsOneWidget);
+    final reads = fixture.billing().listenCount;
+    await tester.tap(find.text('利用状況を再確認'));
+    await tester.pump();
+    expect(fixture.billing().listenCount, reads + 1);
+    expect(find.byType(SubscriptionPlanScreen), findsNothing);
+    expect(find.text(_loading), findsOneWidget);
+    fixture.billing().emit(_paid());
+    await tester.pump();
+    expect(find.text('対象機能'), findsOneWidget);
+  });
+
+  testWidgets('expired trial recheck never starts or resets the trial',
+      (tester) async {
+    final expired = {
+      ..._activeTrial(),
+      'endsAt': Timestamp.fromDate(DateTime.now().subtract(const Duration(days: 1))),
+    };
+    await tester.pumpWidget(_gate(fixture, initialTrial: true));
+    fixture.billing().emit(null);
+    await tester.pump();
+    fixture.trial().emit(expired);
+    await tester.pump();
+    expect(find.textContaining('無料体験は終了しました'), findsOneWidget);
+    final billingReads = fixture.billing().listenCount;
+    final trialReads = fixture.trial().listenCount;
+    await tester.tap(find.text('利用状況を再確認'));
+    await tester.pump();
+    expect(fixture.billing().listenCount, billingReads + 1);
+    fixture.billing().emit(null);
+    await tester.pump();
+    expect(fixture.trial().listenCount, trialReads + 1);
+    fixture.trial().emit(expired);
+    await tester.pump();
+    expect(find.text(_startTrial), findsNothing);
+    expect(find.text('対象機能'), findsNothing);
+    expect(find.textContaining('無料体験は終了しました'), findsOneWidget);
+  });
+
+  testWidgets('app resume refreshes paid access and rejects cached stale data',
+      (tester) async {
+    await tester.pumpWidget(_gate(fixture));
+    fixture.billing().emit(_paid());
+    await tester.pump();
+    expect(find.text('対象機能'), findsOneWidget);
+    final reads = fixture.billing().listenCount;
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(fixture.billing().listenCount, reads + 1);
+    fixture.billing().emit(_paid(), fromCache: true);
+    await tester.pump();
+    _expectPending();
+    fixture.billing().emit(_paid());
+    await tester.pump();
+    expect(find.text('対象機能'), findsOneWidget);
   });
 
   testWidgets('parent rebuild keeps the confirmed billing subscription',

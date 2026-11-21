@@ -11,52 +11,67 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing_status.dart';
 import '../models/entitlement_snapshot.dart';
-import '../services/app_analytics.dart';
+import '../models/initial_trial_access.dart';
 import '../services/billing_status_repo.dart';
 import '../theme/app_theme.dart';
 import '../widgets/hamster_feedback_popup.dart';
 
+/// Account usage only. New purchases are not started from the application.
 class SubscriptionPlanScreen extends StatefulWidget {
-  const SubscriptionPlanScreen({super.key, this.billingRepo});
+  const SubscriptionPlanScreen({super.key, this.billingRepo, this.now});
 
   final BillingStatusRepo? billingRepo;
+  final DateTime Function()? now;
 
   @override
   State<SubscriptionPlanScreen> createState() => _SubscriptionPlanScreenState();
 }
 
-class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
-  static final Uri _privacyPolicyUrl = Uri.parse(
-    'https://hamster-breeding-app.web.app/privacy/',
-  );
-  static final Uri _termsOfUseUrl = Uri.parse(
-    'https://hamster-breeding-app.web.app/terms/',
-  );
+class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen>
+    with WidgetsBindingObserver {
+  static final Uri _privacyPolicyUrl =
+      Uri.parse('https://hamster-breeding-app.web.app/privacy/');
+  static final Uri _termsOfUseUrl =
+      Uri.parse('https://hamster-breeding-app.web.app/terms/');
 
   late BillingStatusRepo _repo;
   late Stream<EntitlementSnapshot<BillingStatus>> _billingStream;
+  late Stream<EntitlementSnapshot<InitialTrialAccess>> _trialStream;
   StreamSubscription<String?>? _authSubscription;
+  final _billingDeadline = _UsageDeadline();
+  final _trialDeadline = _UsageDeadline();
   String? _streamUid;
   int _readVersion = 0;
+  bool _isOpeningPortal = false;
+
+  DateTime _now() => (widget.now ?? DateTime.now)();
 
   @override
   void initState() {
     super.initState();
     _bindRepo();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   void _bindRepo() {
     final repo = _repo = widget.billingRepo ?? BillingStatusRepo();
     _streamUid = repo.currentUserId;
-    _billingStream = repo.watchBillingStatus();
+    _bindUsageStreams();
     _authSubscription = repo.watchUserId().listen((uid) {
       if (!mounted || !identical(repo, _repo) || uid == _streamUid) return;
       setState(() {
         _streamUid = uid;
         _readVersion++;
-        _billingStream = repo.watchBillingStatus();
+        _bindUsageStreams();
       });
     });
+  }
+
+  void _bindUsageStreams() {
+    _billingDeadline.clear();
+    _trialDeadline.clear();
+    _billingStream = _repo.watchBillingStatus();
+    _trialStream = _repo.watchInitialTrialAccess();
   }
 
   @override
@@ -69,152 +84,85 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
     }
   }
 
-  void _retryBillingRead() {
+  void _retryUsageRead() {
     setState(() {
       _readVersion++;
-      _billingStream = _repo.watchBillingStatus();
+      _bindUsageStreams();
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) _retryUsageRead();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _billingDeadline.clear();
+    _trialDeadline.clear();
     _authSubscription?.cancel();
     super.dispose();
   }
-
-  bool _isOpeningCheckout = false;
-  bool _isOpeningPortal = false;
 
   FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(
         app: Firebase.app(),
         region: 'asia-northeast1',
       );
 
-  Future<void> _startCheckout() async {
-    if (_isOpeningCheckout) return;
-
-    setState(() {
-      _isOpeningCheckout = true;
-    });
-    await AppAnalytics.logCheckoutStarted();
-
-    try {
-      final callable = _functions.httpsCallable('createStripeCheckoutSession');
-      final result = await callable.call();
-
-      final data = result.data;
-      final checkoutUrl = data is Map ? data['checkoutUrl']?.toString() : null;
-
-      if (checkoutUrl == null || checkoutUrl.isEmpty) {
-        throw Exception('Checkout URL を取得できませんでした。');
-      }
-
-      final uri = Uri.parse(checkoutUrl);
-
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched) {
-        throw Exception('Stripe Checkout を開けませんでした。');
-      }
-      await AppAnalytics.logCheckoutOpened();
-    } on FirebaseFunctionsException catch (_) {
-      await AppAnalytics.logCheckoutFailed();
-
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(
-        context,
-        message: '購入ページの作成に失敗しました。時間をおいてお試しください。',
-      );
-    } catch (e) {
-      await AppAnalytics.logCheckoutFailed();
-
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(context, message: '購入ページを開けませんでした。');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isOpeningCheckout = false;
-        });
-      }
-    }
-  }
-
+  // Existing-contract management remains for the account-deletion safety
+  // exception. It does not start a new purchase or grant entitlement.
   Future<void> _openCustomerPortal() async {
-    if (_isOpeningPortal) return;
-
-    setState(() {
-      _isOpeningPortal = true;
-    });
-
+    final uid = _repo.currentUserId;
+    if (_isOpeningPortal || uid == null || uid != _streamUid) return;
+    final repo = _repo;
+    final version = _readVersion;
+    setState(() => _isOpeningPortal = true);
     try {
       final callable =
           _functions.httpsCallable('createStripeCustomerPortalSession');
-
       final result = await callable.call();
-
+      if (!mounted ||
+          !identical(repo, _repo) ||
+          _repo.currentUserId != uid ||
+          version != _readVersion) {
+        return;
+      }
       final data = result.data;
       final portalUrl = data is Map ? data['portalUrl']?.toString() : null;
-
-      if (portalUrl == null || portalUrl.isEmpty) {
-        throw Exception('Customer Portal URL を取得できませんでした。');
-      }
-
-      final uri = Uri.parse(portalUrl);
-
+      if (portalUrl == null || portalUrl.isEmpty) throw StateError('portal');
       final launched = await launchUrl(
-        uri,
+        Uri.parse(portalUrl),
         mode: LaunchMode.externalApplication,
       );
-
-      if (!launched) {
-        throw Exception('Stripe Customer Portal を開けませんでした。');
+      if (!launched) throw StateError('portal');
+    } catch (_) {
+      if (mounted &&
+          identical(repo, _repo) &&
+          _repo.currentUserId == uid &&
+          version == _readVersion) {
+        HamsterFeedbackPopup.show(context, message: '契約管理画面を開けませんでした。');
       }
-    } on FirebaseFunctionsException catch (_) {
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(
-        context,
-        message: '利用プラン管理画面を開けませんでした。時間をおいてお試しください。',
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(context, message: '利用プラン管理画面を開けませんでした。');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isOpeningPortal = false;
-        });
-      }
+      if (mounted) setState(() => _isOpeningPortal = false);
     }
   }
 
   Future<void> _openLegalPage(Uri uri) async {
     try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched) {
-        throw Exception('ページを開けませんでした。');
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw StateError('legal_page');
       }
-    } catch (error) {
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(context, message: 'ページを開けませんでした。');
+    } catch (_) {
+      if (mounted) {
+        HamsterFeedbackPopup.show(context, message: 'ページを開けませんでした。');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -225,10 +173,7 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
         extendBodyBehindAppBar: true,
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(
-            '利用プラン',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          title: Text('利用状況', style: Theme.of(context).textTheme.titleLarge),
           backgroundColor: Colors.transparent,
           elevation: 0,
         ),
@@ -249,58 +194,54 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
                 final confirmed = sameUser &&
                     read?.isServerConfirmed == true &&
                     read?.uid == _repo.currentUserId;
-
+                final billing = confirmed ? read!.data : null;
+                _billingDeadline.schedule(
+                  billing?.isPaid == true ? billing?.currentPeriodEnd : null,
+                  _now(),
+                  () {
+                    if (mounted) setState(() {});
+                  },
+                );
                 return ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                   children: [
                     if (!confirmed || snapshot.hasError)
-                      _BillingReadStatusCard(
+                      _ReadStatusCard(
                         unavailable: sameUser && snapshot.hasError,
-                        onRetry: _retryBillingRead,
+                        onRetry: _retryUsageRead,
                       )
-                    else
-                      _BillingStatusHeroCard(
-                        billing: read!.data!,
-                        isOpeningCheckout: _isOpeningCheckout,
+                    else ...[
+                      _BillingUsageCard(
+                        billing: billing!,
+                        now: _now(),
                         isOpeningPortal: _isOpeningPortal,
-                        onStartCheckout: _startCheckout,
                         onOpenCustomerPortal: _openCustomerPortal,
-                        onOpenPrivacyPolicy: () =>
-                            _openLegalPage(_privacyPolicyUrl),
-                        onOpenTermsOfUse: () => _openLegalPage(_termsOfUseUrl),
                       ),
+                      if (!billing.canUsePaidFeaturesAt(_now())) ...[
+                        const SizedBox(height: 16),
+                        _trialStatus(),
+                      ],
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _retryUsageRead,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('利用状況を再確認'),
+                      ),
+                    ],
                     const SizedBox(height: 16),
-                    const _PaidPlanFeatureCard(
-                      icon: Icons.thermostat_rounded,
-                      title: '温湿度の自動記録',
-                      body:
-                          'SwitchBot温湿度計と連携し、温度・湿度の変化を自動で記録します。手入力では見落としやすい夜間や外出中の変化も確認しやすくなります。',
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton(
+                          onPressed: () => _openLegalPage(_termsOfUseUrl),
+                          child: const Text('利用規約'),
+                        ),
+                        TextButton(
+                          onPressed: () => _openLegalPage(_privacyPolicyUrl),
+                          child: const Text('プライバシーポリシー'),
+                        ),
+                      ],
                     ),
-                    const _PaidPlanFeatureCard(
-                      icon: Icons.insights_rounded,
-                      title: '環境評価',
-                      body:
-                          '記録された温湿度データをもとに、ハムスターにとって過ごしやすい環境かどうかを評価します。単なる数値ではなく、飼育判断に使いやすい形で確認できます。',
-                    ),
-                    const _PaidPlanFeatureCard(
-                      icon: Icons.notifications_active_rounded,
-                      title: '異常検知通知',
-                      body:
-                          '高温・高湿・危険評価など、注意が必要な変化を検知したときに通知します。ケージ環境の異変に早く気づくための補助機能です。',
-                    ),
-                    const _PaidPlanFeatureCard(
-                      icon: Icons.smart_toy_rounded,
-                      title: 'AI相談',
-                      body:
-                          'ペットプロフィール、飼育環境、温湿度データなどを踏まえて、日々の飼育で確認すべきポイントをAIに相談できます。',
-                    ),
-                    const _PaidPlanFeatureCard(
-                      icon: Icons.favorite_rounded,
-                      title: 'このアプリの考え方',
-                      body:
-                          'このアプリは、ハムスターの体調を診断するものではありません。日々の観察と環境管理を続けやすくし、異変に気づくきっかけを増やすための飼育支援アプリです。',
-                    ),
-                    const _PaidPlanNoticeCard(),
                   ],
                 );
               },
@@ -310,496 +251,243 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen> {
       ),
     );
   }
+
+  Widget _trialStatus() =>
+      StreamBuilder<EntitlementSnapshot<InitialTrialAccess>>(
+        key: ValueKey((_streamUid, _readVersion, 'initial_trial')),
+        stream: _trialStream,
+        builder: (context, snapshot) {
+          final read = snapshot.data;
+          final confirmed = _streamUid == _repo.currentUserId &&
+              read?.isServerConfirmed == true &&
+              read?.uid == _repo.currentUserId;
+          final trial = confirmed ? read!.data : null;
+          _trialDeadline.schedule(
+            trial?.status == 'active' ? trial?.endsAt : null,
+            _now(),
+            () {
+              if (mounted) setState(() {});
+            },
+          );
+          if (!confirmed || snapshot.hasError) {
+            return _ReadStatusCard(
+              unavailable: snapshot.hasError,
+              trialOnly: true,
+              onRetry: _retryUsageRead,
+            );
+          }
+          final access = trial!;
+          if (access.isActiveAt(_now())) {
+            final remaining =
+                (access.endsAt!.difference(_now()).inMilliseconds /
+                        Duration.millisecondsPerDay)
+                    .ceil();
+            return _UsageCard(
+              icon: Icons.timelapse_rounded,
+              title: '無料体験中です',
+              message: 'カード登録不要・自動課金なしの21日間無料体験です。',
+              detail: '残り$remaining日\n無料体験の終了日時：${_formatDate(access.endsAt!)}',
+            );
+          }
+          if ((access.status == null && access.endsAt == null) ||
+              access.status == 'not_started') {
+            return const _UsageCard(
+              icon: Icons.hourglass_empty_rounded,
+              title: '無料体験は未開始です',
+              message: '無料体験は21日間です。カード登録は不要で、自動課金はありません。',
+            );
+          }
+          if (access.status == 'expired' ||
+              access.status == 'ended' ||
+              (access.status == 'active' &&
+                  access.endsAt != null &&
+                  !_now().isBefore(access.endsAt!))) {
+            return _UsageCard(
+              icon: Icons.event_busy_rounded,
+              title: '無料体験は終了しました。',
+              message: 'このアカウントでは、現在プレミアム機能を利用できません。',
+              detail: access.endsAt == null
+                  ? null
+                  : '無料体験の終了日時：${_formatDate(access.endsAt!)}',
+            );
+          }
+          return _ReadStatusCard(
+            unavailable: true,
+            trialOnly: true,
+            onRetry: _retryUsageRead,
+          );
+        },
+      );
 }
 
-class _BillingReadStatusCard extends StatelessWidget {
-  const _BillingReadStatusCard(
-      {required this.unavailable, required this.onRetry});
+String _formatDate(DateTime value) =>
+    DateFormat('yyyy年M月d日 HH:mm').format(value.toLocal());
 
+class _BillingUsageCard extends StatelessWidget {
+  const _BillingUsageCard({
+    required this.billing,
+    required this.now,
+    required this.isOpeningPortal,
+    required this.onOpenCustomerPortal,
+  });
+  final BillingStatus billing;
+  final DateTime now;
+  final bool isOpeningPortal;
+  final VoidCallback onOpenCustomerPortal;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = billing.canUsePaidFeaturesAt(now);
+    final canceledAtEnd = active && billing.cancelAtPeriodEnd;
+    final String title;
+    final String message;
+    if (canceledAtEnd) {
+      title = '解約予定です';
+      message = '現在の契約期間が終了するまではプレミアム機能を利用できます。';
+    } else if (active) {
+      title = 'プレミアム利用中です';
+      message = 'このアカウントではプレミアム機能を利用できます。';
+    } else if (billing.isPaid) {
+      title = 'プレミアムの利用期間が終了しています';
+      message = '現在の契約状態をご確認ください。';
+    } else {
+      switch (billing.status) {
+        case BillingStatusValue.pastDue:
+        case BillingStatusValue.unpaid:
+          title = 'お支払いの確認が必要です';
+          message = '現在のお支払い状態を確認できていません。';
+        case BillingStatusValue.canceled:
+          title = 'プレミアム契約は終了しています';
+          message = '現在の契約状態を表示しています。';
+        case BillingStatusValue.incomplete:
+          title = '契約状態は未完了です';
+          message = '利用状況を再確認してください。';
+        case BillingStatusValue.none:
+          title = '現在の契約はありません';
+          message = '無料体験の利用状況は下に表示されます。';
+        case BillingStatusValue.unknown:
+        case BillingStatusValue.active:
+        case BillingStatusValue.trialing:
+          title = '契約状態を確認できません';
+          message = '時間をおいて利用状況を再確認してください。';
+      }
+    }
+    final end =
+        canceledAtEnd ? billing.effectiveCancelAt : billing.currentPeriodEnd;
+    return _UsageCard(
+      icon: active ? Icons.verified_rounded : Icons.info_outline_rounded,
+      title: title,
+      message: message,
+      detail: end == null
+          ? null
+          : '${active ? '利用可能期限' : '契約期間の終了日時'}：${_formatDate(end)}',
+      extra: billing.canManageSubscription
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: isOpeningPortal ? null : onOpenCustomerPortal,
+                  icon: const Icon(Icons.manage_accounts_rounded),
+                  label: Text(isOpeningPortal ? '管理画面を準備中…' : '契約管理'),
+                ),
+                const SizedBox(height: 8),
+                const Text('お支払い方法や解約など、現在の契約を管理します。'),
+              ],
+            )
+          : null,
+    );
+  }
+}
+
+class _ReadStatusCard extends StatelessWidget {
+  const _ReadStatusCard({
+    required this.unavailable,
+    required this.onRetry,
+    this.trialOnly = false,
+  });
   final bool unavailable;
   final VoidCallback onRetry;
+  final bool trialOnly;
+
+  @override
+  Widget build(BuildContext context) => _UsageCard(
+        icon: Icons.sync_rounded,
+        title: trialOnly
+            ? (unavailable ? '無料体験の状態を確認できませんでした' : '無料体験の状態を確認しています')
+            : (unavailable ? '利用状態を確認できませんでした' : '利用状態を確認しています'),
+        message: unavailable ? '通信状態を確認して、もう一度お試しください。' : '確認が終わるまでお待ちください。',
+        extra: unavailable
+            ? OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('利用状況を再確認'),
+              )
+            : const Padding(
+                padding: EdgeInsets.only(top: 16),
+                child: CircularProgressIndicator(),
+              ),
+      );
+}
+
+class _UsageCard extends StatelessWidget {
+  const _UsageCard({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.detail,
+    this.extra,
+  });
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? detail;
+  final Widget? extra;
 
   @override
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         padding: const EdgeInsets.all(22),
         decoration: AppTheme.cardGradient(
-          Theme.of(context).brightness == Brightness.dark,
-        ),
+            Theme.of(context).brightness == Brightness.dark),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!unavailable) ...[
-              const CircularProgressIndicator(),
-              const SizedBox(height: 18),
+            Icon(icon, color: AppTheme.accent, size: 38),
+            const SizedBox(height: 16),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 10),
+            Text(message),
+            if (detail != null) ...[
+              const SizedBox(height: 12),
+              Text(detail!),
             ],
-            Text(
-              unavailable ? '利用状態を確認できませんでした' : '利用状態を確認しています',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            if (unavailable) ...[
-              const SizedBox(height: 18),
-              FilledButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('もう一度確認'),
-              ),
+            if (extra != null) ...[
+              const SizedBox(height: 16),
+              extra!,
             ],
           ],
         ),
       );
 }
 
-class _BillingStatusHeroCard extends StatelessWidget {
-  const _BillingStatusHeroCard({
-    required this.billing,
-    required this.isOpeningCheckout,
-    required this.isOpeningPortal,
-    required this.onStartCheckout,
-    required this.onOpenCustomerPortal,
-    required this.onOpenPrivacyPolicy,
-    required this.onOpenTermsOfUse,
-  });
-
-  final BillingStatus billing;
-  final bool isOpeningCheckout;
-  final bool isOpeningPortal;
-  final VoidCallback onStartCheckout;
-  final VoidCallback onOpenCustomerPortal;
-  final VoidCallback onOpenPrivacyPolicy;
-  final VoidCallback onOpenTermsOfUse;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canManageSubscription = billing.canManageSubscription;
-    final visual = _visualForBillingStatus();
-
-    final periodEndText = billing.currentPeriodEnd == null
-        ? null
-        : DateFormat('yyyy年M月d日').format(billing.currentPeriodEnd!);
-
-    final cancellationEndText = billing.effectiveCancelAt == null
-        ? null
-        : DateFormat('yyyy年M月d日').format(billing.effectiveCancelAt!);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: AppTheme.cardGradient(isDark),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            visual.icon,
-            color: visual.accentColor,
-            size: 46,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            visual.title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w900,
-                  height: 1.35,
-                ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            visual.description,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.secondaryText(context),
-                  height: 1.55,
-                ),
-          ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppTheme.chipFill(
-                visual.accentColor,
-                context,
-                opacity: 0.14,
-              ),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Text(
-              _statusText(
-                periodEndText: periodEndText,
-                cancellationEndText: cancellationEndText,
-              ),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: visual.accentColor,
-                    fontWeight: FontWeight.w800,
-                    height: 1.45,
-                  ),
-            ),
-          ),
-          if (canManageSubscription) ...[
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: isOpeningPortal ? null : onOpenCustomerPortal,
-                icon: isOpeningPortal
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.manage_accounts_rounded),
-                label: Text(
-                  isOpeningPortal ? '管理画面を準備中...' : 'プランを管理する',
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '解約、支払い方法の変更、請求履歴の確認はStripeの安全な管理画面で行えます。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                    height: 1.45,
-                  ),
-            ),
-          ] else ...[
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppTheme.chipFill(
-                  AppTheme.accent,
-                  context,
-                  opacity: 0.1,
-                ),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hamster Care Premium Plan',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '月額500円（税込）',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '1か月ごとに自動更新されます。いつでも解約でき、解約後も現在の請求期間の終了までは利用できます。',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.secondaryText(context),
-                          height: 1.45,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: isOpeningCheckout ? null : onStartCheckout,
-                icon: isOpeningCheckout
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.open_in_new_rounded),
-                label: Text(
-                  isOpeningCheckout ? '購入ページを準備中...' : '月額プランに登録する',
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              visual.checkoutNote,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: AppTheme.secondaryText(context),
-                    height: 1.45,
-                  ),
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 4,
-              runSpacing: 0,
-              children: [
-                TextButton(
-                  onPressed: onOpenTermsOfUse,
-                  child: const Text('利用規約'),
-                ),
-                TextButton(
-                  onPressed: onOpenPrivacyPolicy,
-                  child: const Text('プライバシーポリシー'),
-                ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
+class _UsageDeadline {
+  Timer? _timer;
+  DateTime? _deadline;
+  void schedule(DateTime? deadline, DateTime now, VoidCallback onExpiry) {
+    if (_deadline == deadline) return;
+    clear();
+    _deadline = deadline;
+    if (deadline == null || !now.isBefore(deadline)) return;
+    _timer = Timer(deadline.difference(now), () {
+      _deadline = null;
+      onExpiry();
+    });
   }
 
-  String _statusText({
-    required String? periodEndText,
-    required String? cancellationEndText,
-  }) {
-    final base = '現在の状態: ${billing.planLabel} / ${billing.statusLabel}';
-
-    if (billing.isPaid && !billing.canUsePaidFeatures) {
-      return periodEndText == null ? base : '$base\n利用期間の終了日: $periodEndText';
-    }
-
-    if (billing.isCancellationScheduled) {
-      final endText = cancellationEndText ?? periodEndText;
-      if (endText == null) {
-        return '$base\n解約予約済みです';
-      }
-
-      return '$base\n解約予定日: $endText\nこの日までは有料機能を利用できます';
-    }
-
-    if (periodEndText == null) {
-      return base;
-    }
-
-    final status = billing.status;
-
-    if (status == BillingStatusValue.active ||
-        status == BillingStatusValue.trialing) {
-      return '$base\n有効期限: $periodEndText';
-    }
-
-    if (status == BillingStatusValue.pastDue) {
-      return '$base\n確認対象の期限: $periodEndText';
-    }
-
-    if (status == BillingStatusValue.unpaid) {
-      return '$base\n最終確認期限: $periodEndText';
-    }
-
-    if (status == BillingStatusValue.canceled) {
-      return '$base\n終了日: $periodEndText';
-    }
-
-    return base;
-  }
-
-  _BillingStatusVisual _visualForBillingStatus() {
-    if (billing.isPaid && !billing.canUsePaidFeatures) {
-      return const _BillingStatusVisual(
-        icon: Icons.event_busy_rounded,
-        accentColor: AppTheme.accent,
-        title: '有料プランの利用期間が終了しました',
-        description: '現在は有料機能を利用できません。管理画面で契約とお支払いの状態を確認できます。',
-        checkoutNote: '契約の確認や支払い方法の変更は、Stripeの安全な管理画面で行えます。',
-      );
-    }
-    switch (billing.status) {
-      case BillingStatusValue.active:
-      case BillingStatusValue.trialing:
-        if (billing.isCancellationScheduled) {
-          return const _BillingStatusVisual(
-            icon: Icons.event_busy_rounded,
-            accentColor: Color(0xFFFFB020),
-            title: '解約予約済みです',
-            description: '現在の請求期間が終了するまでは、有料機能を利用できます。',
-            checkoutNote: 'Stripeの安全な管理画面で、解約予約の取り消しや支払い方法の変更ができます。',
-          );
-        }
-
-        return const _BillingStatusVisual(
-          icon: Icons.verified_rounded,
-          accentColor: Color(0xFF00D6A3),
-          title: '有料プランを利用中です',
-          description: '温湿度の自動記録、環境評価、異常検知通知、AI相談を利用できます。',
-          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
-        );
-
-      case BillingStatusValue.pastDue:
-        return const _BillingStatusVisual(
-          icon: Icons.error_rounded,
-          accentColor: Color(0xFFFFB020),
-          title: 'お支払いの確認が必要です',
-          description:
-              '前回のお支払いを確認できませんでした。有料機能は一時停止されています。管理画面で支払い方法を確認してください。',
-          checkoutNote: '支払い状態はStripeの安全な管理画面で確認できます。',
-        );
-
-      case BillingStatusValue.unpaid:
-        return const _BillingStatusVisual(
-          icon: Icons.block_rounded,
-          accentColor: Color(0xFFFF6B6B),
-          title: '有料プランは停止中です',
-          description: 'お支払いを確認できなかったため、有料機能は停止されています。管理画面で支払い方法を確認してください。',
-          checkoutNote: '支払い状態はStripeの安全な管理画面で確認できます。',
-        );
-
-      case BillingStatusValue.canceled:
-        return const _BillingStatusVisual(
-          icon: Icons.workspace_premium_rounded,
-          accentColor: AppTheme.accent,
-          title: '有料プランは未契約です',
-          description: '日々の記録と個体別分析、AI相談を再開できます。作成済みのうちの子レポートは、契約なしでも振り返れます。',
-          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
-        );
-
-      case BillingStatusValue.incomplete:
-        return const _BillingStatusVisual(
-          icon: Icons.pending_actions_rounded,
-          accentColor: AppTheme.accent,
-          title: '登録は完了していません',
-          description: '有料プランの登録が完了していません。支払いページで手続きを完了してください。',
-          checkoutNote: 'Stripeの安全な決済ページで手続きを再開できます。',
-        );
-
-      case BillingStatusValue.none:
-        return const _BillingStatusVisual(
-          icon: Icons.workspace_premium_rounded,
-          accentColor: AppTheme.accent,
-          title: '有料プランは未契約です',
-          description:
-              '日々の記録と個体別分析、AI相談を続けて、うちの子の変化を確認できます。作成済みのうちの子レポートは、無料体験後も閲覧できます。',
-          checkoutNote: '料金と請求内容を確認のうえ、Stripeの安全な決済ページで手続きしてください。',
-        );
-
-      case BillingStatusValue.unknown:
-        return const _BillingStatusVisual(
-          icon: Icons.help_rounded,
-          accentColor: AppTheme.accent,
-          title: '契約状態を確認できません',
-          description: '現在の契約状態を確認できませんでした。時間をおいて再度確認してください。',
-          checkoutNote: '必要に応じて、Stripeの決済ページから再度手続きできます。',
-        );
-    }
-  }
-}
-
-class _BillingStatusVisual {
-  const _BillingStatusVisual({
-    required this.icon,
-    required this.accentColor,
-    required this.title,
-    required this.description,
-    required this.checkoutNote,
-  });
-
-  final IconData icon;
-  final Color accentColor;
-  final String title;
-  final String description;
-  final String checkoutNote;
-}
-
-class _PaidPlanFeatureCard extends StatelessWidget {
-  const _PaidPlanFeatureCard({
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: AppTheme.quickActionBorder(context)),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.softShadow(context),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppTheme.chipFill(
-                AppTheme.accent,
-                context,
-                opacity: 0.14,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Icon(
-              icon,
-              color: AppTheme.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  body,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.secondaryText(context),
-                        height: 1.55,
-                      ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PaidPlanNoticeCard extends StatelessWidget {
-  const _PaidPlanNoticeCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.cardInnerDark : AppTheme.cardInnerLight,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.quickActionBorder(context)),
-      ),
-      child: Text(
-        '※ 本アプリは、獣医師による診断や治療の代替ではありません。体調不良、食欲不振、呼吸異常、ぐったりしているなどの異変がある場合は、動物病院への相談を優先してください。',
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.secondaryText(context),
-              height: 1.55,
-            ),
-      ),
-    );
+  void clear() {
+    _timer?.cancel();
+    _timer = null;
+    _deadline = null;
   }
 }

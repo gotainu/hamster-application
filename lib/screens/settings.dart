@@ -555,34 +555,17 @@ class _SettingScreenState extends State<SettingScreen> {
       return;
     }
 
-    final result = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text('$featureNameは有料プランの機能です'),
-          content: const Text(
-            'この機能を利用するには、有料プランが必要です。',
+      builder: (dialogContext) => AlertDialog(
+        title: Text('$featureNameの利用状況'),
+        content: const Text('このアカウントでは、現在この機能を利用できません。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('閉じる'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('閉じる'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('利用プランを見る'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (result != true) return;
-    if (!mounted) return;
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SubscriptionPlanScreen(),
+        ],
       ),
     );
   }
@@ -605,7 +588,7 @@ class _SettingScreenState extends State<SettingScreen> {
     );
   }
 
-  void _openPaidPlanPage() {
+  void _openUsagePage() {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const SubscriptionPlanScreen(),
@@ -1016,14 +999,14 @@ class _SettingScreenState extends State<SettingScreen> {
                 ),
                 _sectionTitle(
                   context,
-                  'プラン・課金',
-                  'このアプリの利用プランを確認できます',
+                  '利用状況',
+                  '無料体験とプレミアムの利用状態を確認できます',
                 ),
                 _settingsTile(
                   icon: Icons.workspace_premium_rounded,
-                  title: '利用プラン',
-                  subtitle: 'ハムスターの環境管理を継続支援する課金プラン',
-                  onTap: _openPaidPlanPage,
+                  title: '利用状況',
+                  subtitle: 'このアカウントの利用状態と期限',
+                  onTap: _openUsagePage,
                 ),
                 _sectionTitle(
                   context,
@@ -1459,10 +1442,10 @@ const List<_PolicySectionData> _termsSections = [
         '本アプリを、不正アクセス、虚偽情報の登録、他者のアカウント利用、アプリやサーバーへの過度な負荷、その他不適切な目的で利用しないでください。',
   ),
   _PolicySectionData(
-    title: '有料プラン',
+    title: 'プレミアムの利用について',
     body:
-        '有料プランは月額500円（税込）の自動更新契約です。申込み時にStripeの決済画面で料金と請求内容を確認し、支払いを完了すると有料機能が利用可能になります。\n\n'
-        '解約は「利用プラン」からStripeの管理画面を開いて行えます。解約後も現在の請求期間の終了までは有料機能を利用でき、以後の自動更新は行われません。',
+        'プレミアム機能の利用可否は、ログイン中のアカウントの契約状態と無料体験の利用状態に基づいて表示します。\n\n'
+        '既存の契約は「利用状況」から確認・管理できます。解約手続き後も、現在の契約期間が終了するまではプレミアム機能を利用でき、次回更新以降の請求は停止します。',
   ),
   _PolicySectionData(
     title: 'サービス内容の変更',

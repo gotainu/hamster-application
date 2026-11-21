@@ -290,8 +290,8 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       ),
       const PaidFeatureGate(
         featureName: '変化',
-        lockedTitle: '21日間の無料体験が終わりました',
-        lockedMessage: '変化の確認を続けるには、有料プランをご利用ください。',
+        lockedTitle: '変化の利用状況',
+        lockedMessage: 'このアカウントでは、現在この機能を利用できません。',
         icon: Icons.insights_rounded,
         showBackground: false,
         useInitialTrial: true,
@@ -326,8 +326,8 @@ class TabsScreenState extends State<TabsScreen> with WidgetsBindingObserver {
       ),
       body: const PaidFeatureGate(
         featureName: '記録',
-        lockedTitle: '記録は有料プランの機能です',
-        lockedMessage: '走行距離の記録、今日の様子、活動量評価に使う記録機能は、有料プランで利用できます。',
+        lockedTitle: '記録の利用状況',
+        lockedMessage: 'このアカウントでは、現在この機能を利用できません。',
         icon: Icons.edit_note_rounded,
         showBackground: false,
         useInitialTrial: true,

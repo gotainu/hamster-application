@@ -123,6 +123,9 @@ void main() {
     expect(find.text('体重'), findsOneWidget);
     expect(find.textContaining('契約'), findsNothing);
     expect(find.textContaining('無料体験を始める'), findsNothing);
+    expect(find.textContaining('プランを見る'), findsNothing);
+    expect(find.textContaining('月額'), findsNothing);
+    expect(find.textContaining('購入'), findsNothing);
     expect(tester.takeException(), isNull);
   });
   testWidgets('A3 runs after actual render once per report presentation',

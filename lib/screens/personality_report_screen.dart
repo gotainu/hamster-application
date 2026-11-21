@@ -24,7 +24,6 @@ import '../services/legacy_first_reports_repo.dart';
 import '../services/personality_report_view_service.dart';
 import '../widgets/legacy_first_report_body.dart';
 import 'personality_report_history_screen.dart';
-import '../widgets/report_continuation_link.dart';
 
 /// A free read-only presentation of an immutable generated snapshot.
 class PersonalityReportScreen extends StatefulWidget {
@@ -432,8 +431,6 @@ class _ReportContent extends StatelessWidget {
             ],
             const SizedBox(height: AppTheme.dataSectionGap),
             _Details(vm: vm),
-            const SizedBox(height: AppTheme.dataContentGap),
-            const ReportContinuationLink(),
           ],
         ),
       ),

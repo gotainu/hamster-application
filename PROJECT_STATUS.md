@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-app-strategy-c-cta-20261121:start -->
+## 2026-11-21 戦略C：Flutter新規購入CTA撤去（契約管理は安全例外、本番未配信）
+
+- **開始点/監査先行**：承認済み`eb731dbee423`、同じ専用branch/worktree。Flutter実装変更前に[購入導線A〜G監査](docs/release/flutter_strategy_c_cta_audit_20261121.md)を記録。直接Checkout1箇所、間接誘導（機能ガード/設定/レポート）、旧500円の価格と内蔵規約の申込説明を分類した。今回の差分はFlutterと直接関係する試験/記録だけ。
+- **撤去/中立化**：Flutterの`createStripeCheckoutSession`呼出・購入処理/ボタン/価格を削除。レポート購入widgetと2つの使用箇所を撤去。設定は「利用状況」、lockedは「このアカウントでは、現在この機能を利用できません。」を基本にし、AIエラーのプラン誘導も中立化した。新規購入へ進むアプリ内ルート/URL/価格比較/QRを追加せず、iOS/Android共通で同じsourceを使う。
+- **維持/再取得**：21日体験・カード不要/自動課金なし・開始条件/AI枠・既存の明示開始・有料機能判定・課金モデル/Repo/バックエンドを維持。利用状況は同一UIDのserver確認済みbillingと体験を読取り、active/有効trialing/期限内の解約予約を利用可として扱う。再確認ボタンは読取streamを再購読するだけ。起動/UID切替時の監視を維持し、専用の復帰時再取得が元sourceになかったため、利用状況と機能ガードへread-onlyのresume再購読を追加。期限・認証切替・キャッシュ/pending writeによる誤解放を防ぐ。無料体験未開始を終了済みと表示しない。
+- **残したリンク**：Privacy/Terms/サポートmailto/YouTube参照/研究DOIの非購入8箇所を維持。既存analyticsの定義・レポート内容/生成・記録・condition score・AI文脈・通知は変更しない。価格履歴の表示UIは見つからず、旧500円は新規申込説明にのみ存在した。
+- **最終検証**：23ファイル271/271件PASS（状態/UID/キャッシュ/期限/再確認/復帰、無料体験、AI同意/認証/ペット切替、Home/Drawer/Settings/利用状況の明暗実ナビゲーション、レポート閲覧/analytics、記録Repo、通知等）。利用状況は360px/文字2倍も確認。185 Dart source・27 asset指定/137 unique asset/4テキストの共通スキャン5件PASS、新規Checkout/購入価格/購入CTA/QR/購入URLは0、F Portal1とG非購入8は保持。変更17 Dartファイルのanalyzeはerror/warning0、新規指摘0、既存Settings activeColorの非推奨info6件は同じsourceのまま残した。既存カレンダーGolden系列はfont固定SHA不一致で準備/終了時の2エラーとなり未検証（既知環境制約）。期待画像/helper/固定SHAを変更せず、今回の導線は別の非Golden試験で確認。実機/ネイティブ新ビルド/ストア承認の確認とは区別する。
+- **重大ブロッカー/F例外**：既存削除処理は有効契約でも「削除へ進む」で迂回でき、解約予約/past_due/読取失敗等では警告を通らず削除へ進む。サーバーもStripe契約を確認/終了せずAuthとusers配下billingを削除し、継続請求・対応消失が残り得る。今回は削除本体をbyte単位で維持し、既存契約だけのPortal呼出/「契約管理」と削除警告→利用状況の経路を安全例外として残した。UID確認中/未契約には管理を出さず、非同期中のUID変更でも古いURLを開かない。**「契約中ユーザーのアカウント削除」を独立必須タスクとして解消するまで、Portal完全撤去・戦略C版の正式提出/配信はNO-GO**。このタスクで削除問題を解決したとは扱わない。
+- **保護**：実Firestore/Auth/体験/契約/テスター権限変更0、Stripe/Functions/Webhook/メールoutbox/Hosting/ストア変更0、Android/iOSビルド配信0、実機install0、main merge/push0。pubspecとlock/バージョン`1.0.1+3`は開始点から不変。既存の一致する依存情報とキャッシュ済みFlutter3.47.7/Dart3.13.5を利用し、SDK/依存更新・pub getなし。
+<!-- hamcare-app-strategy-c-cta-20261121:end -->
+
 <!-- hamcare-billing-notifications-20261121:start -->
 ## 2026-11-21 戦略C：契約通知outbox・Gmail Worker（本人Preview配送確認、本番未配備）
 

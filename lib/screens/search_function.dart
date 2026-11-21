@@ -2470,8 +2470,8 @@ class FuncSearchScreenState extends State<FuncSearchScreen> {
       endDrawer: _buildChatHistoryDrawer(context),
       body: PaidFeatureGate(
         featureName: 'AI相談',
-        lockedTitle: 'AI相談は有料プランの機能です',
-        lockedMessage: 'ペットプロフィール、飼育環境、温湿度データを踏まえたAI相談は、有料プランで利用できます。',
+        lockedTitle: 'AI相談の利用状況',
+        lockedMessage: 'このアカウントでは、現在この機能を利用できません。',
         icon: Icons.smart_toy_rounded,
         showBackground: widget.showPaidGateBackground,
         trialFeature: widget.trialFeature,
