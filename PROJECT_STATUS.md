@@ -1,5 +1,14 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-price-policy-20261121:start -->
+## 2026-11-21 正式価格を「月額550円」に固定（文書更新のみ）
+
+- **現在の正本**：HamCare プレミアムは「月額550円」。Preview／本番Web／Stripe Test／Stripe Live／利用規約／特商法で、この価格とStripeの最終請求額550円を正本とする。税抜500円の補助表示や税務上の区分による表示分岐は採用しない。申告・納税上の扱いはバックオフィス事項として別管理し、料金UXやリリースRunbookの判断条件にしない。以下の過去節にある旧表示・税務確認待ちの記載は、現行の料金方針・公開条件として採用しない。
+- **本番切替方針**：旧Live月額500円Priceと既存契約は直接変更・削除・自動移行しない。別途承認後、新しい月額550円Live Priceを作成し、新規申込だけをそのPriceへ接続する。Preview Test Priceは550円を維持する。元の体験終了日時、0円/550円の初回分岐、UID正本、Webhook/権限/Portalの安全境界を維持する。
+- **今回の範囲**：料金・法務整合文書、提出草案の方針部分、[本番切替Runbook案](docs/release/web_billing_live_cutover_runbook_ja.md)を更新。追跡文書に独立した課金切替Runbookがなかったため、既存監査書の切替案を料金関係に限定して分離した。HTML/JavaScript/Flutter・掲載用txtへの実表示反映は後続で、今回は変更・配備していない。過去の監査台帳とStripe読取り証拠は保持する。
+- **保護**：本番Stripe変更・新Live Price作成・Stripe Test変更・Firestore billing/既存契約/テスター権限変更・Hosting/Functions/ストア操作・main merge/pushは0。今回は外部APIを呼ばず文書だけを変更する。返金、事業者表示、連絡先保持/削除・Relay配送、最終申込画面、Flutter購入CTAなど価格以外の残件は維持する。
+<!-- hamcare-price-policy-20261121:end -->
+
 <!-- hamcare-pricing-legal-20261119:start -->
 ## 2026-11-19 戦略C：料金・法務の改定案整合（未公開・本番切替不可）
 
@@ -49,7 +58,7 @@
 - **保護範囲**：本方針整理により本番Stripe、live Hosting、Flutter、既存契約、現在の体験、テスター権限を変更しない。公開・本番切替は別指示とする。
 <!-- hamcare-contact-accessibility-policy-20261116:end -->
 
-最終更新: 2026-11-19
+最終更新: 2026-11-21
 
 このファイルを、開発進捗・優先順位・重要判断の**正本**とします。日常の更新はこのファイルへ記録し、変更履歴はGitで管理します。従来のExcel管理表は2026-09-06時点の履歴スナップショットとして保存し、今後は原則更新しません。
 
