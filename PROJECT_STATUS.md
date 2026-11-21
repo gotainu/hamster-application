@@ -1,5 +1,14 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-apple-deletion-revocation-20261121:start -->
+## 2026-11-21 Apple認可失効をアカウント削除に統合（コード・Mock、未配信）
+
+- **開始点/範囲**：承認済み`e1fe0524dbb9`、同じ専用branch/worktree、開始時clean。有料契約者0人の前提を維持。Apple関連のclient処理・直接試験・記録だけを変更し、前工程のStripe停止・削除フェンス・worker・データ/Auth削除を不変とする。
+- **API/順序**：既存Firebase Auth6.0.0の再認証/失効APIを再利用しSDK更新0。削除確認後、Apple連携があれば既存Userを再認証し元/返却/現在Firebase UIDと既知Apple subjectを確認。codeを直ちに失効し、その後だけ既存Callable→Stripe停止確認→データ/Auth削除→ローカル同意消去/signOut/完了へ進む。短寿命codeをStripe待機/workerへ持ち越さず、保存/ログ/Callable送信しない。
+- **失敗/他provider**：UID・既知subjectの不一致や本人認証異常は停止。初期Apple情報/code欠損、認証取消、失効未確認/30秒timeout、Android/Web非対応は手動解除案内と明示的な「削除を続ける」を用意し、TN3194どおり削除を永久拒否しない。Apple連携なしは処理をスキップし、複数providerはapple.comの有無で判定する。Apple失効だけで完了扱いにせず、Stripe失敗は既存の未完了/再試行を維持。
+- **検証/保護**：関連Flutter26ファイル385/385件PASS（新規service43件、Settingsの再認証/失効→既存削除・明示手動fallback・UID拒否・サーバー失敗/再試行等）。Dart新規指摘0、既存activeColor info6件のみ。Functions/Stripe停止/worker/フェンス/深い削除/Web/native設定/依存は開始HEADから不変。実Apple認可・実アカウント削除・本番API呼出/書込0、Functions/Hosting/Apple設定/ストア/テスター変更0、SDK/依存更新0、main merge/push/新ビルド配信0。[API根拠・失敗時の扱い・順序・試験記録](docs/release/apple_account_deletion_revocation_20261121.md)を参照。専用アカウントでの実機失効E2Eは別途事前承認後の残件であり、Google Play Web削除導線の独立実装は次指示で着手可能。
+<!-- hamcare-apple-deletion-revocation-20261121:end -->
+
 <!-- hamcare-account-deletion-billing-20261121:start -->
 ## 2026-11-21 アカウント削除前の継続課金停止（コード・ローカル検証、未配備）
 

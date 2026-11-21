@@ -8,6 +8,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
 import '../services/account_deletion_guard.dart';
+import '../services/apple_account_deletion_service.dart';
 import '../services/app_analytics.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/ai_text_consent_store.dart';
@@ -25,12 +26,14 @@ class SettingScreen extends StatefulWidget {
   final bool embeddedInTab;
   final FirebaseAuth? auth;
   final AccountDeletionGuard? accountDeletionGuard;
+  final AppleAccountDeletionService? appleDeletionService;
 
   const SettingScreen({
     super.key,
     this.embeddedInTab = false,
     this.auth,
     this.accountDeletionGuard,
+    this.appleDeletionService,
   });
 
   @override
@@ -42,6 +45,8 @@ class _SettingScreenState extends State<SettingScreen> {
   final AccountDeleteService _accountDeleteService = AccountDeleteService();
   late final AccountDeletionGuard _accountDeletionGuard =
       widget.accountDeletionGuard ?? AccountDeletionGuard(auth: _auth);
+  late final AppleAccountDeletionService _appleDeletionService =
+      widget.appleDeletionService ?? AppleAccountDeletionService(auth: _auth);
   final NotificationSettingsService _notificationSettingsService =
       NotificationSettingsService();
   final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
@@ -185,6 +190,20 @@ class _SettingScreenState extends State<SettingScreen> {
         );
         return;
       }
+      // Apple codes are short-lived. Revoke immediately after same-UID
+      // reauthentication, before the server's potentially long Stripe retry.
+      // Only the server can confirm billing stopped and delete account data.
+      final apple = await _appleDeletionService.prepare(uid);
+      if (!mounted || _auth.currentUser?.uid != uid) return;
+      final needsManualAppleRevocation =
+          apple == AppleDeletionRevocation.cancelled ||
+              apple == AppleDeletionRevocation.unavailable;
+      if (needsManualAppleRevocation) {
+        final continueDeletion = await _confirmManualAppleRevocation();
+        if (!mounted || _auth.currentUser?.uid != uid || !continueDeletion) {
+          return;
+        }
+      }
       final result = await _accountDeleteService.deleteMyAccountAndData(
         confirmText: 'DELETE_MY_ACCOUNT',
         deleteAuthUser: true,
@@ -205,7 +224,12 @@ class _SettingScreenState extends State<SettingScreen> {
       // Do not sign out a different account while the server request was in flight.
       if (_auth.currentUser?.uid != uid) return;
       if (mounted) {
-        HamsterFeedbackPopup.show(context, message: 'アカウントの削除が完了しました。');
+        HamsterFeedbackPopup.show(
+          context,
+          message: needsManualAppleRevocation
+              ? 'アカウントの削除が完了しました。Apple設定でHamCareとの連携も解除してください。'
+              : 'アカウントの削除が完了しました。',
+        );
       }
       try {
         await _auth.signOut();
@@ -220,6 +244,12 @@ class _SettingScreenState extends State<SettingScreen> {
       }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
+    } on AppleDeletionIdentityChanged {
+      if (!mounted) return;
+      HamsterFeedbackPopup.show(
+        context,
+        message: '本人のアカウントを確認できませんでした。設定を開き直してからお試しください。',
+      );
     } on FirebaseFunctionsException catch (error) {
       if (!mounted || _auth.currentUser?.uid != uid) return;
       final details = error.details;
@@ -255,6 +285,34 @@ class _SettingScreenState extends State<SettingScreen> {
     } finally {
       if (mounted) setState(() => _isDeletingAccount = false);
     }
+  }
+
+  Future<bool> _confirmManualAppleRevocation() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: const Text('Apple連携の解除について'),
+            scrollable: true,
+            content: const Text(
+              'Apple連携の自動解除の完了を確認できませんでした。アカウント削除は続けられます。\n\n'
+              '削除後、iPhoneの「設定」→自分の名前→「Appleでサインイン」→'
+              '「Ham Care」が表示される場合は連携を解除してください。Apple AccountのWebサイトの'
+              '「サインインとセキュリティ」→「Appleでサインイン」からも操作できます。\n\n'
+              '削除を続けても、Stripeの請求停止を確認できなければアカウント削除は完了しません。',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('戻る'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('削除を続ける'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   Future<AccountDeletionEligibility> _readDeletionEligibility(

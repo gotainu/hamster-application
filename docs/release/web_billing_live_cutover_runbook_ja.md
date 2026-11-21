@@ -37,7 +37,7 @@
 | Android Chrome表示 | GO（既存表示検証） | 連絡先ページの実機表示/入力PASS。Androidの購入E2E全体とは区別 |
 | Live Stripe | 未実施 | 新550円Price・新規申込接続は未実行 |
 | live Hosting | 今回の戦略C切替は未実施 | 既存公開サイトは存在。今回の新Web購入公開とは別 |
-| Flutter CTA撤去 | 新規購入・Portal導線ともコード撤去済・未配信 | [Portal撤去記録](flutter_customer_portal_removal_20261121.md)。Webの契約管理とアプリの権限読取りは維持。本人確認では現在有料契約者0人。[削除前の請求停止](account_deletion_billing_safety_20261121.md)はコード/Mock/Emulator準備済・未配備。Apple認可失効と配備/監視等は正式公開前に解消する |
+| Flutter CTA撤去 | 新規購入・Portal導線ともコード撤去済・未配信 | [Portal撤去記録](flutter_customer_portal_removal_20261121.md)。Webの契約管理とアプリの権限読取りは維持。本人確認では現在有料契約者0人。[削除前の請求停止](account_deletion_billing_safety_20261121.md)と[Apple失効統合](apple_account_deletion_revocation_20261121.md)はコード・ローカル試験準備済、未配備/未配信。専用実機失効E2E・配備/監視等は残件 |
 | Apple審査 | 戦略C版は未提出 | Case103009817213は回答済み、事前承認なし・実提出後判断 |
 | Google審査 | 戦略C版は未提出 | 既存Alphaの審査提出・配信履歴はある。Google審査を一度もしていないという意味ではない |
 

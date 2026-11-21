@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hamster_project/main.dart';
 import 'package:hamster_project/screens/settings.dart';
 import 'package:hamster_project/services/account_deletion_guard.dart';
+import 'package:hamster_project/services/apple_account_deletion_service.dart';
 import 'package:hamster_project/services/ai_text_consent_store.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -34,6 +35,8 @@ class _User implements User {
   final String uid;
   @override
   String? get email => null;
+  @override
+  List<UserInfo> get providerData => [];
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
@@ -105,10 +108,29 @@ class _PausedGuard extends AccountDeletionGuard {
   }
 }
 
+class _AppleDeletion extends AppleAccountDeletionService {
+  _AppleDeletion(_Auth auth) : super(auth: auth);
+  AppleDeletionRevocation outcome = AppleDeletionRevocation.revoked;
+  bool identityChanged = false;
+  int calls = 0;
+  VoidCallback? beforeReturn;
+
+  @override
+  Future<AppleDeletionRevocation> prepare(String expectedUid) async {
+    expect(expectedUid, _uid);
+    calls++;
+    if (identityChanged) throw AppleDeletionIdentityChanged();
+    beforeReturn?.call();
+    return outcome;
+  }
+}
+
 class _DeleteApp extends MyApp {
-  const _DeleteApp({required this.auth, required this.guard});
+  const _DeleteApp(
+      {required this.auth, required this.guard, this.appleDeletion});
   final _Auth auth;
   final AccountDeletionGuard guard;
+  final AppleAccountDeletionService? appleDeletion;
   @override
   State<MyApp> createState() => _DeleteAppState();
 }
@@ -124,7 +146,11 @@ class _DeleteAppState extends MyAppState {
     final app = widget as _DeleteApp;
     return MaterialApp(
       theme: AppTheme.lightTheme,
-      home: SettingScreen(auth: app.auth, accountDeletionGuard: app.guard),
+      home: SettingScreen(
+        auth: app.auth,
+        accountDeletionGuard: app.guard,
+        appleDeletionService: app.appleDeletion,
+      ),
     );
   }
 }
@@ -137,7 +163,9 @@ Future<void> _frames(WidgetTester tester) async {
 }
 
 Future<void> _openDelete(WidgetTester tester, _Auth auth,
-    {AccountDeletionGuard? guard, bool doubleTap = false}) async {
+    {AccountDeletionGuard? guard,
+    AppleAccountDeletionService? appleDeletion,
+    bool doubleTap = false}) async {
   final originalErrorHandler = FlutterError.onError;
   FlutterError.onError = (details) {
     // Existing Settings decoration diagnostic, unrelated to this change.
@@ -155,6 +183,7 @@ Future<void> _openDelete(WidgetTester tester, _Auth auth,
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(_DeleteApp(
       auth: auth,
+      appleDeletion: appleDeletion,
       guard: guard ??
           AccountDeletionGuard(db: FirebaseFirestore.instance, auth: auth)));
   await _frames(tester);
@@ -302,7 +331,8 @@ void main() {
     await _openDelete(tester, auth);
     expect(_notice, findsNothing);
     await _confirm(tester);
-    expect(functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
+    expect(
+        functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
     expect(auth.signOutCalls, 1);
     await _finish(tester);
   });
@@ -385,7 +415,8 @@ void main() {
     await _openDelete(tester, auth);
     expect(_notice, findsNothing);
     await _confirm(tester);
-    expect(functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
+    expect(
+        functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
     expect(_completion, findsNothing);
     expect(auth.signOutCalls, 0);
 
@@ -437,7 +468,8 @@ void main() {
         'unconfirmed server deletion cannot report success: throws=$fail',
         (tester) async {
       functions.response = {'ok': false};
-      functions.failure = fail ? StateError('synthetic callable failure') : null;
+      functions.failure =
+          fail ? StateError('synthetic callable failure') : null;
       await _openDelete(tester, auth);
       await _confirm(tester);
       expect(functions.requests, hasLength(1));
@@ -448,4 +480,109 @@ void main() {
       await _finish(tester);
     });
   }
+
+  testWidgets('Apple revocation precedes the unchanged paid server request',
+      (tester) async {
+    backend.documents[_billingPath] = {'plan': 'paid', 'status': 'active'};
+    final apple = _AppleDeletion(auth)
+      ..beforeReturn = () => expect(functions.requests, isEmpty);
+    await _openDelete(tester, auth, appleDeletion: apple);
+    expect(apple.calls, 0);
+    await _confirm(tester);
+    expect(apple.calls, 1);
+    expect(functions.requests, [
+      {
+        'confirmText': 'DELETE_MY_ACCOUNT',
+        'deleteAuthUser': true,
+        'stopBillingConfirmed': true
+      }
+    ]);
+    expect(_completion, findsOneWidget);
+    expect(auth.signOutCalls, 1);
+    await _finish(tester);
+  });
+
+  for (final outcome in [
+    AppleDeletionRevocation.cancelled,
+    AppleDeletionRevocation.unavailable
+  ]) {
+    testWidgets('Apple $outcome waits for an explicit manual-revoke choice',
+        (tester) async {
+      final apple = _AppleDeletion(auth)..outcome = outcome;
+      await _openDelete(tester, auth, appleDeletion: apple);
+      await _confirm(tester);
+      expect(find.text('Apple連携の解除について'), findsOneWidget);
+      expect(find.textContaining('「Appleでサインイン」'), findsOneWidget);
+      expect(functions.requests, isEmpty);
+      expect(auth.signOutCalls, 0);
+      await tester.tap(find.text('削除を続ける'));
+      await _frames(tester);
+      expect(functions.requests, hasLength(1));
+      expect(find.textContaining('アカウントの削除が完了しました。Apple設定'), findsOneWidget);
+      expect(auth.signOutCalls, 1);
+      await _finish(tester);
+    });
+  }
+
+  testWidgets('returning from Apple fallback preserves the account',
+      (tester) async {
+    final apple = _AppleDeletion(auth)
+      ..outcome = AppleDeletionRevocation.cancelled;
+    await _openDelete(tester, auth, appleDeletion: apple);
+    await _confirm(tester);
+    await tester.tap(find.text('戻る'));
+    await _frames(tester);
+    expect(functions.requests, isEmpty);
+    expect(auth.signOutCalls, 0);
+    expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
+    await _finish(tester);
+  });
+
+  testWidgets('different Apple identity cannot use the fallback to delete',
+      (tester) async {
+    final apple = _AppleDeletion(auth)..identityChanged = true;
+    await _openDelete(tester, auth, appleDeletion: apple);
+    await _confirm(tester);
+    expect(find.textContaining('本人のアカウントを確認できませんでした。'), findsOneWidget);
+    expect(find.text('削除を続ける'), findsNothing);
+    expect(functions.requests, isEmpty);
+    expect(auth.signOutCalls, 0);
+    await _finish(tester);
+  });
+
+  testWidgets(
+      'UID switch while preparing Apple deletion never deletes the new UID',
+      (tester) async {
+    final apple = _AppleDeletion(auth)
+      ..beforeReturn = () => auth.currentUser = _User('another-owner');
+    await _openDelete(tester, auth, appleDeletion: apple);
+    await _confirm(tester);
+    expect(functions.requests, isEmpty);
+    expect(auth.signOutCalls, 0);
+    await _finish(tester);
+  });
+
+  testWidgets(
+      'a server failure after Apple revoke is unfinished and retry prepares again',
+      (tester) async {
+    final apple = _AppleDeletion(auth);
+    functions.failure =
+        FirebaseFunctionsException(code: 'unavailable', message: 'synthetic');
+    await _openDelete(tester, auth, appleDeletion: apple);
+    await _confirm(tester);
+    expect(apple.calls, 1);
+    expect(_completion, findsNothing);
+    expect(auth.signOutCalls, 0);
+    expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
+    await tester.pump(const Duration(seconds: 5));
+    functions.failure = null;
+    await tester.tap(find.text('アカウントを削除'));
+    await _frames(tester);
+    await _confirm(tester);
+    expect(apple.calls, 2);
+    expect(functions.requests, hasLength(2));
+    expect(auth.signOutCalls, 1);
+    expect(_completion, findsOneWidget);
+    await _finish(tester);
+  });
 }

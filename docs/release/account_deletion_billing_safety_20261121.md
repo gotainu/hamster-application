@@ -39,7 +39,7 @@ open/draft Invoiceは停止前にCustomer/Subscriptionの所有関係と決済�
 
 Stripe Customer/Subscription/Invoice等の会計記録は保持する。トップレベルの課金対応・Session調整情報・Webhook receipt・通知outboxは一括削除しない。これらの保持期間/アクセス権・未完了メール確認challengeの削除運用は公開前の保持方針へ接続する。ここで無条件に会計・運用証跡を消さない。
 
-Appleログインの明示的な認可トークン失効処理は現行実装に存在せず、既存の [iOS準備文書](ios_runtime_preparation_stage2_20261018.md) でも残件。今回既存処理を削除/置換しておらず、新たなApple再認証フローは追加していない。Firebase Auth削除をApple認可失効と同一視しない。これは公開前に別途解消する。
+本工程開始時、Appleログインの明示的な認可トークン失効は未実装だった。後続の[Apple失効統合](apple_account_deletion_revocation_20261121.md)でclientの再認証・即時失効・手動fallbackを追加し、本書のStripe停止・既存データ/Auth削除は維持した。Firebase Auth削除をApple認可失効と同一視しない。実Apple失効E2Eは専用アカウントの事前承認後に確認する残件。
 
 ## 遅延Webhook
 
