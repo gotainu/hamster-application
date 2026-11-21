@@ -13,14 +13,14 @@ const rejects = fn => assert.throws(fn, error => error.code === 'preview/invalid
 test('verified immediate quote displays the fixed tax-inclusive total and immediate charge', () => {
   const model = projectCheckoutReview(quote());
   assert.equal(model.nickname, 'テスト'); assert.equal(model.maskedEmail, 'te***@example.test');
-  assert.equal(model.amountLabel, '月額550円（税込）／税抜500円'); assert.equal(model.firstChargeLabel, '申込時（即時）');
-  assert.match(model.trialNote, /本日の請求：550円（税込）/u);
+  assert.equal(model.amountLabel, '月額550円'); assert.equal(model.firstChargeLabel, '申込時（即時）');
+  assert.match(model.trialNote, /本日の請求：550円/u);
   assert.match(model.trialNote, /新たな21日体験が始まることはありません/);
 });
 test('trial quote displays the original server end date and never starts another trial', () => {
   const model = projectCheckoutReview(trial());
   assert.match(model.firstChargeLabel, /2026年11月30日/); assert.match(model.firstChargeLabel, /10:00/);
-  assert.match(model.trialNote, /本日の請求：0円/); assert.match(model.trialNote, /初回550円（税込）/u);
+  assert.match(model.trialNote, /本日の請求：0円/); assert.match(model.trialNote, /初回550円/u);
   assert.match(model.trialNote, /それまでは請求されません/); assert.match(model.trialNote, /延長・リセット/);
 });
 test('price mismatch 500 or 605, live mode, foreign currency and other plans fail closed', () => {
@@ -124,7 +124,7 @@ const mirrored = (status = 'active') => ({testMode:true,syncState:'synced',billi
 test('Webhook mirror maps all subscription states to Japanese without exposing raw status', () => {
   const expected={trialing:'体験期間中・契約登録済み',active:'有料会員',past_due:'お支払いの確認が必要です',unpaid:'お支払いを確認できませんでした',paused:'契約は一時停止中です',incomplete:'お申し込みは未完了です',incomplete_expired:'お申し込みの有効期限が切れました',canceled:'解約済み'};
   for(const [status,label] of Object.entries(expected)){
-    const model=projectPreviewBilling(mirrored(status));assert.equal(model.statusLabel,label);assert.equal(model.amountLabel,'月額550円（税込）／1か月ごとの自動更新');assert.match(model.syncedAtLabel,/日本時間/);
+    const model=projectPreviewBilling(mirrored(status));assert.equal(model.statusLabel,label);assert.equal(model.amountLabel,'月額550円／1か月ごとの自動更新');assert.match(model.syncedAtLabel,/日本時間/);
     assert.match(model.copy,/本番利用権限には反映されません/);
   }
 });

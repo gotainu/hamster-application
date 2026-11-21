@@ -33,14 +33,14 @@ export function projectCheckoutReview(raw, verifyMissingEmailReview) {
     nickname: typeof raw.account.nickname === 'string' && raw.account.nickname.trim() ? raw.account.nickname.trim().slice(0, 120) : '未設定',
     maskedEmail: raw.account.maskedEmail,
     planName: PREMIUM_MONTHLY.name,
-    amountLabel: '月額550円（税込）／税抜500円',
+    amountLabel: '月額550円',
     cardRegistrationLabel: dateLabel(billing.cardRegistrationAt),
     firstChargeLabel: billing.kind === 'trial' ? dateLabel(billing.firstChargeAt) : '申込時（即時）',
-    firstChargeAmountLabel: '550円（税込）',
+    firstChargeAmountLabel: '550円',
     trialNote: (fixture ? 'Preview専用のテストデータを使用しています。本番の体験状態は変更しません。' : '') + (billing.kind === 'trial'
-      ? fixture ? '本日カードをご登録いただくテストです。本日の請求：0円。初回550円（税込）は、上記の初回請求予定日（Preview専用の体験データに記録した終了日時）に請求される予定です。それまでは請求されません。本番の体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
-        : '本日カードをご登録いただきます。本日の請求：0円。初回550円（税込）は、上記の初回請求予定日（現在の体験終了日時）に請求される予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
-      : '本日の請求：550円（税込）。申し込み時に即時お支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。'),
+      ? fixture ? '本日カードをご登録いただくテストです。本日の請求：0円。初回550円は、上記の初回請求予定日（Preview専用の体験データに記録した終了日時）に請求される予定です。それまでは請求されません。本番の体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+        : '本日カードをご登録いただきます。本日の請求：0円。初回550円は、上記の初回請求予定日（現在の体験終了日時）に請求される予定です。それまでは請求されません。体験期間を延長・リセットしたり、新たな21日間を追加したりしません。'
+      : '本日の請求：550円。申し込み時に即時お支払いいただくテストです。このWeb申込によって、新たな21日体験が始まることはありません。'),
   });
 }
 
@@ -122,7 +122,7 @@ export function projectPreviewBilling(raw) {
   };
   const fixtureNote = billing.testDataSource === 'preview_fixture' ? 'Preview専用のテストデータを使用しています。本番の体験状態は変更しません。' : '';
   const result = {...empty, state: 'synced', outcome: 'stored', statusLabel: statuses[billing.status] || '契約状態を確認できません', planLabel: PREMIUM_MONTHLY.name,
-    amountLabel: '月額550円（税込）／1か月ごとの自動更新', firstChargeLabel: date(billing.firstChargeAt), nextChargeLabel: billing.nextChargeAt ? date(billing.nextChargeAt) : '予定を確認できません',
+    amountLabel: '月額550円／1か月ごとの自動更新', firstChargeLabel: date(billing.firstChargeAt), nextChargeLabel: billing.nextChargeAt ? date(billing.nextChargeAt) : '予定を確認できません',
     periodStartLabel: date(billing.currentPeriodStart), periodEndLabel: date(billing.currentPeriodEnd), trialEndLabel: date(billing.trialEnd),
     cancelLabel: billing.cancelAtPeriodEnd ? '期間末に解約予定' : '期間末の解約予定なし', syncedAtLabel: date(billing.syncedAt),
     entitlementLabel: billing.entitlementMirror === true ? '有効として保存（Preview限定）' : billing.entitlementMirror === false ? '無効として保存（Preview限定）' : '確認できません',

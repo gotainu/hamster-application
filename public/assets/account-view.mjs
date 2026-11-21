@@ -505,7 +505,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     }
     if (!option.checked) return;
     element('plan-selected-name').textContent = PREMIUM_MONTHLY.name;
-    element('plan-selected-amount').textContent = `月額${PREMIUM_MONTHLY.taxInclusiveYen}円（税込）／税抜${PREMIUM_MONTHLY.taxExclusiveYen}円`;
+    element('plan-selected-amount').textContent = `月額${PREMIUM_MONTHLY.taxInclusiveYen}円`;
     element('plan-selection-status').textContent = '月額プランを選択しました。内容の確認のみで、申し込みは行われていません。';
     element('plan-checkout').disabled = !checkout;
     // Choosing a plan itself sends no request. Checkout requires a fresh review.

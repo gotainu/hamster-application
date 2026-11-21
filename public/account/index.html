@@ -179,7 +179,7 @@
                 <legend class="visually-hidden">確認するプラン</legend>
                 <label class="plan-option" for="premium-monthly">
                   <input type="radio" id="premium-monthly" value="premium_monthly" />
-                  <span><strong>HamCare プレミアム</strong><span class="plan-price"><span class="plan-price-amount">月額550<span class="plan-price-period">円（税込）</span></span><span>税抜500円・消費税10％</span></span></span>
+                  <span><strong>HamCare プレミアム</strong><span class="plan-price"><span class="plan-price-amount">月額550<span class="plan-price-period">円</span></span><span>1か月ごとの自動更新</span></span></span>
                 </label>
               </fieldset>
               <p class="plan-preview-note" id="plan-price-note">本番公開に向けて確定した月額料金を、Previewで確認しています。現在の契約や本番の請求額を変更するものではありません。年額・割引プランはありません。</p>
@@ -240,24 +240,24 @@
                 <div><dt>メールアドレス</dt><dd id="plan-email"></dd></div>
                 <div><dt>ログイン方法</dt><dd id="plan-method"></dd></div>
                 <div><dt>確認中のプラン</dt><dd id="plan-selected-name">未選択</dd></div>
-                <div><dt>月額の税込総額（Preview）</dt><dd id="plan-selected-amount">プランを選ぶと表示します</dd></div>
+                <div><dt>月額料金（Preview）</dt><dd id="plan-selected-amount">プランを選ぶと表示します</dd></div>
               </dl>
               <p class="help-copy">契約対象は、今ログインしているHamCareアカウントです。アカウントを変える場合は、アカウント確認へ戻ってログアウトし、アプリと同じ方法でログインし直してください。</p>
-              <p class="help-copy">21日間の無料体験はアプリで別途開始する仕組みです。体験だけの利用にカード登録は不要で、有料契約を申し込まなければ体験終了後の自動課金はありません。体験中に有料契約を申し込む場合は、カードを登録し、現在の体験終了日時に初回550円（税込）が請求されます。体験の延長・リセットは行いません。体験のAI相談は最大20回で、共通枠などの制限もあります。この画面から体験は開始しません。</p>
+              <p class="help-copy">21日間の無料体験はアプリで別途開始する仕組みです。体験だけの利用にカード登録は不要で、有料契約を申し込まなければ体験終了後の自動課金はありません。体験中に有料契約を申し込む場合は、カードを登録し、現在の体験終了日時に初回550円が請求されます。体験の延長・リセットは行いません。体験のAI相談は最大20回で、共通枠などの制限もあります。この画面から体験は開始しません。</p>
             </section>
             <section class="plan-section" aria-labelledby="plan-terms-title">
               <h2 id="plan-terms-title">契約前に知っておきたいこと</h2>
               <p class="plan-preview-note">以下は新しいWeb申込の本番公開に向けた契約条件の確認画面です。次の画面はStripe Test Mode専用で、実請求はありません。</p>
               <dl class="account-summary plan-terms">
-                <div><dt>請求周期・自動更新</dt><dd>1か月ごとの自動更新です。解約しない限り、次回以降も月額550円（税込）が請求されます。次回請求日はHamCare Webの契約管理画面でご確認ください。</dd></div>
-                <div><dt>初回のお支払い・次回請求</dt><dd>体験中の申し込みは本日カードを登録し、本日の請求は0円です。初回550円（税込）は現在の体験終了日時に請求されます。体験を延長・リセットしません。体験が未開始・終了済みの場合、本日の請求は550円（税込）です。実際の初回請求日時は次の画面で確認できます。このPreviewでは実際の請求は発生しません。</dd></div>
+                <div><dt>請求周期・自動更新</dt><dd>1か月ごとの自動更新です。解約しない限り、次回以降も月額550円が請求されます。次回請求日はHamCare Webの契約管理画面でご確認ください。</dd></div>
+                <div><dt>初回のお支払い・次回請求</dt><dd>体験中の申し込みは本日カードを登録し、本日の請求は0円です。初回550円は現在の体験終了日時に請求されます。体験を延長・リセットしません。体験が未開始・終了済みの場合、本日の請求は550円です。実際の初回請求日時は次の画面で確認できます。このPreviewでは実際の請求は発生しません。</dd></div>
                 <div><dt>サービス開始時期</dt><dd>申込手続き後、契約状態の反映を確認でき次第、有料機能を利用できます。反映に時間がかかる場合があります。</dd></div>
                 <div><dt>解約方法・解約期限</dt><dd>HamCare Webの「支払方法・請求・解約を管理する」からStripe Customer Portalを開き、現在の契約期間が終了する前に解約手続きを完了してください。次回更新時の請求を停止します。契約期間の終了日時はWebの契約管理画面でご確認ください。</dd></div>
                 <div><dt>解約後の利用</dt><dd>解約手続き後も、現在の契約期間が終了するまではHamCareプレミアムをご利用いただけます。</dd></div>
-                <div><dt>キャンセル・返金</dt><dd>支払い後の利用者都合による当該請求期間のキャンセル・日割り返金は原則として受け付けません。重複請求・決済上の誤り・法令上必要な返金はサポートへご相談ください。</dd></div>
+                <div><dt>返金</dt><dd>利用者都合による支払済み料金の返金は原則として行いません。ただし、重複課金、当方のシステムによる誤請求、その他法令上返金が必要となる場合は個別に対応します。</dd></div>
                 <div><dt>その他の費用・利用環境</dt><dd>通信料金は利用者負担です。対応するスマートフォンとインターネット接続が必要です。SwitchBotの自動取得には対応機器・ハブなどが必要です。</dd></div>
               </dl>
-              <p class="plan-preview-note">新しいWeb申込の公開料金は月額550円（税込・税抜500円）に確定しています。現在公開中の規約・特商法表記には旧料金の月額500円（税込）の記載があり、本番StripeのPriceは500円・税別設定のままです。本番公開前に税と表示を揃えて切り替えます。このPreview確認では、現在の本番料金・既存契約は変更していません。</p>
+              <p class="plan-preview-note">新しいWeb申込の公開料金は月額550円に確定しています。リンク先は現在公開中の法務・サポートページで、改定案は未公開です。このPreview確認では、現在の本番料金・既存契約は変更していません。</p>
               <nav class="plan-legal-links" aria-label="契約条件・お問い合わせ">
                 <a href="https://hamster-breeding-app.web.app/terms/">利用規約</a>
                 <a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a>
@@ -291,14 +291,15 @@
             <div><dt>初回請求額</dt><dd id="checkout-first-charge-amount"></dd></div>
           </dl>
           <p id="checkout-trial-note" class="plan-preview-note"></p>
-          <p>解約するまで1か月ごとに自動更新され、次回以降も月額550円（税込）が請求されます。次回請求日はHamCare Webの契約管理画面で確認できます。</p>
+          <p>解約するまで1か月ごとに自動更新され、次回以降も月額550円が請求されます。次回請求日はHamCare Webの契約管理画面で確認できます。</p>
           <p>HamCare Webの「支払方法・請求・解約を管理する」からStripe Customer Portalを開き、現在の契約期間が終了する前に解約手続きを完了すると、次回更新時の請求を停止します。解約手続き後も、現在の契約期間が終了するまではHamCareプレミアムをご利用いただけます。</p>
-          <p>申込手続き後、契約状態の反映を確認でき次第、有料機能を利用できます。支払い後の利用者都合による当該請求期間のキャンセル・日割り返金は原則として受け付けません。重複請求・決済上の誤り・法令上必要な返金はサポートへご相談ください。返金条件の詳細は特定商取引法に基づく表記をご確認ください。</p>
+          <p>申込手続き後、契約状態の反映を確認でき次第、有料機能を利用できます。</p>
+          <p>利用者都合による支払済み料金の返金は原則として行いません。ただし、重複課金、当方のシステムによる誤請求、その他法令上返金が必要となる場合は個別に対応します。返金については特定商取引法に基づく表記もご確認ください。</p>
           <p class="help-copy">カード番号・有効期限・CVCはStripeの入力欄内だけで扱い、Stripeが処理します。HamCareでは受け取り・保存を行いません。</p>
           <nav class="plan-legal-links" aria-label="お申し込みの条件">
             <a href="https://hamster-breeding-app.web.app/terms/">利用規約</a><a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a><a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a><a href="https://hamster-breeding-app.web.app/support/">サポート</a>
           </nav>
-          <p class="help-copy">新しいWeb申込の公開料金は月額550円（税込）に確定しています。現在の公開条件には旧料金の月額500円（税込）の記載があり、本番StripeのPriceは500円・税別設定のままです。本番公開前に税と表示を揃えて切り替えます。このPreviewではテスト料金550円だけを確認し、本番契約・請求は変更しません。</p>
+          <p class="help-copy">新しいWeb申込の公開料金は月額550円に確定しています。リンク先は現在公開中の法務・サポートページで、改定案は未公開です。このPreviewではテスト料金550円だけを確認し、本番契約・請求は変更しません。</p>
           <label class="checkout-consent" for="checkout-terms"><input id="checkout-terms" type="checkbox" /><span>料金・自動更新・解約・返金条件と利用規約・プライバシーポリシーを確認しました。Stripe Test Modeのテスト操作であることを理解しました。</span></label>
           <button class="button primary full-width" id="checkout-start" type="button" disabled>Stripeの安全な支払い画面へ進む</button>
         </div>

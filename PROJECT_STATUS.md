@@ -1,5 +1,20 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-launch-policy-final-20261121:start -->
+## 2026-11-21 残存方針確定・本番切替Runbook最終化（未実行）
+
+本節と[26工程Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)を現在の正本とし、旧節の返金候補/メール基盤未決定/Relay配送待ちの公開条件は採用しない。
+
+- **確定**：月額550円、旧Live500円と既存契約は保持して新Live550円は後日新規申込だけへ接続。返金は利用者都合を原則行わず、重複課金/当方システム誤請求/法令上必要な場合を個別対応。期間末解約・期間末まで利用・次回請求停止・日割り返金なしを別に案内する。
+- **特商法/窓口**：CAA Q15/Q17を照合し請求開示方式の文面・窓口を用意。購入判断前の十分な時間的余裕と遅滞ない書面/メール提供の実体制を本人が確認すればGO。氏名/自宅住所/個人電話を常時公開せず、個人値を転記しない。VO契約不要、将来検討のみ。公開窓口は既存Gmailを共用、ブランド差出人を維持する。
+- **メール**：認証関連はFirebase、連絡先確認と契約開始/解約予約/契約終了/支払失敗/重要/必要なサポート通知は初回Gmail API採用。Stripeメールは補助。現実装は本人限定Preview確認のみで、本番通知・有限再試行/指数バックオフ/429/重複抑止/送信済失敗状態/バウンス等の不足を別紙へ。今回新規送信実装なし。独自ドメイン/Resend等は将来検討、初回非ブロッキング。
+- **Relay/連絡先**：登録2送信元/SPF/両ドメイン対応を既存証拠として維持、実配送未確認は非ブロッキング。本人宛先確保後、本番前又は公開直後に確認。UID正本、確認済み通常メール/Relay、メールなしだけ確認済み補完というPreview実装と整合。実メールを必須にしない。
+- **現状態**：方針/既存Test・Safari E2E/Android連絡先表示はGO。Gmail本番通知、Live接続、保持削除、CTA撤去、戦略C版ビルド/提出は未実施。既存Alphaの提出配信履歴はあり、Google審査を未経験とは扱わない。Go/No-GoはRunbookで方針採用と実装完了を区別する。
+- **今回だけの差分**：文書・Runbook・指定された公開前Web文面/表示文字列と関連検査のみ。新メール機能/Functions/Rules/Flutter/SDK/Live Stripe/Hosting/ストア設定変更なし、決済/メール送信/本番billing/既存契約/テスター権限への変更0、Runbook実行0、main merge/push0。指定メッセージの1コミットへ整理して停止する。
+- **関連**：[開示運用](docs/release/commercial_disclosure_operations_20261121.md)、[不足通知とFlutterの削除/維持対象](docs/release/launch_notifications_and_flutter_scope_20261121.md)、[料金・法務整合](docs/release/pricing_legal_alignment_20261119.md)。
+- **今回の限定検証**：既存frontend12ファイル443件、静的LP84/account171/brand177＝432項目PASS。指定順序26工程と各5記載項目、Go表19項目、規約/特商法/最終確認/FAQの正式返金文・解約文、6 HTMLのローカル68参照、関連新文書リンク、diff check PASS。フロント金額の数値定数・認証/契約ガードは維持。既存Safari Test E2E/Android連絡先表示/実配送1件を再利用し、今回新しい実機・決済・配送・バックエンド試験は行っていない。個人値/Secretパターンなし、Flutter/Functions/Rules/SDK/設定差分なし。指定の1コミット保存後に停止する。
+<!-- hamcare-launch-policy-final-20261121:end -->
+
 <!-- hamcare-price-policy-20261121:start -->
 ## 2026-11-21 正式価格を「月額550円」に固定（文書更新のみ）
 

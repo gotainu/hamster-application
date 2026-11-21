@@ -1,5 +1,15 @@
 # Hamster Care プライバシー申告チェックリスト
 
+<!-- hamcare-launch-mail-policy-20261121:start -->
+## 2026-11-21 初回メール基盤・現在の確認範囲
+
+認証確認/再設定はFirebase、連絡先確認と契約開始/解約予約/契約終了/支払失敗/重要・必要なサポート通知は既存Gmail APIを採用する。新しいメールサービスは追加せず、独自ドメイン/Resend等は将来候補。Stripeメールだけに重要通知を依存しない。現在のPreviewは本人限定の確認メールだけで、本番通知と保持削除運用の実装は残る。
+
+登録済み送信元・SPF・Relay両ドメイン対応を維持。実Relay配送未確認は非ブロッキングで、本人所有の宛先確保時に本番前又は公開直後に確認する。配送済みとは扱わない。個人実メールは必須でなく、UID正本/確認済み通常メール・Relay/メールなしだけ確認済み補完を維持。
+
+新しい通知の実装・メール送信・設定変更は今回なし。現状と不足・非公開ログ/送信状態/再試行・バウンス要件は[通知監査](launch_notifications_and_flutter_scope_20261121.md)と[Runbook](web_billing_live_cutover_runbook_ja.md)を正本とする。下記の旧日付の異なる方針は当時の記録として保持する。
+<!-- hamcare-launch-mail-policy-20261121:end -->
+
 2026-10-27最新：通常文字AI同意の実装・26件／iPhone TestFlight同意UI／Androidローカル更新と本人保持／独立VMの実Play code1→code2更新・保持／Release DeviceCheckサーバー計測PASSを維持。今回は既存Play申告を限定照合し、診断情報の任意→必須1点だけを保存。利用者向け停止設定がなくサーバーで選択によらず技術ログを記録する実装と既存表へ整合した。12type・用途・共有なしは維持し、実収集処理や公開Privacyは変更しない。その後、審査用ログインの通常契約・権限同期とConsoleアクセス申告の保存・再読取が完了。本人承認のfeedback追加を含む14変更を2026-10-27 11:09 JSTに送信し、送信ID1は審査中。審査通過・Alpha実配信は未確認、Production一般公開とApp Store審査送信は未実施。
 
 2026-10-25実装・成果物生成（履歴）：通常文字AIの事前同意を既存最小案の範囲で実装し、通信モック限定26件PASS。対応する署名AAB／Distribution IPAを新規生成し、同意前成果物と区別した（正本の提出物欄）。App Privacy10typeのPublished／Play掲載・Data Safety12type保存は完了を維持。端末更新、実AI追加送信、本番変更、ストアupload／審査送信は行っていない。

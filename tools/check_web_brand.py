@@ -267,9 +267,12 @@ def main():
     check('Apple service defaults off and configured entry explicitly opts in to SDK Popup','appleSignInEnabled = false' in auth_service and 'appleSignInEnabled: true' in auth_entry and 'appleSignInEnabled: false' not in auth_entry and "new sdk.OAuthProvider('apple.com')" in auth_service and 'sdk.signInWithPopup(auth, provider)' in auth_service)
     # Pricing/legal copy may change without replacing the approved brand.
     # Only the price paragraph's inline span arrangement/accessible name may
-    # change; all other markup, links, controls, classes and media stay fixed.
+    # change. A dedicated refund paragraph may be added; all other markup,
+    # links, controls, classes and media stay fixed.
     def landing_structure(source):
-        source = re.sub(r'<p class="price"(?: aria-label="月額550円（税込）")?>.*?</p>', '<p class="price"></p>', source, flags=re.S)
+        source = re.sub(r'<p class="price"(?: aria-label="月額550円(?:（税込）)?")?>.*?</p>', '<p class="price"></p>', source, flags=re.S)
+        source = re.sub(r'<p class="small-text refund-policy">[^<]*</p>', '', source)
+        source = re.sub(r'<details class="billing-policy-faq"><summary>[^<]*</summary><p>[^<]*</p><p>[^<]*</p></details>', '', source)
         return re.sub(r'(?<=>)[^<]*(?=<)', '', source)
     check('landing copy retains approved brand markup', landing_structure((PUBLIC/'index.html').read_text()) == landing_structure(baseline('public/index.html', CHECKOUT_BASE).decode()))
     for path in ['public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
