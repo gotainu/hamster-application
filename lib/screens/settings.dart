@@ -3,6 +3,7 @@ import 'package:hamster_project/main.dart';
 import 'package:hamster_project/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
@@ -55,6 +56,7 @@ class _SettingScreenState extends State<SettingScreen> {
   bool _isRevokingAiTextConsent = false;
   bool _isDeletingAiChatHistory = false;
   bool _isDeletingAccount = false;
+  String? _billingConfirmationRequiredUid;
   bool _isSigningOut = false;
   bool _isUpdatingNotificationSetting = false;
 
@@ -93,7 +95,12 @@ class _SettingScreenState extends State<SettingScreen> {
     }
     setState(() => _isDeletingAccount = true);
     try {
-      if (!await _canDeleteFreeAccount(uid) || !mounted) return;
+      final eligibility = await _readDeletionEligibility(uid);
+      if (!mounted || eligibility == AccountDeletionEligibility.unavailable) {
+        return;
+      }
+      final showBillingNotice = _billingConfirmationRequiredUid == uid ||
+          eligibility == AccountDeletionEligibility.contractPresent;
 
       final confirmText = await showDialog<String>(
         context: context,
@@ -102,13 +109,23 @@ class _SettingScreenState extends State<SettingScreen> {
 
           return AlertDialog(
             title: const Text('アカウントを削除しますか？'),
+            scrollable: true,
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Firestore上の飼育記録、AI相談履歴、SwitchBot連携情報、Firebase Authのアカウントを削除します。この操作は元に戻せません。',
+                  'アカウントを削除すると、HamCareの登録情報と飼育記録、'
+                  'AI相談履歴、SwitchBot連携情報が削除されます。この操作は元に戻せません。',
                 ),
+                if (showBillingNotice) ...[
+                  const SizedBox(height: 12),
+                  const Text(
+                    '有料契約中の場合は、今後の自動請求を停止します。'
+                    '残りの契約期間があっても、削除後はサービスを利用できません。'
+                    '支払済み料金の日割り返金は原則ありません。',
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const Text(
                   '削除するには DELETE_MY_ACCOUNT と入力してください。',
@@ -154,16 +171,29 @@ class _SettingScreenState extends State<SettingScreen> {
         return;
       }
       // Confirmation can remain open while the account or billing state changes.
-      if (!await _canDeleteFreeAccount(uid) || !mounted) return;
-      if (_auth.currentUser?.uid != uid) return;
+      final latestEligibility = await _readDeletionEligibility(uid);
+      if (!mounted ||
+          _auth.currentUser?.uid != uid ||
+          latestEligibility == AccountDeletionEligibility.unavailable) {
+        return;
+      }
+      if (!showBillingNotice &&
+          latestEligibility == AccountDeletionEligibility.contractPresent) {
+        HamsterFeedbackPopup.show(
+          context,
+          message: '契約状態が変わりました。削除の内容をもう一度ご確認ください。',
+        );
+        return;
+      }
       final result = await _accountDeleteService.deleteMyAccountAndData(
         confirmText: 'DELETE_MY_ACCOUNT',
         deleteAuthUser: true,
+        stopBillingConfirmed: showBillingNotice,
       );
       if (result['ok'] != true) {
         throw StateError('Account deletion was not confirmed.');
       }
-      debugPrint('Account deletion confirmed.');
+      _billingConfirmationRequiredUid = null;
       try {
         await _aiTextConsentStore.revoke(uid);
       } catch (_) {
@@ -174,31 +204,73 @@ class _SettingScreenState extends State<SettingScreen> {
       }
       // Do not sign out a different account while the server request was in flight.
       if (_auth.currentUser?.uid != uid) return;
-      await _auth.signOut();
+      if (mounted) {
+        HamsterFeedbackPopup.show(context, message: 'アカウントの削除が完了しました。');
+      }
+      try {
+        await _auth.signOut();
+      } catch (_) {
+        if (mounted) {
+          HamsterFeedbackPopup.show(
+            context,
+            message: '削除は完了しました。ログアウトできなかったため、アプリを開き直してください。',
+          );
+        }
+        return;
+      }
       if (!mounted) return;
       Navigator.of(context).popUntil((route) => route.isFirst);
+    } on FirebaseFunctionsException catch (error) {
+      if (!mounted || _auth.currentUser?.uid != uid) return;
+      final details = error.details;
+      if (error.code == 'failed-precondition' &&
+          details is Map &&
+          details['reason'] == 'paid_confirmation_required') {
+        _billingConfirmationRequiredUid = uid;
+        HamsterFeedbackPopup.show(
+          context,
+          message: '契約の停止を確認するため、削除の内容をもう一度ご確認ください。',
+        );
+        return;
+      }
+      if (error.code == 'unavailable' &&
+          details is Map &&
+          details['reason'] == 'manual_review') {
+        HamsterFeedbackPopup.show(
+          context,
+          message: '削除を続けるには確認が必要です。設定の「お問い合わせ」からご連絡ください。',
+        );
+        return;
+      }
+      final message = switch (error.code) {
+        'aborted' => 'アカウントの削除を処理中です。時間をおいてから、もう一度お試しください。',
+        'unavailable' || 'deadline-exceeded' =>
+          '削除の完了を確認できませんでした。時間をおいてから、もう一度お試しください。',
+        _ => '削除に失敗しました。もう一度お試しください。',
+      };
+      HamsterFeedbackPopup.show(context, message: message);
     } catch (_) {
-      if (!mounted) return;
-      HamsterFeedbackPopup.show(context, message: '削除に失敗しました。');
+      if (!mounted || _auth.currentUser?.uid != uid) return;
+      HamsterFeedbackPopup.show(context, message: '削除に失敗しました。もう一度お試しください。');
     } finally {
       if (mounted) setState(() => _isDeletingAccount = false);
     }
   }
 
-  Future<bool> _canDeleteFreeAccount(String uid) async {
+  Future<AccountDeletionEligibility> _readDeletionEligibility(
+    String uid,
+  ) async {
     final eligibility = await _accountDeletionGuard.check(uid);
-    if (!mounted) return false;
-    if (_auth.currentUser?.uid == uid &&
-        eligibility == AccountDeletionEligibility.freeAccount) {
-      return true;
+    if (!mounted || _auth.currentUser?.uid != uid) {
+      return AccountDeletionEligibility.unavailable;
     }
-    HamsterFeedbackPopup.show(
-      context,
-      message: eligibility == AccountDeletionEligibility.contractPresent
-          ? '現在の契約状態では、アカウント削除を完了できません。'
-          : '利用状況を確認できませんでした。通信を確認して、もう一度お試しください。',
-    );
-    return false;
+    if (eligibility == AccountDeletionEligibility.unavailable) {
+      HamsterFeedbackPopup.show(
+        context,
+        message: '利用状況を確認できませんでした。通信を確認して、もう一度お試しください。',
+      );
+    }
+    return eligibility;
   }
 
   Future<void> _revokeAiTextConsent() async {

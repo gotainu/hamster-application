@@ -10,6 +10,8 @@ const cfg=load('webBillingConfig'),identity=load('webBillingShared'),webhook=loa
 const NOW=Date.UTC(2030,0,1),UID='syntheticRuntimeOwner';
 const config=extra=>({secretKey:'sk_live_synthetic',publishableKey:'pk_live_synthetic',priceId:'price_syntheticNew550',legacyPriceId:'price_syntheticOld500',
   webhookSecret:'whsec_synthetic',portalConfigurationId:'bpc_syntheticRestricted',origin:cfg.WEB_BILLING_ORIGIN,returnUrl:cfg.WEB_BILLING_RETURN_URL,...extra});
+const deletion=load('accountDeletion');
+const markerPath=uid=>deletion.accountDeletionRef({doc:path=>({path})},uid).path;
 const clone=v=>structuredClone(v);
 function fixture(options={}) {
   const calls={config:0,factory:[],verify:[],user:[],read:[],write:[],checkout:[],portal:[],webhook:[],signature:[]},captured={};
@@ -24,7 +26,7 @@ function fixture(options={}) {
   const client={webhooks:{constructEvent(...args){calls.signature.push(args);if(options.badSignature)throw Error('synthetic secret raw body');
     return {id:'evt_syntheticRuntime',type:'invoice.paid',livemode:true,created:NOW/1000,data:{object:{id:'in_syntheticRuntime'}}};}}};
   const imports={
-    './webBillingConfig':cfg,'./webBillingShared':identity,
+    './accountDeletion':deletion,'./webBillingConfig':cfg,'./webBillingShared':identity,
     './webBillingCheckout':{WEB_BILLING_CONTACT_PURPOSE:'billing_contact_live',createWebBillingCheckout(d){captured.checkout=d;
       return Object.fromEntries(['review','create','status','cancel'].map(action=>[action,async(who,input)=>{calls.checkout.push([action,who,input]);return {action};}]));}},
     './webBillingCustomer':{createWebBillingCustomerResolver(d){captured.customer=d;return {resolveCustomer:async input=>({customerId:'cus_syntheticRuntime'})};}},
@@ -84,7 +86,7 @@ test('facts read existing owner/main, pet/main_pet, billing/subscription and ori
     [`users/${UID}/feature_access/initial_trial_v2`,{status:'active'}]]});
   await f.runtime.checkout(f.request());const facts=await f.captured.checkout.readFacts(UID);
   assert.equal(facts.appAccountExists,true);assert.equal(facts.nickname,'Synthetic owner');assert.equal(facts.billing.kind,'missing');assert.equal(facts.trial.kind,'found');
-  assert.deepEqual(new Set(f.calls.read),new Set([`users/${UID}/owner_profiles/main`,`users/${UID}/pet_profiles/main_pet`,
+  assert.deepEqual(new Set(f.calls.read),new Set([markerPath(UID),`users/${UID}/owner_profiles/main`,`users/${UID}/pet_profiles/main_pet`,
     `users/${UID}/billing/subscription`,`users/${UID}/feature_access/initial_trial_v2`]));
   assert.equal(f.calls.write.length,0);
 });
@@ -94,7 +96,7 @@ test('new purchase facts require both owner and pet while still reading original
 });
 test('verified Auth contact is read from current Admin identity without contact fallback reads',async()=>{
   const f=fixture();await f.runtime.checkout(f.request());const who=f.calls.checkout[0][1];
-  assert.equal(await f.captured.checkout.readContact(who),'synthetic@example.test');assert.deepEqual(f.calls.read,[]);assert.equal(f.calls.write.length,0);
+  assert.equal(await f.captured.checkout.readContact(who),'synthetic@example.test');assert.deepEqual(f.calls.read,[markerPath(UID)]);assert.equal(f.calls.write.length,0);
 });
 function appleC(options={}) {
   return {token:{email_verified:false,firebase:{sign_in_provider:'apple.com',identities:{'apple.com':['syntheticAppleSubject']}}},
@@ -105,15 +107,15 @@ const verifiedContact=extra=>({firebaseUid:UID,purpose:'billing_contact_live',sc
 test('email-less Apple contact reads only strict same-UID verified production schema',async()=>{
   const f=fixture(appleC({documents:[[`billing_contacts/${UID}`,verifiedContact()],[`preview_billing_contacts/${UID}`,{email:'synthetic-preview@example.test'}]]}));
   await f.runtime.checkout(f.request());assert.equal(await f.captured.checkout.readContact(f.calls.checkout[0][1]),'synthetic-contact@example.test');
-  assert.deepEqual(f.calls.read,[`billing_contacts/${UID}`]);assert.equal(f.calls.write.length,0);
+  assert.deepEqual(f.calls.read,[markerPath(UID),`billing_contacts/${UID}`]);assert.equal(f.calls.write.length,0);
 });
 for(const [field,value]of [['firebaseUid','syntheticOther'],['purpose','preview'],['verified',false],['verificationStatus','pending'],['source','unverified'],['verifiedAt',NOW+1],['email','bad email']])
   test('independent contact rejects '+field+' without writes or Preview fallback',async()=>{
     const f=fixture(appleC({documents:[[`billing_contacts/${UID}`,verifiedContact({[field]:value})]]}));await f.runtime.checkout(f.request());
-    assert.equal(await f.captured.checkout.readContact(f.calls.checkout[0][1]),null);assert.deepEqual(f.calls.read,[`billing_contacts/${UID}`]);assert.equal(f.calls.write.length,0);
+    assert.equal(await f.captured.checkout.readContact(f.calls.checkout[0][1]),null);assert.deepEqual(f.calls.read,[markerPath(UID),`billing_contacts/${UID}`]);assert.equal(f.calls.write.length,0);
   });
 test('contact reader refuses another UID supplied to the already authorized request',async()=>{
-  const f=fixture();await f.runtime.checkout(f.request());assert.equal(await f.captured.checkout.readContact({uid:'syntheticOther'}),null);assert.deepEqual(f.calls.read,[]);
+  const f=fixture();await f.runtime.checkout(f.request());assert.equal(await f.captured.checkout.readContact({uid:'syntheticOther'}),null);assert.deepEqual(f.calls.read,[markerPath(UID)]);
 });
 test('native Portal null payload preserves existing callable DTO and needs no contact or new account facts',async()=>{
   const f=fixture(appleC());const result=await f.runtime.portal(f.request(null,{origin:undefined}));
@@ -195,3 +197,30 @@ for(const [name,options]of [['revoked',{revoked:true}],['disabled',{user:{disabl
     const f=fixture(options);await assert.rejects(f.runtime.portal(f.request(null,{origin:undefined})));
     assert.deepEqual(f.calls.factory,[]);assert.deepEqual(f.calls.portal,[]);assert.deepEqual(f.calls.write,[]);
   });
+
+test('deletion prevents a new Checkout before a Stripe client is constructed',async()=>{
+  const f=fixture({documents:[[markerPath(UID),{status:'running'}]]});
+  await assert.rejects(f.runtime.checkout(f.request({flow:'web',action:'create'})));
+  assert.deepEqual(f.calls.factory,[]);
+  assert.deepEqual(f.calls.checkout,[]);
+  assert.deepEqual(f.calls.write,[]);
+});
+test('deletion between authentication and reservation rejects both Customer and Checkout writes',async()=>{
+  const f=fixture();
+  await f.runtime.checkout(f.request());
+  const stores=[f.captured.customer.store,f.captured.checkout.store];
+  for(const store of stores) await store.read(UID);
+  f.documents.set(markerPath(UID),{status:'running'});
+  for(const store of stores) {
+    await assert.rejects(store.mutate(UID,()=>assert.fail('reservation after deletion')));
+    await assert.rejects(store.read(UID));
+  }
+  assert.deepEqual(f.calls.write,[]);
+});
+test('another UID deletion allows normal Checkout and its own reservation',async()=>{
+  const f=fixture({documents:[[markerPath('otherUser'),{status:'completed'}]]});
+  await f.runtime.checkout(f.request());
+  await f.captured.checkout.store.mutate(UID,()=>({state:{firebaseUid:UID},result:true}));
+  assert.equal(f.calls.write.length,1);
+  assert.equal(f.calls.write[0][1].firebaseUid,UID);
+});

@@ -11,12 +11,17 @@ class AccountDeleteService {
   Future<Map<String, dynamic>> deleteMyAccountAndData({
     required String confirmText,
     bool deleteAuthUser = true,
+    bool stopBillingConfirmed = false,
   }) async {
-    final callable = _functions.httpsCallable('deleteMyAccountAndData');
+    final callable = _functions.httpsCallable(
+      'deleteMyAccountAndData',
+      options: HttpsCallableOptions(timeout: const Duration(minutes: 9)),
+    );
 
     final result = await callable.call<Map<String, dynamic>>({
       'confirmText': confirmText,
       'deleteAuthUser': deleteAuthUser,
+      if (stopBillingConfirmed) 'stopBillingConfirmed': true,
     });
 
     return Map<String, dynamic>.from(result.data);

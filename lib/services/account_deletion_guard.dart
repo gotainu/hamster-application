@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 enum AccountDeletionEligibility { freeAccount, contractPresent, unavailable }
 
-/// Temporary app-side boundary until server-side cancellation and deletion are
-/// handled together. This does not certify the absence of a Stripe contract.
+/// Chooses the confirmation copy from the same account's server snapshot.
+/// The deletion function independently verifies and stops Stripe billing.
 class AccountDeletionGuard {
   AccountDeletionGuard({FirebaseFirestore? db, FirebaseAuth? auth})
       : _db = db ?? FirebaseFirestore.instance,
@@ -39,6 +39,17 @@ class AccountDeletionGuard {
     final plan = data['plan'];
     final status = data['status'];
     final cancelAtPeriodEnd = data['cancelAtPeriodEnd'];
+    final customerId = data['stripeCustomerId'];
+    if (plan == 'none' &&
+        (status == 'canceled' || status == 'incomplete_expired') &&
+        cancelAtPeriodEnd == false &&
+        subscriptionId is String &&
+        RegExp(r'^sub_[A-Za-z0-9_]+$').hasMatch(subscriptionId) &&
+        (customerId == null ||
+            (customerId is String &&
+                RegExp(r'^cus_[A-Za-z0-9_]+$').hasMatch(customerId)))) {
+      return AccountDeletionEligibility.freeAccount;
+    }
     if ((subscriptionId != null && subscriptionId != '') ||
         (plan != null && plan != 'none') ||
         (status != null && status != 'none' && status != 'canceled') ||

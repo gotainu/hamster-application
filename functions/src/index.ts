@@ -5,8 +5,11 @@ import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { onRequest, onCall, HttpsError } from 'firebase-functions/v2/https';
 import * as logger from 'firebase-functions/logger';
 import crypto from 'crypto';
+import Stripe from 'stripe';
+import {runAccountDeletion, retryDueAccountDeletions} from './accountDeletion';
+import {DeletionStop} from './accountDeletionBilling';
 import { defineSecret } from 'firebase-functions/params';
-import {createProductionWebBillingRuntime, safeWebBillingError, WEB_BILLING_UNAVAILABLE} from './webBillingRuntime';
+import {createProductionWebBillingRuntime, readWebBillingConfig, safeWebBillingError, WEB_BILLING_UNAVAILABLE} from './webBillingRuntime';
 import {WEB_BILLING_ORIGIN} from './webBillingConfig';
 import {WebBillingWebhookError} from './webBillingWebhook';
 import {blockAnalyticsEventsForDeletion} from './analyticsJourneyEvents';
@@ -1524,81 +1527,73 @@ export const disableSwitchbotIntegration = onCall(
 );
 
 export const deleteMyAccountAndData = onCall(
-  {
-    region: 'asia-northeast1',
-    timeoutSeconds: 540,
-    memory: '1GiB',
-  },
-  async (req) => {
+  {region:'asia-northeast1', timeoutSeconds:540, memory:'1GiB', secrets:[LIVE_WEB_BILLING_CONFIG]},
+  async req => {
     const uid = req.auth?.uid;
-
-    if (!uid) {
-      throw new HttpsError('unauthenticated', 'ログインが必要です。');
+    if (!uid) throw new HttpsError('unauthenticated','ログインが必要です。');
+    const input = req.data;
+    if (input?.confirmText !== 'DELETE_MY_ACCOUNT' || (input.deleteAuthUser !== undefined && input.deleteAuthUser !== true) ||
+        (input.stopBillingConfirmed !== undefined && typeof input.stopBillingConfirmed !== 'boolean') ||
+        Object.keys(input).some(k => !['confirmText','deleteAuthUser','stopBillingConfirmed'].includes(k))) {
+      throw new HttpsError('invalid-argument','削除確認が必要です。');
     }
-
-    const confirmText = String(req.data?.confirmText ?? '').trim();
-
-    if (confirmText !== 'DELETE_MY_ACCOUNT') {
-      throw new HttpsError(
-        'invalid-argument',
-        '削除確認文字列が一致しません。',
-      );
-    }
-
-    const deleteAuthUser = req.data?.deleteAuthUser !== false;
-
-    const stats = createDeepDeleteStats();
-
-    logger.warn('deleteMyAccountAndData started', {
-      uid,
-      deleteAuthUser,
-    });
-
     try {
-      // Fence asynchronous journey metadata before enumerating descendants.
-      // Its root marker stays present until Auth can no longer pass validation.
-      await blockAnalyticsEventsForDeletion(db, uid);
-      // Block new sensor evidence before traversing the subtree; late config
-      // events and in-flight acquisitions must not recreate deleted children.
-      await blockSensorCaptureForDeletion(db, uid);
-      await deleteDocumentDeep(db.collection('users').doc(uid), stats, async () => {
-        await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
-        if (!deleteAuthUser) return false; // data-only cleanup retains the deletion fence
-        try {
-          await admin.auth().deleteUser(uid);
-        } catch (e: any) {
-          if (e?.code === 'auth/user-not-found') {
-            logger.warn('deleteMyAccountAndData auth user already missing', {uid});
-          } else {
-            throw e; // retain the fence on Auth failure so a retry remains safe
-          }
-        }
-        return true;
-      });
-
-      const result = {
-        ok: true,
-        uid,
-        deleteAuthUser,
-        deletedDocuments: stats.deletedDocuments,
-        deletedBatches: stats.deletedBatches,
-        touchedCollections: Array.from(stats.touchedCollections).sort(),
-        deletedRootDocuments: stats.deletedRootDocuments,
-      };
-
-      logger.warn('deleteMyAccountAndData completed', result);
-
+      const result = await runAccountDeletion(deletionDependencies, uid, {kind:'request',
+        stopBillingConfirmed:input.stopBillingConfirmed === true});
+      if (!result.ok) {
+        if (result.reason === 'manual_review') logger.error('Account deletion needs operator review');
+        throw new HttpsError(result.reason === 'processing'?'aborted':'unavailable',
+          result.reason === 'processing'?'削除を処理中です。':'削除処理を確認しています。',{reason:result.reason});
+      }
       return result;
-    } catch (e: any) {
-      logger.error('deleteMyAccountAndData failed', {
-        uid,
-        error: String(e?.message ?? e),
-      });
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      if (err instanceof DeletionStop && err.reason === 'paid_confirmation_required') {
+        throw new HttpsError('failed-precondition','有料契約の停止に同意してください。',{reason:err.reason});
+      }
+      logger.error('Account deletion needs retry');
+      throw new HttpsError('unavailable','削除状況を確認できません。時間をおいてもう一度お試しください。');
+    }
+  },
+);
 
-      throw new HttpsError(
-        'internal',
-        `アカウントデータ削除に失敗しました: ${String(e?.message ?? e)}`,
-      );
+const deletionDependencies = {
+  db,
+  stripe: () => {
+    const config = readWebBillingConfig(process.env.HAMCARE_LIVE_WEB_BILLING_CONFIG);
+    return {stripe:new Stripe(config.secretKey,{apiVersion:'2025-02-24.acacia',timeout:20000,
+      maxNetworkRetries:1,telemetry:false}),livemode:true,priceId:config.priceId,legacyPriceId:config.legacyPriceId};
+  },
+  async deleteData(uid:string) {
+    const stats = createDeepDeleteStats();
+    await blockAnalyticsEventsForDeletion(db, uid);
+    await blockSensorCaptureForDeletion(db, uid);
+    await deleteDocumentDeep(db.collection('users').doc(uid), stats, async () => {
+      await deleteDocumentDeep(db.collection('switchbot_users').doc(uid), stats);
+      // This operational contact is separate from Stripe's accounting records.
+      await db.doc('billing_contacts/'+uid).delete();
+      await admin.storage().bucket().file('hamster_images/'+uid+'-main_pet.jpg').delete({ignoreNotFound:true});
+      try {
+        await admin.auth().deleteUser(uid);
+      } catch (err:any) {
+        if (err?.code !== 'auth/user-not-found') throw err;
+      }
+      return true;
+    });
+  },
+};
+
+export const retryAccountDeletions = onSchedule(
+  {region:'asia-northeast1',schedule:'every 15 minutes',timeoutSeconds:540,maxInstances:1,
+    memory:'1GiB',secrets:[LIVE_WEB_BILLING_CONFIG]},
+  async () => {
+    try {
+      const result = await retryDueAccountDeletions(deletionDependencies);
+      if (result.manual) logger.error('Account deletion needs operator review',{count:result.manual});
+    } catch {
+      // Keep the scheduled invocation failed for monitoring without logging SDK errors or paths.
+      logger.error('Account deletion worker failed');
+      throw new Error('Account deletion worker failed');
     }
   },
 );

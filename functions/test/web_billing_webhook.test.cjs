@@ -34,7 +34,7 @@ function fakeDb() {
   const ref = path => ({path});
   function snapshot(r) {
     const value = docs.has(r.path) ? clone(docs.get(r.path)) : undefined, v = versions.get(r.path);
-    return {exists:value!==undefined,ref:r,data:()=>value,updateTime:v?{seconds:v,nanoseconds:0}:undefined};
+    return {exists:value!==undefined,ref:r,data:()=>value,get:key=>value?.[key],updateTime:v?{seconds:v,nanoseconds:0}:undefined};
   }
   function seed(path,value) {docs.set(path,clone(value));versions.set(path,++version);}
   const db = {doc:ref,getAll:async(...refs)=>refs.map(snapshot),async runTransaction(fn) {
@@ -423,4 +423,49 @@ test('existing verified trial end permits cancellation after original profile an
     stripeCustomerId:CUSTOMER,stripeSubscriptionId:SUB,stripePriceId:PRICE,trialEndSeconds:END},
     sub:{status:'canceled',canceled_at:START,trial_end:END}});
   await s.engine.process(s.event('customer.subscription.deleted'));assert.equal(s.billing().plan,'none');assert.equal(s.billing().trialEndSeconds,END);
+});
+
+const deletionPath=uid=>load('accountDeletion').accountDeletionRef({doc:path=>({path})},uid).path;
+test('late signed webhook after deletion is acknowledged without restoring billing or sending mail',async()=>{
+  const s=setup({mapping:false,facts:{appAccountExists:false}});
+  s.memory.seed(deletionPath(UID),{status:'completed'});
+  const event=s.event('invoice.paid');
+  assert.deepEqual(await s.engine.process(event),{result:'ignored'});
+  assert.deepEqual(await s.engine.process(event),{result:'duplicate'});
+  assert.equal(s.billing(),undefined);
+  assert.deepEqual(s.hooks(),[]);
+  assert.equal(s.memory.writes.some(([,p])=>p.startsWith('users/')),false);
+});
+test('deletion between webhook read and commit suppresses billing and outbox atomically',async()=>{
+  const s=setup({onRead(name){
+    if(name==='price')s.memory.seed(deletionPath(UID),{status:'running',billingStopped:true});
+  }});
+  const event=s.event('invoice.paid');
+  assert.deepEqual(await s.engine.process(event),{result:'ignored'});
+  const receipt=s.memory.docs.get('billing_webhook_events/'+hash(event.id));
+  assert.equal(receipt.result,'processed');
+  assert.equal(receipt.reason,'account_deletion');
+  assert.equal(s.billing(),undefined);
+  assert.deepEqual(s.hooks(),[]);
+  assert.deepEqual(await s.engine.process(event),{result:'duplicate'});
+});
+test('deletion for a different UID does not suppress this UID billing or outbox',async()=>{
+  const s=setup();
+  s.memory.seed(deletionPath('otherUser'),{status:'completed'});
+  assert.deepEqual(await s.engine.process(s.event()),{result:'synced'});
+  assert.equal(s.billing().firebaseUid,UID);
+  assert.ok(s.hooks().length>0);
+});
+
+test('an abandoned free deletion cannot permanently acknowledge a paid webhook',async()=>{
+  const s=setup();
+  const event=s.event('invoice.paid');
+  s.memory.seed(deletionPath(UID),{status:'running',billingStopped:false});
+  // The owner can decline cancellation after discovering a purchase that had
+  // not reached the app. Its invoice still grants access and creates mail.
+  assert.deepEqual(await s.engine.process(event),{result:'synced'});
+  s.memory.docs.delete(deletionPath(UID));
+  assert.deepEqual(await s.engine.process(event),{result:'duplicate'});
+  assert.equal(s.billing().firebaseUid,UID);
+  assert.ok(s.hooks().length>0);
 });

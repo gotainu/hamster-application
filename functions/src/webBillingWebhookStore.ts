@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {Timestamp} from 'firebase-admin/firestore';
 import {billingNotificationsFromHooks} from './billingNotificationEvents';
+import {accountDeletionRef} from './accountDeletion';
 import {
   WebBillingWebhookError, WebBillingWebhookStore, WebBillingSubject,
   WebBillingSubscription, WebBillingCommit,
@@ -12,6 +13,10 @@ export const WEB_BILLING_SYNC_COLLECTION = 'billing_webhook_subjects';
 export const WEB_BILLING_OUTBOX_COLLECTION = 'billing_notification_outbox';
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 const conflict = (): never => {throw new WebBillingWebhookError('sync_conflict', true);};
+// An unconfirmed deletion may still be declined. Preserve normal billing until
+// cancellation has been durably confirmed, before any account data is removed.
+const deletionFinal = (snap: FirebaseFirestore.DocumentSnapshot): boolean =>
+  snap.exists && (snap.get('billingStopped') === true || snap.get('status') === 'completed');
 function assertHash(value: string): void {
   if (!/^[a-f0-9]{64}$/.test(value)) throw new WebBillingWebhookError('reference_invalid');
 }
@@ -74,8 +79,8 @@ export function createWebBillingWebhookStore(db: FirebaseFirestore.Firestore, no
     },
     async readSubject(uid) {
       const ref = refs(uid);
-      const [mapping,billing] = await db.getAll(ref.mapping,ref.billing);
-      return subject(mapping,billing);
+      const [mapping,billing,deletion] = await db.getAll(ref.mapping,ref.billing,accountDeletionRef(db,uid));
+      return {...subject(mapping,billing),...(deletionFinal(deletion)?{deletionRequested:true}:{})};
     },
     async claimSubject(uid, lease, nowMs, untilMs) {
       assertLease(lease,nowMs,untilMs);
@@ -84,6 +89,18 @@ export function createWebBillingWebhookStore(db: FirebaseFirestore.Firestore, no
         if (old.lease && old.untilMs>nowMs) return false;
         tx.set(ref,{lease,untilMs,stripeLivemode:true});
         return true;
+      });
+    },
+    async ignoreDeletedSubject({uid,eventHash,lease,nowMs}) {
+      const ref=refs(uid), receipt=eventRef(eventHash);
+      await db.runTransaction(async tx=>{
+        const [deletion,event,locked]=await Promise.all([
+          tx.get(accountDeletionRef(db,uid)),tx.get(receipt),tx.get(ref.subject),
+        ]);
+        if (!deletionFinal(deletion) || event.data()?.lease!==lease || locked.data()?.lease!==lease) conflict();
+        tx.set(receipt,{result:'processed',reason:'account_deletion',processedAtMillis:nowMs,
+          stripeLivemode:true,lease:null,leaseUntil:0},{merge:true});
+        tx.set(ref.subject,{lease:null,untilMs:0,stripeLivemode:true});
       });
     },
     async commit(input: WebBillingCommit) {
@@ -98,14 +115,20 @@ export function createWebBillingWebhookStore(db: FirebaseFirestore.Firestore, no
       }
       const notifications = billingNotificationsFromHooks({billing,hooks,environment:'live'});
       const outbox = notifications.map(notification=>db.doc(`${WEB_BILLING_OUTBOX_COLLECTION}/${notification.id}`));
-      await db.runTransaction(async tx => {
+      return db.runTransaction(async tx => {
         // Firestore requires all reads before writes, including outbox dedupe.
-        const [locked,event,mapping,current,...existingHooks] = await Promise.all([
-          tx.get(ref.subject),tx.get(receipt),tx.get(ref.mapping),tx.get(ref.billing),...outbox.map(r=>tx.get(r)),
+        const [locked,event,mapping,current,deletion,...existingHooks] = await Promise.all([
+          tx.get(ref.subject),tx.get(receipt),tx.get(ref.mapping),tx.get(ref.billing),tx.get(accountDeletionRef(db,uid)),...outbox.map(r=>tx.get(r)),
         ]);
         const lock = locked.data() ?? {}, e = event.data() ?? {};
         const commitTime = Math.max(nowMs,now());
         if (!Number.isSafeInteger(commitTime) || lock.lease!==lease || lock.untilMs<=commitTime || e.lease!==lease || e.leaseUntil<=commitTime || e.result!=='processing') conflict();
+        if (deletionFinal(deletion)) {
+          tx.set(receipt,{result:'processed',reason:'account_deletion',processedAtMillis:nowMs,
+            stripeLivemode:true,lease:null,leaseUntil:0},{merge:true});
+          tx.set(ref.subject,{lease:null,untilMs:0,stripeLivemode:true});
+          return 'ignored' as const;
+        }
         if (version(mapping)!==before.mappingVersion || version(current)!==before.billingVersion) conflict();
         binding(subject(mapping,current),uid,billing.stripeCustomerId);
         const previousFence = current.data()?.billingSyncFence;

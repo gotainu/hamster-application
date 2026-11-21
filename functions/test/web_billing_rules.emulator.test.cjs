@@ -45,6 +45,7 @@ test('current Rules deny all Preview and server billing coordination namespace a
     `preview_billing_contacts/${uid}`,
     `preview_billing_contacts/${uid}/status/current`,
     'preview_billing_contact_delivery_limits/2026-11-21',
+    `account_deletion_requests/${subject}`,
     `billing_customers/${subject}`,
     `billing_checkout_sessions/${subject}`,
     `billing_contacts/${uid}`,
@@ -61,6 +62,10 @@ test('current Rules deny all Preview and server billing coordination namespace a
     });
     for(const actor of [uid,'synthetic-production-billing-other',null]){
       const db=(actor?env.authenticatedContext(actor):env.unauthenticatedContext()).firestore();
+      // The seeded subject below exercises read/list/update/delete. Use an
+      // absent document as well to exercise the distinct Rules create branch.
+      const absentSubject=createHash('sha256').update('another-free-owner').digest('hex');
+      await assertFails(setDoc(doc(db,`account_deletion_requests/${absentSubject}`),{status:'completed'}));
       for(const target of targets){
         await assertFails(getDoc(doc(db,target)));
         await assertFails(getDocs(collection(db,target.slice(0,target.lastIndexOf('/')))));

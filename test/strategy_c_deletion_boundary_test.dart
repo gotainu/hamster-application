@@ -5,8 +5,7 @@ import 'package:hamster_project/models/billing_status.dart';
 import 'package:hamster_project/models/entitlement_snapshot.dart';
 import 'package:hamster_project/models/initial_trial_access.dart';
 
-// These tests preserve the temporary deletion boundary and entitlement rules.
-// Server-side Stripe cancellation before Auth deletion remains a separate task.
+// These tests preserve deletion as a separate flow from contract management.
 String _source(String path) => File(path).readAsStringSync();
 
 BillingStatus _subscription(
@@ -27,14 +26,12 @@ BillingStatus _subscription(
 
 void main() {
   group('app deletion boundary has no contract navigation', () {
-    test('deletion refuses unsafe states instead of offering Portal or bypass',
+    test('deletion stays in Settings without contract navigation',
         () {
       final source = _source('lib/screens/settings.dart');
       final start = source.indexOf('Future<void> _deleteAccount()');
       final end = source.indexOf('Future<void> _revokeAiTextConsent()', start);
       final deletion = source.substring(start, end);
-      expect(deletion, contains('_canDeleteFreeAccount(uid)'));
-      expect(deletion, contains("result['ok'] != true"));
       expect(deletion, isNot(contains('SubscriptionPlanScreen')));
       expect(deletion, isNot(contains('manage-plan')));
       expect(deletion, isNot(contains('delete-now')));
@@ -52,7 +49,7 @@ void main() {
     test('deletion request does not gain a client-controlled contract identity',
         () {
       final source = _source('lib/services/account_delete_service.dart');
-      expect(source, contains("httpsCallable('deleteMyAccountAndData')"));
+      expect(source, contains("'deleteMyAccountAndData'"));
       expect(source, contains("'confirmText': confirmText"));
       expect(source, contains("'deleteAuthUser': deleteAuthUser"));
       expect(source, isNot(contains("'uid':")));

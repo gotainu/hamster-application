@@ -98,6 +98,14 @@ void main() {
       {},
       {'plan': 'none', 'status': 'none'},
       {'plan': 'none', 'status': 'canceled'},
+      for (final status in ['canceled', 'incomplete_expired'])
+        {
+          'plan': 'none',
+          'status': status,
+          'cancelAtPeriodEnd': false,
+          'stripeSubscriptionId': 'sub_synthetic',
+          'stripeCustomerId': 'cus_synthetic',
+        },
       {'stripeCustomerId': 'synthetic-customer'},
       {'stripeSubscriptionId': '', 'cancelAtPeriodEnd': false},
     ]) {
@@ -119,12 +127,24 @@ void main() {
       {'status': ''},
       {'plan': ''},
       {'stripeSubscriptionId': 'synthetic-subscription', 'status': 'canceled'},
+      {
+        'plan': 'none',
+        'status': 'canceled',
+        'cancelAtPeriodEnd': false,
+        'stripeSubscriptionId': 'malformed',
+      },
+      {
+        'plan': 'paid',
+        'status': 'canceled',
+        'cancelAtPeriodEnd': false,
+        'stripeSubscriptionId': 'sub_synthetic',
+      },
       {'stripeSubscriptionId': 42},
       {'stripeSubscriptionId': ' '},
       {'cancelAtPeriodEnd': 'false'},
       {'cancelAtPeriodEnd': true},
     ]) {
-      test('contract or unresolved state $data refuses deletion', () {
+      test('contract or unresolved state $data requires billing notice', () {
         expect(AccountDeletionGuard.fromBillingData(data),
             AccountDeletionEligibility.contractPresent);
       });

@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:cloud_functions_platform_interface/cloud_functions_platform_interface.dart'
     as fu;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,6 +23,10 @@ import 'first_ai_monitoring_cta_test.dart'
 
 const _uid = 'onboarding-widget-test';
 const _billingPath = 'users/$_uid/billing/subscription';
+const _trialPath = 'users/$_uid/feature_access/initial_trial_v2';
+const _billingNotice = '有料契約中の場合は、今後の自動請求を停止します。';
+final _notice = find.textContaining(_billingNotice);
+final _completion = find.text('アカウントの削除が完了しました。');
 
 class _User implements User {
   _User(this.uid);
@@ -53,7 +58,7 @@ class _Functions extends fu.FirebaseFunctionsPlatform {
   _Functions() : super(null, 'asia-northeast1');
   final requests = <Map<String, dynamic>>[];
   Map<String, dynamic> response = {'ok': true, 'deletedDocuments': 1};
-  bool fail = false;
+  Object? failure;
   VoidCallback? beforeReturn;
   @override
   fu.FirebaseFunctionsPlatform delegateFor(
@@ -75,7 +80,7 @@ class _Callable extends fu.HttpsCallablePlatform {
   Future<dynamic> call([dynamic parameters]) async {
     final fake = functions as _Functions;
     fake.requests.add(Map<String, dynamic>.from(parameters as Map));
-    if (fake.fail) throw StateError('synthetic callable failure');
+    if (fake.failure case final error?) throw error;
     fake.beforeReturn?.call();
     return fake.response;
   }
@@ -200,9 +205,10 @@ void main() {
     auth = _Auth();
     functions.requests.clear();
     functions.response = {'ok': true, 'deletedDocuments': 1};
-    functions.fail = false;
+    functions.failure = null;
     functions.beforeReturn = null;
     backend.documents.remove(_billingPath);
+    backend.documents.remove(_trialPath);
     FlutterSecureStorage.setMockInitialValues({});
     await AiTextConsentStore().accept(_uid);
   });
@@ -213,12 +219,22 @@ void main() {
     {'plan': 'none', 'status': 'none'},
     {'stripeCustomerId': 'synthetic-customer'},
     {'plan': 'none', 'status': 'canceled'},
+    for (final status in ['canceled', 'incomplete_expired'])
+      {
+        'plan': 'none',
+        'status': status,
+        'cancelAtPeriodEnd': false,
+        'stripeSubscriptionId': 'sub_synthetic',
+        'stripeCustomerId': 'cus_synthetic',
+      },
   ]) {
     testWidgets('confirmed free user deletes with existing payload: $billing',
         (tester) async {
       if (billing != null) backend.documents[_billingPath] = billing;
       await _openDelete(tester, auth);
+      expect(_notice, findsNothing);
       await _confirm(tester);
+      expect(_completion, findsOneWidget);
       expect(functions.requests, [
         {'confirmText': 'DELETE_MY_ACCOUNT', 'deleteAuthUser': true}
       ]);
@@ -238,20 +254,58 @@ void main() {
     {'status': 'unknown'},
     {'status': 'canceled', 'stripeSubscriptionId': 'synthetic-subscription'},
   ]) {
-    testWidgets('contract state cannot bypass deletion: $billing',
+    testWidgets('contract state requires a billing notice: $billing',
         (tester) async {
       backend.documents[_billingPath] = billing;
       await _openDelete(tester, auth);
-      expect(find.text('アカウントを削除しますか？'), findsNothing);
-      expect(find.text('現在の契約状態では、アカウント削除を完了できません。'), findsOneWidget);
+      expect(_notice, findsOneWidget);
       expect(find.text('プランを管理する'), findsNothing);
-      expect(find.text('削除へ進む'), findsNothing);
       expect(functions.requests, isEmpty);
-      expect(auth.signOutCalls, 0);
-      expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
+      await _confirm(tester);
+      expect(functions.requests, [
+        {
+          'confirmText': 'DELETE_MY_ACCOUNT',
+          'deleteAuthUser': true,
+          'stopBillingConfirmed': true,
+        }
+      ]);
+      expect(_completion, findsOneWidget);
+      expect(auth.signOutCalls, 1);
+      expect(await AiTextConsentStore().hasAccepted(_uid), isFalse);
       await _finish(tester);
     });
   }
+
+  testWidgets('paid deletion stays operable with a small view and keyboard',
+      (tester) async {
+    backend.documents[_billingPath] = {'plan': 'paid', 'status': 'active'};
+    await _openDelete(tester, auth);
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.resetViewInsets);
+    await _frames(tester);
+
+    await tester.ensureVisible(_notice);
+    expect(_notice.hitTestable(), findsOneWidget);
+    final field = find.byType(TextField);
+    await tester.ensureVisible(field);
+    expect(field.hitTestable(), findsOneWidget);
+    expect(find.text('削除する').hitTestable(), findsOneWidget);
+    await _confirm(tester);
+    expect(functions.requests.single['stopBillingConfirmed'], isTrue);
+    expect(_completion, findsOneWidget);
+    await _finish(tester);
+  });
+
+  testWidgets('free trial has no billing notice', (tester) async {
+    backend.documents[_trialPath] = {'status': 'active'};
+    await _openDelete(tester, auth);
+    expect(_notice, findsNothing);
+    await _confirm(tester);
+    expect(functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
+    expect(auth.signOutCalls, 1);
+    await _finish(tester);
+  });
 
   testWidgets('cancel preserves account and consent', (tester) async {
     await _openDelete(tester, auth);
@@ -321,16 +375,74 @@ void main() {
     expect(await AiTextConsentStore().hasAccepted(_uid), isFalse);
     await _finish(tester);
   });
+  testWidgets('server-discovered contract requires another paid confirmation',
+      (tester) async {
+    functions.failure = FirebaseFunctionsException(
+      code: 'failed-precondition',
+      message: 'synthetic failure',
+      details: {'reason': 'paid_confirmation_required'},
+    );
+    await _openDelete(tester, auth);
+    expect(_notice, findsNothing);
+    await _confirm(tester);
+    expect(functions.requests.single.containsKey('stopBillingConfirmed'), isFalse);
+    expect(_completion, findsNothing);
+    expect(auth.signOutCalls, 0);
+
+    functions.failure = null;
+    await tester.tap(find.text('アカウントを削除'));
+    await _frames(tester);
+    expect(_notice, findsOneWidget);
+    await _confirm(tester);
+    expect(functions.requests.last['stopBillingConfirmed'], isTrue);
+    expect(auth.signOutCalls, 1);
+    await _finish(tester);
+  });
+
+  testWidgets('manual review directs the user to existing support',
+      (tester) async {
+    functions.failure = FirebaseFunctionsException(
+      code: 'unavailable',
+      message: 'synthetic failure',
+      details: {'reason': 'manual_review'},
+    );
+    await _openDelete(tester, auth);
+    await _confirm(tester);
+    expect(find.textContaining('「お問い合わせ」からご連絡ください。'), findsOneWidget);
+    expect(_completion, findsNothing);
+    expect(auth.signOutCalls, 0);
+    expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
+    await _finish(tester);
+  });
+
+  for (final code in ['aborted', 'unavailable', 'deadline-exceeded']) {
+    testWidgets('unfinished remote deletion can be retried: $code',
+        (tester) async {
+      functions.failure = FirebaseFunctionsException(
+        code: code,
+        message: 'synthetic failure',
+      );
+      await _openDelete(tester, auth);
+      await _confirm(tester);
+      expect(find.textContaining('もう一度お試しください。'), findsOneWidget);
+      expect(_completion, findsNothing);
+      expect(auth.signOutCalls, 0);
+      expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
+      await _finish(tester);
+    });
+  }
+
   for (final fail in [false, true]) {
     testWidgets(
         'unconfirmed server deletion cannot report success: throws=$fail',
         (tester) async {
       functions.response = {'ok': false};
-      functions.fail = fail;
+      functions.failure = fail ? StateError('synthetic callable failure') : null;
       await _openDelete(tester, auth);
       await _confirm(tester);
       expect(functions.requests, hasLength(1));
-      expect(find.text('削除に失敗しました。'), findsOneWidget);
+      expect(find.textContaining('削除に失敗しました。'), findsOneWidget);
+      expect(_completion, findsNothing);
       expect(auth.signOutCalls, 0);
       expect(await AiTextConsentStore().hasAccepted(_uid), isTrue);
       await _finish(tester);

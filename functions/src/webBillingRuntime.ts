@@ -9,6 +9,7 @@ import {createWebBillingCustomerResolver} from './webBillingCustomer';
 import {createWebBillingPortalEngine} from './webBillingPortal';
 import {createWebBillingWebhook, verifyWebBillingEvent} from './webBillingWebhook';
 import {createWebBillingWebhookStore} from './webBillingWebhookStore';
+import {accountDeletionRef} from './accountDeletion';
 
 type Data = Record<string, any>;
 const object = (v: unknown): v is Data => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -45,10 +46,17 @@ export function createWebBillingCoordinationStore(db: FirebaseFirestore.Firestor
     return db.doc(collection+'/'+createHash('sha256').update(uid).digest('hex'));
   }
   return {
-    async read(uid) {return (await ref(uid).get()).data() ?? {};},
+    async read(uid) {
+      const [deletion, snapshot] = await Promise.all([accountDeletionRef(db,uid).get(),ref(uid).get()]);
+      if (deletion.exists) throw new BillingConfigurationError();
+      return snapshot.data() ?? {};
+    },
     async mutate(uid,update) {
       return db.runTransaction(async tx=>{
-        const target=ref(uid), snap=await tx.get(target), next=update(snap.data() ?? {});
+        const target=ref(uid);
+        const [deletion,snap]=await Promise.all([tx.get(accountDeletionRef(db,uid)),tx.get(target)]);
+        if (deletion.exists) throw new BillingConfigurationError();
+        const next=update(snap.data() ?? {});
         tx.set(target,next.state); return next.result;
       });
     },
@@ -115,7 +123,9 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
       const {flow,action,...input}=req.data;
       if (!['review','create','status','cancel'].includes(action) ||
         (['status','cancel'].includes(action) && Object.keys(input).length)) throw new BillingConfigurationError();
-      const {identity}=await authorize(req), client=stripe(config.secretKey);
+      const {identity}=await authorize(req);
+      if ((await accountDeletionRef(d.db,identity.uid).get()).exists) throw new BillingConfigurationError();
+      const client=stripe(config.secretKey);
       const resolver=customers(client);
       const engine=createWebBillingCheckout({config,stripe:client,store:createWebBillingCoordinationStore(d.db,'billing_checkout_sessions'),
         readFacts,readContact:async target=>{

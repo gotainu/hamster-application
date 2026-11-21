@@ -24,6 +24,7 @@ export interface WebBillingSubject {
   /** Opaque database update versions; commit must compare both under lease. */
   mappingVersion: string | null;
   billingVersion: string | null;
+  deletionRequested?: boolean;
 }
 export interface WebBillingWebhookFacts {
   appAccountExists: boolean;
@@ -67,9 +68,11 @@ export interface WebBillingWebhookStore {
   claimEvent(eventHash: string, lease: string, nowMs: number, untilMs: number, meta: WebBillingEventMeta): Promise<'claimed' | 'processed' | 'busy'>;
   readSubject(uid: string): Promise<WebBillingSubject>;
   claimSubject(uid: string, lease: string, nowMs: number, untilMs: number): Promise<boolean>;
+  /** ACK a valid event without recreating billing after a deletion fence. */
+  ignoreDeletedSubject?(input: {uid:string;eventHash:string;lease:string;nowMs:number}): Promise<void>;
   /** Atomically recheck leases, stored UID mapping and both snapshot versions;
    * write the normalized billing, pending hooks and processed receipt together. */
-  commit(input: WebBillingCommit): Promise<void>;
+  commit(input: WebBillingCommit): Promise<void | 'ignored'>;
   release(input: {uid?: string; eventHash: string; lease: string; errorCode: string}): Promise<void>;
 }
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -188,6 +191,11 @@ export function createWebBillingWebhook(d: WebBillingWebhookDependencies) {
         // All authority reads happen after the subject lock. A prior network
         // response can never be committed after another synchronization.
         const before = await d.store.readSubject(uid);
+        if (before.deletionRequested) {
+          if (!d.store.ignoreDeletedSubject) fail('deletion_fence_unavailable',true);
+          await d.store.ignoreDeletedSubject({uid,eventHash,lease,nowMs:millis(d)});
+          return {result:'ignored'};
+        }
         const currentRoute = await route(event);
         if (currentRoute.customerId !== initialRoute.customerId || await customerUid(currentRoute.customerId) !== uid) fail('uid_binding_mismatch');
         storedBinding(before, uid, currentRoute.customerId);
@@ -302,9 +310,9 @@ export function createWebBillingWebhook(d: WebBillingWebhookDependencies) {
         if (cancelReserved && (!sameContract || previous?.cancelAtPeriodEnd!==true)) add('cancel_reserved',eventHash);
         if (sameContract && previous?.cancelAtPeriodEnd===true && !cancelReserved && paid) add('resumed',eventHash);
         if (mappedStatus==='canceled' && (!sameContract || previous?.status!=='canceled')) add('canceled',String(seconds(sub.canceled_at)??sub.id));
-        await d.store.commit({uid,eventHash,lease,nowMs:now,before,billing,hooks,
+        const committed = await d.store.commit({uid,eventHash,lease,nowMs:now,before,billing,hooks,
           eventRecord:{...meta,processedAtMillis:now,subscriptionHash:digest(sub.id)}});
-        return {result:'synced'};
+        return {result:committed === 'ignored' ? 'ignored' : 'synced'};
       } catch (error) {
         const safe = error instanceof WebBillingWebhookError ? error : new WebBillingWebhookError('sync_unavailable',true);
         try {await d.store.release({uid,eventHash,lease,errorCode:safe.code});}

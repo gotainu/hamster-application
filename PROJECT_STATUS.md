@@ -1,5 +1,16 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-account-deletion-billing-20261121:start -->
+## 2026-11-21 アカウント削除前の継続課金停止（コード・ローカル検証、未配備）
+
+- **開始点**：承認済み`6e85a3c25640`、同じ専用branch/worktree、開始時clean。運営者確認では有料契約者0人、無料テスターのみ。既存ユーザーの移行処理や実削除は行わない。
+- **サーバー**：既存`deleteMyAccountAndData`とFirestore再帰削除・analytics/sensorフェンスを再利用。本人UIDの削除要求をtransactionで保持し、同UIDの新規Checkout/Customer予約を禁止。無料・Stripe手掛かりなしならStripe生成/API呼出0。契約ありはUID/Customer/Price/mode/Session/Invoiceを照合し、`invoice_now=false,prorate=false`で即時キャンセル、個別再取得と一覧で停止確認後にだけデータ/Authを削除する。通常Web解約は期間末のまま。
+- **失敗/通知競合**：11分lease、15分worker/batch4、有限指数backoff/最大12回、manual_reviewと運営確認手順を用意。通信断・停止後のFirebase失敗を再開でき、`billingStopped`保存後は再キャンセルしない。Webhookの最終transactionは停止確認済み/completedだけ書込抑止し、未同意の削除中止時には支払通知を失わない。別UID不変。
+- **削除/UI**：既存users/switchbot_users/Authに加え、本人の固定ペット画像と非会計の補完連絡先だけを削除。Stripe会計記録・Customer・運用証跡は一括削除しない。Flutterは無料には課金説明なし、有料だけ停止/残期間利用終了/原則日割り返金なしを確認する。新規購入/Portalリンク0を維持し、`ok=true`だけ完了扱い。
+- **検証**：課金関連Mock504件、削除Emulator9件、Rules Emulator2件、Flutter334件＋小画面/キーボード1件PASS。TypeScript strict build PASS、Dart新規指摘0（既存activeColor info6件）。専用demo localhostと合成Auth/Storage/Stripeを使用し、実アカウントは削除しない。既存Golden font SHA制約は維持。
+- **公開前残件/保護**：Apple認可トークンの明示失効は既存未実装で、Auth削除と同一視せず別途解消する。専用Live設定/Secret/IAM/Scheduler・運用監視通知・保持削除方針・配備後検証は未実施。本番Stripe/Firestore/Auth/StorageへのAPI呼出/書込0、本番Functions/Hosting/テスター/ストア変更0、新ビルド配信0、依存SDK更新0、main merge/push0。[実装・検証・再試行手順](docs/release/account_deletion_billing_safety_20261121.md)を参照し、今回1コミット後に停止する。
+<!-- hamcare-account-deletion-billing-20261121:end -->
+
 <!-- hamcare-app-portal-removal-20261121:start -->
 ## 2026-11-21 戦略C：Flutter契約管理導線の撤去（ローカルコード、未配信）
 
