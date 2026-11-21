@@ -1,5 +1,18 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-billing-notifications-20261121:start -->
+## 2026-11-21 戦略C：契約通知outbox・Gmail Worker（本人Preview配送確認、本番未配備）
+
+- **開始点/範囲**：承認済み`81ac23933fda`、同じ専用branch/worktree。通知基盤だけの実装・合成検証・本人限定Preview5通。Webhookの契約/体験/料金判断は変えず、既存transactionの通知hookを不変の契約snapshot付きoutboxへ変換した。Gmailの成功をbilling同期・権限更新の成功条件にしない。
+- **通知と重複抑止**：契約登録（体験0円/即時）、支払成功（初回/更新）、支払失敗、解約予約、予約取消、契約終了の6種類。contract/trialを登録1通へ、初回/更新や別名eventをinvoice単位の支払1通へ統合。未確認支払いの繰返しを同一invoiceで重複通知せず、単なるmetadata/内部同期/再送では送らない。新規550円、既存500円は明示legacy snapshotの実額を維持。宛先/本文/Secretはoutboxへ保存しない。
+- **送信境界**：本番`billing_notification_outbox`とPreview`preview_billing_notification_outbox`を分離。UIDから現在の確認済みAuth通常メール→Apple provider根拠のある両Relayドメイン→同一UIDの確認済み補完連絡先を解決。未確認/宛先なしは`blocked_no_verified_contact`で停止。Previewは本人UID/宛先hashの二重allowlistと本人だけのsmoke runnerに限定し、任意送信APIは追加しない。
+- **OAuth/Worker**：個人Gmailの既存送信専用本人OAuthをPreviewでメモリ利用。DWD/サービスアカウントによるGmail impersonationなし、新規認可/Secret変更なし。本番用Secretは宣言だけで未登録。将来のWorkerは15分周期・最大instance1・batch5・lease120秒。初回含む最大5回、送信前の一時障害/明確な拒否は有限指数backoff、quotaは最低24時間。送信後5xx/timeoutや送信中lease切れは`uncertain`で隔離し、二重送信を避けて有人照合する。送信専用APIだけでexactly-once配送を保証しない。
+- **本人実配送**：既存Secret/本人の同一UID/飼い主/ペット/確認済み補完連絡先を読み取り照合後、Preview fixtureから契約登録・支払成功・支払失敗・解約予約・契約終了を各1通、計5通送信。Gmail API受付/outbox sentは5/5・各attempt1。本人が5通の受信、件名、HamCare表示、Reply-To、本文、550円、日付、固定管理リンク、迷惑メール判定、Gmailスマホ表示、日本語表示すべて問題なしと回答。予約取消は合成試験のみ。実Relay配送は未確認・非ブロッキングの既存残件を維持する。
+- **最終検証/再実行**：Functions/Preview strict TypeScript build PASS。本番API・通知関連21ファイル984/984、Preview既存11ファイル514/514、専用demo Rules Emulator2/2・228アクセス操作で計1500テストPASS。Worker62/Gmail95/宛先・本文110/Runtime・送信枠116/通知変換11/固定runner6の新規400件、既存関連584件を含む。Gmail制限後は全通知共通の送信停止期限も保存し、後続通知はGmailへ進まず延期。旧500円metadata同期から過去の支払通知を作らず、後から届く実支払eventはinvoice単位で1通とする。実runner再実行でproviderSendCalls0、送信済み5件/attempt1維持を確認。再実行時刻が変わって増えた未送信fixture1件は、当該run/UID/未送信を照合して削除し、run時刻を固定して再発を6件の回帰試験で防いだ。追加メール0通、送信枠/履歴のリセットなし。Emulator停止・loopback閉鎖確認済み。
+- **本番前の残件**：本番OAuth/Secretの本人承認・長期利用可否（同意画面の公開状態等）、明示送信枠/IAM/Scheduler、独立連絡先確認producer、通知失敗/不達/uncertainの有人運用と保持削除、実Live契約・通知E2E。通知コード準備と本人Preview配送は、本番配備承認・長期配送保証とは別。Flutter CTA撤去は別指示の独立タスクとして着手可能で、今回変更しない。
+- **根拠/保護**：[通知実装・配送記録](docs/release/billing_notification_outbox_20261121.md)。本番Stripe API呼出/書込み0、本番Firestore/billing変更0、既存契約/体験/外部テスター権限変更0、外部テスターへの送信0、Functions/Hosting配備0、Flutter/ストア変更0、main merge/push0。Secret値/ID token/メール全文のログ出力なし、依存/SDK更新なし。新しいWorkerを配備せず指定の1コミットへ整理して停止する。
+<!-- hamcare-billing-notifications-20261121:end -->
+
 <!-- hamcare-production-web-billing-api-20261121:start -->
 ## 2026-11-21 戦略C：本番Web課金APIの準備（コード・ローカル試験のみ、未配備）
 

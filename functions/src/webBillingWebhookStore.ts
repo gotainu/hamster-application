@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto';
 import {Timestamp} from 'firebase-admin/firestore';
+import {billingNotificationsFromHooks} from './billingNotificationEvents';
 import {
   WebBillingWebhookError, WebBillingWebhookStore, WebBillingSubject,
   WebBillingSubscription, WebBillingCommit,
@@ -90,12 +91,13 @@ export function createWebBillingWebhookStore(db: FirebaseFirestore.Firestore, no
       assertUid(uid); assertLease(lease,nowMs); assertBilling(uid,billing);
       if (eventRecord.version!==1 || eventRecord.processedAtMillis!==nowMs) throw new WebBillingWebhookError('event_invalid');
       const ref = refs(uid), receipt = eventRef(eventHash);
-      const outbox = hooks.map(hook => {
+      for (const hook of hooks) {
         assertHash(hook.id);
         if (hook.id!==digest(hook.transitionKey) || hook.firebaseUid!==uid || hook.subscriptionId!==billing.stripeSubscriptionId ||
             hook.eventHash!==eventHash || hook.status!=='pending') throw new WebBillingWebhookError('hook_invalid');
-        return db.doc(`${WEB_BILLING_OUTBOX_COLLECTION}/${hook.id}`);
-      });
+      }
+      const notifications = billingNotificationsFromHooks({billing,hooks,environment:'live'});
+      const outbox = notifications.map(notification=>db.doc(`${WEB_BILLING_OUTBOX_COLLECTION}/${notification.id}`));
       await db.runTransaction(async tx => {
         // Firestore requires all reads before writes, including outbox dedupe.
         const [locked,event,mapping,current,...existingHooks] = await Promise.all([
@@ -116,7 +118,7 @@ export function createWebBillingWebhookStore(db: FirebaseFirestore.Firestore, no
           latestStripeEventAt:committedAt,updatedAt:committedAt},{merge:true});
         tx.set(receipt,{...eventRecord,stripeLivemode:true,result:'processed',lease:null,leaseUntil:0});
         tx.set(ref.subject,{lease:null,untilMs:0,stripeLivemode:true});
-        for (let i=0;i<hooks.length;i++) if (!existingHooks[i].exists) tx.create(outbox[i],hooks[i]);
+        for (let i=0;i<notifications.length;i++) if (!existingHooks[i].exists) tx.create(outbox[i],notifications[i]);
       });
     },
     async release({uid,eventHash,lease,errorCode}) {

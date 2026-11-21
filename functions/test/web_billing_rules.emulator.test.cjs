@@ -51,6 +51,9 @@ test('current Rules deny all Preview and server billing coordination namespace a
     `billing_webhook_subjects/${subject}`,
     'billing_webhook_events/synthetic-event',
     'billing_notification_outbox/synthetic-notification',
+    'preview_billing_notification_outbox/synthetic-notification',
+    'preview_billing_notification_delivery_limits/synthetic-day-budget',
+    'billing_notification_delivery_limits/synthetic-day-budget',
   ];
   try{
     await env.withSecurityRulesDisabled(async c=>{

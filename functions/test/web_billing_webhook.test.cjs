@@ -68,7 +68,7 @@ function setup(options={}) {
   const facts=options.facts===undefined?{appAccountExists:true}:options.facts;
   const engine=createWebBillingWebhook({stripe,store,config:config(options.config),now:()=>new Date(currentTime),readFacts:async()=>facts});
   const event=(type='customer.subscription.updated',id='evt_syntheticMain',extra={})=>({id,type,livemode:true,created:START,
-    data:{object:{id:type.startsWith('invoice.')?INVOICE:type.startsWith('checkout.')?remote.session.id:SUB}},...extra});
+    data:{object:{id:type.startsWith('invoice.')?remote.invoice.id:type.startsWith('checkout.')?remote.session.id:SUB}},...extra});
   return {memory,remote,calls,stripe,store,engine,event,billing:()=>memory.docs.get(billingPath),
     hooks:()=>[...memory.docs.entries()].filter(([path])=>path.startsWith('billing_notification_outbox/')).map(([,v])=>v),
     now:()=>currentTime,setTime:value=>{currentTime=value;}};
@@ -163,7 +163,7 @@ test('Stripe original trial uses exact original end and zero invoice gives no ch
     facts:{appAccountExists:true,trial:{kind:'found',data:{endsAt:new Date(trialEnd*1000-500)}}}});
   await s.engine.process(s.event('checkout.session.completed'));
   assert.equal(s.billing().nextChargeAtSeconds,trialEnd);assert.equal(s.billing().latestInvoicePaymentStatus,'no_payment_required');
-  assert.deepEqual(s.hooks().map(h=>h.type).sort(),['contract_started','trial_started']);
+  assert.deepEqual(s.hooks().map(h=>h.type).sort(),['contract_registered']);
 });
 test('a new Stripe trial cannot extend the original app trial',async()=>{
   const s=setup({sub:{status:'trialing',trial_end:END},facts:{appAccountExists:true,trial:{kind:'found',data:{endsAt:new Date((END-1)*1000)}}}});
@@ -189,7 +189,7 @@ test('new550 success alias and invoice.paid share canonical billing and one invo
   assert.deepEqual(await s.engine.process(s.event('invoice.paid','evt_syntheticPaidAfterAlias')),{result:'synced'});
   assert.equal(s.billing().plan,'paid');assert.equal(s.billing().amount,550);assert.equal(s.billing().stripePriceId,PRICE);
   assert.equal(s.billing().currentPeriodEndSeconds,period);assert.equal(s.billing().firstChargeAtSeconds,charge);
-  assert.equal(s.hooks().length,hooks);assert.equal(s.hooks().filter(h=>h.type==='first_charge').length,1);
+  assert.equal(s.hooks().length,hooks);assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,1);
   assert.equal([...s.memory.docs.keys()].filter(p=>p.startsWith('users/')&&p.endsWith('/billing/subscription')).length,1);
   assert.equal(s.memory.docs.get('billing_webhook_events/'+hash('evt_syntheticSuccessAlias')).result,'processed');
   assert.equal(s.memory.docs.get('billing_webhook_events/'+hash('evt_syntheticPaidAfterAlias')).result,'processed');
@@ -199,7 +199,7 @@ test('duplicate event receipt skips Stripe and hooks; distinct duplicate invoice
   const calls=s.calls.length,hooks=s.hooks().length;
   assert.deepEqual(await s.engine.process(s.event('invoice.paid')),{result:'duplicate'});assert.equal(s.calls.length,calls);
   await s.engine.process(s.event('invoice.paid','evt_syntheticDuplicateInvoice'));
-  assert.equal(s.hooks().length,hooks);assert.equal(s.hooks().filter(h=>h.type==='first_charge').length,1);assert.equal(s.billing().billingSyncFence,2);
+  assert.equal(s.hooks().length,hooks);assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,1);assert.equal(s.billing().billingSyncFence,2);
 });
 test('canonical Stripe is re-fetched under the UID lease instead of using the routing response',async()=>{
   const s=setup();const original=s.store.claimSubject;
@@ -215,12 +215,47 @@ test('late old deletion cannot replace a current paid replacement subscription',
 test('late old invoice payload resolves current renewed invoice and keeps the current period',async()=>{
   const s=setup();s.remote.sub.latest_invoice='in_syntheticRenewal';s.remote.invoice.id='in_syntheticRenewal';s.remote.invoice.billing_reason='subscription_cycle';
   s.remote.sub.current_period_end=END+30*86400;
-  await s.engine.process(s.event('invoice.paid',undefined,{created:START-86400}));
+  await s.engine.process(s.event('invoice.paid',undefined,{created:START-86400,data:{object:{id:INVOICE}}}));
   assert.equal(s.billing().latestInvoiceId,'in_syntheticRenewal');assert.equal(s.billing().currentPeriodEndSeconds,END+30*86400);
-  assert.equal(s.hooks().filter(h=>h.type==='renewal').length,1);
+  assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,0);
+});
+test('internal metadata synchronization does not notify an existing old500 payment first observed by the new model',async()=>{
+  const s=setup({billing:{provider:'stripe',stripeCustomerId:CUSTOMER,stripeSubscriptionId:SUB,stripePriceId:OLD,plan:'paid',status:'active'},
+    sub:{metadata:{},items:{data:[{quantity:1,price:{id:OLD}}]}},invoice:{total:500,amount_due:500,amount_paid:500}});
+  Object.assign(s.remote.price,{id:OLD,unit_amount:500,tax_behavior:'exclusive'});
+  await s.engine.process(s.event('customer.subscription.updated','evt_syntheticLegacyMetadata'));
+  await s.engine.process(s.event('customer.subscription.updated','evt_syntheticLegacyInternalSync'));
+  assert.equal(s.billing().latestInvoiceId,INVOICE);assert.equal(s.billing().amount,500);assert.equal(s.billing().stripePriceId,OLD);
+  assert.deepEqual(s.hooks(),[]);
+});
+test('a real paid event after subscription synchronization still creates exactly one payment notification',async()=>{
+  const s=setup();await s.engine.process(s.event('customer.subscription.created','evt_syntheticSubscribedFirst'));
+  assert.equal(s.billing().latestInvoiceId,INVOICE);assert.equal(s.billing().latestInvoicePaymentStatus,'paid');
+  assert.equal(s.hooks().filter(h=>h.type==='contract_registered').length,1);
+  assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,0);
+  await s.engine.process(s.event('invoice.paid','evt_syntheticActualPaidAfterSubscription'));
+  await s.engine.process(s.event('invoice.payment_succeeded','evt_syntheticAliasAfterSubscription'));
+  await s.engine.process(s.event('invoice.paid','evt_syntheticPaidRetryAfterSubscription'));
+  const paid=s.hooks().filter(h=>h.type==='payment_success');assert.equal(paid.length,1);
+  assert.equal(paid[0].snapshot.amount,550);assert.equal(paid[0].invoiceId,INVOICE);assert.equal(paid[0].snapshot.legacyPrice,false);
+});
+test('old500 actual payment after internal sync keeps the actual old amount in the notification',async()=>{
+  const s=setup({billing:{provider:'stripe',stripeCustomerId:CUSTOMER,stripeSubscriptionId:SUB,stripePriceId:OLD,plan:'paid',status:'active'},
+    sub:{metadata:{},items:{data:[{quantity:1,price:{id:OLD}}]}},invoice:{total:500,amount_due:500,amount_paid:500}});
+  Object.assign(s.remote.price,{id:OLD,unit_amount:500,tax_behavior:'exclusive'});
+  await s.engine.process(s.event('customer.subscription.updated','evt_syntheticLegacySyncBeforePaid'));
+  assert.equal(s.hooks().length,0);
+  await s.engine.process(s.event('invoice.payment_succeeded','evt_syntheticLegacyActualPaid'));
+  await s.engine.process(s.event('invoice.paid','evt_syntheticLegacyActualPaidAlias'));
+  const paid=s.hooks().filter(h=>h.type==='payment_success');assert.equal(paid.length,1);assert.equal(paid[0].snapshot.amount,500);
+  assert.equal(paid[0].snapshot.legacyPrice,true);assert.equal(paid[0].snapshot.latestInvoiceAmountPaid,500);
+  const {renderBillingNotification}=load('billingNotificationTemplates');
+  const message=renderBillingNotification({type:paid[0].type,mode:'live',snapshot:paid[0].snapshot});
+  assert.match(message.text,/500円/);assert.doesNotMatch(message.text,/550円/);assert.doesNotMatch(message.html,/550円/);
 });
 test('billing emits cancellation, resume, failure and end hooks only on their canonical transitions',async()=>{
   const s=setup();await s.engine.process(s.event());
+  await s.engine.process(s.event('invoice.paid','evt_syntheticActualInitialPayment'));
   s.remote.sub.cancel_at_period_end=true;s.remote.sub.cancel_at=END;
   await s.engine.process(s.event(undefined,'evt_syntheticCancelReserve'));assert.equal(s.billing().plan,'paid');
   await s.engine.process(s.event(undefined,'evt_syntheticCancelDuplicate'));
@@ -231,12 +266,12 @@ test('billing emits cancellation, resume, failure and end hooks only on their ca
   await s.engine.process(s.event('invoice.payment_failed','evt_syntheticFailureDuplicate'));
   Object.assign(s.remote.sub,{status:'canceled',canceled_at:START+10});
   await s.engine.process(s.event('customer.subscription.deleted','evt_syntheticEnd'));
-  for(const type of ['contract_started','first_charge','cancel_reserved','resumed','payment_failed','canceled'])assert.equal(s.hooks().filter(h=>h.type===type).length,1,type);
+  for(const type of ['contract_registered','payment_success','cancel_reserved','resumed','payment_failed','canceled'])assert.equal(s.hooks().filter(h=>h.type===type).length,1,type);
   assert.equal(s.billing().plan,'none');assert.equal(s.billing().nextChargeAtSeconds,null);
 });
 test('a stale payment-failed event cannot queue failure for a newer paid invoice',async()=>{
   const s=setup();s.remote.invoice.id='in_syntheticCurrentPaid';s.remote.sub.latest_invoice=s.remote.invoice.id;
-  await s.engine.process(s.event('invoice.payment_failed'));assert.equal(s.hooks().some(h=>h.type==='payment_failed'),false);
+  await s.engine.process(s.event('invoice.payment_failed',undefined,{data:{object:{id:INVOICE}}}));assert.equal(s.hooks().some(h=>h.type==='payment_failed'),false);
 });
 test('busy UID lease is retryable and leaves the other owner lease intact',async()=>{
   const s=setup();await s.store.claimSubject(UID,'synthetic-other-lease',NOW,NOW+120000);
@@ -352,11 +387,11 @@ test('first paid subscription_cycle after a zero-charge trial emits first_charge
   s.remote.sub.status='active';s.remote.sub.latest_invoice='in_syntheticFirstAfterTrial';
   Object.assign(s.remote.invoice,{id:'in_syntheticFirstAfterTrial',total:550,amount_due:550,amount_paid:550,billing_reason:'subscription_cycle',status_transitions:{paid_at:trialEnd}});
   await s.engine.process(s.event('invoice.paid','evt_syntheticFirstAfterTrial'));
-  assert.equal(s.hooks().filter(h=>h.type==='first_charge').length,1);assert.equal(s.hooks().filter(h=>h.type==='renewal').length,0);
+  assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,1);assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,1);
   s.remote.sub.latest_invoice='in_syntheticSecondAfterTrial';s.remote.invoice.id='in_syntheticSecondAfterTrial';
   s.remote.invoice.status_transitions.paid_at=trialEnd+30*86400;
   await s.engine.process(s.event('invoice.paid','evt_syntheticSecondAfterTrial'));
-  assert.equal(s.hooks().filter(h=>h.type==='first_charge').length,1);assert.equal(s.hooks().filter(h=>h.type==='renewal').length,1);
+  assert.equal(s.hooks().filter(h=>h.type==='payment_success').length,2);assert.equal(s.hooks().filter(h=>h.type==='payment_success' && h.invoiceId===s.remote.invoice.id).length,1);
 });
 test('real SDK verifies signatures offline, refusing tampering, expired or future signatures',()=>{
   const Stripe=require('stripe');const stripe=new Stripe('sk_live_synthetic');

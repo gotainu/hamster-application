@@ -283,7 +283,14 @@ export function createWebBillingWebhook(d: WebBillingWebhookDependencies) {
         const sameContract = previous?.stripeSubscriptionId === sub.id;
         if (!sameContract && paid) add('contract_started', sub.id);
         if (sub.status==='trialing' && (!sameContract || previous?.status!=='trialing')) add('trial_started', String(trialEnd));
-        if (invoicePaid && invoice && (!sameContract || previous?.latestInvoiceId!==invoice.id || previous?.latestInvoicePaymentStatus!=='paid')) {
+        const paymentEvent = ['invoice.paid','invoice.payment_succeeded'].includes(event.type) &&
+          invoice && record(event.data.object) && (event.data.object as Data).id===invoice.id;
+        if (invoicePaid && invoice && paymentEvent) {
+          // A metadata/internal subscription sync may observe an old paid
+          // invoice for the first time. That observation is not a new payment.
+          // Conversely, the real payment event can arrive after subscription
+          // sync already recorded the invoice. Enqueue it then and let the
+          // semantic invoice key deduplicate success aliases and re-delivery.
           // Stripe calls the first invoice after a trial subscription_cycle too.
           // A previously observed zero-charge trial still needs first_charge.
           const renewal = !!priorFirstCharge || (invoice.billing_reason==='subscription_cycle' &&

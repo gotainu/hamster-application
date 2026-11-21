@@ -14,6 +14,7 @@ import { getFeatureAccess } from './featureTrials';
 import {runSensorAcquisition, deriveSchedulerContext, SensorRequestError, SensorApiResult, SensorSchedulerContext, SensorAcquisitionRoute} from './sensorQuality/acquisition';
 import {blockSensorCaptureForDeletion} from './sensorQuality/configuration';
 export {activateFeatureTrial, consumeAiTrial, startInitialTrial, consumeInitialTrialAi} from './featureTrials';
+export {processBillingNotificationOutbox} from './billingNotifications';
 export {
   analyticsWeightRecordCreated,
   analyticsActivityRecordCreated,
