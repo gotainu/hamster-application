@@ -107,6 +107,8 @@ void _noPurchaseUi() {
   expect(find.textContaining('購入'), findsNothing);
   expect(find.textContaining('Stripe'), findsNothing);
   expect(find.textContaining('Webで'), findsNothing);
+  expect(find.text('契約管理'), findsNothing);
+  expect(find.textContaining('お支払い方法や解約'), findsNothing);
 }
 
 Future<void> _noContract(WidgetTester tester, _Repo repo) async {
@@ -115,8 +117,7 @@ Future<void> _noContract(WidgetTester tester, _Repo repo) async {
 }
 
 void main() {
-  testWidgets(
-      'pending/cached/foreign-UID billing cannot show paid or management',
+  testWidgets('pending/cached/foreign-UID billing cannot show paid access',
       (tester) async {
     final repo = _Repo();
     await _mount(tester, repo);
@@ -137,19 +138,20 @@ void main() {
     BillingStatusValue.active,
     BillingStatusValue.trialing
   ]) {
-    testWidgets('$status shows existing access and management without selling',
+    testWidgets('$status shows existing access without billing navigation',
         (tester) async {
       final repo = _Repo();
       await _mount(tester, repo);
       repo.emitBilling(_billing(status: status));
       await tester.pump();
       expect(find.text('プレミアム利用中です'), findsOneWidget);
-      expect(find.text('契約管理'), findsOneWidget);
+      expect(find.text('契約管理'), findsNothing);
       expect(find.textContaining('利用可能期限'), findsOneWidget);
       _noPurchaseUi();
     });
   }
-  testWidgets('period-end cancellation retains access and management until end',
+  testWidgets(
+      'period-end cancellation retains access until end without billing navigation',
       (tester) async {
     final repo = _Repo();
     await _mount(tester, repo);
@@ -157,21 +159,21 @@ void main() {
     await tester.pump();
     expect(find.text('解約予定です'), findsOneWidget);
     expect(find.textContaining('契約期間が終了するまでは'), findsOneWidget);
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
     _noPurchaseUi();
   });
   for (final status in [
     BillingStatusValue.pastDue,
     BillingStatusValue.unpaid
   ]) {
-    testWidgets('$status keeps only existing-contract management',
+    testWidgets('$status shows payment status without billing navigation',
         (tester) async {
       final repo = _Repo();
       await _mount(tester, repo);
       repo.emitBilling(_billing(status: status));
       await tester.pump();
       expect(find.text('お支払いの確認が必要です'), findsOneWidget);
-      expect(find.text('契約管理'), findsOneWidget);
+      expect(find.text('契約管理'), findsNothing);
       expect(find.text('プレミアム利用中です'), findsNothing);
       _noPurchaseUi();
     });
@@ -191,6 +193,23 @@ void main() {
       repo.emitTrial(InitialTrialAccess.empty());
       await tester.pump();
       expect(find.text('契約管理'), findsNothing);
+      _noPurchaseUi();
+    });
+  }
+  for (final status in [
+    BillingStatusValue.canceled,
+    BillingStatusValue.incomplete,
+    BillingStatusValue.unknown,
+  ]) {
+    testWidgets('$status marked paid remains status-only without Portal',
+        (tester) async {
+      final repo = _Repo();
+      await _mount(tester, repo);
+      repo.emitBilling(_billing(status: status));
+      await tester.pump();
+      repo.emitTrial(InitialTrialAccess.empty());
+      await tester.pump();
+      expect(find.text('プレミアム利用中です'), findsNothing);
       _noPurchaseUi();
     });
   }
@@ -345,8 +364,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('無料体験は終了しました。'), findsOneWidget);
   });
-  testWidgets(
-      'paid access deadline updates display while retaining safe management',
+  testWidgets('paid access deadline updates display without billing navigation',
       (tester) async {
     var now = _now;
     final repo = _Repo();
@@ -357,7 +375,7 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     expect(find.text('プレミアム利用中です'), findsNothing);
     expect(find.text('プレミアムの利用期間が終了しています'), findsOneWidget);
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
   });
   testWidgets(
       'resume rechecks both streams without starting or mutating a trial',
@@ -374,9 +392,9 @@ void main() {
     expect(find.text('契約管理'), findsNothing);
     repo.emitBilling(_billing());
     await tester.pump();
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
   });
-  testWidgets('trial failure does not remove verified existing management',
+  testWidgets('trial failure does not hide verified payment status',
       (tester) async {
     final repo = _Repo();
     await _mount(tester, repo);
@@ -385,7 +403,7 @@ void main() {
     repo.trial().addError(StateError('synthetic trial failure'));
     await tester.pump();
     expect(find.text('無料体験の状態を確認できませんでした'), findsOneWidget);
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
   });
   testWidgets('neutral screen keeps legal links at narrow width and large text',
       (tester) async {

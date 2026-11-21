@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 
-/// A shared-source release boundary for iOS and Android. Existing subscription
-/// management is the explicitly audited F exception, not a new purchase route.
+/// A shared-source release boundary for iOS and Android. Purchase and contract
+/// management are independent Web flows; Flutter retains status reads only.
 Map<String, String> flutterSources() => {
   for (final file
       in Directory('lib')
@@ -19,7 +19,7 @@ void main() {
     () {
       final prohibited = RegExp(
         r'createStripeCheckoutSession|checkout\.stripe\.com|buy\.stripe\.com|'
-        r'web\.app/(?:pricing|checkout|subscribe|purchase)|'
+        r'web\.app/(?:account|billing|pricing|checkout|subscribe|purchase)|'
         r'StripeCheckout|_startCheckout',
         caseSensitive: false,
       );
@@ -48,16 +48,19 @@ void main() {
     );
   });
 
-  test('existing-contract Portal has only the audited status-screen entry', () {
-    final callers = <String>[];
+  test('Flutter cannot invoke Portal or expose contract-management links', () {
+    final prohibited = RegExp(
+      r'createStripeCustomerPortalSession|billing\.stripe\.com|'
+      r'_openCustomerPortal|onOpenCustomerPortal|\bportalUrl\b|'
+      r'''['"](?:契約管理|プランを管理する|管理画面を準備中…|支払方法を変更する)['"]|'''
+      r'''['"]/(?:account|billing|pricing|checkout|subscribe|purchase)(?:/|['"]|\?)''',
+      caseSensitive: false,
+    );
+    final violations = <String>[];
     for (final entry in flutterSources().entries) {
-      for (final _ in 'createStripeCustomerPortalSession'.allMatches(
-        entry.value,
-      )) {
-        callers.add(entry.key);
-      }
+      if (prohibited.hasMatch(entry.value)) violations.add(entry.key);
     }
-    expect(callers, ['lib/screens/subscription_plan_screen.dart']);
+    expect(violations, isEmpty);
   });
 
   test(
@@ -110,7 +113,9 @@ void main() {
       ).allMatches(assetBlock).map((match) => match.group(1)!).toSet();
       expect(assetPaths, isNotEmpty);
       final prohibited = RegExp(
-        r'checkout\.stripe\.com|buy\.stripe\.com|(?:500|550)\s*円|Webで購入|月額プランに登録する',
+        r'checkout\.stripe\.com|buy\.stripe\.com|billing\.stripe\.com|'
+        r'web\.app/(?:account|billing|pricing|checkout|subscribe|purchase)|'
+        r'(?:500|550)\s*円|Webで購入|月額プランに登録する',
       );
       final violations = <String>[];
       for (final assetPath in assetPaths) {

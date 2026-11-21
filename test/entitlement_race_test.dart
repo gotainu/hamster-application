@@ -266,30 +266,30 @@ void main() {
     await tester.pump();
     expect(find.text('プレミアム利用中です'), findsNothing);
     expect(find.text('プレミアムの利用期間が終了しています'), findsOneWidget);
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
     expect(find.text('月額プランに登録する'), findsNothing);
   });
 
   for (final status in ['past_due', 'unpaid']) {
     testWidgets(
-        '$status keeps existing portal management without a new checkout',
+        '$status keeps payment status without purchase or Portal navigation',
         (tester) async {
       await tester.pumpWidget(_plan(fixture));
       fixture.billing().emit({..._paid(), 'status': status});
       await tester.pump();
-      expect(find.text('契約管理'), findsOneWidget);
+      expect(find.text('契約管理'), findsNothing);
       expect(find.text('月額プランに登録する'), findsNothing);
       expect(find.text('プレミアム利用中です'), findsNothing);
     });
   }
 
-  testWidgets('scheduled cancellation retains access and its management action',
+  testWidgets('scheduled cancellation retains access without management navigation',
       (tester) async {
     await tester.pumpWidget(_plan(fixture));
     fixture.billing().emit({..._paid(), 'cancelAtPeriodEnd': true});
     await tester.pump();
     expect(find.text('解約予定です'), findsOneWidget);
-    expect(find.text('契約管理'), findsOneWidget);
+    expect(find.text('契約管理'), findsNothing);
     expect(find.text('月額プランに登録する'), findsNothing);
     expect(find.textContaining('現在の契約期間が終了するまでは'), findsOneWidget);
   });

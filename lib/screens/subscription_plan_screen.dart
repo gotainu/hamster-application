@@ -5,8 +5,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:cloud_functions/cloud_functions.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/billing_status.dart';
@@ -42,7 +40,6 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen>
   final _trialDeadline = _UsageDeadline();
   String? _streamUid;
   int _readVersion = 0;
-  bool _isOpeningPortal = false;
 
   DateTime _now() => (widget.now ?? DateTime.now)();
 
@@ -103,49 +100,6 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen>
     _trialDeadline.clear();
     _authSubscription?.cancel();
     super.dispose();
-  }
-
-  FirebaseFunctions get _functions => FirebaseFunctions.instanceFor(
-        app: Firebase.app(),
-        region: 'asia-northeast1',
-      );
-
-  // Existing-contract management remains for the account-deletion safety
-  // exception. It does not start a new purchase or grant entitlement.
-  Future<void> _openCustomerPortal() async {
-    final uid = _repo.currentUserId;
-    if (_isOpeningPortal || uid == null || uid != _streamUid) return;
-    final repo = _repo;
-    final version = _readVersion;
-    setState(() => _isOpeningPortal = true);
-    try {
-      final callable =
-          _functions.httpsCallable('createStripeCustomerPortalSession');
-      final result = await callable.call();
-      if (!mounted ||
-          !identical(repo, _repo) ||
-          _repo.currentUserId != uid ||
-          version != _readVersion) {
-        return;
-      }
-      final data = result.data;
-      final portalUrl = data is Map ? data['portalUrl']?.toString() : null;
-      if (portalUrl == null || portalUrl.isEmpty) throw StateError('portal');
-      final launched = await launchUrl(
-        Uri.parse(portalUrl),
-        mode: LaunchMode.externalApplication,
-      );
-      if (!launched) throw StateError('portal');
-    } catch (_) {
-      if (mounted &&
-          identical(repo, _repo) &&
-          _repo.currentUserId == uid &&
-          version == _readVersion) {
-        HamsterFeedbackPopup.show(context, message: '契約管理画面を開けませんでした。');
-      }
-    } finally {
-      if (mounted) setState(() => _isOpeningPortal = false);
-    }
   }
 
   Future<void> _openLegalPage(Uri uri) async {
@@ -214,8 +168,6 @@ class _SubscriptionPlanScreenState extends State<SubscriptionPlanScreen>
                       _BillingUsageCard(
                         billing: billing!,
                         now: _now(),
-                        isOpeningPortal: _isOpeningPortal,
-                        onOpenCustomerPortal: _openCustomerPortal,
                       ),
                       if (!billing.canUsePaidFeaturesAt(_now())) ...[
                         const SizedBox(height: 16),
@@ -327,13 +279,9 @@ class _BillingUsageCard extends StatelessWidget {
   const _BillingUsageCard({
     required this.billing,
     required this.now,
-    required this.isOpeningPortal,
-    required this.onOpenCustomerPortal,
   });
   final BillingStatus billing;
   final DateTime now;
-  final bool isOpeningPortal;
-  final VoidCallback onOpenCustomerPortal;
 
   @override
   Widget build(BuildContext context) {
@@ -381,21 +329,6 @@ class _BillingUsageCard extends StatelessWidget {
       detail: end == null
           ? null
           : '${active ? '利用可能期限' : '契約期間の終了日時'}：${_formatDate(end)}',
-      extra: billing.canManageSubscription
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: isOpeningPortal ? null : onOpenCustomerPortal,
-                  icon: const Icon(Icons.manage_accounts_rounded),
-                  label: Text(isOpeningPortal ? '管理画面を準備中…' : '契約管理'),
-                ),
-                const SizedBox(height: 8),
-                const Text('お支払い方法や解約など、現在の契約を管理します。'),
-              ],
-            )
-          : null,
     );
   }
 }

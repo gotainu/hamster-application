@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/account_delete_service.dart';
+import '../services/account_deletion_guard.dart';
 import '../services/app_analytics.dart';
 import '../services/ai_chat_history_repo.dart';
 import '../services/ai_text_consent_store.dart';
@@ -21,10 +22,14 @@ import 'breeding_environment_edit_screen.dart';
 
 class SettingScreen extends StatefulWidget {
   final bool embeddedInTab;
+  final FirebaseAuth? auth;
+  final AccountDeletionGuard? accountDeletionGuard;
 
   const SettingScreen({
     super.key,
     this.embeddedInTab = false,
+    this.auth,
+    this.accountDeletionGuard,
   });
 
   @override
@@ -32,7 +37,10 @@ class SettingScreen extends StatefulWidget {
 }
 
 class _SettingScreenState extends State<SettingScreen> {
+  late final FirebaseAuth _auth = widget.auth ?? FirebaseAuth.instance;
   final AccountDeleteService _accountDeleteService = AccountDeleteService();
+  late final AccountDeletionGuard _accountDeletionGuard =
+      widget.accountDeletionGuard ?? AccountDeletionGuard(auth: _auth);
   final NotificationSettingsService _notificationSettingsService =
       NotificationSettingsService();
   final AiChatHistoryRepo _aiChatHistoryRepo = AiChatHistoryRepo();
@@ -41,8 +49,7 @@ class _SettingScreenState extends State<SettingScreen> {
   final AiTextConsentStore _aiTextConsentStore = AiTextConsentStore();
 
   PackageInfo? _packageInfo;
-  late final Stream<User?> _accountUsers =
-      FirebaseAuth.instance.authStateChanges();
+  late final Stream<User?> _accountUsers = _auth.authStateChanges();
 
   bool _isOpeningContact = false;
   bool _isRevokingAiTextConsent = false;
@@ -59,7 +66,7 @@ class _SettingScreenState extends State<SettingScreen> {
     });
 
     try {
-      await FirebaseAuth.instance.signOut();
+      await _auth.signOut();
 
       if (!mounted) return;
 
@@ -78,180 +85,125 @@ class _SettingScreenState extends State<SettingScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final uid = user?.uid;
-
+    if (_isDeletingAccount) return;
+    final uid = _auth.currentUser?.uid;
     if (uid == null) {
       HamsterFeedbackPopup.show(context, message: 'ログインユーザーが見つかりません。');
       return;
     }
-
+    setState(() => _isDeletingAccount = true);
     try {
-      final billing = await _billingStatusRepo.fetchBillingStatus();
+      if (!await _canDeleteFreeAccount(uid) || !mounted) return;
 
-      if (billing.canUsePaidFeatures && !billing.isCancellationScheduled) {
-        if (!mounted) return;
+      final confirmText = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          String inputText = '';
 
-        final subscriptionChoice = await showDialog<String>(
-          context: context,
-          builder: (dialogContext) {
-            return AlertDialog(
-              title: const Text('月額プランを利用中です'),
-              content: const Text(
-                'アカウントを削除しても、Stripeの月額プランは自動では解約されません。継続請求を防ぐため、先に「プランを管理する」から解約してください。\n\n'
-                'アカウントは今すぐ削除することもできますが、その場合も月額プランの解約は別途必要です。',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(null),
-                  child: const Text('キャンセル'),
+          return AlertDialog(
+            title: const Text('アカウントを削除しますか？'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Firestore上の飼育記録、AI相談履歴、SwitchBot連携情報、Firebase Authのアカウントを削除します。この操作は元に戻せません。',
                 ),
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(dialogContext).pop('delete-now'),
-                  child: const Text('削除へ進む'),
+                const SizedBox(height: 16),
+                const Text(
+                  '削除するには DELETE_MY_ACCOUNT と入力してください。',
+                  style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.of(dialogContext).pop('manage-plan'),
-                  child: const Text('プランを管理する'),
+                const SizedBox(height: 8),
+                TextField(
+                  autofocus: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    hintText: 'DELETE_MY_ACCOUNT',
+                  ),
+                  onChanged: (value) {
+                    inputText = value.trim();
+                  },
                 ),
               ],
-            );
-          },
-        );
-
-        if (subscriptionChoice == 'manage-plan') {
-          if (!mounted) return;
-
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const SubscriptionPlanScreen(),
             ),
-          );
-          return;
-        }
-
-        if (subscriptionChoice != 'delete-now') {
-          return;
-        }
-      }
-    } catch (error) {
-      debugPrint(
-        'Could not check subscription before account deletion: $error',
-      );
-    }
-
-    if (!mounted) return;
-
-    final confirmText = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        String inputText = '';
-
-        return AlertDialog(
-          title: const Text('アカウントを削除しますか？'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Firestore上の飼育記録、AI相談履歴、SwitchBot連携情報、Firebase Authのアカウントを削除します。この操作は元に戻せません。',
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(null),
+                child: const Text('キャンセル'),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                '削除するには DELETE_MY_ACCOUNT と入力してください。',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                autofocus: true,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  hintText: 'DELETE_MY_ACCOUNT',
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
                 ),
-                onChanged: (value) {
-                  inputText = value.trim();
+                onPressed: () {
+                  Navigator.of(dialogContext).pop(inputText);
                 },
+                child: const Text('削除する'),
               ),
             ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(null),
-              child: const Text('キャンセル'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () {
-                Navigator.of(dialogContext).pop(inputText);
-              },
-              child: const Text('削除する'),
-            ),
-          ],
-        );
-      },
-    );
+          );
+        },
+      );
 
-    if (confirmText == null) {
-      return;
-    }
-
-    if (confirmText != 'DELETE_MY_ACCOUNT') {
-      if (!mounted) return;
-
-      HamsterFeedbackPopup.show(context, message: '削除確認文字列が一致しませんでした。');
-      return;
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _isDeletingAccount = true;
-    });
-
-    try {
+      if (confirmText == null) return;
+      if (confirmText != 'DELETE_MY_ACCOUNT') {
+        if (!mounted) return;
+        HamsterFeedbackPopup.show(context, message: '削除確認文字列が一致しませんでした。');
+        return;
+      }
+      // Confirmation can remain open while the account or billing state changes.
+      if (!await _canDeleteFreeAccount(uid) || !mounted) return;
+      if (_auth.currentUser?.uid != uid) return;
       final result = await _accountDeleteService.deleteMyAccountAndData(
         confirmText: 'DELETE_MY_ACCOUNT',
         deleteAuthUser: true,
       );
-
-      debugPrint(
-        'Account deleted. deletedDocuments=${result['deletedDocuments']}',
-      );
-
+      if (result['ok'] != true) {
+        throw StateError('Account deletion was not confirmed.');
+      }
+      debugPrint('Account deletion confirmed.');
       try {
         await _aiTextConsentStore.revoke(uid);
       } catch (_) {
         // Account deletion has already succeeded. Do not report that server
         // operation as failed or skip sign-out for a device storage failure.
-        debugPrint('[AiTextConsent] Local removal failed after account deletion');
+        debugPrint(
+            '[AiTextConsent] Local removal failed after account deletion');
       }
-
-      await FirebaseAuth.instance.signOut();
-
+      // Do not sign out a different account while the server request was in flight.
+      if (_auth.currentUser?.uid != uid) return;
+      await _auth.signOut();
       if (!mounted) return;
-
       Navigator.of(context).popUntil((route) => route.isFirst);
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-
       HamsterFeedbackPopup.show(context, message: '削除に失敗しました。');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isDeletingAccount = false;
-        });
-      }
+      if (mounted) setState(() => _isDeletingAccount = false);
     }
+  }
+
+  Future<bool> _canDeleteFreeAccount(String uid) async {
+    final eligibility = await _accountDeletionGuard.check(uid);
+    if (!mounted) return false;
+    if (_auth.currentUser?.uid == uid &&
+        eligibility == AccountDeletionEligibility.freeAccount) {
+      return true;
+    }
+    HamsterFeedbackPopup.show(
+      context,
+      message: eligibility == AccountDeletionEligibility.contractPresent
+          ? '現在の契約状態では、アカウント削除を完了できません。'
+          : '利用状況を確認できませんでした。通信を確認して、もう一度お試しください。',
+    );
+    return false;
   }
 
   Future<void> _revokeAiTextConsent() async {
     if (_isRevokingAiTextConsent) return;
-    final ownerUid = FirebaseAuth.instance.currentUser?.uid;
+    final ownerUid = _auth.currentUser?.uid;
     if (ownerUid == null) {
       HamsterFeedbackPopup.show(context, message: 'ログイン情報を確認してください。');
       return;
@@ -278,16 +230,18 @@ class _SettingScreenState extends State<SettingScreen> {
         ),
       );
       if (confirmed != true || !mounted) return;
-      if (FirebaseAuth.instance.currentUser?.uid != ownerUid) {
-        HamsterFeedbackPopup.show(context, message: 'アカウントが変わりました。設定を開き直してください。');
+      if (_auth.currentUser?.uid != ownerUid) {
+        HamsterFeedbackPopup.show(context,
+            message: 'アカウントが変わりました。設定を開き直してください。');
         return;
       }
       await _aiTextConsentStore.revoke(ownerUid);
-      if (!mounted || FirebaseAuth.instance.currentUser?.uid != ownerUid) return;
+      if (!mounted || _auth.currentUser?.uid != ownerUid) return;
       HamsterFeedbackPopup.show(context, message: 'AI相談の情報送信への同意を取り消しました。');
     } catch (_) {
-      if (mounted && FirebaseAuth.instance.currentUser?.uid == ownerUid) {
-        HamsterFeedbackPopup.show(context, message: '同意を取り消せませんでした。もう一度お試しください。');
+      if (mounted && _auth.currentUser?.uid == ownerUid) {
+        HamsterFeedbackPopup.show(context,
+            message: '同意を取り消せませんでした。もう一度お試しください。');
       }
     } finally {
       if (mounted) setState(() => _isRevokingAiTextConsent = false);
@@ -493,7 +447,7 @@ class _SettingScreenState extends State<SettingScreen> {
       _isOpeningContact = true;
     });
 
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
     final packageInfo = _packageInfo;
 
     final appVersionText = packageInfo == null
@@ -773,7 +727,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       const SizedBox(height: 12),
                       StreamBuilder<User?>(
                         stream: _accountUsers,
-                        initialData: FirebaseAuth.instance.currentUser,
+                        initialData: _auth.currentUser,
                         builder: (context, snapshot) {
                           final user = snapshot.data;
                           return _OwnerAccountLabel(
@@ -1443,9 +1397,8 @@ const List<_PolicySectionData> _termsSections = [
   ),
   _PolicySectionData(
     title: 'プレミアムの利用について',
-    body:
-        'プレミアム機能の利用可否は、ログイン中のアカウントの契約状態と無料体験の利用状態に基づいて表示します。\n\n'
-        '既存の契約は「利用状況」から確認・管理できます。解約手続き後も、現在の契約期間が終了するまではプレミアム機能を利用でき、次回更新以降の請求は停止します。',
+    body: 'プレミアム機能の利用可否は、ログイン中のアカウントの契約状態と無料体験の利用状態に基づいて表示します。\n\n'
+        '契約状態は「利用状況」で確認できます。解約手続き後も、現在の契約期間が終了するまではプレミアム機能を利用でき、次回更新以降の請求は停止します。',
   ),
   _PolicySectionData(
     title: 'サービス内容の変更',

@@ -1,5 +1,7 @@
 # Flutter戦略C：購入CTA監査・撤去記録（2026-11-21）
 
+> **後続承認による更新**：以下は前工程の監査・実装履歴。最新の[Flutter Portal撤去記録](flutter_customer_portal_removal_20261121.md)により、Fの保持例外は撤回し、アプリ内Portal導線を完全撤去した。WebのPortalは維持する。本人の訂正では現在の有料契約者は0人、利用中は無料テスターであり、旧500円Priceの存在から有料契約の存在を推定しない。アカウント削除は最小の暫定拒否ガードを追加し、Stripe継続請求停止を含むサーバー側安全処理は独立次タスクに残す。
+
 開始点は承認済み`eb731dbee423`、`feature/web-first-stripe-checkout`の専用worktree。以下の分類は**Flutter実装変更前の読み取り監査**として記録した。行番号は開始点のsourceを指す。今回の対象はアプリの購入導線と関連表示・ローカル検証だけであり、Functions/Web/Stripe/Hosting/Firestore/ストア/配信版は変更しない。
 
 ## 実装前の導線分類

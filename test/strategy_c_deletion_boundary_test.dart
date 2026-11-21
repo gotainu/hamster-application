@@ -5,9 +5,8 @@ import 'package:hamster_project/models/billing_status.dart';
 import 'package:hamster_project/models/entitlement_snapshot.dart';
 import 'package:hamster_project/models/initial_trial_access.dart';
 
-// These tests preserve the temporary management/deletion boundary. They do not
-// certify that account deletion is safe: the server-side contract/deletion
-// lifecycle remains a documented release blocker and is outside this change.
+// These tests preserve the temporary deletion boundary and entitlement rules.
+// Server-side Stripe cancellation before Auth deletion remains a separate task.
 String _source(String path) => File(path).readAsStringSync();
 
 BillingStatus _subscription(
@@ -27,30 +26,25 @@ BillingStatus _subscription(
     );
 
 void main() {
-  group('temporary deletion management exception', () {
-    test('deletion warning retains the route to existing contract management',
+  group('app deletion boundary has no contract navigation', () {
+    test('deletion refuses unsafe states instead of offering Portal or bypass',
         () {
       final source = _source('lib/screens/settings.dart');
       final start = source.indexOf('Future<void> _deleteAccount()');
       final end = source.indexOf('Future<void> _revokeAiTextConsent()', start);
-      expect(start, greaterThanOrEqualTo(0));
-      expect(end, greaterThan(start));
       final deletion = source.substring(start, end);
-      expect(deletion, contains('アカウントを削除しても'));
-      expect(deletion, contains('自動では解約されません'));
-      expect(deletion, contains("subscriptionChoice == 'manage-plan'"));
-      expect(deletion, contains('const SubscriptionPlanScreen()'));
-      expect(deletion, isNot(contains('createStripeCheckoutSession')));
-      expect(deletion, isNot(contains('checkoutUrl')));
+      expect(deletion, contains('_canDeleteFreeAccount(uid)'));
+      expect(deletion, contains("result['ok'] != true"));
+      expect(deletion, isNot(contains('SubscriptionPlanScreen')));
+      expect(deletion, isNot(contains('manage-plan')));
+      expect(deletion, isNot(contains('delete-now')));
+      expect(deletion, isNot(contains('createStripe')));
     });
 
-    test(
-        'existing contract Portal callable is retained without client purchase',
-        () {
+    test('usage remains read-only without Portal or client purchase', () {
       final source = _source('lib/screens/subscription_plan_screen.dart');
-      expect(source, contains('createStripeCustomerPortalSession'));
-      expect(source, contains('_openCustomerPortal'));
-      expect(source, contains('canManageSubscription'));
+      expect(source, isNot(contains('createStripeCustomerPortalSession')));
+      expect(source, isNot(contains('_openCustomerPortal')));
       expect(source, isNot(contains('createStripeCheckoutSession')));
       expect(source, isNot(contains('checkoutUrl')));
     });
@@ -63,15 +57,6 @@ void main() {
       expect(source, contains("'deleteAuthUser': deleteAuthUser"));
       expect(source, isNot(contains("'uid':")));
       expect(source, isNot(contains('stripeCustomerId')));
-    });
-
-    test('known deletion risk stays an explicit release blocker', () {
-      final audit =
-          _source('docs/release/flutter_strategy_c_cta_audit_20261121.md');
-      expect(audit, contains('契約中ユーザーのアカウント削除'));
-      expect(audit, contains('NO-GO'));
-      expect(audit, contains('Portalを残す'));
-      expect(audit, contains('Stripe状態確認/解約'));
     });
   });
 
@@ -108,7 +93,8 @@ void main() {
       BillingStatusValue.pastDue,
       BillingStatusValue.unpaid,
     ]) {
-      test('$status retains payment management without granting access', () {
+      test('$status retains payment-attention state without granting access',
+          () {
         final billing =
             _subscription(status, plan: BillingPlan.none, periodEnd: end);
         expect(billing.canUsePaidFeaturesAt(now), isFalse);
@@ -129,7 +115,7 @@ void main() {
       });
     }
 
-    test('no contract cannot unlock paid features or Portal management', () {
+    test('no contract cannot unlock paid features', () {
       expect(BillingStatus.empty().canUsePaidFeaturesAt(now), isFalse);
       expect(BillingStatus.empty().canManageSubscription, isFalse);
     });

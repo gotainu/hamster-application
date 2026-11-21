@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-app-portal-removal-20261121:start -->
+## 2026-11-21 戦略C：Flutter契約管理導線の撤去（ローカルコード、未配信）
+
+- **前提訂正/開始点**：本人の訂正により現在の有料契約者は0人、利用中は無料テスター。旧Live500円Priceの存在から契約者の存在を推定しない。今回新たな移行・互換処理を追加しない。承認済み`d23820c42c4b`、同じ`feature/web-first-stripe-checkout`の専用worktree、開始時clean。
+- **撤去**：利用状況のPortal callable/URL/外部起動/管理ボタンと、削除確認から管理へ進む経路・削除続行の迂回を撤去。内蔵Termsの「利用状況から管理」も読取りだけへ訂正。WebサイトのCustomer PortalとFunctionsは維持。前工程のF例外は今回の承認で失効し、以下の前工程記録は履歴として読む。
+- **維持**：21日体験・明示開始/AI枠、契約状態、UID単位の有料権限取得/再取得、Web契約による機能解放、起動/復帰時読取り、通常アカウント管理・無料削除、Privacy/Terms/Supportを維持。iOS/Androidの共通ソースに購入経路差なし。
+- **削除の暫定境界**：本人UIDのbillingをserverから確認し、契約あり/不明/取得失敗/cache/pending/UID変更では削除要求しない。文書なし/契約なし/Customer参照のみの無料アカウントは既存確認→削除Functionへ。確認前後に読取り、`ok=true`以外は成功扱いせずsignOutしない。これはクライアント側の暫定拒否であり、Stripe正本の不存在や競合防止を保証しない。
+- **独立次タスク**：`deleteMyAccountAndData`は今回未変更。Stripe継続請求を停止・確認してからAuth/データを削除するサーバー処理、Webhookの遅延/再作成、Customer対応・連絡先/outboxの保持削除、失敗/再試行を別タスクで実装する。今回、有料契約の安全削除や配信準備完了とは扱わない。
+- **検証**：関連25ファイル322/322件PASS。無料削除の実Settings/Callable wrapper21件、guard28件、境界16件、利用状況28件・entitlement race37件、21日体験、明暗Home/Drawer/Settings/利用状況、AI/記録/通知/レポートを含む。186 Dart、同梱asset27指定/137ファイル（文字4）のスキャン5件PASS、購入/Portal/Web購入導線0、非購入外部起動8箇所。変更/追加9 Dartのanalyzeは新規指摘0、既存Settings activeColor非推奨info6件のみ。既存カレンダーGoldenのfont SHA不一致は前工程の制約として残し、今回の導線は非Goldenで確認。画像全件OCR/実機再確認・実アカウント削除は行わない。
+- **保護/詳細**：実Firestore/Auth/Stripe API呼出0、本番契約/体験/テスター権限変更0、Web/Functions/Hosting/ストア/ネイティブ設定/SDK/依存/版番号変更0、新ビルド配信0、main merge/push0。[今回の撤去・削除境界・検証記録](docs/release/flutter_customer_portal_removal_20261121.md)を参照。
+<!-- hamcare-app-portal-removal-20261121:end -->
+
 <!-- hamcare-app-strategy-c-cta-20261121:start -->
 ## 2026-11-21 戦略C：Flutter新規購入CTA撤去（契約管理は安全例外、本番未配信）
 
