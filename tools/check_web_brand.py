@@ -270,11 +270,17 @@ def main():
     # change. A dedicated refund paragraph may be added; all other markup,
     # links, controls, classes and media stay fixed.
     def landing_structure(source):
+        # The deletion request adds one footer-only destination. Keep every
+        # other approved brand element and existing destination constrained.
+        source = source.replace('<a href="/account-deletion/">アカウント削除</a>', '', 1)
         source = re.sub(r'<p class="price"(?: aria-label="月額550円(?:（税込）)?")?>.*?</p>', '<p class="price"></p>', source, flags=re.S)
         source = re.sub(r'<p class="small-text refund-policy">[^<]*</p>', '', source)
         source = re.sub(r'<details class="billing-policy-faq"><summary>[^<]*</summary><p>[^<]*</p><p>[^<]*</p></details>', '', source)
         return re.sub(r'(?<=>)[^<]*(?=<)', '', source)
     check('landing copy retains approved brand markup', landing_structure((PUBLIC/'index.html').read_text()) == landing_structure(baseline('public/index.html', CHECKOUT_BASE).decode()))
+    landing = (PUBLIC/'index.html').read_text()
+    deletion_link = '<a href="/account-deletion/">アカウント削除</a>'
+    check('deletion request has exactly one footer entry', landing.count(deletion_link) == 1 and deletion_link in landing.split('<footer', 1)[1])
     for path in ['public/assets/landing.css', 'public/assets/brand.css', 'public/assets/plan.css']:
         check('existing brand unchanged for Checkout ' + path, (ROOT / path).read_bytes() == baseline(path, CHECKOUT_BASE))
     account_css=(PUBLIC/'assets/account.css').read_text()

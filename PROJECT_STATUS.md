@@ -1,5 +1,15 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-web-deletion-request-20261121:start -->
+## 2026-11-21 Google Play向けWeb削除申請ページ（Preview確認、live未公開）
+
+- **開始点/実装**：承認済み`6940aec7ca6d`、同じ専用branch/worktree、開始時clean。既存`/account-deletion/`を現行outlineロゴ/星空/すりガラスで改訂。ログイン・再インストール・登録メールからの送信を求めず、Appleメールなし/Relayもメールで申請可能。件名入りmailto、公表サポートメールのコピーと失敗fallback、申請≠完了、削除/保持データ、本人確認後のStripe停止を説明。新API/購入CTAなし。LP/Privacy/Supportのsource導線も整えた。
+- **Preview**：[申請ページ](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account-deletion/)、同じ`web-first-task1`、version`037676ed8b90b69f`、期限11/28 21:48 JST。Hosting専用の新設定で削除ページだけ追加し、元Preview/Auth CSP・法務案除外を維持。Privacy/Supportリンクは既存canonical live。liveはversion`2365135bf558c278`・release不変。
+- **確認**：Web pure454/454、LP86/86、brand178/178 PASS。配信10リソースSHA/HTTP200、対象外4経路404、canonical法務3リンク200。実Previewの匿名閲覧、CSS幅360/390・本文16px・横スクロールなし、コピー成功、LP導線、console異常なし。旧account監査168/171の3件は、今回不変の既承認サーバーsourceと古い固定検証の不整合として記録し、削除/認証を勝手に変更しない。
+- **本人確認/公開残件**：申請メールと認証UIDを安全に結ぶ機能・運営用の安全な実行経路は未実装。メール/UID/スクリーンショットだけでは削除しない。受付リンク→既存Web認証→明示確認記録、および既存安全処理を再利用する承認済み運営実行経路を最小追加案として報告。Apple失効→Stripe失敗後の同UID再ログイン/再開は実機未確認を維持。準備後にcanonical `/account-deletion/` をPlayへ登録する。現時点で削除運用の本番GOとは扱わない。
+- **保護/記録**：本番Stripe/Firestore/契約/Auth/Storage操作0、実ユーザー削除0、Flutter/Functions/テスター/Play Console/Apple設定変更0、live公開/main merge/push/新ビルド配信0。メール送信0、Preview配備だけ1回。[本人確認・削除運用と検証記録](docs/release/web_account_deletion_support_20261121.md)を参照。今回の1コミット後に停止する。
+<!-- hamcare-web-deletion-request-20261121:end -->
+
 <!-- hamcare-apple-deletion-revocation-20261121:start -->
 ## 2026-11-21 Apple認可失効をアカウント削除に統合（コード・Mock、未配信）
 

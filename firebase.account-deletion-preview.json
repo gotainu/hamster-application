@@ -1,0 +1,85 @@
+{
+  "hosting": {
+    "site": "hamster-breeding-app",
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "assets/legal.css",
+      "assets/landing/provenance.json",
+      "billing/**",
+      "commercial-transactions/**",
+      "privacy/**",
+      "support/**",
+      "terms/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "no-referrer"
+          },
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow, noarchive"
+          },
+          {
+            "key": "Permissions-Policy",
+            "value": "camera=(), microphone=(), geolocation=(), payment=()"
+          }
+        ]
+      },
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'none'"
+          }
+        ]
+      },
+      {
+        "source": "/assets/**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; connect-src 'none'"
+          }
+        ]
+      },
+      {
+        "source": "/account/**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'none'; script-src 'self' https://www.gstatic.com/firebasejs/12.17.1/ https://apis.google.com https://js.stripe.com https://*.js.stripe.com https://checkout.stripe.com; style-src 'self'; font-src 'self'; img-src 'self' https://*.stripe.com; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://api.stripe.com https://checkout.stripe.com https://us-central1-hamster-breeding-app.cloudfunctions.net; frame-src https://hamster-breeding-app.firebaseapp.com https://accounts.google.com https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://checkout.stripe.com; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-store, max-age=0"
+          }
+        ]
+      },
+      {
+        "source": "/account-deletion/**",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+          },
+          {
+            "key": "Cache-Control",
+            "value": "no-store, max-age=0"
+          }
+        ]
+      }
+    ]
+  }
+}

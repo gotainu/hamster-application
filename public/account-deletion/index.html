@@ -3,114 +3,101 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Hamster Care アカウントとデータの削除方法" />
-    <title>アカウント削除 | Hamster Care</title>
-    <link rel="stylesheet" href="/assets/legal.css" />
+    <meta name="theme-color" content="#181a20" />
+    <meta name="description" content="HamCareのアカウントと関連データの削除方法。アプリを利用できない場合も、ログインや再インストールなしでメールから削除を申請できます。" />
+    <title>アカウント削除について｜HamCare</title>
+    <link rel="icon" href="/assets/landing/favicon-outline-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/assets/landing/apple-touch-icon-outline.png" sizes="180x180" />
+    <link rel="stylesheet" href="/assets/landing.css" />
+    <link rel="stylesheet" href="/assets/brand.css" />
+    <link rel="stylesheet" href="/assets/account-deletion.css" />
+    <script type="module" src="/assets/account-deletion.mjs"></script>
   </head>
   <body>
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a class="brand" href="/">Hamster Care</a>
-        <nav class="site-nav" aria-label="主要メニュー">
-          <a href="/support/">サポート</a>
-          <a href="/privacy/">プライバシー</a>
-          <a href="/terms/">利用規約</a>
-        </nav>
-      </div>
+    <a class="skip-link" href="#main">本文へ移動</a>
+    <header class="site-header wrap">
+      <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark-outline.png" width="48" height="48" alt="" /><span class="brand-copy"><span class="brand-name">HamCare</span><span class="brand-tagline">うちの子と、もっと健康で幸せに</span></span></a>
+      <nav aria-label="主要メニュー"><a href="https://hamster-breeding-app.web.app/support/">サポート</a><a href="https://hamster-breeding-app.web.app/privacy/">プライバシー</a></nav>
     </header>
-    <main class="page">
-      <article class="document">
-        <header class="document__title">
-          <p class="eyebrow">Account Deletion</p>
-          <h1>アカウントとデータの削除</h1>
-          <p class="updated">最終更新：2026年9月12日</p>
-        </header>
 
-        <section class="section">
-          <h2>アカウントを残して一部のデータを削除する</h2>
-          <h3>AI相談履歴</h3>
-          <ol>
-            <li>Hamster Careへログインします。</li>
-            <li>メニューから「設定」を開きます。</li>
-            <li>「データとプライバシー」の「AI相談履歴を削除」を選択します。</li>
-            <li>確認画面で「削除する」を選択します。</li>
-          </ol>
-          <p>
-            AI相談履歴だけが削除されます。アカウント、ペットプロフィール、飼育記録、温湿度データ、SwitchBot連携情報は削除されません。
-          </p>
+    <main class="deletion-shell" id="main">
+      <section class="deletion-card deletion-intro" aria-labelledby="deletion-title">
+        <p class="eyebrow">HAMCARE ACCOUNT</p>
+        <h1 id="deletion-title">アカウント削除について</h1>
+        <p class="deletion-lead">HamCareのアカウントと、関連する登録情報・飼育記録の削除をご案内します。</p>
+        <p>アプリを利用できない場合は、このページからメールで削除を申請できます。申請にログインやアプリの再インストールは必要ありません。</p>
 
-          <h3>ペットのプロフィール画像</h3>
-          <ol>
-            <li>Hamster Careへログインします。</li>
-            <li>メニューから「設定」を開きます。</li>
-            <li>「飼育情報」の「ペットプロフィール」を開きます。</li>
-            <li>プロフィール画像を選択し、「画像を削除」を選びます。</li>
-            <li>確認画面で削除を確定します。</li>
-          </ol>
-          <p>
-            プロフィール画像だけが削除され、アカウントとその他の登録データは保持されます。
-          </p>
-        </section>
+        <div class="request-box" aria-labelledby="request-title">
+          <h2 id="request-title">メールで削除を申請する</h2>
+          <a class="button primary deletion-mail" href="mailto:gotainu@gmail.com?subject=%E3%80%90HamCare%E3%80%91%E3%82%A2%E3%82%AB%E3%82%A6%E3%83%B3%E3%83%88%E5%89%8A%E9%99%A4%E7%94%B3%E8%AB%8B">メールで削除を申請する</a>
+          <p class="support-address" id="support-address">gotainu@gmail.com</p>
+          <button class="copy-email" id="copy-email" type="button" hidden>メールアドレスをコピー</button>
+          <p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="deletion-help">メールソフトが開かない場合は、上のアドレスをコピーするか長押しして、ご利用のメールサービスから送信してください。</p>
+          <p class="deletion-help">件名：<span class="mail-subject">【HamCare】アカウント削除申請</span></p>
+        </div>
+        <p class="request-note">メールの送信だけで削除が完了することはありません。運営が対象アカウントとご本人の確認方法をご案内し、確認後に削除を進めます。</p>
+      </section>
 
-        <section class="section">
-          <h2>アカウントと関連データを削除する</h2>
-          <ol>
-            <li>Hamster Careへログインします。</li>
-            <li>メニューから「設定」を開きます。</li>
-            <li>「アカウントを削除」を選択します。</li>
-            <li>確認画面の内容を読み、削除を確定します。</li>
-          </ol>
-          <p>削除後は元に戻せません。必要な記録は、削除前にご自身で控えてください。</p>
-        </section>
+      <section class="deletion-card" aria-labelledby="no-app-title">
+        <h2 id="no-app-title">アプリを利用できない方へ</h2>
+        <p>Appleの「メールを非公開」を使っている方、HamCareのログイン情報にメールアドレスが設定されていない方も申請できます。現在受信できるメールアドレスからご連絡ください。</p>
+        <p>分かる範囲で、利用していたログイン方法（Apple・Google・メールアドレスなど）と、アプリを利用できるかをお知らせください。分からない項目があっても、まずはご相談いただけます。</p>
+        <p class="safety-note"><strong>パスワード、認証コード、Firebase ID Tokenなどの認証トークンは送らないでください。</strong>運営からメールでこれらの情報を求めることはありません。</p>
+        <p>送信元メールアドレスやアカウントの識別情報だけで、ご本人と判断して削除することはありません。第三者による削除を防ぐため、個別に確認を行います。</p>
+      </section>
 
-        <section class="section">
-          <h2>アプリを利用できない場合</h2>
-          <p>
-            登録メールアドレスから、件名を「Hamster Care アカウント削除依頼」としてサポートへご連絡ください。第三者による不正な削除を防ぐため、本人確認をお願いする場合があります。
-          </p>
-          <a class="button" href="mailto:gotainu@gmail.com?subject=Hamster%20Care%20%E3%82%A2%E3%82%AB%E3%82%A6%E3%83%B3%E3%83%88%E5%89%8A%E9%99%A4%E4%BE%9D%E9%A0%BC">削除を依頼する</a>
-        </section>
+      <section class="deletion-card" aria-labelledby="in-app-title">
+        <h2 id="in-app-title">アプリ内から削除する場合</h2>
+        <ol class="deletion-steps">
+          <li>HamCareにログインし、メニューから「アプリ設定」を開きます。</li>
+          <li>「アカウントを削除」を選び、削除内容を確認します。</li>
+          <li>画面の案内に従い、確認文字列を入力して削除を確定します。</li>
+        </ol>
+        <p>Appleで登録している場合は、再認証やApple連携の解除をご案内することがあります。</p>
+        <p>削除後は元に戻せません。残しておきたい記録は、削除前にご自身で控えてください。</p>
+      </section>
 
-        <section class="section">
-          <h2>削除されるデータ</h2>
-          <ul>
-            <li>Firebase Authenticationのアカウント</li>
-            <li>ペットプロフィールとプロフィール画像</li>
-            <li>飼育環境、日々の記録、体重、活動量、温湿度の記録</li>
-            <li>AI相談履歴</li>
-            <li>SwitchBot連携情報と保存された認証情報</li>
-            <li>通知設定と端末の通知トークン</li>
-            <li>アプリ内に保存された契約状態などの関連データ</li>
-          </ul>
-        </section>
+      <section class="deletion-card" aria-labelledby="deleted-data-title">
+        <h2 id="deleted-data-title">削除の対象となるデータ</h2>
+        <p>本人確認後のアカウント削除では、対象アカウントに紐づく次のデータを削除します。</p>
+        <ul>
+          <li>ログイン用アカウント、飼い主・ペットのプロフィール、保存されているペットのプロフィール画像</li>
+          <li>飼育環境、日々の状態、体重・活動量・温湿度などの飼育記録</li>
+          <li>AI相談履歴、通知設定、端末の通知トークン</li>
+          <li>SwitchBotの連携情報・保存された認証情報</li>
+          <li>HamCare内の契約状態と、独立して登録した契約用の連絡先メール</li>
+        </ul>
+      </section>
 
-        <section class="section">
-          <h2>削除後も一定期間保持される場合があるデータ</h2>
-          <p>
-            法令遵守、決済記録、返金・紛争対応、不正利用防止に必要な取引情報やセキュリティログは、目的達成に必要な期間保持される場合があります。バックアップ上のデータは、通常の更新サイクルに従って削除されます。
-          </p>
-          <p>
-            Stripe上の取引記録の取扱いについては、必要に応じてサポートへお問い合わせください。
-          </p>
-        </section>
+      <section class="deletion-card" aria-labelledby="retained-data-title">
+        <h2 id="retained-data-title">保持される場合がある情報</h2>
+        <p>すべての情報が同時に完全削除されるわけではありません。法令遵守、請求・会計、返金・紛争対応、不正利用防止のため、必要な情報を保持する場合があります。</p>
+        <ul>
+          <li>Stripe上の請求書・支払履歴・取引に関する顧客情報</li>
+          <li>課金との対応記録、契約通知や処理の記録、セキュリティ・障害調査の記録</li>
+          <li>削除済みアカウントへの課金やデータの再作成を防ぐための最小限の記録</li>
+        </ul>
+        <p>情報の取扱いは、<a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a>もご確認ください。保持の対象・理由・期間など、具体的な取扱いはサポートへお問い合わせいただけます。</p>
+      </section>
 
-        <section class="section">
-          <h2>月額プランをご利用中の方</h2>
-          <p>
-            アカウント削除の前に、HamCare Webのアカウント確認画面から「支払方法・請求・解約を管理する」を選び、Stripe Customer Portalで月額プランの期間末解約をお手続きください。アカウント削除だけでは、外部決済サービス上の契約が直ちに終了しない場合があります。不明な場合は削除前にサポートへご連絡ください。
-          </p>
-        </section>
-      </article>
+      <section class="deletion-card" aria-labelledby="billing-title">
+        <h2 id="billing-title">有料契約中の場合</h2>
+        <p>アカウント削除を実行する際は、Stripeの継続請求が停止したことを確認してから、登録データとログイン用アカウントを削除します。停止を確認できない場合は、削除完了とはせず、処理状況をご案内します。</p>
+        <p>削除後は、残りの契約期間があってもサービスを利用できません。利用者都合による支払済み料金の日割り返金は原則ありません。重複課金・誤請求・法令上必要な返金は個別に対応します。</p>
+        <p>削除申請メールの受信時点で、契約や請求が直ちに終了するわけではありません。申請後に不明な請求があった場合も、サポートへご連絡ください。</p>
+      </section>
+
+      <section class="deletion-card deletion-contact" aria-labelledby="contact-title">
+        <h2 id="contact-title">ご不明な点はサポートへ</h2>
+        <p>本人確認や削除の対象についても、ご相談を受け付けています。</p>
+        <a href="https://hamster-breeding-app.web.app/support/">サポート・お問い合わせ</a>
+      </section>
     </main>
-    <footer class="site-footer">
-      <div class="site-footer__inner">
-        <span>© 2026 Hamster Care</span>
-        <nav class="footer-links" aria-label="フッターメニュー">
-          <a href="/privacy/">プライバシー</a>
-          <a href="/terms/">利用規約</a>
-          <a href="/support/">サポート</a>
-        </nav>
-      </div>
+
+    <footer class="deletion-footer wrap">
+      <span>© 2026 HamCare</span>
+      <nav aria-label="フッターメニュー"><a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a><a href="https://hamster-breeding-app.web.app/terms/">利用規約</a><a href="https://hamster-breeding-app.web.app/support/">サポート</a></nav>
     </footer>
   </body>
 </html>
