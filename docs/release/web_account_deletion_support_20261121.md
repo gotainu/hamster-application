@@ -1,4 +1,87 @@
-# Webアカウント削除申請・本人確認の運用案（2026-11-21）
+# Webアカウント削除申請・本人確認の運用（2026-11-22更新、未配備）
+
+## 今回つながった経路
+
+承認済み`fcdd64465613`から継続。メール受付→運営が既存Authレコードを選択→申請専用リンク→既存Firebase Web認証/再認証→サーバーでUID/作成日時/Apple subjectを検証→同じ申請に削除と継続課金停止への同意を記録→運営dry-run→明示実行→既存`runAccountDeletion`→完了証跡照合、という最小接続を追加した。実行は`e1fe0524dbb9`のStripe停止・排他・再試行・削除フェンス・既存tree walkを使い、直接Auth/Firestoreを消す別経路は作らない。現在有料契約者0人という前提を維持する。
+
+**コード/Mock・隔離検証の準備であり、本番運用開始ではない。** Functionsは未配備、サーバーenable switchは未設定なら停止、Webのenable定数もfalse。PreviewからFirebase認証/Apple失効/本人確認APIへ進ませない。メール送信、実アカウント削除、本番Firestore/Stripe/Auth/Storage操作は行わない。
+
+### 本人確認と期限
+
+- `support_account_deletion_requests/{random192bit}`に、運営がAdminで選択した既存UIDとAuth作成時刻、個人情報を含まない受付番号を固定。メール/本文UID/写真は候補特定の補助に限り、本人確認の証拠にはしない。選択が誤っていれば確認を拒否し、運営が元の申請を照合してリンクを再発行する。メール一致による統合はしない。
+- リンク秘密値は256bit、`sha256(requestId:proof)`のみ保存。URL fragmentから読み取って即座にURLを消去、メモリだけで保持。ID Token、UID、メールはURLに載せない。リンクの転送・公開・追跡クリックサービスを使わない。
+- リンクは24時間、Firebase再認証は5分以内かつ申請発行後、運営reviewは5分。未着手の確認済み申請も確認から24時間を過ぎれば再確認が必要。処理開始済みは既存の永続削除要求を正本にし、期限を理由に中途放棄しない。これはセキュリティ上の有効期限であり、保存データが自動削除される期間ではない。
+- Admin `verifyIdToken(token,true)`と現在の`getUser`、既存`authorizeWebBillingManagementIdentity`を再利用。署名・失効・同一UID・当初Auth作成時刻を検証し、Appleセッションはprovider subjectも照合。別UID、後から作成/再作成したUID、新規登録、期限切れ、他申請proof、再利用を拒否。本人が明示した削除/課金停止意思を同じ申請にtransactionで1回記録する。
+- 購入用のメール確認、飼い主/ペット存在、体験/購入ガードは使用しない。既存のプロフィール未登録・未確認メール・Appleメールなし/Relayも同じ既存UIDの認証ができれば対象。実メール登録・購入・アプリ再インストールは要求しない。
+
+### 運営手順（配備/権限確認後だけ使用、今回実行しない）
+
+1. 公開ページからのメールに受付番号を付ける。返信の送付先は連絡先であり本人認証ではない。既存Authで候補を確認し、対象UIDと`creationTime`を非公開管理画面で照合する。申請者へパスワード・認証コード・ID Tokenを送らせない。
+2. 運営端末の非公開ファイル（0600、Git外）に`{"targetUid":"対象の既存UID","intakeRef":"CASE_001"}`を置く。UIDをチャット/コマンド引数/公開記録へ転載しない。
+3. `tools/support_account_deletion.cjs`を既存Node22で実行する。`--service-account=<承認済み運営SA> --create --input=<非公開ファイル> --output=<新規非公開リンクファイル>`。固定private endpointだけへ、専用SAをimpersonateしたaudience指定OIDCで接続する。リンクはファイルへだけ保存（0600/exclusive、既存ファイルは上書きしない）。今回この操作はMockのみ。
+4. リンクを申請メールの返信で案内する。本人が既存のログイン方式でサインイン/再認証し、対象・削除範囲・課金停止条件を確認して同意する。サーバーでUID一致を確認できない限り削除へ進まない。
+5. `--service-account=... --request=<申請ID> --output=<新規reviewファイル>`が既定dry-run。削除対象UIDハッシュ、受付番号、削除範囲、**Firestore上の契約snapshot（Stripe最新状態ではない）**、停止/処理状態、Apple対応、Auth有無を非公開reviewで確認する。dry-runはStripe API/削除フェンス/データ変更0。判断に必要な実UID照合は運営の非公開Auth画面と行い、対外文面に載せない。
+6. 対象/意思/範囲に相違がない場合だけ`--service-account=... --request=... --execute --review-file=<直前review> --ack=EXECUTE_VERIFIED_DELETION`。実行にUID引数はなく、確認済み申請のUIDだけを使う。申請/契約snapshotが変化したり5分を過ぎればreviewをやり直す。
+7. Stripe最新状態・UID/Customer/Subscription/Price/Invoiceを既存処理で照合。停止未確認ならAuth/データ削除を止め、同じ申請からreview/再開する。停止済みなら既存cleanupへ。新規Checkout排他、11分lease、有限backoff/15分worker/最大12回、manual_review、遅延Webhook抑止を維持する。停止証跡やフェンスを手動で消したり成功に書き換えない。
+8. `completed`フェンス **かつ** Auth不存在をサーバーで照合してから完了とする。worker完了後も同じ申請をreviewして照合可能。API応答だけ/メール受付だけ/Apple失効だけでは完了にしない。未完了は毎営業日確認し、manual_review、期限超過、worker障害を既存の監視手順へ接続する。
+9. 照合後だけ下記完了案を人が返信する。自動メール送信機能は追加していない。
+
+権限境界：`supportAccountDeletionOperator`は`invoker:'private'`。Hosting rewrite、公開callable、public/allUsers/allAuthenticatedUsers権限を付けない。専用運営SAのCloud Run Invokerはこの1サービスだけ、操作者のToken CreatorはそのSAだけへ限定し、操作者へFirestore/Auth削除権限やプロジェクトOwnerを与えない。runtimeの既存削除用権限/Secretは別途最小化する。IAMの実機拒否/許可テストは配備前提の残件。
+
+### ログインできない場合
+
+メール/パスワードは既存Firebaseパスワード再設定、Google/Appleは元と同じプロバイダとアカウントの復旧を案内する。既存Web認証で同UIDへ復帰できれば申請リンクを再発行する。Appleの非公開アドレスやメールなしを理由に別IDへ付け替えない。購入・プロフィール登録は不要。認証が復旧できない場合は個別サポートで調査/連絡を続け、本人確認成立前の削除経路・メール一致移行・運営によるAuth直接削除は用意しない。処理開始後のAuth削除済み/データ削除途中は、再ログインを要求せず既存要求のworker/運営照合で再開する。
+
+### Web/運営経路のApple対応
+
+既存Firebase JS 12.17.1の`reauthenticateWithPopup`と`revokeAccessToken(auth, accessToken)`を使用でき、SDK/Service ID/Key更新は不要。[Firebase Web Apple公式](https://firebase.google.com/docs/auth/web/apple#token_revocation)。Flutter helperをWebから呼んだり、Firebaseセッション失効をApple OAuth失効と記録したりしない。
+
+Web認証→申請との同UID preflight→連携Appleで再認証→元/返却/現在UIDと既知Apple subjectを照合→再preflight→取得直後のaccessTokenを失効→同じ申請へ意思確認、の順。Appleトークン/codeはメモリ限りで、Firestore/URL/ログ/運営APIへ送らない。Stripe待機やworkerへ持ち越さない。サーバーに残す`revoked_client_reported`は**client申告**であり、Apple側成功の独立証明ではない。
+
+tokenが得られない/失効失敗時は[Apple設定からの手動解除](https://support.apple.com/102571)を明示し、本人が継続を明示した`manual_acknowledged`を記録する。[TN3194](https://developer.apple.com/documentation/technotes/tn3194-handling-account-deletions-and-revoking-tokens-for-sign-in-with-apple)どおりトークンがないだけで削除を永久拒否しない。一方UID不一致・本人認証未成立はmanualで迂回しない。Apple以外の未連携アカウントは失効要求なし。
+
+実Apple失効は今回0件。失効後にStripe停止が失敗した場合の同UID再ログイン/再開は引き続き**実機未確認**。今回Mockの再試行成功を実機PASSに置き換えない。
+
+### 対応目安と保持情報（運営者の最終判断待ち）
+
+既存文書/コードに正式な返信・削除完了SLAはない。推奨案は「初回返信3営業日以内、本人確認後7暦日を完了目安、7日超なら途中連絡し以降7日ごと」。保証/自動処理期限ではない。承認前は公開ページに具体日数を約束せず、確認後に予定を知らせる。
+
+| 情報 | 現在の実装/理由 | 期間・期限後の扱い |
+|---|---|---|
+| Auth/users全階層・switchbot・独立連絡先・固定ペット画像 | Stripe停止確認後、既存cleanupで削除 | 完了工程で削除。すべての外部コピー即時消去とは表示しない |
+| 新申請UID/作成時刻/受付番号/proof hash/同意/Apple対応 | 本人確認・対象固定・再試行/監査 | 自動purgeなし。完了後90日で申請の直接識別情報/対応メールを削除又は最小化する案（未承認・未実装）。未確認期限切れ申請は30日後整理案。保留案件は解決まで保持/定期確認 |
+| 削除中要求 | UID、同意、試行/失敗/停止確認 | 解決まで保持。途中で消さない |
+| 完了フェンス | UIDハッシュ、version/status/completedAt。復活/二重課金防止 | 現在は無期限/TTLなし。ハッシュは匿名化保証ではない。遅延イベント/再作成リスクを評価後、必要最小化を別承認。先に削除しない |
+| 課金Customer/Session対応・Webhook receipt・通知outbox | 会計/重複処理/障害照合 | 現在TTL/purgeなし。目的別の保存期間・手動/自動整理を本番前に承認し、法定記録と分離。年数を推測しない |
+| Stripe請求書/支払い等 | 会計・法令上の保持が必要な場合 | 適用する記録ごとの法定期間を運営/会計担当が確認。今回削除・返金・voidなし |
+| Preview連絡先/challenge・外部ログ/メール/分析/バックアップ | 既存cleanupの対象外がある | challenge15分はリンク期限で自動消去期限ではない。pendingは自然消去されず、使用済みhashは上限10。各保存先の保持/削除作業を別途確定。未実装の自動削除を約束しない |
+
+### 返信文案（今回送信しない）
+
+受付/本人確認案：
+> HamCareのアカウント削除申請を受け付けました。削除を安全に進めるため、別途ご案内する本人確認リンクから、これまでHamCareでお使いの方法でログインし、削除内容をご確認ください。アプリの再インストールや購入、個人の実メール登録は不要です。パスワード・認証コード等を返信する必要はありません。ログインできない場合はその旨をお知らせください。確認後、対応予定をご案内します。
+
+途中案：
+> HamCareの削除申請について、現在、課金停止またはデータ削除の処理状況を確認しています。削除完了はまだ確認できていません。確認が取れ次第、改めてご連絡します。追加の購入や新しいアカウント作成は不要です。
+
+完了案（completedフェンス+Auth不存在の照合後だけ）：
+> ご本人確認をいただいたHamCareアカウントの削除処理が完了したことを確認しました。対象の登録情報・飼育記録等は削除され、該当する有料契約がある場合の今後の自動請求も停止しています。法令上保存が必要な請求記録や、不正利用・二重処理を防ぐための最小限の情報は保持する場合があります。Apple連携の手動解除をご案内していた場合は、Appleアカウント設定で解除状況をご確認ください。ご利用ありがとうございました。
+
+### 今回の検証記録
+
+結果・Preview幅360/390・安全境界・Gitは`PROJECT_STATUS.md`の2026-11-22節を正本とする。実環境で未確認なのは運営IAM/本番配備/実アカウント削除/実Apple失効とその後の同UID再ログイン。実メールは送らない。現在の公開版へつながったと扱わず、承認後に本番反映手順を実施する。
+
+変更ファイル（今回分18件）：
+
+- 接続：`functions/src/supportAccountDeletion.ts`、`functions/src/supportAccountDeletionHttp.ts`、`functions/src/index.ts`。
+- Web：`public/account-deletion/index.html`、`public/account-deletion/confirm/index.html`、`public/assets/support-deletion-service.mjs`、`public/assets/support-deletion.mjs`、`public/assets/support-deletion.css`。
+- 運営：`tools/support_account_deletion.cjs`。
+- 限定試験：`functions/test/support_account_deletion.test.cjs`、`functions/test/support_account_deletion_http.test.cjs`、`functions/test/support_account_deletion_emulator.test.cjs`、`tools/test_support_account_deletion_operator.cjs`、`tools/test_web_support_deletion.mjs`。
+- 既存文書：`PROJECT_STATUS.md`、本書、`docs/release/account_deletion_billing_safety_20261121.md`、`docs/release/web_billing_live_cutover_runbook_ja.md`。
+
+---
+
+## 前工程の記録（2026-11-21時点。以下の「未実装」は当時の状態）
 
 開始点は承認済み `6940aec7ca6d`。今回のページは、ログイン不要の申請窓口を提供するもの。メール送信だけで削除完了にならず、新しい削除APIや運営用実行ツールを実装・配備したものでもない。本番公開・実ユーザー削除・Play Console設定変更は行わない。
 

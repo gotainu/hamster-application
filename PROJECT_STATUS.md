@@ -1,5 +1,18 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-verified-support-deletion-20261122:start -->
+## 2026-11-22 メール削除申請→Web本人確認→既存安全削除の接続（未配備）
+
+- **開始点/対象**：承認済み`fcdd64465613`、同じ`feature/web-first-stripe-checkout`/専用worktree、開始時clean。現在有料契約者0人の前提を維持。今回の接続・限定試験・既存文書だけを1コミットとし、Flutter/SDK/依存/Apple設定/ストアを変更しない。
+- **本人確認**：運営がAdminで選択した既存UID/Auth作成時刻と受付番号へ申請を固定。192bit申請ID/256bit秘密値（hash保存）、24時間/1回限り、直近5分かつ発行後のFirebase再認証、失効検査、現在のAdminレコード/Apple subject照合。メール/本文UID/画像は証拠にせず、別UID/新規/再作成/期限切れ/流用/再使用を拒否。同じ申請へ削除/課金停止意思をtransactionで記録。メール確認/購入/飼い主/ペット登録を削除条件にしない。
+- **運営実行**：private IAM endpoint、未設定時falseのenable switch、固定先OIDC CLI（秘密値/UIDを標準出力へ出さず0600ファイル）。既定は読み取りdry-run、確認済み申請のUID hash/範囲/Firestore契約snapshot/処理状態を確認し、5分期限のsnapshot digest+明示executeだけで実行。任意UIDへ差し替え不可。`runAccountDeletion`と既存`deletionDependencies`をそのまま共有し、Stripe停止/排他/再試行/tree walk/Auth/Storageを迂回しない。完了はcompletedフェンス+Auth不存在の再照合。実メールは送らず受付/途中/完了の案内文を用意。
+- **Apple**：既存JS12.17.1の再認証/`revokeAccessToken`を再利用する独立Web接続。申請UID preflight→Apple再認証/UID・subject再照合→失効→同意記録。token/codeはメモリ限り、保存/送信/ログなし。失効取消/失敗/30秒未確認時だけ明示manual fallbackを提示し、不一致は迂回不可。server記録はclient申告と区別。実失効/失効後Stripe失敗からの同UID実機再ログインは未確認を維持。
+- **限定検証**：Functions strict TypeScript build PASS。今回関連Mock/pure6ファイル66/66（core17、HTTP8、CLI5、Web25、既存匿名ページ8、Preview境界3）、Firestore Emulator2/2で計68件PASS。Emulatorは専用demo/loopback18687、Auth/Storage/StripeはMock。未確認運営実行/別UID/期限/再使用拒否、プロフィールなし/Appleメールなし、Stripe停止失敗とcleanup失敗後の同じ申請からの再開、二重要求/完了証跡を確認。LP86/86、brand178/178 PASS（現行outline masterの正本/派生を含む）。全アプリ/既存購入E2Eの繰返しは行わない。
+- **Preview表示**：[申請案内](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account-deletion/) / [本人確認説明](https://hamster-breeding-app--web-first-task1-lco08m60.web.app/account-deletion/confirm/)。同じchannel、最終version`e01a69d94cb66f1f`、期限11/29 08:10 JST。確認機能false+canonical限定でSDK読込/認証/Apple失効/API送信/削除0、CSP connect-noneを維持。CSS幅360/390・本文16px・横はみ出しなし、説明/正本アイコン/停止状態とconsole error/warnなしをCUAで確認。配信6リソースHTTP200/SHA一致、本番live`2365135bf558c278`不変。画像はworktree外`artifacts/support-deletion-20261122/`へ保存。今回の物理Safari実機削除PASSとは扱わない。
+- **運用値/公開残件**：正式な対応SLA/保持期間は既存未設定。推奨案は初回3営業日・本人確認後7暦日目安・7日ごと途中連絡、完了履歴90日/未確認期限切れ30日で整理（未承認/自動purge未実装）。完了フェンス等は現在TTLなし。会計保存期間は記録種別ごとに確認し、全消去期限を約束しない。運営IAM/最小権限・本番core/worker/Secret/監視・新endpoint配備・Web有効化/最小CSP・専用アカウントの配備後確認は別承認の残件。今回の接続タスク完了と本番削除運用開始を区別する。[現行運用/返信案/保持一覧/反映手順](docs/release/web_account_deletion_support_20261121.md)と[本番Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)を更新。
+- **保護**：本番Firestore/Stripe/Auth/Storage操作・実ユーザー削除・実Apple失効・実メール送信0。Functions/live Hosting/テスター/契約/Play Console変更0、main merge/push/新ビルド配信0。Hosting Previewの停止状態の静的表示だけ反映。既存の未追跡素材に触れず、検証用依存symlink/Emulatorは後始末して今回1コミット後に停止する。
+<!-- hamcare-verified-support-deletion-20261122:end -->
+
 <!-- hamcare-web-deletion-request-20261121:start -->
 ## 2026-11-21 Google Play向けWeb削除申請ページ（Preview確認、live未公開）
 

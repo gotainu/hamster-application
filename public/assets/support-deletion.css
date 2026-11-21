@@ -1,0 +1,16 @@
+.deletion-shell [hidden] { display: none !important; }
+.deletion-shell fieldset { border: 0; padding: 0; margin: 24px 0; min-width: 0; }
+.deletion-shell legend { font-weight: 700; margin-bottom: 12px; }
+.deletion-shell label:not(.support-choice) { display: block; margin: 16px 0 8px; }
+.deletion-shell input[type="email"], .deletion-shell input[type="password"] { width: 100%; box-sizing: border-box; padding: 12px; font: inherit; font-size: 16px; color: var(--hamcare-text-primary); border: 1px solid #8390a6; border-radius: 10px; background: #121924; min-height: 48px; }
+.deletion-shell button { font: inherit; cursor: pointer; white-space: normal; overflow-wrap: anywhere; }
+.deletion-shell button:disabled { opacity: .6; cursor: default; }
+.support-action, #support-email-form button { display: block; width: 100%; min-height: 48px; margin: 16px 0; padding: 12px 16px; box-sizing: border-box; border: 1px solid #8390a6; border-radius: 12px; background: #24273b; color: #fff; }
+.deletion-shell button.primary { background: var(--hamcare-primary-action); border-color: #6a9cdc; }
+.support-choice { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 12px 0; color: var(--hamcare-text-primary); cursor: pointer; }
+.support-choice input { flex: 0 0 auto; width: 22px; height: 22px; margin-top: 3px; accent-color: var(--hamcare-accent-cyan); }
+.support-choice span { min-width: 0; overflow-wrap: anywhere; }
+.support-apple-notice, #deletion-intent-panel, #support-verified { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--hamcare-border); }
+#support-apple-manual { margin: 20px 0; padding: 16px; border-radius: 12px; background: #172330; }
+#request-error { color: #fff; padding: 16px; border: 1px solid #f6c97c; border-radius: 12px; background: #33291b; overflow-wrap: anywhere; }
+@media (forced-colors: active) { .support-action, #support-apple-manual, #request-error, .deletion-shell input { background: Canvas; color: CanvasText; border-color: CanvasText; } }

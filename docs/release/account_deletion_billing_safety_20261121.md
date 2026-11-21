@@ -2,6 +2,12 @@
 
 開始点は承認済み `6e85a3c25640`、`feature/web-first-stripe-checkout` の同じ専用worktree、開始時clean。現在の有料契約者0人・無料テスターのみという運営者確認を前提とする。今回はコード・ローカル検証だけで、配備、実アカウント削除、Live Stripeアクセスを行わない。
 
+## Webメール申請からの再利用（2026-11-22、未配備）
+
+[Web削除運用](web_account_deletion_support_20261121.md)で、既存Firebase認証の確認済みUID・削除/課金停止意思を申請へ固定し、private IAMの運営dry-run/実行から本書の`runAccountDeletion`を呼ぶ接続を追加。`deletionDependencies`のStripe/既存tree walk/Auth/Storage処理を共有し、直接削除・新しい削除システムは追加しない。運営の実行入力はrequestId+直前reviewだけでUID変更不可。未確認の申請を実行できず、Stripe停止失敗やcleanup途中失敗は同じ要求の排他/再試行へ合流する。古いAuth作成時刻も照合し、同じUIDが再作成された場合を拒否する。
+
+dry-runの契約表示はFirestore snapshot。Stripeの最新状態/所有者照合/停止確認は既存coreの実行時に行う。完了は既存completedフェンスとAuth不存在を再読込みして判定。Web Apple再認証/失効はFlutterとは別で、結果はclient申告/手動案内確認として区別する。実Apple失効後のStripe障害・同UID再ログインは実機未確認。本番Functions/実ユーザー/Stripe Liveには今回触れない。
+
 ## 既存処理と今回の変更
 
 - FlutterはSettingsの削除確認、確認文字列、既存Callable名 `deleteMyAccountAndData` を維持。本人UIDのserver billingを確認して文面を選ぶ。無料には課金説明なし。有効/支払未解決/未確定契約には、登録情報・飼育記録の削除、自動請求停止、残期間の利用終了、原則日割り返金なしを表示する。明確な終了済み・未契約表示でもサーバーのStripe照合を省略する根拠にはしない。

@@ -1,5 +1,7 @@
 # HamCare：本番切替Runbook（方針最終版・未実行）
 
+2026-11-22追記：メール削除申請を既存Web認証・安全な削除処理へ接続するコードと限定試験を追加。[削除申請の運用手順](web_account_deletion_support_20261121.md)を参照。新public確認endpointとprivate運営endpointは未配備、server/Webの有効化は停止状態。実アカウント削除・本番操作・メール送信は0。以下の本番手順は今回も実行しない。
+
 更新：2026-11-21。開始点 `4aeab766f90e`。今回は方針・公開前文面・Runbookを最終化するだけで、以下の工程は**一つも実行しない**。各GOは方針決定又は既存検証の状態であり、本番変更の実行承認ではない。既存の配信アプリ・テスター・契約を維持する。
 
 本番APIのコード準備は[2026-11-21実装記録](production_web_billing_api_20261121.md)を参照。今回も本Runbookは未実行。後続のFunctions切替には専用`HAMCARE_LIVE_WEB_BILLING_CONFIG`の全必須項目と旧500円対応の事前確認が必要であり、旧`STRIPE_*`から自動補完しない。設定なしの先行配備は既存Webhook/Portalも停止するため行わない。新規購入は明示的なWeb見積り/同意を必要とし、旧アプリの空の購入要求は安全停止する。WebのLive API接続・本番連絡先確認・本番通知・IAM/実データ互換確認は、コード準備完了と別の工程として残す。
@@ -38,6 +40,7 @@
 | Live Stripe | 未実施 | 新550円Price・新規申込接続は未実行 |
 | live Hosting | 今回の戦略C切替は未実施 | 既存公開サイトは存在。今回の新Web購入公開とは別 |
 | Flutter CTA撤去 | 新規購入・Portal導線ともコード撤去済・未配信 | [Portal撤去記録](flutter_customer_portal_removal_20261121.md)。Webの契約管理とアプリの権限読取りは維持。本人確認では現在有料契約者0人。[削除前の請求停止](account_deletion_billing_safety_20261121.md)と[Apple失効統合](apple_account_deletion_revocation_20261121.md)はコード・ローカル試験準備済、未配備/未配信。専用実機失効E2E・配備/監視等は残件 |
+| Web削除申請 | メール→本人確認→運営実行のコード接続/限定試験済・未配備 | 固定された既存UID/作成日時、1回限りリンク、同じ申請の意思確認、IAM privateのdry-run/実行。既存Stripe停止/削除フェンス/workerを再利用。未確認申請は実行不可。公開窓口はPreviewのみ、実機Apple失効・運営IAM・本番削除の確認は残件 |
 | Apple審査 | 戦略C版は未提出 | Case103009817213は回答済み、事前承認なし・実提出後判断 |
 | Google審査 | 戦略C版は未提出 | 既存Alphaの審査提出・配信履歴はある。Google審査を一度もしていないという意味ではない |
 
@@ -52,6 +55,19 @@
 3. Gmailの本番通知は [不足通知と後続実装](launch_notifications_and_flutter_scope_20261121.md) に従う。確認済み宛先、有限の送信枠、永続キュー/重複抑止、429/一時障害の上限付き再試行、認証失効時停止、不明な送信結果の手動照合・再送判断を用意する。API成功は受信完了ではない。配送不能の確認・サポート手順と既存OAuthの継続利用可否を確認し、権限を無断追加しない。Previewの本人許可リスト・送信上限を本番のために解除しない。
 4. 独立連絡先・確認履歴・送信記録の保持期間、期限切れ情報の削除、退会時削除/法定保持の分離を実装・確認し、Privacyを実態と揃える。15分のトークン期限を保存データの削除期限と取り違えない。特商法の請求開示体制と公開前法務一式も確認する。Relay配送未確認だけでこれらの準備を止めない。
 5. 既存Live設定/Hosting版/配布版/対象本人契約の安全な照合記録と、承認済み変更の一覧を準備する。復旧手段を事前に実装・リハーサルし、存在しない停止スイッチを使用可能と書かない。個人値・UID・Token・カード情報を公開証跡へ出さない。
+6. Web削除申請は次の独立した本番操作を別承認後に行う。新規購入/連絡先補完とは結合せず、購入用profile/pet guardを流用しない。
+
+## Web削除申請の本番反映（未実行）
+
+| 実施対象/変更 | 成功条件 | 停止条件 | ロールバック/継続対応 |
+|---|---|---|---|
+| 削除core/workerと専用Live設定の配備計画 | 既存`runAccountDeletion`/tree walk/Stripe停止確認をそのまま呼ぶ。無料はStripe API0、課金ありは停止確認前にAuth/データ削除0 | 未配備旧削除Functionに依存、Secret/IAM/Scheduler/監視不備、別UID/請求書未解決 | 新受付/実行を停止し原因確認。既存永続要求・停止証跡・完了フェンスは保持。安全版workerの継続/復旧を確認し、途中処理を放置しない |
+| 新確認Function・private運営Function | `HAMCARE_SUPPORT_DELETION_ENABLED`未設定では停止。運営は`invoker:private`、専用SAに当該サービスだけのRun Invoker、担当者のToken Creatorも当該SA限定。不要な広域Admin権限なし。publicendpointはcanonicalOrigin/失効検査/最新Auth/UID固定 | allUsers/allAuthenticatedUsersの運営権限、ブラウザから運営API、任意UID実行、token/リンクのログ | enableをfalse、運営Invokerを外し新規実行を止める。データをrestoreしたと扱わず既存要求を照合 |
+| Web本人確認画面/法務/公開窓口 | Web側enable定数を承認済みリリースだけで有効化し、canonical限定。最小CSPは既存Firebase SDK12.17.1/Auth/当該endpointだけ。Previewはfalse/connect-noneを維持。申請は匿名、後段は本人認証と意思確認 | Previewの本番API接続、UID/メール/tokenのURL漏れ、profile/pet登録/購入を削除条件化 | 有効化前のWeb版へ戻し、公開窓口とサポートで受付継続。申請/停止済み記録は消さない |
+| 専用合成/本人承認済み削除用アカウントの配備後確認 | private IAM拒否、別UID拒否、同意/課金停止/cleanup/完了判定を確認。実Apple失効は専用アカウントの別承認後だけ | テスター/既存本人アカウントの無承認削除、Mockを実機PASS扱い | 検証停止、対象/実施済み工程を照合。不可逆な削除をコードrollbackで取り消せるとしない |
+| 運営手順/保持/案内/監視 | dry-run→対象/範囲/キャッシュ契約状態確認→明示実行→completedフェンス+Auth不存在照合。毎日pending/古いrunning/retryable/manual_review/worker失敗を確認。完了連絡は照合後 | 受付メールだけで削除、直接Auth削除、billingStopped手動偽装、未確定の全消去期限を約束 | 個別対応へ切替え、未完了を案内し再確認。返信目安・履歴保持の推奨案を運営承認後に公開文面へ反映 |
+
+申請リンク24時間・再認証5分・review5分は実装済みの認証期限であり、申請データの自動削除ではない。返信3営業日/確認後7暦日・7日ごと途中連絡、完了後履歴90日/期限切れ未確認30日の整理は推奨案で未確定・自動purge未実装。会計記録の法定期間は記録種別ごとに確認し、現在TTLなしの完了フェンスを先に消さない。Apple実失効後にStripe失敗→同UID再ログイン/再開の実機残件を維持する。
 
 ## 共通の停止・ロールバック原則
 

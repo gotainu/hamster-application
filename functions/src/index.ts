@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import Stripe from 'stripe';
 import {runAccountDeletion, retryDueAccountDeletions} from './accountDeletion';
 import {DeletionStop} from './accountDeletionBilling';
+import {createSupportDeletionHttp, SUPPORT_DELETION_ORIGIN} from './supportAccountDeletionHttp';
 import { defineSecret } from 'firebase-functions/params';
 import {createProductionWebBillingRuntime, readWebBillingConfig, safeWebBillingError, WEB_BILLING_UNAVAILABLE} from './webBillingRuntime';
 import {WEB_BILLING_ORIGIN} from './webBillingConfig';
@@ -1582,6 +1583,42 @@ const deletionDependencies = {
     });
   },
 };
+
+// No support workflow is enabled by deployment alone. Its operator transport
+// additionally requires Cloud Run Invoker IAM; never grant allUsers here.
+const supportDeletion = createSupportDeletionHttp({
+  enabled:()=>process.env.HAMCARE_SUPPORT_DELETION_ENABLED==='true',
+  auth:admin.auth(),
+  core:{db,
+    async getUser(uid:string) {
+      try {return await admin.auth().getUser(uid);}
+      catch (error:any) {if (error?.code==='auth/user-not-found') return null; throw error;}
+    },
+    runDeletion:(uid:string)=>runAccountDeletion(deletionDependencies,uid,
+      {kind:'request',stopBillingConfirmed:true}),
+  },
+});
+export const confirmSupportAccountDeletion = onRequest(
+  {region:'asia-northeast1',timeoutSeconds:60,maxInstances:2,memory:'256MiB',
+    cors:SUPPORT_DELETION_ORIGIN},
+  async(req,res)=>{
+    res.set('Cache-Control','no-store, max-age=0');
+    res.set('Referrer-Policy','no-referrer');
+    if(req.rawBody.length>4096) {res.status(400).json({ok:false});return;}
+    const reply=await supportDeletion.confirm(req);
+    res.status(reply.status).json(reply.body);
+  },
+);
+export const supportAccountDeletionOperator = onRequest(
+  {region:'asia-northeast1',invoker:'private',timeoutSeconds:540,maxInstances:1,
+    memory:'1GiB',secrets:[LIVE_WEB_BILLING_CONFIG],cors:false},
+  async(req,res)=>{
+    res.set('Cache-Control','no-store, max-age=0');
+    if(req.rawBody.length>4096) {res.status(400).json({ok:false});return;}
+    const reply=await supportDeletion.operator(req);
+    res.status(reply.status).json(reply.body);
+  },
+);
 
 export const retryAccountDeletions = onSchedule(
   {region:'asia-northeast1',schedule:'every 15 minutes',timeoutSeconds:540,maxInstances:1,
