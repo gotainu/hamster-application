@@ -33,9 +33,9 @@ function fixture(options={}) {
   return {db,user,token,calls,run,sends,proof,advance:ms=>now+=ms,now:()=>now,setConfig:v=>raw=v,getConfig:()=>raw,
     setEnabled:v=>enabled=v,setDailyLimit:v=>dailyLimit=v};
 }
-test('limited Live parser requires explicit exact one UID, one recipient, total=1 and finite expiry',()=>{
-  const parsed=parse(config(),'live');assert.ok(Object.isFrozen(parsed.limitedContactTest));assert.equal(parsed.allowedSubjectHashes.length,1);
-  for(const patch of [{limitedContactTest:undefined},{limitedContactTest:{}},{limitedContactTest:{expiresAtMillis:NOW,maxTotalSends:2}},
+test('limited Live max1 configuration keeps exact one UID, one recipient and finite expiry',()=>{
+  const parsed=parse(config(),'live');assert.equal(parsed.limitedContactTest.maxTotalSends,1);assert.ok(Object.isFrozen(parsed.limitedContactTest));assert.equal(parsed.allowedSubjectHashes.length,1);
+  for(const patch of [{limitedContactTest:undefined},{limitedContactTest:{}},{limitedContactTest:{expiresAtMillis:NOW,maxTotalSends:3}},
     {limitedContactTest:{expiresAtMillis:NaN,maxTotalSends:1}},{limitedContactTest:{expiresAtMillis:0,maxTotalSends:1}},
     {limitedContactTest:{expiresAtMillis:NOW,maxTotalSends:1,reset:true}},
     {allowedSubjectHashes:[]},{allowedRecipientHashes:[]},{allowedSubjectHashes:[hash(UID),hash('other')]},

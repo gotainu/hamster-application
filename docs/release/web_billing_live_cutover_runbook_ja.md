@@ -1,5 +1,19 @@
 # HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
 
+## 2026-11-22 追加1通で本番連絡先確認を完了（累計2通・停止復帰済）
+
+開始点`69c2667947d5`。本人が「追加最大1通・前回を含む累計最大2通」、同じ本人UID/画面指定1宛先、必要な最小コード/設定/1関数配備、本人contact/確認情報/制限記録の書込み、完了後停止を承認した。準備配備のやり直しや古いSecretへの巻戻しは行わない。
+
+- **宛先・前提**：前回の予約1/要求履歴1/日次全体・本人各1/期限切れpending/verified=falseを読み取り、追加枠が未使用であることを確認。本人は別宛先を選び、Mac内の一時入力画面へ直接指定。最初の保護判定によるRejectedは宛先保存/送信前に修正し、再入力・本人所有チェックを受理。選択値は非公開0600ファイルだけに保持し、メールは正規の本番フローから発行。Apple ID/Authのメールを宛先の正本にしない。
+- **累計2の制御**：trusted Secretの`maxTotalSends:1|2`、UID/宛先hash各1、有限期限。max2は旧slot1の厳密7項目/schema1/同owner/正規hash/予約時刻を確認し、固定slot2だけtx.create。slot2にはordinal2/旧notification hashを記録。旧宛先のslot1は変更せず、新指定宛先をslot2へ束縛。同key再送、slot2消費後、翌日・再起動・期限/上限再設定でも3通目なし。送信直前transactionが最終防壁で、既に枠消費済みのrequestはpending変更前に拒否する。
+- **検証/配備**：4srcとtest2のみ、strict TypeScript・関連330/330・Hosting helper10/10 PASS。Secret v2の送信専用認可をメモリで再利用し、同UID/新宛先/累計2/6時間を明示したv3を追加。既存scope gmail.sendだけをrefresh確認、OAuth設定/同意/Previewのread/write変更0。`billingContactEmail`だけfalse/日次2/v3で配備し、revision`billingcontactemail-00005-sas`、164ソース/compiled/package一致、archive SHA256 `c7af10c1e7c66e9744f5fd084ccf2d2b09bc250eb4ba053ab0ca0b141e182d4a`。本人限定trueのrevision`billingcontactemail-00006-fuj`へ切替。他Functions/IAM/Rules/Index/Stripe/Flutter/ストア変更0。
+- **実機E2E PASS**：本人が本番で同じAppleアカウントへログインし、送信直前のスマホ準備確認に「今から確認できる」と回答。新指定宛先で追加メールの受信・差出人/本文/スマホ表示に問題なしと報告。新しい確認リンクを開き「連絡用メールを確認済みです」を確認。同UID/正規Live原本で新宛先verified=true、pending消去、usedTokenHashes1、要求履歴2/旧prefix保持、旧slot1 full-document hash不変/slot2正規、同UTC日のglobal/owner counter各2を照合。token/link全文のGit/診断/Firestoreへの保存・表示なし。初回1通の実配送は未確認の履歴のまま維持する。
+- **送信操作と保存の照合**：UI要求後、一度「再送が続いています」と確認済みパネルが同時表示された。直ちにDBを照合すると追加枠は消費済み・確認済み保存済みだったため、既に進んだ処理を引継ぎ、再送しない。要求と送信の順序/操作主体は推測せず、実績は永久2予約・日次2・履歴2・本人受信報告で確認。上限拒否は3通目の送信成功とは扱わない。以後のアカウント再表示は正常で、Web画面の追加改修は行わない。
+- **画面復帰 PASS**：スマホで固定「プラン確認へ戻る」→「アカウント確認へ戻る」→再読込後も「確認済みの連絡先を利用できます」を本人確認。Macでも固定plan/アカウント復帰と確認済み連絡先表示を照合。Authメールは未設定のまま、別の連絡先補完が保存された状態であり、購入受付/課金/無料体験を開始しない。
+- **停止復帰**：revision`billingcontactemail-00007-vah` ACTIVE、enabled=false/日次1/v3参照。POST status/request/confirm各503+`contact_service_unavailable`、購入API403（tokenなし、送信0）。Hostingの一時案内4aadを終了し、停止版`22b8c97c2532f11c`へ直接再release、45hash/CSPと実画面を確認。旧journalを再利用/巻戻しせずround2専用journalへ記録した。資格情報/確認済み原本/全履歴/旧永久slot/追加slotは取り消さず保持。
+- **書込みの分類**：構成変更はLive Secret v3・対象1Functionのcode/revision・一時flag/日次枠・Hostingの案内切替/復元。業務書込みは本人`billing_contacts/{uid}`の正規pending再発行→verified保存/usedhash、既存日次global/ownerの2docの1→2、追加attempt予約とslot2の新規2doc。日次枠は停止時1へ戻してもcounter2を保持し、リセットしない。Auth projection/owner/pet/trial/billingの基準hashは停止後も不変、他テスター/Preview/契約/利用権限/Stripe/Storage/Apple設定変更0。
+- **終了条件**：今回追加1通・累計2通、受信/確認/同UID保存/スマホ復帰を完了。3通目・旧リンク利用・期限延長・履歴削除は行わない。一般受付/一般送信を停止したまま、このコード/test/既存2文書だけを1コミット。実Relay配送等の別タスクを今回のPASSへ混ぜない。
+
 ## 2026-11-22 準備配備の承認範囲と現在地の再照合
 
 準備配備は`14b7904edb53`から実行し、`d475c8b229e1`で記録済み。今回求められた購入停止の実効性と静的検査3件目の具体的説明も同記録に含まれる。後続の本人限定連絡先確認`304465659444`を巻き戻さず、今回は再配備・Secret登録・OAuth変更をせず、現行停止状態の再確認とこの追記だけを行った。

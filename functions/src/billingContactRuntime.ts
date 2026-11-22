@@ -3,7 +3,7 @@ import type * as admin from 'firebase-admin';
 import {accountDeletionRef} from './accountDeletion';
 import {authorizeWebBillingIdentity,BillingAuthenticationError,validWebBillingUid,normalizeBillingEmail} from './webBillingShared';
 import {BillingContactError,createBillingContactEngine,BillingContactView,BILLING_CONTACT_LIVE_ORIGIN} from './billingContact';
-import {createLiveBillingContactStore,LIVE_BILLING_CONTACT_TEST_RESERVATION_PATH} from './billingContactStore';
+import {createLiveBillingContactStore,canRequestLimitedLiveBillingContact} from './billingContactStore';
 import {parseBillingNotificationMailConfig} from './billingNotificationGmail';
 import {createLiveBillingContactSender} from './billingContactMail';
 
@@ -64,7 +64,7 @@ export function createProductionBillingContactRuntime(d:ProductionBillingContact
       try {
         const config=parseBillingNotificationMailConfig(d.rawConfig(),'live'),dailyLimit=d.dailyLimit();
         if(!Number.isSafeInteger(dailyLimit)||dailyLimit<1||dailyLimit>100 ||
-          (config.limitedContactTest && (dailyLimit!==1 || !Number.isSafeInteger(now()) || now()<=0 || now()>=config.limitedContactTest.expiresAtMillis))) throw new BillingContactError('contact_configuration_invalid');
+          (config.limitedContactTest && (dailyLimit>config.limitedContactTest.maxTotalSends || !Number.isSafeInteger(now()) || now()<=0 || now()>=config.limitedContactTest.expiresAtMillis))) throw new BillingContactError('contact_configuration_invalid');
         const bearer=req.headers.authorization;
         if(typeof bearer!=='string'||!/^Bearer [^\s]{1,8192}$/.test(bearer)) throw new BillingContactError('unauthenticated');
         let token:admin.auth.DecodedIdToken,user:admin.auth.UserRecord;
@@ -86,7 +86,7 @@ export function createProductionBillingContactRuntime(d:ProductionBillingContact
         // Keep the first usable proof intact. A repeat request must not replace
         // its pending contact before the final irreversible-send guard rejects it.
         if(config.limitedContactTest && op==='request' &&
-          (await d.db.doc(LIVE_BILLING_CONTACT_TEST_RESERVATION_PATH).get()).exists) throw new BillingContactError('contact_rate_limited');
+          !(await canRequestLimitedLiveBillingContact(d.db,identity.uid,config.limitedContactTest.maxTotalSends,now()))) throw new BillingContactError('contact_rate_limited');
         const sendMail=op==='request'?createLiveBillingContactSender({db:d.db,config,dailyLimit,now,fetchRequest:d.fetchRequest,sleep:d.sleep},identity.uid):undefined;
         const engine=createBillingContactEngine({environment:'live',store:createLiveBillingContactStore(d.db),now:()=>new Date(now()),sendMail});
         const view=op==='status'?await engine.status(context):op==='request'?await engine.request(context,req.body.email):await engine.confirm(context,req.body.token);

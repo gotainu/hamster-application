@@ -18,10 +18,10 @@ export function createLiveBillingContactSender(d:LiveBillingContactMailDependenc
   const now=d.now??Date.now;
   const reserve=createBillingNotificationBudget(d.db,'live',d.dailyLimit);
   const sender=createBillingNotificationGmailSender(d.config,{fetchRequest:d.fetchRequest,now:()=>new Date(now()),
-    ...(d.config.limitedContactTest ? {reserveLimitedContactTest:createLimitedLiveBillingContactReservation(d.db,uid)} : {})});
+    ...(d.config.limitedContactTest ? {reserveLimitedContactTest:createLimitedLiveBillingContactReservation(d.db,uid,d.config.limitedContactTest.maxTotalSends)} : {})});
   const sleep=d.sleep??(ms=>new Promise(resolve=>setTimeout(resolve,ms)));
   return async(message:BillingContactMail):Promise<void>=>{
-    if (d.config.environment!=='live' || (d.config.limitedContactTest && d.dailyLimit!==1) || !/^[a-f0-9]{64}$/.test(message.idempotencyKey) ||
+    if (d.config.environment!=='live' || (d.config.limitedContactTest && d.dailyLimit>d.config.limitedContactTest.maxTotalSends) || !/^[a-f0-9]{64}$/.test(message.idempotencyKey) ||
       !new RegExp('^'+BILLING_CONTACT_LIVE_ORIGIN.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'/account/contact/#token=[A-Za-z0-9_-]{43}$').test(message.verificationUrl)) {
       throw Object.assign(new BillingContactError('contact_configuration_invalid'),{delivery:'not_sent'});
     }

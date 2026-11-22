@@ -13,7 +13,7 @@ export interface BillingNotificationMailConfig {
   allowedSubjectHashes?: readonly string[];
   allowedRecipientHashes?: readonly string[];
   /** Explicit one-recipient production smoke only; never an implicit Live allowlist. */
-  limitedContactTest?: Readonly<{expiresAtMillis:number;maxTotalSends:1}>;
+  limitedContactTest?: Readonly<{expiresAtMillis:number;maxTotalSends:1|2}>;
 }
 export type BillingNotificationMailErrorCategory = 'configuration_invalid' | 'recipient_not_allowed' |
   'invalid_recipient' | 'request_invalid' | 'authorization_revoked' | 'authorization_failed' |
@@ -68,7 +68,7 @@ export function parseBillingNotificationMailConfig(raw: unknown, expectedEnviron
   if (expectedEnvironment==='preview' && (!validHashes(v.allowedSubjectHashes) || !validHashes(v.allowedRecipientHashes))) return fail('configuration_invalid');
   const limited=v.limitedContactTest;
   if (limited!==undefined && (expectedEnvironment!=='live' || !object(limited) ||
-    Object.keys(limited).sort().join(',')!=='expiresAtMillis,maxTotalSends' || limited.maxTotalSends!==1 ||
+    Object.keys(limited).sort().join(',')!=='expiresAtMillis,maxTotalSends' || ![1,2].includes(limited.maxTotalSends) ||
     !Number.isSafeInteger(limited.expiresAtMillis) || limited.expiresAtMillis<=0 || limited.expiresAtMillis>8640000000000000 ||
     !validHashes(v.allowedSubjectHashes) || v.allowedSubjectHashes.length!==1 ||
     !validHashes(v.allowedRecipientHashes) || v.allowedRecipientHashes.length!==1)) return fail('configuration_invalid');
@@ -78,7 +78,7 @@ export function parseBillingNotificationMailConfig(raw: unknown, expectedEnviron
     clientId:v.clientId,clientSecret:v.clientSecret,refreshToken:v.refreshToken,
     ...(expectedEnvironment==='preview' || limited!==undefined ? {
       allowedSubjectHashes:Object.freeze([...v.allowedSubjectHashes]),allowedRecipientHashes:Object.freeze([...v.allowedRecipientHashes])} : {}),
-    ...(limited!==undefined ? {limitedContactTest:Object.freeze({expiresAtMillis:limited.expiresAtMillis,maxTotalSends:1 as const})} : {})});
+    ...(limited!==undefined ? {limitedContactTest:Object.freeze({expiresAtMillis:limited.expiresAtMillis,maxTotalSends:limited.maxTotalSends as 1|2})} : {})});
 }
 
 function validateMessage(message: BillingNotificationMailMessage): string {

@@ -1,5 +1,15 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-22 追加1通で本番連絡先確認を完了（累計2通・停止復帰済）
+
+- **開始/本人指定**：`69c2667947d52e6d846cbc95bcb495f72ad29c97`・同じ専用branch/worktree・開始時clean。前回の同じApple UIDを維持し、本人がMac内の非公開入力画面で新しい受信可能な連絡先を指定。宛先指定の保護判定を直して再入力後に受理し、この段階のメール送信0。Apple IDメールから宛先を推測せず、Authメール/ログイン方式/UIDを変更しない。
+- **追加枠の最小実装**：既存`limitedContactTest`の明示累計上限を1または2に限定。旧永久slotのschema/同owner/hash/予約時刻を検証した場合だけ`billing_notification_delivery_limits/_limited_contact_test_2`をtransaction create。旧slot/送信履歴/日次counterをリセットせず、別宛先1件への変更にも対応。同key再試行・3通目・未知結果後・翌日/再起動で追加POST不可。Auth/確認engine/期限15分/使い切り/固定復帰は維持。4source/直接test2だけ変更、TypeScript・関連330件、Hosting helper10件PASS。
+- **設定/限定配備**：Live Secret v2の同じgmail.send認可を再利用し、v3へ同UIDhash1/新指定宛先hash1/有限6時間/累計2だけを設定。OAuth設定/認可/Previewは変更せず、Preview Secretのreadも0。日次枠は既存消費1を含め一時2、`billingContactEmail`だけfalseで配備（`billingcontactemail-00005-sas`）し、164ソース/compiled/packageの一致を確認。本人限定trueは`billingcontactemail-00006-fuj`。他Functions/IAM/Rules/Index/Stripe/Flutter/ストア変更0。
+- **実確認PASS**：本人が本番Appleログインし、送信直前にスマホで今回の宛先を開けると回答。追加分の受信・差出人/本文/スマホ表示に問題なし、新しいリンクで確認済み表示を本人確認。同UIDの`billing_contacts`は新指定連絡先のverified=true/pendingなし/使用済みhash1、requestedAt履歴2・旧prefix保持・永久slot1不変/slot2正規・UTC全体/本人counter各2を照合。送信枠消費後の要求は上限拒否され、既に進んだ確認を引継ぎ、3通目は送らない。初回メールの実受信は未確認の履歴のまま。
+- **復帰PASS**：本人のスマホで「プラン確認へ戻る」→「アカウント確認へ戻る」→再読込後も「確認済みの連絡先を利用できます」を確認。Macでも固定plan復帰・同じテストnickname/Apple/Authメール未設定と独立した確認済み連絡先を表示。契約/購入/体験開始へ進まない。
+- **最終停止/保持**：停止revision`billingcontactemail-00007-vah`がACTIVE、enabled=false/日次1/Secret v3。status/request/confirm各503+正規停止code、購入API403。Hostingは本人限定版4aad→停止版`22b8c97c2532f11c`へ再release、45hash/CSP不変、実画面の停止案内を確認。今回追加1通・累計2通で停止し、再送/期限延長/回数リセット0。確認済み原本/旧履歴/2永久予約を保持。
+- **本番書込み/保護**：本人contactの正規再発行/確認済み遷移、既存日次全体/本人2docの1→2更新、追加attempt/slot2の新規2docのみ。Authメール未設定/provider構成とowner/pet/trial/billing基準hashは停止後も不変。既存テスター/Preview/Stripe/契約/利用権限/Apple設定/実削除/他配備変更0。秘密値/UID/宛先/token/link全文はGit/診断へ出さない。既存PROJECT_STATUSとRunbookを今回のコード/testと1コミットにまとめ、main merge/pushなしで停止する。
+
 ## 2026-11-22 本番準備配備の承認範囲を再照合（再配備なし）
 
 - `14b7904edb53`を配備元とする準備配備と静的検査3件目の説明補足は、記録コミット`d475c8b229e1`で完了済み。後続承認の本人限定確認`304465659444`を維持し、古いコードの再配備・Secret v1への巻戻し・OAuth変更は行わない。
