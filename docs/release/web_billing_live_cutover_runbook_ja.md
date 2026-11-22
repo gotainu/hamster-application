@@ -1,5 +1,14 @@
 # HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
 
+## 2026-11-22 準備配備の承認範囲と現在地の再照合
+
+準備配備は`14b7904edb53`から実行し、`d475c8b229e1`で記録済み。今回求められた購入停止の実効性と静的検査3件目の具体的説明も同記録に含まれる。後続の本人限定連絡先確認`304465659444`を巻き戻さず、今回は再配備・Secret登録・OAuth変更をせず、現行停止状態の再確認とこの追記だけを行った。
+
+- 購入serviceのInvoker IAMチェックは有効、service/projectの公開bindingなし。一般向けFunctions URLとRun URLへのtokenなし空callable要求はともに403。Live Checkout SessionをGETで再読取りし、open 0/有効な未完了0。失効・契約取消・Customer/Session作成なし。
+- contactはACTIVE/revision`billingcontactemail-00004-luf`、`HAMCARE_BILLING_CONTACT_ENABLED=false`/日次1/Secret v2。正規Originのstatus/request/confirm各503・`contact_service_unavailable`で、起動失敗ではない。Hosting最新versionは`22b8c97c2532f11c`で停止版のまま。旧13保全＋追加32/CSP限定の配備実績は下記記録を維持する。
+- 静的3件目は`production billing/Auth source unchanged functions/src/index.ts`。旧基準との全文不一致を保持し、共有認証と停止条件の欠落ではないこと、旧58関数を配備しないことを根拠に準備配備を進めた。168/171をPASSへ変更せず、検査も無効化しない。
+- この再確認の構成変更・配備・実メール・Stripe書込み・ユーザー業務データ変更は0。後続承認で登録済みのSecret v2/送信専用認可は維持し、本人pendingも変更しない。先行タスクの1通受付を実配送・確認完了として扱わない。一般受付/送信を引き続き停止し、今回の文書追記だけを1コミットにする。
+
 ## 2026-11-22 本人限定の連絡先実確認（1通受付・確認未完了、停止復帰済）
 
 開始点`d475c8b229e12af3b64c7498a0c86c4b74fd989f`。本人が1UID/1宛先/最大1通・必要な最小実装/配備・本人連絡先/送信制限の書込み・確認後停止・1コミットを承認。購入/Stripe/通知worker/他Functions/一般送信/削除/Flutter/ストア/merge/pushは範囲外。前工程の全監査/E2Eをやり直さず、今回の変更境界だけを確認する。

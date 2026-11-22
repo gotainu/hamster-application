@@ -1,5 +1,12 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-22 本番準備配備の承認範囲を再照合（再配備なし）
+
+- `14b7904edb53`を配備元とする準備配備と静的検査3件目の説明補足は、記録コミット`d475c8b229e1`で完了済み。後続承認の本人限定確認`304465659444`を維持し、古いコードの再配備・Secret v1への巻戻し・OAuth変更は行わない。
+- 現行状態を読み取りで再確認：購入serviceのInvoker IAMチェック有効、service/projectの公開bindingなし。Functions/Run両経路の空callable要求は403。有効な未完了Live Checkout Sessionは0件（open 0/未失効0、Stripe GETのみ）。contactはACTIVE/revision`billingcontactemail-00004-luf`、enabled=false/日次1/Secret v2、status/request/confirm各503かつ`contact_service_unavailable`。Hosting最新は停止版`22b8c97c2532f11c`。
+- 実際の3件目の検査名は`production billing/Auth source unchanged functions/src/index.ts`。旧基準との全文不一致を失敗のまま保持し、共有認証・停止条件・1関数限定配備と旧58関数不変の根拠は既存Runbookに記録済み。検査無効化/PASS扱いなし。
+- この再確認での設定変更・配備・実メール・Stripe書込み・ユーザー業務データ変更は0。先行タスクの本人宛送信受付1件と未確認pendingを取り消す記録ではない。購入/メール停止を維持し、今回の追記だけを独立した文書1コミットにする。
+
 <!-- hamcare-owner-live-contact-20261122:start -->
 ## 2026-11-22 本人限定1通の本番連絡先確認（送信受付1・確認未完了／停止復帰済）
 
