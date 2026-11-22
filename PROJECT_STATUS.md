@@ -1,5 +1,14 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-23 本番550円設定を作成・購入停止版のみ先行配備（審査0円の同期保護で残工程を保留）
+
+- **承認/開始**：`b9d6e160eb940f1d0f6d483d0d7391d882ed44b9`/同専用branch、開始時clean。本人が設定/3関数停止配備・記録を承認し、0円審査契約の同期へ影響があればその工程と依存変更だけを保留する条件を追加した。連絡先確認は完了扱いで再試験0。
+- **影響を確認して保留**：実Live審査契約は旧500円＋100%forever割引でactive、最新Invoice0円Paid、期間末2026-11-27 10:03:01 JST。Stripe参照と同UID billingをGET照合。旧Webhookを停止し新処理falseのままにすると期限更新が止まり審査権限を失い得る。legacyPriceId省略の新Portalも同契約を拒否するため、旧Webhook停止/差替え・Portal handler切替・新Webhook/完全JSON Secret登録を保留。一般有料利用者0人とLive契約0件は区別する。旧受信/署名/契約/割引は維持した。
+- **独立して完了**：既存Product再利用でLive550円Price `price_1Uek2xK6h5kxGn4c9ji94qtp`、非default専用Portal `bpc_1UekYpK6h5kxGn4ctmpsyYh9`を各1件作成。550/JPY/月1回/licensed/inclusiveと許可機能・固定return/法務URLをGET検証、旧500/default Product/旧default Portal不変。既存Live公開可能キーも同アカウント/Live一致で取得、rotationなし/値非表示。Portalの入力400は理由選択肢を収集無効のまま2件指定して解消し、作成物は1件だけ。
+- **先行配備は1関数だけ**：購入API `createStripeCheckoutSession`をb9 exactへ更新、`createstripecheckoutsession-00006-ruf` ACTIVE。purchase=false/webhook=false/private/IAM検査有効、旧4つのSecret bindingを保持。新JSONがなくても設定/Auth/DB/Stripe前で止まり、旧500円fallbackなし。Functions/Run両経路403。164ファイルのsource/compiled hashを照合。Webhookは00010-kuq、Portalは00009-hecのsource/設定/IAM不変。
+- **本番変更の分類/保護**：Stripe成功書込みはPrice1/Portal1の設定だけ、契約/請求/Customer/Session変更0。旧Webhookはenabledのまま、停止時刻/新endpoint/新署名Secret/専用Secret/追加Accessorは未実施。審査Subscription/期間/割引/最新0円Invoiceとbilling全文は前後不変、確認済み連絡先/既存履歴/contact false/テスター/体験/権限/Previewを維持。Hosting/メール/通知worker/削除/Flutter/ストア/merge/push変更0、復旧実行0。
+- **検証/残件**：既存490件は再実施せずcompile1回＋起動/falseの4局所入力確認。停止中の設定読取/Auth/DB/network0。既存設定・0円契約の限定GETを行い、未処理eventを一括再送しない。[既存Runbook冒頭](docs/release/web_billing_live_cutover_runbook_ja.md)へID/版/5現行event/7予定event/署名参照・保留理由・再開前の契約/期間/配送履歴照合・対象eventの正規同期手順を記録。同期維持条件を解決してから残るSecret/Webhook/Portal接続、その後Live画面adapter/DTO/status復帰へ進める。今回の記録2文書だけを1コミットにまとめ停止する。
+
 ## 2026-11-22 550円・課金API・Webhook接続の次回本番変更一覧を準備（未実行）
 
 - **現在地**：承認済み`cd624d4c9ae7`/同じ専用branch、開始時clean。連絡先の受信・同UID確認済み保存・スマホ復帰は完了扱いで再試験0。購入private/contact false・確認済み連絡先/累計2通/既存履歴を維持する。
