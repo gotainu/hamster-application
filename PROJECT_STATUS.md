@@ -1,5 +1,19 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-production-contact-20261122:start -->
+## 2026-11-22 有料登録前の連絡先確認の本番対応（コード・限定検証、未配備）
+
+- **開始点/再利用**：承認済み`c88955cecd81`、同じ専用branch/worktree、開始時clean。Preview確認engineを共通化し、既存15分/1回token・送信制限・旧確認済みメール保持・発行済みPreview hashを維持。本番Store/API/Webの必要部分だけを追加し、Preview実配送/既存の全課金・認証・削除E2Eを繰り返さない。
+- **本番接続**：`billingContactEmail`（asia-northeast1）のPOST status/request/confirm、canonical Origin/JSON/Bearer/失効検査・現在Admin UID/Apple subject照合。明示`HAMCARE_BILLING_CONTACT_ENABLED==='true'`、既存本番`HAMCARE_LIVE_BILLING_MAIL_CONFIG`、有限`HAMCARE_BILLING_MAIL_DAILY_LIMIT`が不足すると日本語で停止。Preview設定/データ/URL/枠へfallbackなし、今回有効化0。
+- **原本/消費者**：`billing_contacts/{uid}`・`purpose:billing_contact_live`・firebaseUid/schemaVersion/verified/verificationStatus/source/verifiedAt/email。課金/通知は共通`readVerifiedBillingContact`、既存安全削除は同じdocを削除。Storeのtransactionでも削除フェンスを確認し、遅延確認による復活を拒否。Auth逆同期/メール統合/Customerメール検索なし。A通常確認済み/B Apple Relayは追加実メール不要、C本当にメールなしだけ補完、既存未確認メールはAuth確認を案内する。
+- **送信/変更**：旧確認済み連絡先は新しい確認のtransaction完了まで維持。Gmail sender/OAuth/通知と共有するLive予算・停止期限を再利用し、新メールサービス/Secret/OAuth追加0。60秒/3回時/5回24時間、未知送信の自動再送禁止、明確な送信前失敗だけ最大1回の1秒backoff。新規申込は引き続き停止し、既存Preview Portalと本番Portal APIの連絡先非依存を維持。canonicalのLive購入/Portal UI有効化は後続切替で、今回PASSとは扱わない。
+- **Web復帰**：固定Origin/endpoint/Auth保存名と応答modeを厳密分離。確認tokenはSDK前にfragmentを消してメモリのみ。同じUIDで明示確認後、固定`/account/?contact=verified&view=plan`→連絡先再読込み→読取り専用プランへ復帰。任意復帰先・他UID・期限切れ・旧link上書き・再利用拒否。既存購入用ガード/体験/550円/有料権限は維持。
+- **検証**：Functions/Preview strict TypeScript build PASS。関連backend179（新Live15、Preview互換62、既存課金/通知reader99、Checkout境界3）＋Web176＋Firestore Emulator2＝**357件PASS**。専用demo/localhost18689、Auth/Gmail/Stripe/StorageはMock。実transactionの二重消費1回、原本→共有reader/通知、既存削除core→原本消去→古い確認で復活不可を確認。LP86/brand178 PASS、旧account静的168/171の既知3件は維持し、今回影響6件だけstrict環境分離/固定復帰の検査へ更新。
+- **表示/証拠**：外部connect禁止の実HTML/View/CSS＋合成fixtureで360/390px、入力/待ち/確認/完了・Relay追加入力なし・削除案内SLA/保持説明を確認。横はみ出し0、入力16px、正本outlineアイコン/テーマ維持。worktree外`artifacts/billing-contact-live-20261122/`に個人情報なし画像。物理スマホ/実メール配送/実Relay確認とは区別する。ローカルserver/Emulator/依存参照は後始末する。
+- **確定削除運用値**：原則初回3営業日（JST土日祝除外）、本人確認＋意思確認後は原則7暦日目安、遅延理由/見通し→以後7日ごと連絡。完了窓口履歴90日/期限切れ未確認履歴は失効後30日。窓口メール/添付・support申請・CLIファイルだけが対象で、処理中/既存再試行/復活防止/会計へ一括適用しない。Go担当の毎営業日期限確認・週最初の営業日の手動整理手順を既存文書/公開予定HTMLへ反映。TTL/履歴削除/整理稼働0、確認リンク期限延長0。
+- **残件/保護**：Secret/IAM/明示枠/有効化、Hosting/CSP、本番配備後の実配送・復帰・Relay/不達・課金/通知参照確認は別承認後。[本番Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)と[連絡先実装記録](docs/release/japan_store_payment_and_ios_readiness_20261018.md)を更新。前工程の実アカウント削除・実Apple失効/その後の同UID再ログインは未確認のまま。本番Firestore/Stripe/Auth/Storage操作・実メール0、Hosting/Preview/Functions配備0、テスター/契約/Flutter/ストア/Apple設定/SDK/lock変更0、main merge/push0。今回分だけ1コミットで停止する。
+<!-- hamcare-production-contact-20261122:end -->
+
 <!-- hamcare-verified-support-deletion-20261122:start -->
 ## 2026-11-22 メール削除申請→Web本人確認→既存安全削除の接続（未配備）
 

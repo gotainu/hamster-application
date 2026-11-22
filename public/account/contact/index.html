@@ -17,7 +17,7 @@
   </head>
   <body>
     <a class="skip-link" href="#main">本文へ移動</a>
-    <div class="preview-banner"><span>PREVIEW</span> 連絡用メールの確認テストです。本番契約・アプリの利用権限は変更しません。</div>
+    <div class="preview-banner" id="contact-environment-notice"><span>PREVIEW</span> 連絡用メールの確認テストです。本番契約・アプリの利用権限は変更しません。</div>
     <header class="account-header wrap">
       <a class="brand" href="/" aria-label="HamCare トップ"><img src="/assets/landing/hamcare-mark-outline.png" width="48" height="48" alt="黒い背景に白いハムスターの輪郭線と心拍の波形を描いたHamCareアイコン" /><span class="brand-copy"><span class="brand-name">HamCare</span><span class="brand-tagline">うちの子と、もっと健康で幸せに</span></span></a>
       <a class="back-home" href="/account/">アカウントへ戻る</a>
@@ -101,7 +101,7 @@
         <h1 id="contact-complete-title" tabindex="-1">連絡用メールを確認済みです</h1>
         <p id="contact-complete-email" class="masked-address"></p>
         <p id="contact-complete-copy" class="panel-lead">この連絡先でプラン確認へ進めます。この画面では契約は成立しません。</p>
-        <a class="button primary full-width" href="/account/?contact=verified" id="contact-plan-return">プラン確認へ戻る</a>
+        <a class="button primary full-width" href="/account/?contact=verified&amp;view=plan" id="contact-plan-return">プラン確認へ戻る</a>
         <button class="quiet-button" type="button" id="contact-change" hidden>連絡用メールを変更する</button>
       </section>
 
@@ -113,6 +113,6 @@
       </section>
       <p class="contact-back"><a class="text-link" href="/account/">アカウント確認へ戻る</a></p>
     </main>
-    <footer class="account-footer wrap"><nav aria-label="法務とサポート"><a href="https://hamster-breeding-app.web.app/terms/">利用規約</a><a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a><a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a><a href="https://hamster-breeding-app.web.app/support/">サポート</a></nav><p>HamCare · Preview / Stripe Test Mode</p></footer>
+    <footer class="account-footer wrap"><nav aria-label="法務とサポート"><a href="https://hamster-breeding-app.web.app/terms/">利用規約</a><a href="https://hamster-breeding-app.web.app/privacy/">プライバシーポリシー</a><a href="https://hamster-breeding-app.web.app/commercial-transactions/">特定商取引法に基づく表記</a><a href="https://hamster-breeding-app.web.app/support/">サポート</a></nav><p id="contact-environment-footer">HamCare · Preview / Stripe Test Mode</p></footer>
   </body>
 </html>

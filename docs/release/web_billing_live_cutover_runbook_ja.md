@@ -1,5 +1,7 @@
 # HamCare：本番切替Runbook（方針最終版・未実行）
 
+2026-11-22連絡先確認追記：Previewで完成した確認engineを共通化し、本番`billing_contacts/{uid}`・`billingContactEmail`・canonical Webの確認/プラン復帰へ接続するコードを追加。本番課金と通知は同じ確認済み原本の共通readerを利用し、既存削除処理も同じ原本を削除する。設定定義・Mock/Emulator/ローカル表示の段階であり、本番配備・実配送・受付開始ではない。削除窓口の3営業日/7暦日/7日ごと、完了履歴90日/未確認期限切れ30日は確定済み。範囲・手動担当/頻度は[削除窓口運用](web_account_deletion_support_20261121.md)に従い、TTL/履歴整理は今回実行しない。
+
 2026-11-22追記：メール削除申請を既存Web認証・安全な削除処理へ接続するコードと限定試験を追加。[削除申請の運用手順](web_account_deletion_support_20261121.md)を参照。新public確認endpointとprivate運営endpointは未配備、server/Webの有効化は停止状態。実アカウント削除・本番操作・メール送信は0。以下の本番手順は今回も実行しない。
 
 更新：2026-11-21。開始点 `4aeab766f90e`。今回は方針・公開前文面・Runbookを最終化するだけで、以下の工程は**一つも実行しない**。各GOは方針決定又は既存検証の状態であり、本番変更の実行承認ではない。既存の配信アプリ・テスター・契約を維持する。
@@ -34,6 +36,7 @@
 | Apple Relay送信元登録 | GO（過去の登録証拠） | 2送信元登録・SPF確認済み。今回設定再確認/変更なし |
 | Relay実配送 | 未確認・非ブロッキング | 本人所有の宛先確保時に確認、成功したとは記録しない |
 | 連絡先補完 | Preview GO | 既存の実配送1件と確認済み連絡先・UIDガードの証拠を維持 |
+| 本番連絡先確認 | コード接続/限定検証・未配備 | Previewのデータ/Secret/URL/枠へfallbackしない。enable未設定では停止。本番実配送/Relay/公開ドメインでの復帰確認は未実施 |
 | Stripe Test | GO（既存検証） | 550円、体験/即時、Webhook、Portalの既存証拠。今回追加決済なし |
 | Safari E2E | GO（既存Test E2E） | 既存Apple購入・同期・Portal・期間末解約PASS。今回の本番検証ではない |
 | Android Chrome表示 | GO（既存表示検証） | 連絡先ページの実機表示/入力PASS。Androidの購入E2E全体とは区別 |
@@ -67,7 +70,25 @@
 | 専用合成/本人承認済み削除用アカウントの配備後確認 | private IAM拒否、別UID拒否、同意/課金停止/cleanup/完了判定を確認。実Apple失効は専用アカウントの別承認後だけ | テスター/既存本人アカウントの無承認削除、Mockを実機PASS扱い | 検証停止、対象/実施済み工程を照合。不可逆な削除をコードrollbackで取り消せるとしない |
 | 運営手順/保持/案内/監視 | dry-run→対象/範囲/キャッシュ契約状態確認→明示実行→completedフェンス+Auth不存在照合。毎日pending/古いrunning/retryable/manual_review/worker失敗を確認。完了連絡は照合後 | 受付メールだけで削除、直接Auth削除、billingStopped手動偽装、未確定の全消去期限を約束 | 個別対応へ切替え、未完了を案内し再確認。返信目安・履歴保持の推奨案を運営承認後に公開文面へ反映 |
 
-申請リンク24時間・再認証5分・review5分は実装済みの認証期限であり、申請データの自動削除ではない。返信3営業日/確認後7暦日・7日ごと途中連絡、完了後履歴90日/期限切れ未確認30日の整理は推奨案で未確定・自動purge未実装。会計記録の法定期間は記録種別ごとに確認し、現在TTLなしの完了フェンスを先に消さない。Apple実失効後にStripe失敗→同UID再ログイン/再開の実機残件を維持する。
+申請リンク24時間・再認証5分・review5分は実装済みの認証期限であり、申請データの自動削除ではない。初回返信はJSTの土日祝を除く原則3営業日以内、本人確認と削除意思確認後は原則7暦日以内が完了目安。遅延理由/見通しを知らせ、その後7日ごとに連絡する方針が確定。完了窓口履歴90日/期限切れ未確認30日は窓口のメール/添付・support申請・CLI受付/リンク/reviewファイルだけを対象とし、処理中・既存再試行/停止証跡・完了フェンス・会計へ一括適用しない。担当Go、毎営業日の期限確認と週最初の営業日の手動整理確認を予定し、本番運用/自動purge/TTLは未開始。会計の法定期間は記録種別ごとに確認し、Apple実失効後のStripe失敗→同UID再ログイン/再開も実機未確認を維持する。
+
+## 本番連絡用メール確認の反映手順（定義、今回は実行しない）
+
+既存の認証・プラン・課金・通知を作り直さず、確認engineとGmail sender/予算を共有する。詳細・試験記録は[戦略C連絡先確認](japan_store_payment_and_ios_readiness_20261018.md)の2026-11-22節を参照。Previewの過去の実配送成功を、本番の配送成功へ読み替えない。
+
+| 対象 | 必要な定義/操作 | 成功/停止条件・復旧 |
+|---|---|---|
+| Function | `billingContactEmail`、`asia-northeast1`、HTTP `/status` `/request` `/confirm`、POST JSON/Bearer、2KiB、canonical Origin固定。maxInstances1/concurrency5/timeout60秒 | 別UID/任意UID本文/query/異Origin/失効tokenを拒否。公開HTTPのためInvokerは利用者に到達可能な構成が必要だが、実データはAdmin検証後だけ。未承認の本番配備はしない |
+| 有効化 | `HAMCARE_BILLING_CONTACT_ENABLED`は既定未設定/false。本番用の明示trueを別承認後に設定 | これだけで新規課金受付を開始しない。異常時falseへ戻し新送信/確認を止める。旧verifiedメールを削除しない |
+| Secret/OAuth | 既存の本番定義`HAMCARE_LIVE_BILLING_MAIL_CONFIG`を通知と共用。JSONは`enabled:true,environment:'live',from:'gotainu@gmail.com',clientId,clientSecret,refreshToken`。秘密値をGit/診断へ出さない | 本人承認済みgmail.send専用OAuth・継続利用可否を確認してSecret Managerへ別途登録。Preview用Secret/allowlist/Test値からの補完なし。資格情報不備で日本語の利用停止案内、送信/DB変更前に停止 |
+| 送信枠 | `HAMCARE_BILLING_MAIL_DAILY_LIMIT`は明示整数1〜100、未設定/不正なら停止。`billing_notification_delivery_limits`の全体/UID/予約/`_sender`停止期限を既存通知と共有 | 連絡先は既存60秒間隔・3回/時・5回/24時間も維持。Previewの10件枠とは別。Gmail429/枠不足/バウンス等は成功扱いしない。枠をリセット/自動増枠しない |
+| IAM | 当該Function実行SAに当該SecretのAccessor、Authの検証/対象ユーザー読取り、必要なFirestoreアクセス。既存Gmailの送信専用本人OAuthだけを使用 | 不要なSecret/ストア/Stripe/管理権限を与えない。Gmail impersonation/DWDや新しいメール権限で回避しない。既存通知worker/SchedulerのIAMも維持 |
+| 保存/削除 | 本番`billing_contacts/{uid}`、purpose`billing_contact_live`、firebaseUid/schemaVersion1/verified/verificationStatus/source/verifiedAt/email。pendingは同一docに独立保持、確認時だけ切替 | 課金・通知の共通readerが同じ原本を読み、削除coreは同じdocを削除。削除フェンスをtransaction内で確認し、遅延確認による復活を拒否。Preview原本のコピー/移行なし |
+| Web接続 | canonical`https://hamster-breeding-app.web.app`だけLive endpointへ。既存Preview originは従来endpoint/保存/枠のまま、他originは停止。Authアプリ名も環境別 | 本番contact経路からPreview checkout/Portalを呼ばない。課金UI全体のLive切替は別工程で、今回canonicalの新規Checkout受付は開かない。既存Preview管理と本番Portal APIは連絡先未確認でも独立 |
+| Hosting/CSP | `/account/`と`/account/contact/`の既存テーマ/SDK12.17.1/Auth/Firestore読取りを維持。`connect-src`へ`https://asia-northeast1-hamster-breeding-app.cloudfunctions.net`を追加、canonical用にはPreview API hostを接続先にしない | `script-src`はself/固定gstatic SDK/Google auth、`frame-src`は固定Firebase Auth Handler/Google、`base-uri 'none';form-action 'none';frame-ancestors 'none';object-src 'none'`、no-store/no-referrer/nosniff。既存Stripe購入画面のCSPは別工程、広い`*`/unsafe-inlineで解決しない。今回はHosting設定/配備変更0 |
+| 復帰/配送後確認 | 固定の`/account/?contact=verified&view=plan`だけを使用し、ログイン後に連絡先を再読込みして読取り専用プラン確認へ復帰 | 外部URL/任意returnTo/URL内UID・メール・tokenを拒否。リンクのtokenはfragment→SDK前に削除→メモリのみ。実配送/本番での復帰/Relay/不達を別途確認。API受理を受信成功としない |
+
+本番反映時は、既存の本番課金API/通知/削除coreの承認済み版と上記を照合し、必要なFunctionだけを選んで配備する。`firebase deploy`で全体を一括変更したり、Previewガードを取り払って本番化したりしない。連絡先の確認成功は課金受付開始の承認ではない。既存課金設定/Live Secret未設定で新規申込が停止する境界を維持する。
 
 ## 共通の停止・ロールバック原則
 

@@ -17,7 +17,7 @@ class Element {
 }
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{promise,resolve,reject};}
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function setup({checkoutService=null,contactService=null,search='',pathname='/account/',appleSignInEnabled=false}={}) {
+async function setup({checkoutService=null,contactService=null,search='',pathname='/account/',appleSignInEnabled=false,resumePlan=false}={}) {
   const nodes = new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
   nodes.get('premium-monthly').value='premium_monthly';
   nodes.get('premium-monthly').checked=false;
@@ -31,7 +31,7 @@ async function setup({checkoutService=null,contactService=null,search='',pathnam
   const user={emailVerified:true,identityVerified:true,authenticationBasis:'verified_email',maskedEmail:'sa***@example.invalid',methods:['メール/パスワード'],isNewUser:false};
   const summary={appAccountExists:true,nickname:'本人ニックネーム',maskedEmail:user.maskedEmail,methods:user.methods,billingLabel:'未契約',trialLabel:'サーバー保存状態：active',unavailableFields:[],planReview:projectPlanReview({kind:'missing'})};
   const service={appleSignInEnabled,signInApple:async options=>{assert.deepEqual(options,{linkingConsent:true});calls.apple++;callback({...user,methods:['Apple']});},ready:async()=>{},onAuthChanged:cb=>{callback=cb;cb(null);return()=>{};},readAccountSummary:async()=>{calls.reads++;return summary;},signInEmail:async()=>{calls.email++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signOut:async()=>{calls.signOut++;callback(null);},reloadUser:async()=>{calls.reload++;callback(user);},safeError:()=> '通信に失敗しました。'};
-  const cleanup=await mountAccountPage(service,{checkoutService,contactService});
+  const cleanup=await mountAccountPage(service,{checkoutService,contactService,resumePlan});
   return {el:id=>nodes.get(id),service,calls,user,summary,emit:u=>callback(u),cleanup,windowListeners,navigation,replaced,nodes};
 }
 test('initial login and empty form guard',async()=>{
@@ -501,4 +501,15 @@ test('contact checks are double click safe and revoked by logout/pagehide',async
 });
 test('pending contact with uncertain delivery is not shown as sent on account card',async()=>{
  const contact=contactHarness(contactState({pendingMaskedEmail:'pe***@example.test',deliveryState:'uncertain'}));const h=await setup({contactService:contact.service});h.emit(h.user);await flush();assert.match(h.el('account-contact-status').textContent,/送信結果を確認/);assert.doesNotMatch(h.el('account-contact-status').textContent,/リンクから確認/);h.cleanup();
+});
+
+test('live contact return revalidates proof and restores only read-only plan view',async()=>{
+ let reads=0;const contactService={environment:'live',clear(){},async getStatus(){reads++;return {testMode:false,state:'verified',category:'missing',maskedEmail:'sy***@example.test',pendingMaskedEmail:null,canCheckout:true,source:'user_supplied',resendAfter:null,expiresAt:null,deliveryState:null};}};
+ const h=await setup({contactService,resumePlan:true});h.emit(h.user);await flush();
+ assert.equal(reads,1);assert.equal(h.el('plan-panel').hidden,false);assert.equal(h.el('plan-checkout').disabled,true);h.cleanup();
+});
+test('contact return query cannot bypass missing verified contact',async()=>{
+ const contactService={environment:'live',clear(){},async getStatus(){return {testMode:false,state:'missing',category:'missing',maskedEmail:null,pendingMaskedEmail:null,canCheckout:false,source:null,resendAfter:null,expiresAt:null,deliveryState:null};}};
+ const h=await setup({contactService,resumePlan:true});h.emit(h.user);await flush();
+ assert.equal(h.el('plan-panel').hidden,true);assert.equal(h.el('plan-checkout').disabled,true);h.cleanup();
 });

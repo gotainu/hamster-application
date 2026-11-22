@@ -17,15 +17,15 @@ const missing=()=>({testMode:true,state:'missing',category:'missing',maskedEmail
 const verified=(source='user_supplied')=>({...missing(),state:'verified',maskedEmail:'sy***@example.test',canCheckout:true,source});
 const pending=()=>({...missing(),state:'pending',pendingMaskedEmail:'pe***@example.test',resendAfter:'2026-11-19T09:01:00Z',expiresAt:'2026-11-19T09:15:00Z',deliveryState:'sent'});
 function deferred(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return{resolve,reject,promise};}
-async function setup({state=missing(),token=null,initialError=null}={}){
+async function setup({state=missing(),token=null,initialError=null,environment='preview'}={}){
  const nodes=new Map([...html.matchAll(/id="([^"]+)"/g)].map(x=>[x[1],new Element(x[1])]));
  const document={getElementById:id=>nodes.get(id)};const listeners=new Map();
  const window={addEventListener:(k,fn)=>listeners.set(k,fn),removeEventListener:k=>listeners.delete(k)};
- let callback;let currentState=state;const calls={status:0,request:[],confirm:[],clear:0,signOut:0,apple:0,google:0,email:0,profiles:0};
+ let callback;let currentState={...state,testMode:environment==='preview'};const calls={status:0,request:[],confirm:[],clear:0,signOut:0,apple:0,google:0,email:0,profiles:0};
  const user={identityVerified:true,authenticationBasis:'apple_provider',emailVerified:false,methods:['Apple']};
  const summary={appAccountExists:true};
  const accountService={appleSignInEnabled:true,ready:async()=>{},onAuthChanged(fn){callback=fn;fn(null);return()=>{};},readAccountSummary:async()=>{calls.profiles++;return summary;},signOut:async()=>{calls.signOut++;callback(null);},signInApple:async consent=>{assert.deepEqual(consent,{linkingConsent:true});calls.apple++;callback(user);},signInGoogle:async()=>{calls.google++;callback(user);},signInEmail:async()=>{calls.email++;callback(user);},reloadUser:async()=>callback(user),safeError:()=> 'ログインを確認してください。'};
- const service={getStatus:async()=>{calls.status++;return currentState;},requestVerification:async email=>{calls.request.push(email);return currentState=pending();},confirmVerification:async value=>{calls.confirm.push(value);return currentState=verified();},clear:()=>calls.clear++};
+ const service={environment,getStatus:async()=>{calls.status++;return currentState;},requestVerification:async email=>{calls.request.push(email);return currentState={...pending(),testMode:environment==='preview'};},confirmVerification:async value=>{calls.confirm.push(value);return currentState={...verified(),testMode:environment==='preview'};},clear:()=>calls.clear++};
  let now=Date.parse('2026-11-19T09:00:00Z');const timers=[];
  const cleanup=await mountBillingContactPage(service,{accountService,initialToken:token,initialError,document,window,now:()=>now,setIntervalFn:fn=>{timers.push(fn);return timers.length;},clearIntervalFn:()=>{}});
  return{el:id=>nodes.get(id),nodes,service,accountService,user,summary,calls,listeners,timers,cleanup,emit:callback,setState:next=>currentState=next,setNow:value=>now=value};
@@ -58,3 +58,26 @@ test('logout clears masked values, form values and pending link proof',async()=>
 test('pagehide clears private state and link proof',async()=>{const h=await setup({token:'a'.repeat(43)});h.emit(h.user);await flush();h.listeners.get('pagehide')();assert.equal(h.el('contact-loading-panel').hidden,false);assert.equal(h.el('contact-complete-email').textContent,'');assert.equal(h.el('contact-confirm').disabled,true);h.cleanup();});
 test('HTML includes named labels, masked-only placeholders, brand and existing live legal links',()=>{for(const id of ['billing-contact-email','contact-login-email','contact-login-password','contact-apple-consent'])assert.match(html,new RegExp('<label[^>]+for="'+id+'"'));for(const item of ['広告配信には使用しません','個人の実メール','契約主体はFirebase UID','統合','habitat','privaterelay']){if(['habitat','privaterelay'].includes(item))continue;assert.ok(html.includes(item),item);}assert.match(html,/hamcare-mark-outline.png/);assert.doesNotMatch(html,/white.hamster|innerHTML|card-number|name="(?:email|token|uid)"/i);for(const href of ['/terms/','/privacy/','/commercial-transactions/','/support/']){assert.ok(html.includes('href="https://hamster-breeding-app.web.app'+href+'"'));assert.ok(!html.includes('href="'+href+'"'));}});
 test('bootstrap clears fragment before remote Firebase imports and never stores proof',async()=>{const source=await readFile(new URL('../public/assets/billing-contact.mjs',import.meta.url),'utf8');assert.ok(source.indexOf('consumeVerificationFragment(location, history)')<source.indexOf("import('https://"));assert.doesNotMatch(source,/localStorage|sessionStorage|console\.|setDoc|updateDoc|createUser/);const view=await readFile(new URL('../public/assets/billing-contact-view.mjs',import.meta.url),'utf8');assert.doesNotMatch(view,/innerHTML|localStorage|sessionStorage|console\.|location\.assign.*token/);});
+
+// Production uses the same UI; only an explicitly selected deployment may project it.
+test('live missing contact completes explicit verification and returns to the fixed plan view',async()=>{
+ const h=await setup({environment:'live',token:'a'.repeat(43)});h.emit(h.user);await flush();
+ assert.equal(h.el('contact-confirm-panel').hidden,false);assert.equal(h.calls.confirm.length,0);
+ await h.el('contact-confirm').dispatch('click');
+ assert.equal(h.el('contact-complete-panel').hidden,false);
+ assert.equal(h.el('contact-plan-return').attrs.href,'/account/?contact=verified&view=plan');
+ assert.equal(h.calls.confirm.length,1);assert.equal(h.calls.request.length,0);h.cleanup();
+});
+for(const state of [{...verified('auth_verified'),category:'normal'},{...verified('apple_relay'),category:'apple_relay',maskedEmail:'sy***@privaterelay.appleid.com'}])test('live verified '+state.source+' requires no supplemental contact',async()=>{
+ const h=await setup({environment:'live',state});h.emit(h.user);await flush();assert.equal(h.el('contact-complete-panel').hidden,false);assert.equal(h.el('contact-editor-panel').hidden,true);assert.equal(h.calls.request.length,0);h.cleanup();
+});
+test('live view rejects Preview response rather than treating it as proof',async()=>{
+ const h=await setup({environment:'live'});h.service.getStatus=async()=>verified();h.emit(h.user);await flush();
+ assert.equal(h.el('contact-blocked-panel').hidden,false);assert.equal(h.el('contact-complete-panel').hidden,true);assert.equal(h.calls.confirm.length,0);h.cleanup();
+});
+test('live replacement keeps the old verified contact while new mail is pending',async()=>{
+ const h=await setup({environment:'live',state:verified()});h.emit(h.user);await flush();h.el('contact-change').dispatch('click');
+ h.service.requestVerification=async()=>({...verified(),testMode:false,pendingMaskedEmail:'ne***@example.test',expiresAt:'2026-11-19T09:15:00Z',deliveryState:'sent'});
+ h.el('billing-contact-email').value='new@example.test';h.el('billing-contact-form').dispatch('submit',{preventDefault(){}});await flush();
+ assert.match(h.el('contact-active-note').textContent,/sy\*\*\*@example.test/);assert.match(h.el('contact-pending-note').textContent,/ne\*\*\*@example.test/);assert.equal(h.calls.confirm.length,0);h.cleanup();
+});

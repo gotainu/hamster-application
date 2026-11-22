@@ -1,11 +1,14 @@
 import {projectAccountIdentity, isVerifiedAccountIdentity} from './account-identity.mjs';
 import {normalizeBillingEmail, projectBillingContact} from './billing-contact-model.mjs';
+import {billingContactEnvironment, resolveBillingContactEnvironment, BILLING_CONTACT_ENDPOINT} from './billing-contact-environment.mjs';
 
-export const BILLING_CONTACT_ENDPOINT = 'https://us-central1-hamster-breeding-app.cloudfunctions.net/previewBillingContactEmail';
+export {BILLING_CONTACT_ENDPOINT, BILLING_CONTACT_LIVE_ENDPOINT} from './billing-contact-environment.mjs';
 
 /** No cookies, token persistence, arbitrary endpoints, or automatic mutation retry. */
-export function createBillingContactService({auth, fetchRequest = globalThis.fetch, endpoint = BILLING_CONTACT_ENDPOINT}) {
-  if (endpoint !== BILLING_CONTACT_ENDPOINT) throw new Error('test_configuration_invalid');
+export function createBillingContactService({auth, fetchRequest = globalThis.fetch, environment = 'preview',
+  endpoint = billingContactEnvironment(environment).endpoint, origin = globalThis.location?.origin}) {
+  const deployment=billingContactEnvironment(environment);
+  if (endpoint !== deployment.endpoint || (origin !== undefined && resolveBillingContactEnvironment(origin).environment !== environment)) throw {code:'contact_configuration_unavailable'};
   let generation = 0;
   let mutationPending = null;
   const controllers = new Set();
@@ -31,7 +34,7 @@ export function createBillingContactService({auth, fetchRequest = globalThis.fet
         if (response.status === 401 && attempt === 0) continue;
         const value = await response.json(); ensureCurrent();
         if (!response.ok) throw {code:typeof value?.code === 'string' ? value.code : 'service_unavailable'};
-        return projectBillingContact(value);
+        return projectBillingContact(value,{environment});
       }
     } catch (error) {
       if (!current() || error?.name === 'AbortError') throw {code:'session_changed'};
@@ -47,6 +50,7 @@ export function createBillingContactService({auth, fetchRequest = globalThis.fet
     try {return await request(operation, body);} finally {if(mutationPending === started)mutationPending = null;}
   }
   return Object.freeze({
+    environment,
     getStatus: () => request('status'),
     requestVerification(value) {
       const email = normalizeBillingEmail(value);

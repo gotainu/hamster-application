@@ -5,7 +5,7 @@ import { PREMIUM_MONTHLY, projectPlanReview } from './plan-model.mjs';
 import { projectBillingContact, billingContactError } from './billing-contact-model.mjs';
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
-export async function mountAccountPage(service, { checkoutService = null, contactService = null, resumeCheckout = false } = {}) {
+export async function mountAccountPage(service, { checkoutService = null, contactService = null, resumeCheckout = false, resumePlan = false } = {}) {
   const element = (id) => document.getElementById(id);
   const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel', 'checkout-panel'];
   const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields', 'plan-nickname', 'plan-email', 'plan-method', 'plan-billing', 'plan-trial', 'plan-customer-check', 'plan-checkout-check', 'plan-route-title', 'plan-route-detail'];
@@ -29,6 +29,8 @@ export async function mountAccountPage(service, { checkoutService = null, contac
   let portalReturnPending = window.location?.pathname === '/account/' && new URLSearchParams(window.location?.search || '').get('portal') === 'return';
   if (portalReturnPending) window.history?.replaceState(null, '', '/account/');
   let resumePending = resumeCheckout && !portalReturnPending;
+  let contactPlanPending = resumePlan === true;
+  const projectContact = value => projectBillingContact(value,{environment:contactService?.environment || 'preview'});
   let previewRead = 0;
   let previewModel = null;
   let previewReading = false;
@@ -165,7 +167,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     element('account-contact-panel').hidden = false;
     element('account-contact-status').textContent = '連絡用メールの状態を確認しています。';
     try {
-      const model = projectBillingContact(await contactService.getStatus());
+      const model = projectContact(await contactService.getStatus());
       if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser) return;
       renderContact(model);
     } catch {
@@ -182,7 +184,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     element('review-plan').disabled = true;
     element('plan-checkout').disabled = true;
     try {
-      const model = projectBillingContact(await contactService.getStatus());
+      const model = projectContact(await contactService.getStatus());
       if (destroyed || generation !== epoch || request !== contactRead || user !== currentUser || !isVerifiedAccountIdentity(currentUser)) return false;
       renderContact(model);
       if (!model.canCheckout) { window.location.assign('/account/contact/'); return false; }
@@ -343,6 +345,13 @@ export async function mountAccountPage(service, { checkoutService = null, contac
         ? 'このログイン情報に対応するHamCareアプリのペット登録を確認できませんでした。アプリで普段使用しているアカウントか確認してください。ここでは登録・契約・体験を開始しません。'
         : 'HamCareアカウントの登録状態を読み取れないため、プラン確認と契約管理を停止しています。時間をおいて表示内容を再確認してください。';
       setBusy(false);
+      if (contactPlanPending && !user.isNewUser && summary.appAccountExists === true) {
+        contactPlanPending = false;
+        // A query flag never acts as proof: re-read the same UID's contact before
+        // restoring only the read-only plan view, never a Session or purchase.
+        if (contactService && await checkContactBeforePurchase()) plan = true;
+        if (destroyed || request !== epoch || currentUser !== user) return;
+      }
       if (plan && !user.isNewUser && summary.appAccountExists === true) {
         renderPlan(summary);
         setPanel('plan-panel', 'plan-title');
@@ -438,6 +447,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
   const onLogout = async () => {
     if (loggingOut) return;
     loggingOut = true;
+    contactPlanPending = false;
     signInAttempt = null;
     signInPending = false;
     ++epoch;

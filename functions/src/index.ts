@@ -9,6 +9,7 @@ import Stripe from 'stripe';
 import {runAccountDeletion, retryDueAccountDeletions} from './accountDeletion';
 import {DeletionStop} from './accountDeletionBilling';
 import {createSupportDeletionHttp, SUPPORT_DELETION_ORIGIN} from './supportAccountDeletionHttp';
+import {createProductionBillingContactRuntime, LIVE_BILLING_CONTACT_MAIL_SECRET} from './billingContactRuntime';
 import { defineSecret } from 'firebase-functions/params';
 import {createProductionWebBillingRuntime, readWebBillingConfig, safeWebBillingError, WEB_BILLING_UNAVAILABLE} from './webBillingRuntime';
 import {WEB_BILLING_ORIGIN} from './webBillingConfig';
@@ -39,7 +40,24 @@ const db = admin.firestore();
 const ENVELOPE_KEY_SECRET = defineSecret('ENVELOPE_KEY');
 // Dedicated Live-only configuration is bound, but not registered or read at startup.
 const LIVE_WEB_BILLING_CONFIG = defineSecret('HAMCARE_LIVE_WEB_BILLING_CONFIG');
+const LIVE_BILLING_CONTACT_MAIL_CONFIG = defineSecret(LIVE_BILLING_CONTACT_MAIL_SECRET);
 const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
+
+// Contact verification defaults to disabled and cannot enable new purchase
+// intake. No Preview credential, contact or endpoint fallback is provided.
+const billingContact = createProductionBillingContactRuntime({db,auth:admin.auth(),
+  enabled:()=>process.env.HAMCARE_BILLING_CONTACT_ENABLED==='true',
+  rawConfig:()=>process.env.HAMCARE_LIVE_BILLING_MAIL_CONFIG,
+  dailyLimit:()=>Number(process.env.HAMCARE_BILLING_MAIL_DAILY_LIMIT),
+});
+export const billingContactEmail = onRequest({region:'asia-northeast1',
+  secrets:[LIVE_BILLING_CONTACT_MAIL_CONFIG],maxInstances:1,concurrency:5,
+  timeoutSeconds:60,memory:'256MiB',invoker:'public',cors:false},async(req,res)=>{
+  const result=await billingContact.handle(req);
+  for(const [name,value] of Object.entries(result.headers))res.set(name,value);
+  if(result.status===204){res.status(204).send('');return;}
+  res.status(result.status).json(result.body);
+});
 
 
 // Keep existing deployed names/callable transport. Old app purchase requests

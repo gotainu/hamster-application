@@ -1,5 +1,34 @@
 # HamCare 日本限定・両ストア公開準備（2026-10-18）
 
+<!-- hamcare-live-contact-20261122:start -->
+## 2026-11-22 有料登録前の連絡先メール確認：本番接続コード・限定検証（未配備）
+
+承認済み`c88955cecd81`から同じbranch/worktreeで継続し、Previewで完成した機能を本番へ接続するコードを追加した。既存の認証/UID・価格550円・元の体験期間・有料権限・テスター・購入/削除の全E2Eを作り直さない。本番配備、実メール送信、課金、実削除、実Apple失効、Flutter/ストア変更、merge/pushは今回0。過去のPreview実配送と今回Mockを区別する。
+
+- **再利用/追加**：Preview確認engineを`functions/src/billingContact.ts`へ抽出し、Preview adapterから再利用。既存の15分token/1回消費/hash/cooldown/旧verified連絡先保持を維持し、発行済みPreviewリンクのhash形式も変えない。Liveはpurposeを含む別proof、固定Live URL/Schema/Store/HTTP runtimeを追加。Gmail OAuth/sender/有限予算/送信者停止期限は既存通知基盤を共用し、新しいSecret/OAuth/メールサービスを追加しない。
+- **本人と連絡先**：Firebase Adminの失効検査付きtoken検証→同じ現在UID/User/Apple subject→既存アカウント/飼い主/ペットのガードを維持。A通常確認済み/B既存方針で認めるApple Relayは追加入力不要。C本当のメールなしだけ補完。既存未確認/不正メールをCへ丸めずAuth確認案内へ。個人実メール強制・Auth逆同期・メール一致統合・Customerのメール検索0。
+- **本番原本**：`billing_contacts/{uid}`、`firebaseUid`、`purpose:'billing_contact_live'`、`schemaVersion:1`、`verified:true`、`verificationStatus:'verified'`、`source:'user_supplied'`、過去millis`verifiedAt`、`email`。pendingは宛先/tokenHash/期限/配送状態を分離保持し、確認transactionでだけ有効連絡先を置換する。古い/別UID/期限切れ/使用済みのリンクは置換できない。未確認の新メール中も旧verified原本は利用可能。
+- **参照関係**：課金`webBillingRuntime`と通知`billingNotificationRecipient`は同じ`readVerifiedBillingContact`で原本を読む。未確認/不正/Preview purpose/別UID/future verifiedAtは拒否。既存`index.ts`の安全削除が同じ`billing_contacts/{uid}`を削除し、新Storeは読取/各transaction内で削除フェンスを確認して遅延確認による再作成を止める。課金対応/契約主体はUIDのまま。
+- **本番API/設定**：新`billingContactEmail`はasia-northeast1、POST `/status` `/request` `/confirm`、固定canonical Origin、JSON/Bearer/2KiB。`HAMCARE_BILLING_CONTACT_ENABLED==='true'`、既存本番Secret `HAMCARE_LIVE_BILLING_MAIL_CONFIG`のLive-only設定、明示`HAMCARE_BILLING_MAIL_DAILY_LIMIT`1〜100が揃わなければAuth/DB/送信へ進まず日本語で停止。PreviewのSecret/許可リスト/保存/URL/送信枠へfallbackしない。Secret値・宛先・token・MIME・SDKエラーを診断へ出さない。
+- **送信**：従来60秒間隔/3回毎時/5回24時間、同一pendingのdispatching/uncertainは期限まで自動再送しない。Live全体は通知と`billing_notification_delivery_limits`を共有（既存UTC日の予約、Gmail quotaは最低24時間の停止）。明確な送信前一時障害だけ最大1回/1秒backoff、不明なsend結果は再試行しない。送信停止期限の保存自体がDB障害で失敗した場合は状態照合が必要で、配送/停止の完全保証とはしない。API受付を受信成功としない。
+- **Web復帰/購入停止**：canonicalと既存Previewを固定Origin/endpoint/Authアプリ名で分離し、他Originは停止。fragmentはSDK import前にURLから除去し、メモリ限り。確認後は固定`/account/?contact=verified&view=plan`から本人の連絡先状態を再読込みして読取り専用プランへ戻る。任意のreturn URLは受け付けない。canonicalではPreview Checkout/Portal serviceを生成せず、新規Session/受付は開かない。既存Preview Portalと、本番Portal APIの「連絡先確認を購入条件と混同しない」境界を維持。**Live購入/Portal UIの有効化は別の本番切替工程**であり、今回Live Portal実機PASSとはしない。
+- **本番反映手順**：必要Function/Secret名/IAM/Hosting・CSP差分/有効化・停止・復帰は[本番Runbookの連絡先節](web_billing_live_cutover_runbook_ja.md)へ定義。今回設定/配備なし。公開後の専用本人テストで、実配送/リンク復帰/Relay/不達/本番の課金・通知の読み取りを別途確認する。
+
+### 今回の限定検証
+
+- Functions/Previewのstrict TypeScript build PASS。関連backend8ファイル179/179（新Live15、Preview互換62、既存課金/通知reader99、今回に直結するCheckout境界3）、Web6ファイル176/176（contact・account復帰・環境分離・匿名削除案内）、専用Firestore Emulator2/2で**計357件PASS**。OAuth/Gmail/Stripe/Auth/StorageはMock、Firestoreはdemo/127.0.0.1:18689だけ。原本生成→課金/通知共通reader、二重確認1回成功、既存削除core→原本消去→古いlinkの復活拒否を確認。
+- LP86/86・brand178/178 PASS。旧account静的168/171の既知3件（共通化済みserver identity固定文字列2件、過去index全体不変1件）は維持。本タスクで必要となった6件だけを厳密な環境分離/固定復帰の検証へ更新し、無関係な旧検査を合格へ書き換えない。
+- 実HTML/View/CSSの外部connect禁止ローカルMockで360/390pxを確認。メールなし入力→合成送信待ち→明示確認→確認済み/固定プラン復帰、Relayの追加入力なし、削除案内の新SLA/保持説明を確認。両幅で横はみ出し0、入力16px、現行outlineアイコン/テーマを維持。物理スマホの配送/ログインE2Eではない。個人情報なし画像はworktree外`artifacts/billing-contact-live-20261122/`へ保存し、server/Emulator/依存参照は後始末する。
+- 削除窓口の確定SLA/90日・30日範囲/担当Go/毎営業日確認・週1回の手動整理方針を既存運用文書と公開予定HTMLに反映。本番TTL/履歴削除/整理処理の稼働は0、確認リンク期限延長0。前工程の実Apple失効と同UID再ログインも未確認のまま。
+
+### 今回の変更ファイル（28件）
+
+- Server：`functions/src/billingContact.ts`、`billingContactStore.ts`、`billingContactMail.ts`、`billingContactRuntime.ts`（同ディレクトリ）、`functions/src/index.ts`、`functions/src/webBillingShared.ts`、`functions/src/webBillingRuntime.ts`、`functions/src/billingNotificationRecipient.ts`、`preview-functions/src/billing-contact.ts`。
+- Web：`public/account/contact/index.html`、`public/account-deletion/index.html`、`public/assets/billing-contact-environment.mjs`、`public/assets/billing-contact-model.mjs`、`public/assets/billing-contact-service.mjs`、`public/assets/billing-contact-view.mjs`、`public/assets/billing-contact.mjs`、`public/assets/account.mjs`、`public/assets/account-view.mjs`。
+- 試験/静的検査：`functions/test/billing_contact_live.test.cjs`、`functions/test/billing_contact_live_emulator.test.cjs`、`tools/test_web_live_billing_contact.mjs`、`tools/test_web_billing_contact_view.mjs`、`tools/test_web_account_view.mjs`、`tools/check_web_account.py`。
+- 既存文書：`PROJECT_STATUS.md`、本書、`docs/release/web_billing_live_cutover_runbook_ja.md`、`docs/release/web_account_deletion_support_20261121.md`。新しい管理表は作らない。
+
+<!-- hamcare-live-contact-20261122:end -->
 <!-- hamcare-launch-policy-final-20261121:start -->
 ## 2026-11-21 初回課金公開の最終方針（Runbook未実行）
 

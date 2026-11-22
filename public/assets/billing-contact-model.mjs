@@ -3,8 +3,8 @@ const date = value => value === null || (typeof value === 'string' && /^\d{4}-\d
 const invalid = () => { throw {code: 'contact_invalid_response'}; };
 
 /** Display projection only. The server decides contact verification and access. */
-export function projectBillingContact(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.testMode !== true ||
+export function projectBillingContact(raw, {environment = 'preview'} = {}) {
+  if (!['preview','live'].includes(environment) || !raw || typeof raw !== 'object' || Array.isArray(raw) || raw.testMode !== (environment === 'preview') ||
       !['verified', 'missing', 'pending', 'invalid', 'unverified'].includes(raw.state) ||
       !['normal', 'apple_relay', 'missing', 'unverified', 'invalid'].includes(raw.category) ||
       typeof raw.canCheckout !== 'boolean' ||
@@ -16,7 +16,7 @@ export function projectBillingContact(raw) {
   if (raw.canCheckout && (!validMaskedEmail(raw.maskedEmail) || raw.state !== 'verified' || raw.source === null)) invalid();
   if (['invalid', 'unverified'].includes(raw.category) && raw.canCheckout) invalid();
   if (raw.state === 'pending' && !validMaskedEmail(raw.pendingMaskedEmail)) invalid();
-  return Object.freeze({testMode: true, state: raw.state, category: raw.category,
+  return Object.freeze({testMode: raw.testMode, state: raw.state, category: raw.category,
     maskedEmail: raw.maskedEmail, pendingMaskedEmail: raw.pendingMaskedEmail,
     canCheckout: raw.canCheckout, source: raw.source, resendAfter: raw.resendAfter, expiresAt: raw.expiresAt,
     deliveryState: raw.deliveryState ?? null});
@@ -58,7 +58,9 @@ export function billingContactError(error) {
     case 'contact_rate_limited': return '再送が続いています。しばらく待ってからお試しください。';
     case 'contact_sending': return '送信処理を確認しています。すぐに再送せず、しばらく待ってから状態を再確認してください。';
     case 'contact_delivery_unknown': return '送信結果を確認できませんでした。メールの受信状況を確認し、すぐに再送せず、状態を再確認してください。';
-    case 'contact_mail_unavailable': return 'このPreviewの確認メール送信は、まだ利用できません。メールは送信されていません。';
+    case 'contact_mail_unavailable': return '現在、確認メールの送信を受け付けていません。確認メールは送信されていません。しばらく待って再確認するか、サポートへお問い合わせください。';
+    case 'contact_configuration_unavailable':
+    case 'contact_service_unavailable': return '現在、連絡用メールの確認を受け付けていません。しばらく待って再確認するか、サポートへお問い合わせください。';
     case 'app_account_required': return '先にHamCareアプリでアカウントとペットプロフィールを準備してください。';
     case 'unauthenticated':
     case 'session_changed': return 'ログイン状態を確認し直してください。確認リンクを使う場合は、同じアカウントでログインしてからメールのリンクを開き直してください。';

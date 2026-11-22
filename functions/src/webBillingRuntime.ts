@@ -3,8 +3,8 @@ import Stripe from 'stripe';
 import {createHash} from 'crypto';
 import {BillingConfigurationError, parseWebBillingConfig} from './webBillingConfig';
 import {authorizeWebBillingIdentity, authorizeWebBillingManagementIdentity, BillingAuthenticationError, classifyBillingEmail,
-  normalizeBillingEmail, validWebBillingUid, WebBillingIdentity} from './webBillingShared';
-import {createWebBillingCheckout, WebBillingCheckoutStore, WEB_BILLING_CONTACT_PURPOSE} from './webBillingCheckout';
+  readVerifiedBillingContact, validWebBillingUid, WebBillingIdentity} from './webBillingShared';
+import {createWebBillingCheckout, WebBillingCheckoutStore} from './webBillingCheckout';
 import {createWebBillingCustomerResolver} from './webBillingCustomer';
 import {createWebBillingPortalEngine} from './webBillingPortal';
 import {createWebBillingWebhook, verifyWebBillingEvent} from './webBillingWebhook';
@@ -105,13 +105,10 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
     const classification=classifyBillingEmail(identity,user);
     if (classification.kind==='A' || classification.kind==='B') return classification.email ?? null;
     if (classification.kind!=='C') return null;
-    // No Preview contact fallback. A future production confirmation flow must
-    // write this schema only after the same UID consumes its email challenge.
+    // The production confirmation flow writes this same UID-scoped record.
+    // There is no Preview contact fallback or Auth reverse synchronization.
     const snap=await d.db.doc(`billing_contacts/${identity.uid}`).get(), c=snap.data();
-    if (!snap.exists || !c || c.firebaseUid!==identity.uid || c.purpose!==WEB_BILLING_CONTACT_PURPOSE ||
-      c.schemaVersion!==1 || c.verified!==true || c.verificationStatus!=='verified' || c.source!=='user_supplied' ||
-      !Number.isSafeInteger(c.verifiedAt) || c.verifiedAt<=0 || c.verifiedAt>now().getTime()) return null;
-    return normalizeBillingEmail(c.email);
+    return snap.exists ? readVerifiedBillingContact(c,identity.uid,'live',now().getTime()) : null;
   }
   function customers(client:Stripe) {
     return createWebBillingCustomerResolver({stripe:client,store:createWebBillingCoordinationStore(d.db,'billing_customers'),readBilling,now});

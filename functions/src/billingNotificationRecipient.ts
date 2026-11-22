@@ -1,4 +1,4 @@
-import {normalizeBillingEmail, validWebBillingUid} from './webBillingShared';
+import {normalizeBillingEmail, validWebBillingUid, readVerifiedBillingContact} from './webBillingShared';
 import type {BillingNotificationEnvironment} from './billingNotificationTemplates';
 
 export type BillingNotificationRecipientSource = 'auth_verified' | 'apple_relay' | 'user_supplied';
@@ -37,10 +37,6 @@ export function resolveBillingNotificationRecipient(input: {
   }
   const reference=input.supplementalContact;
   if (!reference || reference.uid!==input.uid || !object(reference.state)) return blocked();
-  const s=reference.state, expectedPurpose=input.mode==='live'?'billing_contact_live':'billing_contact_preview';
-  if (s.purpose!==expectedPurpose || s.schemaVersion!==1 || s.verified!==true || s.verificationStatus!=='verified' ||
-    s.source!=='user_supplied' || !Number.isSafeInteger(s.verifiedAt) || Number(s.verifiedAt)<=0 || Number(s.verifiedAt)>input.nowMillis ||
-    (input.mode==='live' ? s.firebaseUid!==input.uid : s.firebaseUid!==undefined && s.firebaseUid!==input.uid)) return blocked();
-  const email=normalizeBillingEmail(s.email);
+  const email=readVerifiedBillingContact(reference.state,input.uid,input.mode,input.nowMillis);
   return email ? {kind:'resolved',email,source:'user_supplied'} : blocked();
 }

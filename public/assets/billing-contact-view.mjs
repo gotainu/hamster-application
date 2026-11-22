@@ -1,5 +1,6 @@
 import {isVerifiedAccountIdentity} from './account-identity.mjs';
 import {billingContactError, normalizeBillingEmail, projectBillingContact} from './billing-contact-model.mjs';
+import {BILLING_CONTACT_PLAN_RETURN} from './billing-contact-environment.mjs';
 
 /** A confirmation link is consumed only by an explicit, authenticated POST. */
 export async function mountBillingContactPage(contactService, {
@@ -8,6 +9,10 @@ export async function mountBillingContactPage(contactService, {
   clearIntervalFn = globalThis.clearInterval,
 } = {}) {
   const el = id => document.getElementById(id);
+  const environment = contactService.environment || 'preview';
+  const project = value => projectBillingContact(value,{environment});
+  // A fixed internal return is independent of link/query values and carries no proof.
+  el('contact-plan-return').setAttribute('href',BILLING_CONTACT_PLAN_RETURN);
   const panels = ['contact-loading-panel','contact-login-panel','contact-unverified-panel','contact-editor-panel','contact-confirm-panel','contact-complete-panel','contact-blocked-panel'];
   const events = [];
   let token = initialToken, model = null, currentUser = null, epoch = 0, busy = true,
@@ -91,7 +96,7 @@ export async function mountBillingContactPage(contactService, {
       const summary=await accountService.readAccountSummary();
       if(!current(generation,user))return;
       if(summary?.appAccountExists!==true)throw {code:'app_account_required'};
-      const next=projectBillingContact(await contactService.getStatus());
+      const next=project(await contactService.getStatus());
       if(!current(generation,user))return;
       model=next;render(focus);
     } catch(cause) {
@@ -110,7 +115,7 @@ export async function mountBillingContactPage(contactService, {
     // Do not retain its old success claim while the new outcome is unknown.
     if(model?.pendingMaskedEmail){model=Object.freeze({...model,deliveryState:null});render();}
     try {
-      const next=projectBillingContact(await contactService.requestVerification(email));
+      const next=project(await contactService.requestVerification(email));
       if(!current(generation,user))return;
       if(next.state==='verified' && next.category==='missing' && next.canCheckout && next.source==='user_supplied' &&
           next.pendingMaskedEmail===null && next.resendAfter===null && next.expiresAt===null && next.deliveryState===null){
@@ -125,7 +130,7 @@ export async function mountBillingContactPage(contactService, {
       // Reconcile delivery without retrying the send. If this read also fails,
       // the old pending link remains visibly uncertain rather than "sent".
       try{
-        const next=projectBillingContact(await contactService.getStatus());
+        const next=project(await contactService.getStatus());
         if(!current(generation,user))return;
         model=next;render();
       }catch{if(!current(generation,user))return;}
@@ -149,7 +154,7 @@ export async function mountBillingContactPage(contactService, {
     const generation=epoch,user=currentUser,confirmationToken=token;
     busy=true;clearError();controls();
     try {
-      const next=projectBillingContact(await contactService.confirmVerification(confirmationToken));
+      const next=project(await contactService.confirmVerification(confirmationToken));
       if(!current(generation,user))return;
       token=null;model=next;editing=false;lastRequestEmail=null;
       el('contact-status').textContent='連絡用メールの確認が完了しました。';render(true);

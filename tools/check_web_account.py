@@ -20,6 +20,17 @@ def baseline(path, revision=AUTH_BASE):
 
 def auth_entry_without_checkout(source):
     """Only exact reviewed Checkout/contact mounts and profile reads may differ."""
+    source=(source
+        .replace("import { resolveBillingContactEnvironment } from './billing-contact-environment.mjs';\n", '')
+        .replace('  const deployment = resolveBillingContactEnvironment(location.origin);\n', '')
+        .replace('name: deployment.appName,', "name: 'hamcare-web-preview',")
+        .replace("""  // Live purchase/Portal activation is a separate approved rollout. A canonical
+  // contact flow must never fall back to the Preview billing endpoints.
+  const checkoutService = deployment.testMode ? createPreviewCheckoutService""", '  const checkoutService = createPreviewCheckoutService')
+        .replace('  }}) : null;\n', '  }});\n')
+        .replace("  const resumePlan = contactReturn && new URLSearchParams(location.search).get('view') === 'plan';\n", '')
+        .replace('createBillingContactService({auth,environment:deployment.environment,origin:location.origin})', 'createBillingContactService({auth})')
+        .replace('resumeCheckout:deployment.testMode && resumeCheckout,resumePlan', 'resumeCheckout'))
     return (source
         .replace('appleSignInEnabled: true, ', '')
         .replace("import { createPreviewCheckoutService } from './checkout-service.mjs';\n", '')
@@ -81,7 +92,7 @@ def main():
     storage_calls=re.findall(r'(?:appleContext\.)?storage\??\.(?:getItem|setItem|removeItem)\(([^)]*)\)',auth_service)
     check('every consent storage access uses its one fixed key',bool(storage_calls) and all(arguments.split(',')[0].strip()=='APPLE_REDIRECT_CONSENT_KEY' for arguments in storage_calls))
     check('no credential or error logging',not re.search(r'console\s*\.|onLog\s*\(',code))
-    non_checkout='\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','checkout-view.mjs','billing-contact-service.mjs'})
+    non_checkout='\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','checkout-view.mjs','billing-contact-service.mjs','billing-contact-environment.mjs'})
     check('no business API outside isolated Checkout/contact modules',not re.search(r'checkout\.stripe|api\.stripe|firebase-functions|firebase-analytics|cloudfunctions\.net|run\.app',non_checkout))
     check('no direct Stripe API or Analytics',not re.search(r'api\.stripe|firebase-functions|firebase-analytics',code))
     network=r'\b(?:fetch|fetchRequest|XMLHttpRequest|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\('
@@ -111,7 +122,7 @@ def main():
     check('Task7 does not change Preview CSP or hosting configuration',(ROOT/'firebase.preview.json').read_bytes()==baseline('firebase.preview.json',APPLE_BASE))
     entry=(PUBLIC/'assets/account.mjs').read_text()
     check('Auth entry unchanged except exact Checkout/contact mounts, profile reads and Apple opt-in',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
-    check('real account entry always supplies verified contact service',all(value in entry for value in ("import { createBillingContactService } from './billing-contact-service.mjs';",'const contactService = createBillingContactService({auth});','await mountAccountPage(service, {checkoutService, contactService, resumeCheckout});')))
+    check('real account entry always supplies environment-bound verified contact service',all(value in entry for value in ("import { createBillingContactService } from './billing-contact-service.mjs';",'createBillingContactService({auth,environment:deployment.environment,origin:location.origin})','await mountAccountPage(service, {checkoutService, contactService, resumeCheckout:deployment.testMode && resumeCheckout,resumePlan});','deployment.testMode ? createPreviewCheckoutService')))
     check('configured Apple provider is explicitly enabled only at the public entry','appleSignInEnabled: true' in entry and 'appleSignInEnabled: false' not in entry and entry.count('appleSignInEnabled:')==1)
     apple=next((a for t,a in nodes if t=='button' and a.get('id')=='apple-signin'),{})
     check('Apple button is a disabled official local image with safe explanation',apple.get('type')=='button' and 'disabled' in apple and 'apple-signin-note' in apple.get('aria-describedby','').split() and any(t=='img' and a.get('src')=='/assets/landing/apple-sign-in-ja.png' and a.get('alt')=='Appleでサインイン' for t,a in nodes))
@@ -142,12 +153,13 @@ def main():
     contact_model=(PUBLIC/'assets/billing-contact-model.mjs').read_text()
     contact_view=(PUBLIC/'assets/billing-contact-view.mjs').read_text()
     contact_entry=(PUBLIC/'assets/billing-contact.mjs').read_text()
-    check('contact transport has one exact Preview endpoint',CONTACT_ENDPOINT in contact_service and contact_service.count('.cloudfunctions.net/')==1 and 'endpoint !== BILLING_CONTACT_ENDPOINT' in contact_service)
+    contact_environment=(PUBLIC/'assets/billing-contact-environment.mjs').read_text()
+    check('contact transport binds exact Live/Preview endpoints without fallback',CONTACT_ENDPOINT in contact_environment and contact_environment.count('.cloudfunctions.net/')==2 and 'https://asia-northeast1-hamster-breeding-app.cloudfunctions.net/billingContactEmail' in contact_environment and 'endpoint !== deployment.endpoint' in contact_service and 'resolveBillingContactEnvironment(origin).environment !== environment' in contact_service and "origin===BILLING_CONTACT_LIVE_ORIGIN" in contact_environment and "origin===BILLING_CONTACT_PREVIEW_ORIGIN" in contact_environment)
     check('contact transport allows only status/request/confirm',all(value in contact_service for value in ("['status','request','confirm'].includes(operation)","request('status')","mutate('request', {email})","mutate('confirm', {token})")))
     check('contact transport uses fresh verified SDK identity and revokes stale reads',all(value in contact_service for value in ('getIdTokenResult(true)','projectAccountIdentity(user, tokenResult, auth.app?.options?.projectId)','started === generation','auth.currentUser === user','auth.currentUser?.uid === uid','new AbortController()','controller.abort()','generation++')))
     check('contact bearer and confirmation proof stay in allowlisted POST bodies',all(value in contact_service for value in ("method:'POST'","credentials:'omit'","cache:'no-store'","referrerPolicy:'no-referrer'","Authorization:'Bearer '+tokenResult.token",'body:JSON.stringify(body)')) and not re.search(r'URLSearchParams|encodeURIComponent|customerId|priceId|subscriptionId|firebaseUid',contact_service))
     check('contact mutations do not retry unknown outcomes','response.status === 401 && attempt === 0' in contact_service and 'mutationPending === started' in contact_service and not re.search(r'setTimeout|setInterval',contact_service))
-    check('contact projection exposes only masked verified contact and delivery status',all(value in contact_model for value in ('raw.testMode !== true','raw.canCheckout && (!validMaskedEmail(raw.maskedEmail)',"raw.state !== 'verified'",'raw.source === null',"['invalid', 'unverified'].includes(raw.category) && raw.canCheckout","![undefined,null,'sent','uncertain','failed'].includes(raw.deliveryState)")) and not re.search(r'raw\.(?:uid|email|token|customerId)\b',contact_model))
+    check('contact projection exposes only environment-matched masked contact and delivery status',all(value in contact_model for value in ("raw.testMode !== (environment === 'preview')",'raw.canCheckout && (!validMaskedEmail(raw.maskedEmail)',"raw.state !== 'verified'",'raw.source === null',"['invalid', 'unverified'].includes(raw.category) && raw.canCheckout","![undefined,null,'sent','uncertain','failed'].includes(raw.deliveryState)")) and not re.search(r'raw\.(?:uid|email|token|customerId)\b',contact_model))
     check('confirmation fragment is cleared before remote SDK imports',contact_entry.index('consumeVerificationFragment(location, history)') < contact_entry.index("import('https://") and "history?.replaceState(null, '', '/account/contact/')" in contact_model and "values.getAll('token').length !== 1" in contact_model and contact_entry.count('confirmation.token=null;')==2)
     confirm_handler=contact_view.split("listen('contact-confirm','click'",1)[1].split("listen('contact-login-form'",1)[0]
     check('contact confirmation requires explicit authenticated click',"contactService.confirmVerification(confirmationToken)" in confirm_handler and 'if(busy || !token || !currentUser)return;' in confirm_handler and contact_view.count('contactService.confirmVerification(')==1 and 'summary?.appAccountExists!==true' in contact_view and '!isVerifiedAccountIdentity(currentUser)' in contact_view)
@@ -168,7 +180,7 @@ def main():
     check('contact fields initially disabled and links disclose no identity',all('disabled' in a for t,a in contact_nodes if t=='fieldset') and all(not re.search(r'[?#].*(?:token|email|uid)=',a.get('href',''),re.I) for t,a in contact_nodes if t=='a'))
     check('contact page offers relay contact without marketing or account merging',all(value in contact_html for value in ('Appleの非公開メールアドレスもご利用いただけます','個人の実メールである必要はありません','広告配信には使用しません','アカウントの統合','新しいメールの確認が終わるまでは、以前の確認済み連絡先を維持')))
     check('contact page has no-referrer and noindex metadata',any(t=='meta' and a.get('name')=='referrer' and a.get('content')=='no-referrer' for t,a in contact_nodes) and any(t=='meta' and a.get('name')=='robots' and 'noindex' in a.get('content','') for t,a in contact_nodes))
-    check('contact account destinations remain local',all(any(t=='a' and a.get('href')==url for t,a in contact_nodes) for url in ('/account/','/account/?contact=verified')))
+    check('contact account destinations remain fixed and local',all(any(t=='a' and a.get('href')==url for t,a in contact_nodes) for url in ('/account/','/account/?contact=verified&view=plan')) and "BILLING_CONTACT_PLAN_RETURN = '/account/?contact=verified&view=plan'" in contact_environment and "setAttribute('href',BILLING_CONTACT_PLAN_RETURN)" in contact_view)
     check('contact legal destinations use existing live documents excluded from Preview',all(any(t=='a' and a.get('href')=='https://hamster-breeding-app.web.app/'+path+'/' for t,a in contact_nodes) and not any(t=='a' and a.get('href')=='/'+path+'/' for t,a in contact_nodes) for path in ('terms','privacy','commercial-transactions','support')))
     checkout_view=(PUBLIC/'assets/checkout-view.mjs').read_text()
     identity=(PUBLIC/'assets/account-identity.mjs').read_text()

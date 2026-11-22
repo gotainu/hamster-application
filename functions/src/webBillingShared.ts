@@ -87,6 +87,19 @@ export function maskBillingEmail(email: string): string {
   const at = email.lastIndexOf('@');
   return email.slice(0, Math.min(2, at)) + '***' + email.slice(at);
 }
+
+/** A supplemental contact is delivery evidence for one UID and environment,
+ * never an Auth identity or a Customer lookup key. Pending replacement fields
+ * do not replace the previously verified contact until confirmation commits. */
+export function readVerifiedBillingContact(state:unknown, uid:string,
+  environment:'live'|'preview', nowMillis:number):string|null {
+  if (!validWebBillingUid(uid) || !['live','preview'].includes(environment) || !Number.isSafeInteger(nowMillis) ||
+      nowMillis<=0 || !object(state) || state.purpose!=='billing_contact_'+environment || state.schemaVersion!==1 ||
+      state.verified!==true || state.verificationStatus!=='verified' || state.source!=='user_supplied' ||
+      !Number.isSafeInteger(state.verifiedAt) || Number(state.verifiedAt)<=0 || Number(state.verifiedAt)>nowMillis ||
+      (environment==='live' ? state.firebaseUid!==uid : state.firebaseUid!==undefined && state.firebaseUid!==uid)) return null;
+  return normalizeBillingEmail(state.email);
+}
 const relay = (email: string) => ['privaterelay.appleid.com', 'private.icloud.com'].includes(email.slice(email.lastIndexOf('@') + 1).toLowerCase());
 const validContactUid = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= 128 && !/[\\/\s\u0000-\u001f\u007f]/u.test(v);
 export interface BillingEmailClassification {kind: 'A'|'B'|'C'|'unverified'|'invalid'; email?: string; source?: 'auth_verified'|'apple_relay';}
