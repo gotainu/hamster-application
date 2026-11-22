@@ -12,6 +12,8 @@ export interface BillingNotificationMailConfig {
   refreshToken: string;
   allowedSubjectHashes?: readonly string[];
   allowedRecipientHashes?: readonly string[];
+  /** Explicit one-recipient production smoke only; never an implicit Live allowlist. */
+  limitedContactTest?: Readonly<{expiresAtMillis:number;maxTotalSends:1}>;
 }
 export type BillingNotificationMailErrorCategory = 'configuration_invalid' | 'recipient_not_allowed' |
   'invalid_recipient' | 'request_invalid' | 'authorization_revoked' | 'authorization_failed' |
@@ -36,6 +38,12 @@ export interface BillingNotificationMailMessage {
 export interface BillingNotificationGmailDependencies {
   fetchRequest?: typeof fetch;
   now?(): Date;
+  /** Required for limited Live contact tests. Atomically consumes a permanent,
+   * non-reusable slot immediately before Gmail's irreversible send request. */
+  reserveLimitedContactTest?(input:LimitedContactTestReservation):Promise<boolean>;
+}
+export interface LimitedContactTestReservation {
+  subjectHash:string;recipientHash:string;notificationIdHash:string;nowMillis:number;expiresAtMillis:number;
 }
 const digest = (v: string) => createHash('sha256').update(v).digest('hex');
 const object = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -52,16 +60,25 @@ const secretText = (v: unknown, min: number): v is string => typeof v==='string'
 export function parseBillingNotificationMailConfig(raw: unknown, expectedEnvironment: BillingNotificationMailEnvironment): BillingNotificationMailConfig {
   let v: unknown;
   try {v=typeof raw==='string' ? JSON.parse(raw) : raw;} catch {return fail('configuration_invalid');}
-  const keys=['enabled','environment','from','clientId','clientSecret','refreshToken','allowedSubjectHashes','allowedRecipientHashes'];
+  const keys=['enabled','environment','from','clientId','clientSecret','refreshToken','allowedSubjectHashes','allowedRecipientHashes','limitedContactTest'];
   if (!['preview','live'].includes(expectedEnvironment) || !object(v) || Object.keys(v).some(k=>!keys.includes(k)) ||
     v.enabled!==true || v.environment!==expectedEnvironment || v.from!==BILLING_NOTIFICATION_FROM ||
     !secretText(v.clientId,10) || !/^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(v.clientId) ||
     !secretText(v.clientSecret,8) || !secretText(v.refreshToken,16)) return fail('configuration_invalid');
   if (expectedEnvironment==='preview' && (!validHashes(v.allowedSubjectHashes) || !validHashes(v.allowedRecipientHashes))) return fail('configuration_invalid');
-  if (expectedEnvironment==='live' && (v.allowedSubjectHashes!==undefined || v.allowedRecipientHashes!==undefined)) return fail('configuration_invalid');
+  const limited=v.limitedContactTest;
+  if (limited!==undefined && (expectedEnvironment!=='live' || !object(limited) ||
+    Object.keys(limited).sort().join(',')!=='expiresAtMillis,maxTotalSends' || limited.maxTotalSends!==1 ||
+    !Number.isSafeInteger(limited.expiresAtMillis) || limited.expiresAtMillis<=0 || limited.expiresAtMillis>8640000000000000 ||
+    !validHashes(v.allowedSubjectHashes) || v.allowedSubjectHashes.length!==1 ||
+    !validHashes(v.allowedRecipientHashes) || v.allowedRecipientHashes.length!==1)) return fail('configuration_invalid');
+  if (expectedEnvironment==='live' && limited===undefined &&
+    (v.allowedSubjectHashes!==undefined || v.allowedRecipientHashes!==undefined)) return fail('configuration_invalid');
   return Object.freeze({enabled:true,environment:expectedEnvironment,from:BILLING_NOTIFICATION_FROM,
     clientId:v.clientId,clientSecret:v.clientSecret,refreshToken:v.refreshToken,
-    ...(expectedEnvironment==='preview' ? {allowedSubjectHashes:Object.freeze([...v.allowedSubjectHashes]),allowedRecipientHashes:Object.freeze([...v.allowedRecipientHashes])} : {})});
+    ...(expectedEnvironment==='preview' || limited!==undefined ? {
+      allowedSubjectHashes:Object.freeze([...v.allowedSubjectHashes]),allowedRecipientHashes:Object.freeze([...v.allowedRecipientHashes])} : {}),
+    ...(limited!==undefined ? {limitedContactTest:Object.freeze({expiresAtMillis:limited.expiresAtMillis,maxTotalSends:1 as const})} : {})});
 }
 
 function validateMessage(message: BillingNotificationMailMessage): string {
@@ -146,8 +163,11 @@ export function createBillingNotificationGmailSender(rawConfig: BillingNotificat
   return {
     async send(message:BillingNotificationMailMessage):Promise<{messageIdHash:string}> {
       const recipient=validateMessage(message);
-      if (config.environment==='preview' && (!config.allowedSubjectHashes!.includes(digest(message.uid)) ||
+      if ((config.environment==='preview' || config.limitedContactTest) && (!config.allowedSubjectHashes!.includes(digest(message.uid)) ||
         !config.allowedRecipientHashes!.includes(digest(recipient)))) return fail('recipient_not_allowed');
+      const limited=config.limitedContactTest;
+      if (limited && (typeof d.reserveLimitedContactTest!=='function' || !Number.isSafeInteger(now().getTime()) ||
+        now().getTime()>=limited.expiresAtMillis)) return fail('configuration_invalid');
       const mime=buildBillingNotificationMime(message,now());
       let response:Response;
       try {
@@ -165,6 +185,19 @@ export function createBillingNotificationGmailSender(rawConfig: BillingNotificat
       } catch (error) {
         if (error instanceof BillingNotificationMailError) throw error;
         return fail('authorization_failed');
+      }
+      if (limited) {
+        const time=now().getTime();
+        if (!Number.isSafeInteger(time) || time<=0 || time>=limited.expiresAtMillis) return fail('configuration_invalid');
+        let reserved=false;
+        try {reserved=await d.reserveLimitedContactTest!({subjectHash:digest(message.uid),recipientHash:digest(recipient),
+          notificationIdHash:digest(message.notificationId),nowMillis:time,expiresAtMillis:limited.expiresAtMillis});}
+        catch {return fail('configuration_invalid');}
+        // Never refund or reuse this slot, including definite Gmail refusal or
+        // a timeout/unknown result. A stable Message-ID is not idempotency.
+        if (reserved!==true) return fail('sending_limit');
+        const dispatchTime=now().getTime();
+        if (!Number.isSafeInteger(dispatchTime) || dispatchTime<=0 || dispatchTime>=limited.expiresAtMillis) return fail('configuration_invalid');
       }
       try {
         response=await fetchRequest('https://gmail.googleapis.com/gmail/v1/users/gotainu%40gmail.com/messages/send',{

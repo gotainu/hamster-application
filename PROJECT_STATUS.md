@@ -1,5 +1,18 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-owner-live-contact-20261122:start -->
+## 2026-11-22 本人限定1通の本番連絡先確認（送信受付1・確認未完了／停止復帰済）
+
+- **範囲**：承認済み`d475c8b229e12af3b64c7498a0c86c4b74fd989f`/同じ専用branch・worktreeから継続。本人1UID/本人所有1宛先/今回総数1通/日次1だけの本番確認。購入受付停止を維持し、通知worker/他Functions/Preview/Flutter/ストア/Stripeは変更しない。今回分をコード・関連test・既存2文書の1コミットにまとめる。
+- **本人照合**：既存Preview許可hashと前回の本人確認済み連絡先を照合し、同じ既存Apple UID・Authメールなし・既存テストowner/petを確認。本番連絡先docは未作成だった。Previewデータは本人特定にだけ使い、確認済みデータをLiveへコピーしない。個人値・UID・token/link全文をGit/診断へ出さない。
+- **設定/コード**：既存Gmail送信専用grantをrefresh確認（scopeはgmail.sendだけ、本人再認可不要）、Preview Secret/認可は不変。Google Auth Platformの宣言へgmail.sendと送信目的を追加し、既存YouTube用途を維持。一般向けOAuth検証完了とは扱わない。Live Secret version2へ本人hash各1/有限6時間/総数1を明示。4sourceの最小変更で、認証後DB前のUID/宛先拒否、Gmail POST直前の永久1回slot、repeat要求による最初のproof上書き防止を追加。slotは翌日/再起動/失敗/未知結果でも再利用しない。日次1も維持。
+- **限定検証/配備**：backend/共有sender306件、Web4対象85件、Hosting helper9件の合成試験とTypeScriptがPASS。`billingContactEmail`だけをまずfalse/Secretv2で配備（revision`billingcontactemail-00002-hox`）、本人ログイン後にtrueへ限定変更（`billingcontactemail-00003-kin`、19:54:56 JST）。未認証statusは401。本人以外・別宛先・同時/再送拒否はMockと配備設定で照合し、別の実アカウントを使った試験はしない。
+- **一時Web表示**：停止版`22b8c97c2532f11c`→本人限定案内`4aad15f145ca5691`。2 HTMLの文言だけを変更し、残る43ファイル/JS/認証/CSP不変・45hashを照合。終了時に同じ停止版を再release済み。
+- **実送信/結果**：本人の本番ログインからUI要求を1回だけ実行し、Gmail受付/UI送信済み/pending sent/requestedAt1/日次全体1・本人1/永久slot1を確認。raw tokenなし、hash/15分期限だけ保存。受信・ブランド/本文/スマホ表示の報告と確認完了保存を得られないまま期限到達し、配送成功・確認E2E成功とは扱わない。再送/期限延長/回数リセット0。
+- **最終結果/停止復帰**：送信要求は1回（Gmail受付済み）、実受信・ブランド/本文/スマホ表示は未確認。確認済み保存/固定plan復帰は未達で、本人docはverified=false/失効pending/usedTokenHashes0のまま保持。20:13:15 JSTにfalseのrevision`billingcontactemail-00004-luf`がACTIVE。status/request/confirm各503+正規停止code、購入API403。Hostingは`22b8c97c2532f11c`へ復元し、45hash/CSP不変・本番画面の停止案内を確認。検証完了とは記録しない。
+- **本番書込み/保護/残件**：本人contactのpending/リクエスト・送信状態と、日次全体/本人/attempt/永久slotの4制限docを保存。確認済み保存は0。Authメールなし・provider構成、owner/pet/trial/billingの基準hash不変。Preview/他Functions/既存テスター/Stripe/Flutter変更なし。追加権限なし。実配備162ソース/compiled/packageの一致を確認。次は受信状況の本人照合と、失効済みのため追加検証をどう行うかの別判断。現行の1通枠では再送せず、永久予約/期限/未確認状態を勝手に書き換えない。
+<!-- hamcare-owner-live-contact-20261122:end -->
+
 <!-- hamcare-stopped-production-preparation-20261122:start -->
 ## 2026-11-22 一般受付停止での本番準備配備（完了・購入再開は別承認）
 

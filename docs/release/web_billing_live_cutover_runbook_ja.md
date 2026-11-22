@@ -1,5 +1,37 @@
 # HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
 
+## 2026-11-22 本人限定の連絡先実確認（1通受付・確認未完了、停止復帰済）
+
+開始点`d475c8b229e12af3b64c7498a0c86c4b74fd989f`。本人が1UID/1宛先/最大1通・必要な最小実装/配備・本人連絡先/送信制限の書込み・確認後停止・1コミットを承認。購入/Stripe/通知worker/他Functions/一般送信/削除/Flutter/ストア/merge/pushは範囲外。前工程の全監査/E2Eをやり直さず、今回の変更境界だけを確認する。
+
+| 対象 | 実施内容/現時点の結果 |
+|---|---|
+| 本人/宛先 | 前回Preview Secretの許可hashと既存verified情報を本人同定にだけ使用。該当1UIDを現在Auth/既存owner/petで再照合、Apple/emailなし・本番contact未作成を確認。Liveのverified値をPreviewから移さない。個人値は非公開の実行用束縛情報だけに保持 |
+| OAuth | 既存sender grantをrefreshしgmail.send単独を確認。新しいOAuth同意/取消/Preview Secret変更なし。Auth Platformへgmail.sendの宣言と用途を追加、既存YouTube宣言/用途を維持。検証要求表示は残り、一般向け検証完了とは扱わない |
+| Live Secret | `HAMCARE_LIVE_BILLING_MAIL_CONFIG` version2。明示Live設定、許可UID/正規化宛先のSHA各1、`limitedContactTest:{expiresAtMillis,maxTotalSends:1}`。期限は登録時から6時間、日次1を明示。資格情報は同じ送信専用grantを再利用し、Preview設定へのfallbackなし。Secret Accessor/IAM拡張なし |
+| 最小実装 | `billingNotificationGmail` parserで限定markerと厳密1件のリストを許可し、裸のLive allowlist/不正policyは拒否。Runtimeは既存false停止を維持し、true時のAuth後・アプリDB前にUID/宛先を拒否。Storeの固定`billing_notification_delivery_limits/_limited_contact_test`へ送信直前にtransaction create。既存なら同じkeyでも再POST不可。TTL/返却/日次再利用なし。失敗/未知結果でもslot保持。request前read guardで最初のpendingを守る |
+| 他sender/Preview | 通常LiveとPreviewの既存分岐を維持。限定Secretを誤って通知senderへ渡しても予約callbackがなければ送信前に停止。既存OAuth前失敗の有限backoffは維持し、Gmail不可逆POSTは最大1。PreviewのSecret/認可/関数/確認済みデータに変更なし |
+| 試験 | backend/共有Gmail306、関連Web85、ローカルHosting helper9 PASS、strict TypeScript PASS。合成Mockのみ。UID不一致/宛先違い/期限/日次設定違い/同時要求/翌日/再起動/unknown後の2回目を拒否。最初のproof保持と通常メール/Relay/Preview回帰を確認。Mockを実アカウントの拒否試験済みとは扱わない |
+| 配備 | `billingContactEmail`のみ。v2参照/falseのrevision`billingcontactemail-00002-hox`→本人ログイン後trueの`billingcontactemail-00003-kin`（19:54:56 JST）。既存SA/1CPU/256MiB/max1/concurrency5/60秒/日次1を維持。未認証status401、購入受付停止は変更しない |
+| 一時Hosting | `22b8c97c2532f11c`→`4aad15f145ca5691`、2 HTMLの案内だけを本人限定へ変更。43ファイルとCSP/JS/Auth不変、45全hashを公開前後に照合。終了時に旧停止版を直接再releaseし、同じ45hashへ復元済み |
+| 実送信 | 本人が本番Appleログイン後、同じsessionのcontact statusが登録可能を表示。照合済み宛先へUI要求を1回だけ実行。UI送信済み・pending deliveryState sent・requestedAt1・全体日次1/本人日次1・永久slot存在を確認。受信/ブランド/本文/スマホ/リンクは未確認のまま15分期限到達。事前テストメール/再送なし |
+| 許可されたFirestore | 本人`billing_contacts/{uid}`のpending（正規のpurpose/schema/UID、メール、token hash、15分期限、送信状態、request履歴）。既存Live日次全体doc、本人hash別doc、attempt予約doc、固定永久slotの計4制限doc。仕様上は確認時に同じcontactのverified/usedTokenHashesへ遷移するが、今回は未達。raw token/確認URL/認可情報は保存しない |
+| 保護/停止 | owner/pet/initial_trial_v2/billingはhash不変、Authメール/プロフィール/契約/権限の更新0。当初は確認完了と固定plan復帰の後に停止する予定だったが、今回は確認未達のため失効後false/停止版復元を実施。本人原本は未確認pendingのまま保持し、共用OAuthは取消さない |
+
+### 最終実績（確認E2Eは未完了）
+
+- 実送信要求**1回**。Gmailが受け付け、UIと本人pendingの`deliveryState:sent`/`requestedAt:1`、日次全体/本人各1、永久slot存在を確認。受信・ブランド差出人・本文・スマートフォン表示の本人報告は得られず、実配送をPASSにしない。15分以内に同UIDのverified保存がなく、最終確認でも`verified:false`、`usedTokenHashes`0、pending失効。リンク確認/確認済み保存/固定plan復帰は未達。
+- 失効後は追加送信せず停止復帰。**20:13:15 JST**、`billingcontactemail-00004-luf` ACTIVE、`HAMCARE_BILLING_CONTACT_ENABLED=false`/日次1/Secretv2。POST status/request/confirm各503かつ`contact_service_unavailable`、購入API403。起動失敗ではなく実handlerの停止応答。Secretの資格情報・Preview grantを取り消さない。
+- Hostingの一時版`4aad15f145ca5691`を終了し、元の`22b8c97c2532f11c`を再release。全45hash/CSPを再照合し、本番Chromeの静的停止案内を確認。原本JS/Auth/価格/LP/法務は不変。一時2HTMLの表示変更はGitの製品コードへ混ぜない。
+- 本番業務データ書込みは許可された本人`billing_contacts/{uid}`1docのpending（token hash/15分期限/送信結果/request履歴）と、`billing_notification_delivery_limits`の全体日次doc・本人hash別日次doc・attempt予約doc・`_limited_contact_test`の**4doc**。確認済みへの書込みは0、原本と必要な予約記録は保持。raw token/link/OAuth値は保存/診断表示しない。期限延長、回数リセット、slot削除0。
+- Auth管理readで同UID・Authメール未設定・provider構成不変を確認。owner/pet/initial_trial_v2/billingの基準hashも一致。既存テスター/他Functions/Preview設定/連絡先/送信認可/既存契約/Stripe/Flutter/ストアに変更なし。既存のSecret単体Accessor/public Invokerを維持し、新しい権限を付与しない。
+- 配備ソースarchive SHA256 `c4dc79e735daab07d32417a9f32223f5f2a1f96eed2fb3b330a1c5e63ad46d6d`、162のソース/compiled/packageをstaged内容と照合（base d475＋今回4source）。Secret/env/依存をarchiveへ含めない。停止への更新は環境フラグだけ。
+- 受信・表示と確認E2Eは残件。既存メールは失効しているため、この1通だけでの確認完了を今後PASSへ変えない。再開には本人が操作できるタイミングで、追加の送信範囲と新しい1回制限を別途判断する。現行枠を勝手に戻さず、過去の予約証跡を保持する。一般受付・一般メール送信は引き続き停止。Relay/追加VoiceOverは今回の条件へ追加しない。
+
+本番メールの送信受付だけで実配送PASSとしない。送信結果が不明でもslot/日次枠を戻さず、受信・既存記録を照合する。今回上限1の許可は追加メールや一般向け有効化の承認ではない。実施結果/未達項目・停止復帰・本番書込み実績と残件を確定してから、今回のコード/test/この2文書だけを1コミットにする。
+
+---
+
 ## 2026-11-22 一般受付停止での本番準備配備：承認済み範囲と実行記録
 
 本人が提示一覧・既存購入受付停止・復旧を一括承認し、2026-11-22に以下の限定配備を実行した。配備元は`14b7904edb53f8270420a4c2e58fd35d5be5dd44`、`feature/web-first-stripe-checkout`。実行開始時の未コミット差分は承認資料の指定2文書だけで、他の差分・素材は変更していない。現在は無料テスターのみ・一般有料利用者0人。正式ローンチの別判断まで購入停止を維持する。後段26工程全体や一般受付・送信・削除の有効化を承認/実施したものではない。
