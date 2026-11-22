@@ -65,9 +65,14 @@ export const billingContactEmail = onRequest({region:'asia-northeast1',
 // Only explicit authenticated Web review/create actions may start a purchase.
 const webBilling = createProductionWebBillingRuntime({
   db, auth:admin.auth(), rawConfig:()=>process.env.HAMCARE_LIVE_WEB_BILLING_CONFIG,
+  purchaseEnabled:()=>process.env.HAMCARE_WEB_PURCHASE_ENABLED==='true',
+  webhookEnabled:()=>process.env.HAMCARE_WEBHOOK_ENABLED==='true',
 });
 const billingOptions = {region:'asia-northeast1',secrets:[LIVE_WEB_BILLING_CONFIG],
   timeoutSeconds:60,maxInstances:10,memory:'256MiB' as const,cors:WEB_BILLING_ORIGIN};
+// Keep callable transport. This SDK does not emit invoker for onCall; production
+// preparation must explicitly preserve private IAM in the deployment operation.
+// Public IAM and purchase activation require separate approval.
 export const createStripeCheckoutSession = onCall(billingOptions,async req=>{
   try {return await webBilling.checkout(req);}
   catch (error:unknown) {const safe=safeWebBillingError(error);throw new HttpsError(safe.code,safe.message);}
@@ -87,6 +92,7 @@ export const stripeWebhook = onRequest({region:'asia-northeast1',secrets:[LIVE_W
   catch(error:unknown) {
     // No token, UID, Customer/Subscription ID, email or raw SDK error in logs.
     const retryable=!(error instanceof WebBillingWebhookError) || error.retryable;
+    if (error instanceof WebBillingWebhookError && error.code==='processing_paused') res.set('Retry-After','60');
     logger.warn('Production billing webhook stopped',{retryable});
     res.status(retryable?503:400).json({ok:false,message:WEB_BILLING_UNAVAILABLE});
   }

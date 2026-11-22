@@ -1,5 +1,102 @@
 # HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
 
+## 2026-11-22 次の承認対象：550円・課金API・Webhookの停止接続準備（本番変更未実行）
+
+連絡先確認は承認済み`cd624d4c9ae7c4357f578c6981c325a53c9b670f`で**完了**。今回再試験せず、確認済み原本・累計2通・履歴・購入停止・contact falseを維持する。本節は既存26工程の次の設定依存だけを実行可能にしたもので、一般購入・一般送信・実契約の開始手順ではない。今回実行したのは対象設定のGETとローカル最小修正/試験だけで、本番の作成・配備・IAM/Hosting変更は0。
+
+### 配備元と照合した現在地
+
+- branch：`feature/web-first-stripe-checkout`。開始HEAD `cd624d4c9ae7`、clean。配備元は**今回の停止制御・test・本節を含む準備コミット**（完了報告の40桁IDを`BILLING_DEPLOY_COMMIT`へ固定）。branch先端の自動採用は禁止し、実行前に承認IDとclean状態を照合する。
+- project：`hamster-breeding-app`（797691641198）、region：`asia-northeast1`。2026-11-22の対象GET結果は以下。識別子は設定オブジェクトだけであり、UID/Customer/Subscription/受信者/資格情報は記録しない。
+
+| 対象 | 既存状態 | 次の承認後の変更 |
+|---|---|---|
+| Product | `prod_UgrYD6tAObiCcy`、Live/active、Hamster Care Premium Plan | 再利用。名前/default_price/旧設定を変更しない |
+| Price | `price_1U4DbCK6h5kxGn4c2p3Y3dyN`、JPY500/month、active、exclusive。550円Priceなし | 同ProductへJPY550/月1回/licensed/inclusiveを**新規1件**。旧500円は変更/削除せず、default_priceも500円のまま保持。新規申込の唯一の`priceId`を新550円IDへ |
+| Portal | `bpc_1U4eAcK6h5kxGn4c5GgRlrtk`、Live/default。期間末解約は正しいがname/email/address/phone更新を許可、法務/return未設定 | 旧defaultは維持し、非defaultの専用Configurationを**新規1件**。下記payloadへ限定 |
+| Webhook | `we_1U4IAnK6h5kxGn4cDdYtGpsy` enabled、固定stripeWebhook URL、API`2026-05-27.dahlia`、5イベント | 旧endpointは削除せず**disabled**へ。SDK固定版に合う新endpointを**1件作成→直ちにdisabledへ更新**。新署名Secretとの対応を一本化し、今回の接続準備終了時は両endpoint停止 |
+| API版 | 既存endpoint/未指定API応答はdahlia。実装のStripe17.7.0は`2025-02-24.acacia`固定 | SDK更新なし。新endpointの`api_version`を`2025-02-24.acacia`へ明示。固定版付きPrice GETはHTTP200/同版の応答を確認済み |
+| 専用Secret | `HAMCARE_LIVE_WEB_BILLING_CONFIG`未作成 | 完全なLive JSONのSecret/versionを新規登録。旧`STRIPE_*`とcontact用mail Secret v3は変更しない |
+| Web | Live version`22b8c97c2532f11c` FINALIZED、45hash/CSPは停止版と一致 | **Hosting/CSP変更0**。Live adapter/DTO/成功後status接続は未実装で今回対象外。購入受付をtrue/publicにする前の別実装・限定検証が必須 |
+
+旧endpointのAPI版は作成後に変更できないため、イベントの追加だけでは版の不一致は解消しない。[Stripe公式Endpoint仕様](https://docs.stripe.com/api/webhook_endpoints/object)、[版切替手順](https://docs.stripe.com/webhooks/versioning)を根拠とする。既存SDKのv1 createにはdisabled指定がなく、作成と停止は別操作である。作成直後の短い有効区間は旧handlerが新署名を受理しないため非2xxとなり得る。実行時に両操作の時刻と当該区間の対象イベント有無をGETで確認し、発生があれば未処理として停止・報告し、黙って処理済みにしない。queryによる二重経路、2署名Secret対応、別の新Functionは追加しない。
+
+### 次の承認後だけ使用する設定payload
+
+生成される新`price_...`/`bpc_...`/`we_...`は返却値を非公開実行記録へ束縛し、IDを推測しない。既存の一致する専用設定が実行前に見つかれば厳密GET照合して再利用し、同じものを重複作成しない。POSTには操作ごと固定のidempotency keyを付け、結果不明時は一覧/metadataで照合し、新しいkeyで再作成しない。
+
+- Price POST `/v1/prices`：`product=prod_UgrYD6tAObiCcy, currency=jpy, unit_amount=550, recurring.interval=month, recurring.interval_count=1, recurring.usage_type=licensed, tax_behavior=inclusive, lookup_key=hamcare_premium_monthly_550`、metadata purpose=`hamcare_web_live_550_v1`。Customer/契約/Invoiceは作成しない。新PriceのLive/active・Product・550・月1回・inclusiveをGET検査。`automatic_tax=false`/割引なし/数量1は既存Checkout実装で維持し、ユーザー向け正式表示は月額550円のみ。
+- Portal POST `/v1/billing_portal/configurations`：`features.customer_update.enabled=false, allowed_updates=[]; invoice_history.enabled=true; payment_method_update.enabled=true; subscription_cancel.enabled=true, mode=at_period_end, proration_behavior=none, cancellation_reason.enabled=false; subscription_update.enabled=false; login_page.enabled=false; default_return_url=https://hamster-breeding-app.web.app/account/?portal=return; business_profile.privacy_policy_url=https://hamster-breeding-app.web.app/privacy/; business_profile.terms_of_service_url=https://hamster-breeding-app.web.app/terms/`、metadata purpose同上。旧defaultを変更せず、返却の`is_default=false`と全機能を検査。Portal Sessionはこの準備では作らない。[公式Configuration仕様](https://docs.stripe.com/api/customer_portal/configurations/create?api-version=2025-02-24.acacia)
+- 新Webhook POST `/v1/webhook_endpoints`：`url=https://asia-northeast1-hamster-breeding-app.cloudfunctions.net/stripeWebhook, api_version=2025-02-24.acacia, connect=false`、description/metadata purpose同上。eventsは厳密に`checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, `invoice.payment_failed`, `invoice.payment_succeeded`の7件。最後の旧success aliasを維持し、全イベント`*`を使わない。返却直後に同IDへ`disabled=true`、GETで停止を確認する。secretは作成時の値をメモリから専用Secretへ渡し、stdout/Git/ログに出さない。
+- `HAMCARE_LIVE_WEB_BILLING_CONFIG`のJSON field：`secretKey`（既存`STRIPE_SECRET_KEY:3`の同Live keyをメモリで再利用）、`publishableKey`（同じStripeアカウントの実`pk_live`）、`priceId`（新550）、`webhookSecret`（新endpointの署名値）、`portalConfigurationId`（新専用構成）、`origin=https://hamster-breeding-app.web.app`, `returnUrl=https://hamster-breeding-app.web.app/account/?portal=return`。今回は有料契約者0人なので任意`legacyPriceId`は未設定とし、旧500円移行/全契約走査/旧記録更新を追加しない。旧価格対応の既存コード自体は削除しない。
+- **実行前に必要な未登録値は同アカウントのLive公開可能キー1件**。関連Secret一覧・既知の環境ファイルでは見つからなかった。本人がStripe Live画面から非公開の設定入力へ渡す（チャット貼付不要）。仮値/Test値/Preview値で補完しない。これが揃う前に旧endpointを止めたり3関数を更新したりしない。新設定IDと新whsecは作成後に取得する生成値であり、追加の方針判断ではない。
+
+### 承認対象となる適用順序・成功条件・復旧
+
+| 順 | 実施対象と変更 | 購入/メール停止・成功確認 | 停止・復旧 |
+|---|---|---|---|
+| 0 | 承認commit、3関数の現行source世代/環境/Secret参照/Invoker、旧Stripe設定を非公開退避。実Live pkを用意 | Checkoutのservice/project公開Invokerなし、IAM check有効を実行前に再照合。contact false/既存確認済み原本は変更しない。新Api/Project IAM追加なし | source/設定/鍵の対応を確定できなければ本番変更前に停止 |
+| 1 | 新550円Priceを作成、既存Productを再利用 | Live/550/JPY/月1回/数量仕様に一致、旧500円/default_price不変 | 不一致なら後続停止。新Priceは記録を消さず必要時inactive、旧500へ接続しない |
+| 2 | 専用非default Portal構成を作成 | 支払方法/請求履歴/期間末解約だけ、氏名・メール・プラン変更/公開loginなし | 設定不一致なら参照せず停止。旧defaultはそのまま |
+| 3 | 旧`we_1U4IAn...`をdisabled、新Acacia endpoint作成→直ちにdisabled | URL/7event/版/新whsecの対応、短いenabled区間の記録。新旧を同時enabledにしない | new disabledを維持。旧handler/旧whsecが不変なら旧endpointだけ復旧可能。切替途中のイベントを消去/一括再処理しない |
+| 4 | 新Live課金Secret作成/完全JSON1版登録。既存compute SAへ当該Secret単体Accessor | `797691641198-compute@developer.gserviceaccount.com`にSecret単体`roles/secretmanager.secretAccessor`。旧Secret/Preview/mail v3不変。秘密値非表示 | 欠損/IAM不備なら配備しない。旧Secretを削除/上書き/失効させない |
+| 5 | `createStripeCheckoutSession`だけ限定更新 | 環境`HAMCARE_WEB_PURCHASE_ENABLED=false`,`HAMCARE_WEBHOOK_ENABLED=false`。既存非公開Invokerを最初から維持。handlerも設定/Auth/DB/Stripe前で拒否 | 購入403が維持されなければ後続停止。公開を後から閉じ直す工程に依存しない |
+| 6 | `stripeWebhook`だけ限定更新。専用Secret/新署名へ切替 | public Invokerは既存のまま、`HAMCARE_WEBHOOK_ENABLED=false`。有効署名でもprocess/claim/Stripe API/DB前503+Retry-After60。新旧Stripe endpointはdisabledのまま | 新endpoint停止を維持。旧source/旧STRIPE_*参照を対で復元した後だけ旧endpointを再開。片側だけ切戻さない |
+| 7 | `createStripeCustomerPortalSession`だけ限定更新 | 既存public Invoker/本人認証・同UID既存Customer限定を維持。確認連絡先を管理の必須条件にしない。匿名要求はAuth拒否、Customer/Session/契約作成0 | 失敗時はこの1関数の退避source/旧Secret参照だけ復旧。新規購入は停止のまま |
+| 8 | 対象3関数と新Stripe設定をGET照合、下記停止smoke | 承認source/Secret version/flags一致、購入両経路403、署名不正400・正署名停止503。業務データ/送信0を確認 | 想定外の権限書込/メール/起動エラーなら終了扱いにせず停止・復旧。構成変更と業務データ変更を分けて報告 |
+
+**この次回準備配備の終了状態**は購入false/非公開、Webhook処理false/新旧Stripe endpoint disabled、contact false/日次1、通知worker未配備、Hosting45不変。Webhookの登録/署名/関数接続が準備できた状態であり、受信同期の稼働PASSではない。新Webhookのenabledと処理true、一般購入true/public、一般メール開始、実契約はこの停止準備の承認に自動で含めず、専用の実課金確認/公開判断で明示する。
+
+### 限定配備方法と停止を維持する根拠
+
+配備は既存の3 Function/対応Run serviceだけ。同名・同entrypointを更新し、sourceへ含まれる他export/workerを配備しない。現在のrevisionはCheckout `createstripecheckoutsession-00005-ceb`、Portal `createstripecustomerportalsession-00009-hec`、Webhook `stripewebhook-00010-kuq`。service名はそれぞれ`createstripecheckoutsession`/`createstripecustomerportalsession`/`stripewebhook`。
+
+- 呼出入口はcallable2件＋HTTP webhook1件を維持。`onCall({invoker:'private'})`は現Firebase Functions SDK7.0.1のmanifestへ反映されないため、見かけのオプションを安全根拠にしない。Firebase CLI13.29.3はcallable新規時にpublicを設定し、限定filter前に無関係Secretを要求し得るため、今回使わない。gcloudの**既存関数更新**は公開化を要求しなければInvokerを維持する。
+- Checkoutは**配備前から公開bindingなし**を必須条件にし、`--allow-unauthenticated`を付けない。`--no-allow-unauthenticated`の防御指定があっても、配備後に閉じ直すことで安全を得る計画にはしない。HTTPへ到達しても新runtimeの`purchaseEnabled !== true`が最初に停止する。非公開IAMと明示falseの両方を維持し、設定完成だけで受付を開かない。
+- 全3関数は既存実行/ビルドSA（上記compute）、Node22、256Mi/1CPU/60秒/concurrency80/maxInstances20を明示して現行リソースを維持。sourceのFirebase CLI向けmaxInstances10を自動適用する方法と混在させず、今回はgcloud設定を正本とする。新規API有効化/サービスID作成/追加Project roleなし。
+- 承認commitから隔離したFunctions sourceを作り、既存lock一致の依存でcompile後にsrc/lib/package/lock/tsconfigだけを配備。`.env`/node_modules/テスト/私用ファイルを同梱しない。実配備archiveのsource/compiled hashを今回commitと照合する。
+- 各関数は旧`STRIPE_*`**参照を専用JSON参照へ置換**するが、Secret Manager内の旧Secret/版を変更しない。新Secret version番号を確認して固定し、`latest`/Test/Preview/旧価格fallbackを使わない。
+
+承認後の各1関数更新コマンドの形（**今回は実行していない**。source path/Secret版は実行記録へ確定する）：
+
+```sh
+CLOUDSDK_CORE_DISABLE_FILE_LOGGING=1 gcloud functions deploy FUNCTION_NAME \
+  --project=hamster-breeding-app --region=asia-northeast1 --gen2 \
+  --runtime=nodejs22 --source="$BILLING_DEPLOY_SOURCE_DIR" \
+  --entry-point=FUNCTION_NAME --trigger-http \
+  --service-account=797691641198-compute@developer.gserviceaccount.com \
+  --build-service-account=projects/hamster-breeding-app/serviceAccounts/797691641198-compute@developer.gserviceaccount.com \
+  --memory=256Mi --cpu=1 --timeout=60s --min-instances=0 --max-instances=20 --concurrency=80 \
+  --update-env-vars=HAMCARE_WEB_PURCHASE_ENABLED=false,HAMCARE_WEBHOOK_ENABLED=false \
+  --set-secrets="HAMCARE_LIVE_WEB_BILLING_CONFIG=HAMCARE_LIVE_WEB_BILLING_CONFIG:$BILLING_SECRET_VERSION" \
+  --docker-repository=projects/hamster-breeding-app/locations/asia-northeast1/repositories/gcf-artifacts \
+  --quiet
+```
+
+`FUNCTION_NAME`は上記順序で1件ずつ置換する。Checkoutだけ`--no-allow-unauthenticated`を追加し既存privateを維持、Portal/Webhookは認証公開フラグを付けず既存publicを維持する。3件完了後の全体deploy、Scheduler作成、通知/削除/体験/AI等の更新はしない。
+
+### 配備後の成功確認（次の承認後のみ）
+
+1. 3関数のACTIVE/source/専用Secret版/flags、Run Invoker差分を照合。資格情報不足・起動失敗を停止制御PASSにしない。
+2. Checkoutの通常Functions/Run経路へtokenなし空callableを各1回→403。これはIAMの証拠でありhandler falseの実行証明ではない。handler副作用0は今回のMock/compile/実配備hash照合と分けて記録する。
+3. Portalへtokenなし空callable1回→unauthenticated（Customer/Portal Sessionを作らない）。contactの再送・受信試験は行わない。
+4. Webhook不正署名1回→400。次に新whsecをメモリだけで使った**合成Live eventの正しい署名POST1回**→503/Retry-After60。実Stripe event/Customer/契約/Invoiceは作らない。合成event hashのFirestore receipt不存在を前後でGET確認し、claim/Stripe API/billing/outbox書込0を照合する。これは停止handlerの確認で、Stripeからの実配送/同期E2E PASSではない。
+5. 専用Secretの配置・API/Price/Portal/新Webhook版と全flagを読み直し、新旧endpoint disabled、購入非公開、contact false/確認済み原本保持、worker不存在、Hosting版不変で終了する。既存テスター実データ更新/AI送信/全アプリE2Eをしない。
+
+### テスター・通知・Web接続の境界と残件
+
+- 更新対象は3 exportだけ。通常ログイン/飼育記録/21日体験/権限取得/既存アプリ内削除は配備しない。`billing_contacts`不存在を通常利用の条件にしない。停止中WebhookはFirestore receiptすら作らず、無料ユーザーのbilling/体験/権限を変えない。稼働後の既存engineもUID/Customer/Subscription/Priceの照合、元trial_end、CAS/遅延event/削除フェンスを維持する。料金・体験や権限評価ロジックは変更していない。
+- `processBillingNotificationOutbox`は現在未配備、今回も配備しない。送信は同workerの15分Schedulerだけで、Firestore outbox作成を直接送信するtriggerはない。Webhookが将来有効になるとpending outboxが作られ得るが、今回falseなので作成0。**contact falseを通知workerの送信停止の代替にしない**。mail Secret v3は本人限定/消費済み2枠のまま、一般通知へ変更せず、過去通知の一括送信/再処理0。通知の一般設定/workerは有料受付前の別工程。
+- Hostingは22b8/45を維持。canonical accountは`checkoutService=null`でLive課金APIへ未接続。Preview transport/DTO（testMode/pk_test/cs_test）をLiveへURLだけ差し替えない。Live callable adapter/安全なDTO projectionと、旧`/billing/success/`の静的成功断定から署名同期済みstatusへ戻す接続は未実装。一般購入をtrue/publicにする前の別実装・限定検証が必須。今回は旧13HTMLも変更しない。
+- 将来Web接続時だけ`/account/**`のCSP connect-srcへ固定Checkout/Portalの2 URL（上記function名のasia-northeast1 cloudfunctions.net）を追加する。WebhookはブラウザCSPへ追加不要。Stripe script/frame/購入CTAは別の公開判断まで追加しない。この未接続を残したまま「本番購入可能」とは報告しない。
+- 新旧endpointがdisabledの準備状態は無期限のイベント保管ではない。StripeのLive自動再送は最大3日で、disabledのendpointは以後の再送が抑止される。[Stripe配送仕様](https://docs.stripe.com/webhooks#automatic-retries)。稼働開始時に対象期間/イベントを確認して未処理を特定し、古いイベントの一括再処理を自動で行わない。
+- 復旧は購入false/private→新endpoint disabled/Webhook falseを優先。退避した**各関数の元source世代と元環境/Secret参照を対で**同名関数へ限定再配備する。旧Webhook復元の正常性を確認後だけ旧endpointを再enable、新endpointは停止。新Price/専用Portal/Secret/receipt/既存履歴は削除しない。Runの旧revisionへtrafficだけ戻してFunctions管理状態と不整合のまま放置しない。Hostingは今回変更0のためrollback不要。
+
+### 今回の限定検証と未実行事項
+
+strict TypeScriptと今回直接関連のMock回帰**490/490 PASS**。購入flag missing/false/不正値はconfig/Auth/DB/Stripe0、旧空要求/同UID認証/Apple連絡先reader/Portal既存管理/550/元trial終了/署名Live/重複・遅延・削除フェンスを維持。Webhook falseは署名後503/Retry-After60でprocess/claim0、不正署名400。連絡先の受信・確認済み保存・復帰の再試験0。依存/SDK更新0。実環境は構成GETだけで、停止probe・新設定作成・関数/Hosting/IAM変更・実メール/契約/削除は0。次の承認対象は本節の0〜8の停止準備だけである。
+
+
 ## 2026-11-22 追加1通で本番連絡先確認を完了（累計2通・停止復帰済）
 
 開始点`69c2667947d5`。本人が「追加最大1通・前回を含む累計最大2通」、同じ本人UID/画面指定1宛先、必要な最小コード/設定/1関数配備、本人contact/確認情報/制限記録の書込み、完了後停止を承認した。準備配備のやり直しや古いSecretへの巻戻しは行わない。
@@ -175,11 +272,11 @@
 | バーチャルオフィス | 不要 | 初回は契約しない。将来検討のみ |
 | サポート窓口 | GO | 既存Gmailを共用、ブランド表示を維持 |
 | Firebase認証メール | GO（既存機能） | 通常メール確認・再設定経路あり。Relay実配送は別項目 |
-| Gmail API | 初回リリース採用・本番送信停止 | Preview配送済。本番contactは停止配備済、通知Worker未配備。scope宣言/資格情報/実配送は残件 |
+| Gmail API | 初回リリース採用・一般送信停止 | 本人限定の本番確認はcd624d4で完了。contact false/日次1/mail v3を維持し、通知Worker未配備。一般用設定/一般OAuth検証・通知稼働は別工程 |
 | Apple Relay送信元登録 | GO（過去の登録証拠） | 2送信元登録・SPF確認済み。今回設定再確認/変更なし |
 | Relay実配送 | 未確認・非ブロッキング | 本人所有の宛先確保時に確認、成功したとは記録しない |
 | 連絡先補完 | Preview GO | 既存の実配送1件と確認済み連絡先・UIDガードの証拠を維持 |
-| 本番連絡先確認 | 停止状態で配備済 | false/資格情報なしSecret、正規JSON停止応答確認。実配送/Relay/確認後復帰は未実施、Preview fallbackなし |
+| 本番連絡先確認 | 本人限定実機確認完了・一般向け停止 | cd624d4承認済：受信/同UID確認済み保存/スマホ復帰PASS、今回は再試験0。確認済み原本/累計2/履歴保持。Relay実配送は別の非ブロッキング項目 |
 | Stripe Test | GO（既存検証） | 550円、体験/即時、Webhook、Portalの既存証拠。今回追加決済なし |
 | Safari E2E | GO（既存Test E2E） | 既存Apple購入・同期・Portal・期間末解約PASS。今回の本番検証ではない |
 | Android Chrome表示 | GO（既存表示検証） | 連絡先ページの実機表示/入力PASS。Androidの購入E2E全体とは区別 |
@@ -215,7 +312,7 @@
 
 申請リンク24時間・再認証5分・review5分は実装済みの認証期限であり、申請データの自動削除ではない。初回返信はJSTの土日祝を除く原則3営業日以内、本人確認と削除意思確認後は原則7暦日以内が完了目安。遅延理由/見通しを知らせ、その後7日ごとに連絡する方針が確定。完了窓口履歴90日/期限切れ未確認30日は窓口のメール/添付・support申請・CLI受付/リンク/reviewファイルだけを対象とし、処理中・既存再試行/停止証跡・完了フェンス・会計へ一括適用しない。担当Go、毎営業日の期限確認と週最初の営業日の手動整理確認を予定し、本番運用/自動purge/TTLは未開始。会計の法定期間は記録種別ごとに確認し、Apple実失効後のStripe失敗→同UID再ログイン/再開も実機未確認を維持する。
 
-## 本番連絡用メール確認の有効化手順（停止準備配備済・有効化/実配送は未実行）
+## 本番連絡用メール確認の有効化手順（本人限定実機確認完了・一般向け停止、以下は一般有効化時の参考）
 
 既存の認証・プラン・課金・通知を作り直さず、確認engineとGmail sender/予算を共有する。詳細・試験記録は[戦略C連絡先確認](japan_store_payment_and_ios_readiness_20261018.md)の2026-11-22節を参照。Previewの過去の実配送成功を、本番の配送成功へ読み替えない。
 

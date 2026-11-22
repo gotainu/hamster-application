@@ -1,5 +1,14 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-22 550円・課金API・Webhook接続の次回本番変更一覧を準備（未実行）
+
+- **現在地**：承認済み`cd624d4c9ae7`/同じ専用branch、開始時clean。連絡先の受信・同UID確認済み保存・スマホ復帰は完了扱いで再試験0。購入private/contact false・確認済み連絡先/累計2通/既存履歴を維持する。
+- **対象の読取り**：Liveは旧500円Price1件のみ（同Product再利用可）、550円未作成。旧default Portalは個人情報変更を許可するため新専用構成が必要。旧Webhookはdahlia/5event、SDKはAcacia固定で新endpointが必要。専用`HAMCARE_LIVE_WEB_BILLING_CONFIG`未作成。同アカウントの実Live公開可能キーだけ実行前入力が必要。旧Price/設定/記録を変更せず、対象GETのみで判定した。
+- **最小修正/検証**：`HAMCARE_WEB_PURCHASE_ENABLED`の明示true以外はconfig/Auth/DB/Stripe前に停止。Webhookは`HAMCARE_WEBHOOK_ENABLED`の明示true以外、正署名/Live判定後かつprocess/claim前に503/Retry-After60。不正署名400、Portal/元21日trial/UID/権限評価は変更なし。runtime/index/直接testの3ファイルだけ修正、strict TypeScript・関連490件PASS、SDK/依存変更0。Callableの見かけのprivate宣言に頼らず、既存非公開IAMを保つgcloud限定更新を正本にする。
+- **次承認の具体範囲**：既存Productへ新550円Price1、非default Portal構成1、旧Webhookを保持して停止→Acacia新endpoint1を作成直後停止、新署名/IDの専用Secret登録と既存compute SAのSecret単体Accessor、既存3 Functionの停止版限定更新。終了時は購入false/private・Webhook false/新旧endpoint disabled・contact false/通知worker未配備。作成直後の短いenabled区間・署名対応・失敗時復旧を[既存Runbook冒頭](docs/release/web_billing_live_cutover_runbook_ja.md)に明記。
+- **Web/通知の境界**：Hosting22b8/45hash/CSP不変、今回配備0。canonicalのLive adapter/DTO/成功後status接続は一般購入前の別実装残件とし、PreviewをLiveへURL差替えしない。通知/削除worker・新Web削除・Flutter・ストアは対象外。contact falseだけを通知worker停止とみなさず、現在未配備のworkerを今回も配備しない。Relay/追加VoiceOverは非ブロッキングを維持する。
+- **本番未変更/次段階**：Price/Portal/Webhook/Secret/IAM/Functions/Hostingの本番新規変更0、業務データ/実メール/実契約/Stripe書込み/実削除0。実Live公開可能キー等の事前入力値・準備コミットIDを確定して承認を受け、承認後の新設定ID/署名値は作成応答へ束縛してRunbook順に実行する。今回は設定/停止制御/手順の準備と既存2文書を1コミットにまとめ、merge/pushせず停止する。
+
 ## 2026-11-22 追加1通で本番連絡先確認を完了（累計2通・停止復帰済）
 
 - **開始/本人指定**：`69c2667947d52e6d846cbc95bcb495f72ad29c97`・同じ専用branch/worktree・開始時clean。前回の同じApple UIDを維持し、本人がMac内の非公開入力画面で新しい受信可能な連絡先を指定。宛先指定の保護判定を直して再入力後に受理し、この段階のメール送信0。Apple IDメールから宛先を推測せず、Authメール/ログイン方式/UIDを変更しない。

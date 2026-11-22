@@ -24,7 +24,7 @@ function fixture(options={}) {
   const auth={async verifyIdToken(value,revoked){calls.verify.push([value,revoked]);if(options.revoked)throw Error('synthetic revoked token');return token;},
     async getUser(uid){calls.user.push(uid);return user;}};
   const client={webhooks:{constructEvent(...args){calls.signature.push(args);if(options.badSignature)throw Error('synthetic secret raw body');
-    return {id:'evt_syntheticRuntime',type:'invoice.paid',livemode:true,created:NOW/1000,data:{object:{id:'in_syntheticRuntime'}}};}}};
+    return {id:'evt_syntheticRuntime',type:'invoice.paid',livemode:true,created:NOW/1000,data:{object:{id:'in_syntheticRuntime'}},...options.event};}}};
   const imports={
     './accountDeletion':deletion,'./webBillingConfig':cfg,'./webBillingShared':identity,
     './webBillingCheckout':{WEB_BILLING_CONTACT_PURPOSE:'billing_contact_live',createWebBillingCheckout(d){captured.checkout=d;
@@ -38,6 +38,8 @@ function fixture(options={}) {
   const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText;
   vm.runInThisContext(`(function(exports,require,module){${code}\n})`,{filename:file})(mod.exports,name=>imports[name]??require(name),mod);
   const runtime=mod.exports.createProductionWebBillingRuntime({db,auth,now:()=>new Date(NOW),
+    ...(options.omitPurchaseSwitch?{}:{purchaseEnabled:()=>Object.hasOwn(options,'purchaseEnabled')?options.purchaseEnabled:true}),
+    ...(options.omitWebhookSwitch?{}:{webhookEnabled:()=>Object.hasOwn(options,'webhookEnabled')?options.webhookEnabled:true}),
     rawConfig:()=>{calls.config++;return options.rawConfig===undefined?JSON.stringify(config()):options.rawConfig;},
     stripeFactory:key=>{calls.factory.push(key);return client;}});
   const request=(data={flow:'web',action:'review',planKey:'premium_monthly'},headers={})=>({data,auth:{uid:UID},
@@ -223,4 +225,76 @@ test('another UID deletion allows normal Checkout and its own reservation',async
   await f.captured.checkout.store.mutate(UID,()=>({state:{firebaseUid:UID},result:true}));
   assert.equal(f.calls.write.length,1);
   assert.equal(f.calls.write[0][1].firebaseUid,UID);
+});
+
+for(const [name,options]of [['missing',{omitPurchaseSwitch:true}],['false',{purchaseEnabled:false}],
+  ['undefined',{purchaseEnabled:undefined}],['null',{purchaseEnabled:null}],['string true',{purchaseEnabled:'true'}],
+  ['number one',{purchaseEnabled:1}]]) {
+  test('closed purchase '+name+' rejects Web, legacy and empty requests before configuration/Auth/DB/Stripe',async()=>{
+    const f=fixture(options);
+    for(const data of [null,undefined,{}, {priceId:'price_syntheticOld500'},
+      ...['review','create','status','cancel'].map(action=>({flow:'web',action,planKey:'premium_monthly'}))]) {
+      const request=f.request();request.data=data;
+      await assert.rejects(f.runtime.checkout(request),error=>error instanceof cfg.BillingConfigurationError);
+    }
+    await assert.rejects(f.runtime.checkout(undefined),error=>error instanceof cfg.BillingConfigurationError);
+    assert.equal(f.calls.config,0);
+    for(const name of ['factory','verify','user','read','write','checkout','portal','webhook','signature'])assert.deepEqual(f.calls[name],[],name);
+  });
+}
+test('purchase switch closes the first request but leaves existing Portal and signed webhook wiring available',async()=>{
+  const f=fixture({omitPurchaseSwitch:true});await assert.rejects(f.runtime.checkout(f.request()));assert.equal(f.calls.config,0);
+  assert.deepEqual(await f.runtime.portal(f.request(null,{origin:undefined})),{ok:true,portalUrl:'https://billing.stripe.com/p/session/live_syntheticRuntime'});
+  assert.deepEqual(await f.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),{result:'synced'});
+  assert.equal(f.calls.portal.length,1);assert.equal(f.calls.webhook.length,1);assert.equal(f.calls.checkout.length,0);assert.equal(f.calls.write.length,0);
+});
+test('deployed purchase and webhook bindings require the exact true environment string',()=>{
+  const file=path.resolve(__dirname,'../src/index.ts'),source=fs.readFileSync(file,'utf8');
+  const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2020,true,ts.ScriptKind.TS),variables=new Map();
+  for(const statement of parsed.statements)if(ts.isVariableStatement(statement))for(const d of statement.declarationList.declarations)
+    if(ts.isIdentifier(d.name)&&d.initializer)variables.set(d.name.text,d.initializer.getText(parsed));
+  const init=variables.get('webBilling');
+  for(const value of [undefined,'false','TRUE','1',' true ','true']) {
+    const env=value===undefined?{}:{HAMCARE_WEB_PURCHASE_ENABLED:value,HAMCARE_WEBHOOK_ENABLED:value},m={exports:{}};
+    const compiled=ts.transpileModule('module.exports='+init+';', {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+    vm.runInNewContext(compiled,{module:m,process:{env},db:{},admin:{auth:()=>({})},createProductionWebBillingRuntime:d=>d});
+    assert.equal(m.exports.purchaseEnabled(),value==='true');assert.equal(m.exports.webhookEnabled(),value==='true');
+  }
+});
+for(const [name,options]of [['missing',{omitWebhookSwitch:true}],['false',{webhookEnabled:false}],
+  ['undefined',{webhookEnabled:undefined}],['null',{webhookEnabled:null}],['string true',{webhookEnabled:'true'}],['number one',{webhookEnabled:1}]])
+  test('paused webhook '+name+' verifies signature/live but returns retryable before engine/API/DB',async()=>{
+    const f=fixture(options),raw=Buffer.from('{}'),signature='t='+NOW/1000+',v1=synthetic';
+    await assert.rejects(f.runtime.webhook(raw,signature),e=>e instanceof webhook.WebBillingWebhookError && e.code==='processing_paused' && e.retryable===true);
+    assert.equal(f.calls.signature.length,1);assert.equal(f.calls.factory.length,1);assert.equal(f.calls.config,1);
+    for(const name of ['verify','user','read','write','checkout','portal','webhook'])assert.deepEqual(f.calls[name],[],name);
+    assert.equal(f.captured.webhook,undefined);assert.equal(f.captured.webhookStore,undefined);
+  });
+test('paused webhook rejects missing configuration, invalid signatures and Test events instead of ACKing',async()=>{
+  const c=fixture({webhookEnabled:false,rawConfig:''});await assert.rejects(c.runtime.webhook(Buffer.from('{}'),'synthetic'),cfg.BillingConfigurationError);assert.deepEqual(c.calls.factory,[]);
+  const f=fixture({webhookEnabled:false,badSignature:true});await assert.rejects(f.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),e=>e.code==='signature_invalid' && e.retryable===false);
+  const t=fixture({webhookEnabled:false,event:{livemode:false}});await assert.rejects(t.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),e=>e.code==='live_mode_required' && e.retryable===false);
+  for(const fixture of [c,f,t]) {assert.deepEqual(fixture.calls.read,[]);assert.deepEqual(fixture.calls.write,[]);assert.equal(fixture.captured.webhookStore,undefined);}
+});
+test('paused production HTTP handler returns503 with Retry-After; bad signatures remain400',async()=>{
+  const file=path.resolve(__dirname,'../src/index.ts'),source=fs.readFileSync(file,'utf8'),parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2020,true,ts.ScriptKind.TS);
+  let init;for(const statement of parsed.statements)if(ts.isVariableStatement(statement))for(const d of statement.declarationList.declarations)
+    if(ts.isIdentifier(d.name)&&d.name.text==='stripeWebhook')init=d.initializer.getText(parsed);
+  assert.ok(init);
+  for(const [code,retryable,status]of [['processing_paused',true,503],['signature_invalid',false,400]]) {
+    const mod={exports:{}},logs=[],reply={headers:{},status(n){this.statusCode=n;return this;},set(k,v){this.headers[k]=v;return this;},json(v){this.body=v;return this;}};
+    const compiled=ts.transpileModule('module.exports='+init+';', {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+    vm.runInNewContext(compiled,{module:mod,Buffer,onRequest:(_options,handler)=>handler,LIVE_WEB_BILLING_CONFIG:{},
+      webBilling:{webhook:async()=>{throw new webhook.WebBillingWebhookError(code,retryable);}},WebBillingWebhookError:webhook.WebBillingWebhookError,
+      logger:{warn:(...args)=>logs.push(args)},WEB_BILLING_UNAVAILABLE:'現在お申し込みを受け付けていません。'});
+    await mod.exports({method:'POST',query:{},rawBody:Buffer.from('{}'),headers:{}},reply);
+    assert.equal(reply.statusCode,status);assert.equal(reply.body.ok,false);assert.equal(reply.headers['Retry-After'],code==='processing_paused'?'60':undefined);
+    assert.doesNotMatch(JSON.stringify(logs),/synthetic|sk_|whsec_|cus_|uid|token/);
+  }
+});
+
+test('purchase and webhook gates are independent rather than enabling each other',async()=>{
+  const f=fixture({webhookEnabled:false});assert.deepEqual(await f.runtime.checkout(f.request()),{ok:true,action:'review'});
+  await assert.rejects(f.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),e=>e.code==='processing_paused');
+  assert.equal(f.calls.checkout.length,1);assert.equal(f.calls.webhook.length,0);assert.deepEqual(f.calls.write,[]);
 });

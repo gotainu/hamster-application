@@ -7,7 +7,7 @@ import {authorizeWebBillingIdentity, authorizeWebBillingManagementIdentity, Bill
 import {createWebBillingCheckout, WebBillingCheckoutStore} from './webBillingCheckout';
 import {createWebBillingCustomerResolver} from './webBillingCustomer';
 import {createWebBillingPortalEngine} from './webBillingPortal';
-import {createWebBillingWebhook, verifyWebBillingEvent} from './webBillingWebhook';
+import {createWebBillingWebhook, verifyWebBillingEvent, WebBillingWebhookError} from './webBillingWebhook';
 import {createWebBillingWebhookStore} from './webBillingWebhookStore';
 import {accountDeletionRef} from './accountDeletion';
 
@@ -24,6 +24,10 @@ export interface WebBillingRuntimeDependencies {
   auth: Pick<admin.auth.Auth, 'verifyIdToken' | 'getUser'>;
   /** Dedicated production JSON only; never old STRIPE_* or Preview values. */
   rawConfig(): unknown;
+  /** Missing/false closes the entire purchase callable, including review/status. */
+  purchaseEnabled?(): boolean;
+  /** Paused signed events return retryable failure without claims or DB writes. */
+  webhookEnabled?(): boolean;
   stripeFactory?(key: string): Stripe;
   now?(): Date;
 }
@@ -115,6 +119,9 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
   }
   return {
     async checkout(req:WebBillingRequest) {
+      // Deployment, valid credentials and public transport must never open
+      // intake implicitly. Do not touch configuration/Auth/Stripe/DB while shut.
+      if (d.purchaseEnabled?.()!==true) throw new BillingConfigurationError();
       const config=configured();
       if (req.rawRequest?.headers.origin!==config.origin || !object(req.data) || req.data.flow!=='web') throw new BillingConfigurationError();
       const {flow,action,...input}=req.data;
@@ -151,6 +158,7 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
     async webhook(raw:Buffer,signature:unknown) {
       const config=configured(), client=stripe(config.secretKey);
       const event=verifyWebBillingEvent(client,raw,signature,config.webhookSecret,now);
+      if (d.webhookEnabled?.()!==true) throw new WebBillingWebhookError('processing_paused',true);
       return createWebBillingWebhook({config,stripe:client,store:createWebBillingWebhookStore(d.db,()=>now().getTime()),readFacts,now}).process(event);
     },
   };
