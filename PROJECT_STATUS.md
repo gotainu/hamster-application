@@ -1,5 +1,20 @@
 # Hamster Care プロジェクト状況
 
+<!-- hamcare-stopped-production-preparation-20261122:start -->
+## 2026-11-22 一般受付停止での本番準備配備（完了・購入再開は別承認）
+
+- **承認/配備元**：本人が具体的一覧・購入停止・復旧を一括承認。`14b7904edb53f8270420a4c2e58fd35d5be5dd44`/`feature/web-first-stripe-checkout`、開始時は承認資料の指定2文書だけdirty。他素材/差分を保護。19:04 JST開始、詳細は[既存Runbook冒頭の実績](docs/release/web_billing_live_cutover_runbook_ja.md)。新管理表/監査書は作らず、この2文書だけ今回1コミットにする。
+- **購入停止**：旧`createstripecheckoutsession`からallUsersのRun Invokerだけを除去。IAM反映後Functions/Run両経路で未認証空要求403。Live発行済みopen/有効Session0、失効/契約取消なし。正式ローンチの購入受付判断まで停止を維持し、復旧でも公開権限を勝手に戻さない。現在は無料テスターのみ・一般有料利用者0人。
+- **本番設定変更**：`HAMCARE_LIVE_BILLING_MAIL_CONFIG`新設/資格情報なし停止version1、既存compute SAへのSecret単体Accessor、新contact service単体public Invoker。9基盤API/既存service-agent roles不変、API有効化/Project IAM変更監査0。Preview資格情報コピー0、対象外Live課金Secret登録0。
+- **新Function1件**：`billingContactEmail`のみ19:10:44 JSTにACTIVE、revision`billingcontactemail-00001-wor`、Node22/256MiB/1CPU/max1/concurrency5/60秒。enabled=false/dailyLimit1/Secretv1を照合。status/request/confirm各503+正規停止code、異Origin403、OPTIONS204。handler正常起動と意図した停止を確認し、起動/Secretエラーを成功扱いにしない。token/実UID/実受信者なし、Auth/DB/Gmail前で停止。配備GCS sourceの162ファイルが承認stagedソース/compiled/packageと一致、env/依存同梱0。
+- **Hosting**：19:14:53 JST、`2365135bf558c278`→`22b8c97c2532f11c`。旧13全hash保全＋追加32＝45を公開前後に厳密照合。cloneで自動再生成されたFirebase予約2ファイルは未公開版で元hashへ復元後release。`/account/`・`/account/contact/`と依存だけ追加し、LP/法務/サポート等は不変。scoped CSPはFirebase Auth/Firestore/本番contactだけ、Preview/Stripe接続なし。初期化後も残る静的停止案内をcontactへ1段落追加（範囲内の表示仕上げ、JS/認証不変）。
+- **Web確認**：全追加32件HTTP200/SHA一致、旧10ページ/リンクHEAD200、account CSP漏れなし。IABで正本outlineロゴ/星空/停止表示・未使用5枠display:none・横はみ出し0、Console error/warn0。個人情報なし画像をGit外へ保存。実ログイン/フォーム送信/物理端末E2Eの繰返しは行っていない。
+- **既存互換/静的3件**：58→59関数、旧58のresource更新/実行設定差分0。通知/削除worker・新Web削除2endpointは未配備、削除URL404。既存ログイン/通常利用/体験/権限/アプリ内削除/Rules/Flutter/テスターは変更0。billing_contacts不存在で通常利用を拒否する依存なし。静的168/171の3失敗は保持し、2件はpolicy共通化と旧文字列検査、3件目は旧index全文と承認済み抽出/追加の150追加827削除の差分。全体配備を正当化せず1関数限定と旧58不変を根拠に非ブロッキング。関連Mock148/148と既存357件を再利用。
+- **障害と監視**：CLIが無関係Secretを要求したため入力せず中止し、同じ1関数を直接指定。初回CPU既定値とconcurrency5不整合は元CLI既定1CPUを明示して解消。稼働停止成功とは分離記録。配備後旧58の稼働ERROR0、意図したcontact503が3、初回制御面エラー1。配備前の既存ERROR2とは区間長が違うため率比較しない。未解決の起動エラーなし。
+- **構成変更と業務データを分離**：本番のIAM/Secret/Function/build/Hosting変更は上記あり。今回のFirestore/Auth/飼育記録/trial/billing/テスター権限/Storage画像の業務書込み0、実メール0、Stripe書込み0、実削除/Apple失効0。作業開始後のLive Customer/Session/Subscription新規作成も各0。Rules/Index/SDK/Flutter/ストア/既存Apple設定/merge/push変更0。
+- **次工程/残件**：Gmailのscope宣言/検証又は例外条件・本番資格情報・送信設定を整えてから、別承認で専用未契約アカウント1件/確認メール1通の確認→プラン復帰を行う案。日次上限1は送信承認ではない。Live550円Price/本番課金API/Portal/Webhook/通知/安全削除の配備、実契約、アプリ配信/ストアは未実施。実Apple失効後復帰/Relay実配送等を未確認として維持し、Relay/追加VoiceOverは非ブロッキング。一般購入停止は本人の次の判断まで維持する。
+<!-- hamcare-stopped-production-preparation-20261122:end -->
+
 <!-- hamcare-production-contact-20261122:start -->
 ## 2026-11-22 有料登録前の連絡先確認の本番対応（コード・限定検証、未配備）
 
