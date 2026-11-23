@@ -1,5 +1,13 @@
 # Hamster Care プライバシー申告チェックリスト
 
+## 2026-11-23 Apple提出準備：音声ON後のApp Privacy限定再評価
+
+- 既存App Store Connectの公開済み10typeとPrivacy URLを再利用する。下段10/25時点の「音声OFF」は履歴であり、現在の音声入力はON。今回、旧OFF条件だけを根拠に非収集とせず、実配備の処理経路と提供者の保持定義を再評価した。
+- 本番RAGは`hamster-rag-api-voice-20261112-2`がtraffic100%、イメージdigest`2d2aba8b98a5251f7025cee2bc28257ed178224278c78d8440239f0bb818629e`。現イメージの小さなappレイヤーから`main.py`/`voice_audio.py`/`config.py`/`transcription.py`の4ファイルを読み取り、現行ローカルソースとbytes一致を確認。これは4対象ファイルの照合であり、全イメージ/全アプリの再監査ではない。公式接続先を外す`OPENAI_BASE_URL`の上書きなし、実音声送信なし。
+- 認証付き`/transcribe`→OpenAI SDKの`audio.transcriptions.create`（モデル`gpt-transcribe`、公式`/v1/audio/transcriptions`）を使用。HamCare側はrequest内のメモリ処理と一時UploadFileを完了/失敗後に閉じ、音声・未送信の変換結果をDB/ログへ保存しない。OpenAIの[公式保持表](https://developers.openai.com/api/docs/guides/your-data)では当該endpointは学習利用No、abuse monitoring retention None、application state retention None。[Appleの収集定義とrequest後非保持のFAQ](https://developer.apple.com/app-store/app-privacy-details/)に照らし、この経路の音声内容は今回Audio Data追加の対象にしない。一般的なAPIの30日保持を当該endpointへ誤適用しない。
+- 既存10type・用途・アカウント関連あり・trackingなしを維持。利用回数/成否等のメタデータは既存のUsage Data/Diagnostics/Identifiers、利用者が改めてAI相談へ送信した文字はOther User Contentの申告対象のまま。端末内処理だけ、又はすべてのデータ非収集とは説明しない。公開Privacyの任意音声・送信先・一時処理/破棄の説明を保持する。
+- この結論は、現在確認したendpointとrequest後非保持の構成に限る。提供者・endpoint・保持設定又は録音保存機能を変える場合は再評価する。ビルド6の本人端末での確認、実Apple認可失効、Apple審査判断・権利上の保証とは別であり、それらの実機PASSやAppleの事前承認を意味しない。今回App Privacyの回答変更・再Publish、Google Play変更、音声実送信、本番設定変更は行っていない。照合証跡はGit外`/private/tmp/hamcare-audio-privacy-source-20261123/`。
+
 <!-- hamcare-launch-mail-policy-20261121:start -->
 ## 2026-11-21 初回メール基盤・現在の確認範囲
 

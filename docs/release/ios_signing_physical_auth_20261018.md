@@ -1,5 +1,15 @@
 # HamCare iOS署名・実機認証準備（2026-10-18）
 
+<!-- hamcare-apple-submit-build6-20261123:start -->
+## 2026-11-23 build6内部配信・提出情報保存（実機確認と主要画面取得は本人操作待ち）
+
+- **配信の正本**：`61e1569`で①〜④の実績を記録済み。iOS `1.0.1 (6)`は固定source `54970b2802f8`、既存Bundle/Distribution/Profile/依存lockを使用。Transporter 10:05 JST Delivered/処理完了、既存「本人実機確認」1 Tester/5 Buildsで6 Testing/90日を15:30 JSTに確認。外部配信/新規招待/審査送信なし。本人のiPhone TestFlight更新・ログイン/プロフィール/記録保持・購入/価格/Portal/Web誘導撤去・体験/契約権限の限定確認は依頼中で、配信完了を端末PASSにはしない。
+- **現在画面の取得準備**：古いXcode16.2のSimulator GUIはcrashしたため使用せず、Xcode27.1 Device Hubで隔離iPhone16 Pro/iOS18.3.1「HamCare Screenshots Build6」を新規作成。同固定sourceのDebug appを導入してログイン画面へ到達した。既存端末/Simulatorのデータを消去せず、まだログインしていない。審査用情報の本人入力を依頼中。旧ストア画像は現行画面との相違があるため流用せず、現在Screenshot0のまま主要画面の取得を待つ。Simulator結果をiPhone実機/Apple認可失効のPASSへ置き換えない。
+- **ASC保存**：1.0.1にbuild6を選択し、Save後6表示/Save disabled/Manual公開を確認。Description/Review Notes/Support/copyright保存済み、電話番号・審査用passwordは本人保存済み。以前のAuth REST検査はブラウザの伏字値を使った無効な検査で、保存済みpassword不正の根拠ではない。実ログインは端末で確認し、追加のpassword REST試行なし。UID/受信先/passwordを本書へ記録しない。
+- **ストア申告の到達点**：Primary Lifestyle/Secondaryなしを保存。親制御/年齢確認/自由Web閲覧/UGC/social/chat/位置共有/広告はNo、成熟/性的/暴力/賭博None、Medical Infrequent/Wellness YesでApple算出13+・overrideなしをSaved確認。既存App Privacy10types/Privacy URL Publishedを維持し、音声endpoint非保持の限定再評価根拠は既存Privacyチェックリストを参照。App AccessibilityはGet StartedのままでVoiceOver等の保証未申告。配信地域はJapan Available on App Release/他174地域Notの読取確認だけで変更0。Content Rightsは本人の権利確認依頼中で未保存。
+- **境界と残件**：⑤本人実機は本人操作待ち、⑥提出情報は進行中。破棄可能な専用Appleアカウントは「ない」の回答を維持し、既存本人/審査/テスターを削除しない。実Apple失効/失効後の同UID再ログイン・削除再開は未確認。一般購入/一般メールの停止を維持し、この確認工程でコード/Cloud変更なし。Apple Case103009817213は回答済み・事前承認なし・実提出後に審査判断。下段の旧Case回答待ち/旧版状態は履歴であり、この現在地へ戻さない。
+<!-- hamcare-apple-submit-build6-20261123:end -->
+
 <!-- hamcare-ui-polish-release5-20261109:start -->
 ## 2026-11-09 1.0.1／build5（既存本人内部グループTesting・90日）
 

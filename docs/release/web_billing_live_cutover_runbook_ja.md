@@ -44,7 +44,7 @@
 - Live専用Callable envelope/flat DTO、同じ認証世代/UIDでのbilling再読取、専用Portalへ接続した。契約・権限の正本はFirebase UIDのまま。`/billing/success/`は固定`/account/?checkout=return`へ戻り、queryは確認のきっかけだけとする。URL到達や403/不明結果/期限切れactiveで完了表示しない。Preview DTO・Test key・保存先へのfallbackなし。
 - `LIVE_PURCHASE_ENABLED=false`でreview/createを画面/dispatch前でも閉じ、server false/privateを重ねて維持。既存契約のPortalは新規申込・連絡先補完から独立する。購入の一般受付は、後続の別承認で対象者制限・server/IAM/build設定を揃えるまで開始しない。
 - LP/規約/特商法/FAQは月額550円と既定の解約/返金方針へ整合。Privacyは現行連絡先の取扱いと一般送信停止を説明し、公開済み音声開示5箇所を保持した。本人連絡先実配送・同UID確認済み原本・既存履歴は再試験/移行/書換えなし。
-- 検証：関連Node407/407、LP静的86/86、Hosting helper Mock20/20。Chrome local Mockのaccount/planは360/390pxでscrollWidth=clientWidth。本番の匿名account画面で停止bannerを確認した。**今回のスマホ実Live表示・ログイン後表示・実決済は未確認**であり、Mock結果を実機PASSにしない。
+- 検証：関連Node407/407、LP静的86/86、Hosting helper Mock20/20。Chrome local Mockのaccount/planに加え、desktop Chromeの明示viewport360/390pxで本番匿名accountの停止banner・正本outline icon・scrollWidth=clientWidthを確認し、viewportを復元した。IAB接続不可のためChromeで実施。**実iPhone Safari/Android・ログイン後表示・実決済は未確認**であり、desktop viewport/Mock結果を実機PASSにしない。安全証跡は非公開実行領域の`live-account-responsive-safe.json`。
 - account静的172/176。未解消4件の正確な検査名と旧baseline/再exportの理由はPROJECT_STATUS同日欄を参照。実認証条件とsource比較は上記別検証で維持し、失敗を隠す検査無効化はしていない。
 
 ### ③アプリ内安全削除backend・再試行Scheduler：配備・接続完了
@@ -59,8 +59,10 @@
 | 段階 | 確認できた到達点 | 未実施・未確認 |
 |---|---|---|
 | ④本人内部TestFlight：配信完了 | `1.0.1 (6)` IPA、`54970b2802f8`固定397入力のsource hash・署名PASS。10:05 JSTにTransporter Delivered/処理完了。既存2〜5と同じStandard OS/TLS・独自暗号なし・France Noの根拠で輸出コンプライアンスを保存し、既存「本人実機確認」グループへ6を追加。15:30 JSTに1 Tester/5 Builds、6 Testing/90日を実UI確認。外部配信/新規招待/審査送信なし | 本人端末でのTestFlight更新・更新版の実機確認は本人操作待ち。内部配信完了を端末動作PASSとは扱わない |
-| ⑤Apple削除/更新実機 | 本人に専用の破棄可能Appleアカウントを確認し「ない」と回答 | 実Apple失効、失効後の同UID再ログイン/削除再開、今回更新版の本人実機。既存本人/審査/テスターは削除に流用しない |
-| ⑥提出情報保存 | Description/Review Notes/電話番号保存、公開方式Manual維持。審査用targetと既存記録は一致 | 以前のAuth REST検査はブラウザ読取で伏字化された値を使用した無効な検査で、INVALID_LOGIN_CREDENTIALSは本人パスワード不正の根拠にならない。本人は既存パスワードの再入力・保存済み。実ログインは未確認で、TestFlight実機で確認する。追加のパスワードREST試行なし。Build selection/スクリーンショット/App Privacy読取は未実施。審査送信なし |
+| ⑤Apple削除/更新実機：本人操作待ち | TestFlight build6の更新・保持・導線撤去等の限定確認を本人へ依頼中。Xcode27.1 Device Hubで隔離iPhone16 Pro/iOS18.3.1を作成し、同sourceのDebug appを導入してログイン画面へ到達。審査用情報の本人入力待ち | ログイン・審査機能アクセス/本人端末確認は未確定。破棄可能な専用Appleアカウントは「ない」ため、実Apple失効・同UID再ログイン/削除再開は未確認。既存本人/審査/テスターは削除に流用しない |
+| ⑥提出情報保存：進行中 | ASC 1.0.1にbuild6選択・Save後6表示/Save disabled/Manual維持を確認。Description/Review Notes/Support/copyright保存、電話番号・審査用passwordは本人保存済み。Primary Lifestyle/Secondaryなし、年齢質問の保存とApple算出13+（overrideなし）を確認。既存App Privacy10types/Privacy URL Published、App Accessibility未申告を維持。Japan Available on App Release/他174地域Notは読取のみ | Screenshot0、現行主要画面の取得待ち。Content Rightsは本人の権利確認待ちで未保存。実ログイン未確認。以前のAuth RESTはブラウザの伏字値を使った無効な検査で、本人パスワード不正の根拠ではない。追加REST試行/審査送信なし |
+
+年齢質問は親制御・年齢確認・自由Web閲覧・UGC・social/chat・位置共有・広告すべてNo、成熟/性的/暴力/賭博None、Medical Infrequent/Wellness Yesを保存した。App Privacyの音声endpoint非保持についての限定再評価根拠は既存`privacy_disclosure_checklist_ja.md`、Simulator/端末・提出情報の進捗は既存`ios_signing_physical_auth_20261018.md`にも追記する。旧スクリーンショットは現行画面の証拠として流用しない。今回のこの確認・保存工程ではコード/Cloud設定を変更していない。
 
 ### 最終停止状態・本番変更の分類・復旧
 

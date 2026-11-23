@@ -1,13 +1,15 @@
-Hamster Careは、ハムスターの毎日の様子、体重、回し車の走行距離、飼育環境を記録するアプリです。HamCareプレミアムでは、SwitchBot温湿度計との連携、温湿度の自動記録と環境評価、異常検知通知、飼育記録を踏まえたAI相談を利用できます。
+HamCare is a hamster care record and monitoring app. It organizes daily observations, weight, activity, temperature/humidity, and optional AI consultations. It does not provide veterinary diagnosis or treatment.
 
-HamCare プレミアムは月額550円（税込）／税抜500円、1か月ごとの自動更新です。申込みはアプリ外のHamCare公式Webから開始し、料金、今回の支払額、初回請求時期、自動更新、解約・返金条件、法務表示を確認します。アプリは同じHamCareアカウントの利用状態を反映します。
+REVIEW ACCESS
+Use the existing credentials entered in App Review Sign-In Information. The review account already has access to premium features through an existing no-charge subscription. No new registration, free-trial activation, payment, or payment card is required. Please sign in using email/password and open Today, Records (+), Changes, and Consultation. SwitchBot automatic measurements require compatible physical hardware; the app also supports manual records.
 
-カード登録不要の体験は本人の開始操作から21日間、AI相談は最大20リクエストです。有料プランに申し込まない限り、体験終了だけで自動課金されません。Web申込時に体験が有効な場合は申込時0円・既存体験終了日時から550円、体験未開始または終了済みの場合は即時550円です。体験の延長・リセットや新しい21日体験の追加は行いません。
+BUSINESS MODEL / iOS BUILD
+This iOS build has no in-app purchase flow, purchase buttons, price display, external purchase links, promotional purchase calls to action, or Customer Portal links. Users who obtain a subscription independently on the HamCare website can use the associated features after signing in to the same HamCare account. Contract ownership and access are bound to Firebase UID, not an email match. General new Web purchases are currently paused; this does not prevent access by the existing review account.
 
-契約確認、支払方法変更、請求履歴、期間末解約は公式WebのStripe Customer Portalから行います。解約手続き後も、現在の契約期間が終了するまではHamCareプレミアムをご利用いただけます。
+The optional card-free trial starts only when the user chooses to start it, lasts 21 days, and allows up to 20 AI requests. Trial expiration alone does not create a subscription or charge. No trial reset or extension is used for review access.
 
-審査用アカウントのメールアドレスとパスワードは、App Review Information欄へ直接入力します。審査用の既存利用状態を維持し、新規登録・無料体験開始・購入は求めません。
+ACCOUNT / DATA
+Sign in with Apple, Google, or existing email/password is supported. AI and optional voice transcription have their own consent explanations. Account deletion is available in the app menu > App Settings > Delete account. The server confirms recurring billing has stopped before removing account data. Apple authorization revocation is handled as part of the Apple deletion flow, with manual instructions if automatic revocation is unavailable.
 
-確認経路: ログイン → 今日／記録／変化／相談
-
-アカウント削除: 設定 → アカウントを削除
+APPLE SUPPORT CASE
+Case 103009817213 was answered: no advance approval was granted; App Review will determine compliance after an actual submission. We do not represent the support answer as approval of this business model.
