@@ -58,9 +58,18 @@
 
 | 段階 | 確認できた到達点 | 未実施・未確認 |
 |---|---|---|
-| ④本人内部TestFlight：配信完了 | `1.0.1 (6)` IPA、`54970b2802f8`固定397入力のsource hash・署名PASS。10:05 JSTにTransporter Delivered/処理完了。既存2〜5と同じStandard OS/TLS・独自暗号なし・France Noの根拠で輸出コンプライアンスを保存し、既存「本人実機確認」グループへ6を追加。15:30 JSTに1 Tester/5 Builds、6 Testing/90日を実UI確認。外部配信/新規招待/審査送信なし | 本人端末でのTestFlight更新・更新版の実機確認は本人操作待ち。内部配信完了を端末動作PASSとは扱わない |
-| ⑤Apple削除/更新実機：本人操作待ち | TestFlight build6の更新・保持・導線撤去等の限定確認を本人へ依頼中。Xcode27.1 Device Hubで隔離iPhone16 Pro/iOS18.3.1を作成し、同sourceのDebug appを導入してログイン画面へ到達。審査用情報の本人入力待ち | ログイン・審査機能アクセス/本人端末確認は未確定。破棄可能な専用Appleアカウントは「ない」ため、実Apple失効・同UID再ログイン/削除再開は未確認。既存本人/審査/テスターは削除に流用しない |
-| ⑥提出情報保存：進行中 | ASC 1.0.1にbuild6選択・Save後6表示/Save disabled/Manual維持を確認。Description/Review Notes/Support/copyright保存、電話番号・審査用passwordは本人保存済み。Primary Lifestyle/Secondaryなし、年齢質問の保存とApple算出13+（overrideなし）を確認。既存App Privacy10types/Privacy URL Published、App Accessibility未申告を維持。Japan Available on App Release/他174地域Notは読取のみ | Screenshot0、現行主要画面の取得待ち。Content Rightsは本人の権利確認待ちで未保存。実ログイン未確認。以前のAuth RESTはブラウザの伏字値を使った無効な検査で、本人パスワード不正の根拠ではない。追加REST試行/審査送信なし |
+| ④本人内部TestFlight：配信・本人更新確認完了 | `1.0.1 (6)` IPA、`54970b2802f8`固定397入力のsource hash・署名PASS。10:05 JSTにTransporter Delivered/処理完了。既存2〜5と同じStandard OS/TLS・独自暗号なし・France Noの根拠で輸出コンプライアンスを保存し、既存「本人実機確認」グループへ6を追加。15:30 JSTに1 Tester/5 Builds、6 Testing/90日を実UI確認。本人は通常アカウントを維持した更新後のHome・ログイン/プロフィール/既存記録保持・利用状況・購入/価格/Portal/Web誘導なしに「更新保持・表示とも問題なし」と回答 | 更新保持確認は完了扱いとし再依頼しない。外部配信/新規招待/審査送信なし |
+| ⑤Apple削除/審査アクセス：限定確認継続 | 本人はiPhoneの提出候補アプリでHamCare審査用メール/パスワードからHome到達と回答。既存審査用0円UIDのAuth lastLoginが15:59:52 JSTへ更新されたことをGET照合。Macの隔離iPhone16 Pro/iOS18.3.1は掲載画像用の同source Debug appであり、そのログインと実機結果を区別する | 審査契約表示/機能アクセスとMac撮影用ログインの結果待ち。既存Apple検証用候補は下記の具体的範囲で本人承認済みだが未削除・未失効。通常利用/審査/外部テスターを削除しない |
+| ⑥提出情報保存：進行中 | ASC 1.0.1にbuild6選択・Save後6表示/Save disabled/Manual維持を確認。Description/Review Notes/Support/copyright保存、電話番号・審査用passwordは本人保存済み。Primary Lifestyle/Secondaryなし、年齢質問の保存とApple算出13+（overrideなし）を確認。既存App Privacy10types/Privacy URL Published、App Accessibility未申告を維持。Japan Available on App Release/他174地域Notは読取のみ | Screenshot0。旧01/02/04は現行UI差分のため更新し、03は現行実画面と照合後に維持できる候補。iPhoneの実機審査ログインは本人回答と同UID lastLoginで確認し、契約/機能画面とMac撮影用ログインは結果待ち。Content Rightsは既存ライセンス/制作記録と具体的3素材群の本人確認に基づきYesを選択し、Savedと権利あり表示を再読取済み。以前の伏字値を使ったAuth REST検査は無効であり、本人パスワード不正の根拠ではない。追加REST試行/審査送信なし |
+
+### ⑤既存Apple検証用アカウントの削除確認準備（本人承認済み・実行結果は別記）
+
+- 対象は過去のApple E2Eと本番連絡先確認に使用した **Apple Web E2E Owner** の同じFirebase UIDに固定。本人は2026-11-23に「通常利用ではない。この範囲で削除検証を承認する」と回答した。審査用0円アカウントとは別UID、Apple単独/メール未設定、有効なowner/petテスト名をGET照合した。新しいAppleアカウント作成やiPhone全体のAppleアカウント切替を前提にしない。
+- 削除対象は既存処理の`users`親/再帰配下（プロフィール、ペット/履歴、相談、体験、スター/起動状態等）、Auth、**確認済み本番連絡先とその確認履歴**。初回読取32文書、後続baseline33文書という時点差を保持し、UIDの差替えや対象縮小で説明しない。SwitchBot親/固定ペット画像なし。本番billing/Customer/Checkout対応/既存削除要求なし。Preview Test Subscriptionはcanceled1、Session complete1/open0。
+- 残すものはPreview namespace/Preview連絡先、Stripe Test Customer/解約済み契約/会計・処理証跡、削除フェンス等。一般の削除処理だけでPreviewまで消したと記録しない。同じApple認可の解除はHamCare Webログインにも影響し得るが、Appleアカウント自体/別UID/審査契約は対象外。
+- 実行順は、本人の更新保持確認完了→審査用機能確認を終える→必要なら**HamCare内だけ**で検証候補へ切替→テスト名/UIDを非公開で再照合→アプリ内削除説明と最終操作を本人に案内する。既存実装は同UID Apple再認証/短命codeの即時失効→サーバーのStripe停止確認→既存データ/Auth削除。手動解除案内/再認証キャンセル/失効結果不明を自動失効PASSへ読み替えない。失敗時は同じ対象の状態を確認し、別UID作成やAuth直接削除で補完しない。
+- 一般削除の完了はAuth/users再帰配下/本番contact不存在とcompletedフェンスを読み取り確認する。Git外の固定対象スクリプト`verify-deletion-candidate-readonly.py verify`はGETだけでPreview/Testと別審査UIDの保全も確認し、Apple認可失効を証明しない。Apple失効は実機の再認証/自動経路とApple側の連携状態を別に確認する。削除後の新規Apple登録を検証のために行わない。
+- この候補は本番Stripe契約なしのため、「Apple失効成功後のStripe停止失敗→同UID再ログイン/削除再開」の実機試験はできない。既存Mockと実環境未確認を区別して残す。現時点の削除/失効は0件で、候補の承認を実行済みと記録しない。
 
 年齢質問は親制御・年齢確認・自由Web閲覧・UGC・social/chat・位置共有・広告すべてNo、成熟/性的/暴力/賭博None、Medical Infrequent/Wellness Yesを保存した。App Privacyの音声endpoint非保持についての限定再評価根拠は既存`privacy_disclosure_checklist_ja.md`、Simulator/端末・提出情報の進捗は既存`ios_signing_physical_auth_20261018.md`にも追記する。旧スクリーンショットは現行画面の証拠として流用しない。今回のこの確認・保存工程ではコード/Cloud設定を変更していない。
 
