@@ -1,6 +1,6 @@
 # HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
-## 2026-11-23 Apple提出準備①〜⑤の限定確認結果（⑥現行掲載画像は継続）
+## 2026-11-23 Apple提出準備①〜⑥完了（審査送信・公開は未実施）
 
 本人の`54970b2802f8`を基準とする①〜⑥一括承認を実行した。**現在の正本は、一般購入false/private・一般メール停止・新Webhookの正規同期process稼働**である。この実績が、下段に履歴として残す「新旧Webhook両停止」「Live adapter未実装」「Hosting45不変」等の旧計画・保留記録に優先する。App Storeへの審査送信・ストア公開・新規実契約・実課金・契約条件変更は今回行っていない。
 
@@ -54,13 +54,19 @@
 - 作成後にURI末尾の表記差分を検知し、PAUSEDへ停止。同じ宛先/認証/IAMであることを厳密照合して採用後にresume。接続直前のqueueは0（未解決/不明0）、手動dispatch0。workerの配備/接続は稼働状態だが、実削除や実Apple失効の検証ではなく、実アカウント削除0件。
 - 停止/復旧はまずSchedulerをPAUSEDにし、privateを維持したまま同じ失敗要求の状態とworker sourceを確認する。Auth/Firestoreの直接削除や削除フェンス解除で代替しない。既存の再試行状態を消して処理済みにしない。
 
-### ④〜⑥の到達点と本人操作待ち
+### ④〜⑥の到達点と未実施範囲
 
 | 段階 | 確認できた到達点 | 未実施・未確認 |
 |---|---|---|
 | ④本人内部TestFlight：配信・本人更新確認完了 | `1.0.1 (6)` IPA、`54970b2802f8`固定397入力のsource hash・署名PASS。10:05 JSTにTransporter Delivered/処理完了。既存2〜5と同じStandard OS/TLS・独自暗号なし・France Noの根拠で輸出コンプライアンスを保存し、既存「本人実機確認」グループへ6を追加。15:30 JSTに1 Tester/5 Builds、6 Testing/90日を実UI確認。本人は通常アカウントを維持した更新後のHome・ログイン/プロフィール/既存記録保持・利用状況・購入/価格/Portal/Web誘導なしに「更新保持・表示とも問題なし」と回答 | 更新保持確認は完了扱いとし再依頼しない。外部配信/新規招待/審査送信なし |
 | ⑤Apple削除/審査アクセス：限定確認PASS | iPhone build6で正しい審査用0円契約UIDの新セッション/Homeを15:59:52 JSTのAuth lastLoginと照合し、契約状態/変化/相談等の必要機能も本人PASS。承認済みApple検証候補の削除直前ログイン16:25:29 JST/有効/Apple連携と実機Homeを確認し、本人がアプリ内削除/同Apple再認証を実施。16:32:55 JSTにAuth/users再帰配下/contact不存在とcompletedフェンス、Preview/Testと別審査UIDの保全を読取確認 | 一般削除完了と本人によるApple連携消失確認を分ける。SDK失効生レスポンスの独立採取ではない。削除後再ログイン/新規登録0。有料契約の停止失敗後に同UIDで再ログイン・削除再開する経路はMockのみ/実機未確認 |
-| ⑥提出情報保存：進行中 | ASC 1.0.1にbuild6選択・Save後6表示/Save disabled/Manual維持を確認。Description/Review Notes/Support/copyright保存、電話番号・審査用passwordは本人保存済み。Primary Lifestyle/Secondaryなし、年齢質問の保存とApple算出13+（overrideなし）を確認。既存App Privacy10types/Privacy URL Published、App Accessibility未申告を維持。Japan Available on App Release/他174地域Notは読取のみ | Screenshot0。旧01/02/04は現行UI差分のため更新し、03は現行実画面と照合後に維持できる候補。iPhone実機の審査ログイン・契約/必要機能画面は本人回答と同UID lastLoginで確認済み。Mac撮影用は別セッションのKeychainエラーでローカル検証パッケージの署名修復中。配布IPA/ソース/バックエンドは不変。Content Rightsは既存ライセンス/制作記録と具体的3素材群の本人確認に基づきYesを選択し、Savedと権利あり表示を再読取済み。以前の伏字値を使ったAuth REST検査は無効であり、本人パスワード不正の根拠ではない。追加REST試行/審査送信なし |
+| ⑥提出情報保存：完了 | ASC 1.0.1にbuild6/Save disabled/Manual選択を最終確認。Description/Review Notes/Support/copyright、本人保存の電話/審査用資格情報、Lifestyle、13+ overrideなし、既存App Privacy10types/Privacy URL Publishedを維持。Content Rights Yesは既存許諾記録と具体的素材群への本人確認で保存済み。必要なDynamic Island medium枠へ現行PNG3枚を登録し、処理完了/3 of 10/再読込後の保持とVersion画面の再表示を確認 | Add for Review/審査送信/一般公開は未実施。配布元build6/IPAは変更なし。Mac専用撮影用パッケージのKeychain問題を実iPhone審査ログインの失敗と扱わない。登録素材は下記の実Widget＋合成fixture描画であり、Native実機撮影ではない |
+
+### ⑥掲載画像の追加と提出前の停止点
+
+- 既存repo素材4枚を照合し、今回のASC 1.0.1対象欄は0枚だった。現行との差分がある01今日/02クイック記録/04相談の3枚を必要なDynamic Island medium枠へ登録。旧4枚・特に03変化はbyte不変で保持し、追加撮影を終了した。登録後の3ファイル/順序/3 of 10を再読込とVersion画面で確認し、処理中/画像エラーなし。画像は`store_assets/screenshots/ios_iphone_6_3/`、詳細は既存READMEへ記録。
+- 固定`54970b2802f8`/build6同一の共有Flutter Widgetと既存合成fixtureを隔離Widget hostで描画。Native Firebase/実UIDを使わず、source327ファイルbyte一致、外部HTTP試行0、描画1/1 PASS/例外・Overflowなし、1206×2622/RGB/alphaなし。実UIを描画した掲載用素材で、iPhone実機撮影/Native認証E2Eの証拠にはしない。日本語/アイコンのフォント差、初期状態、OSステータス創作なしをREADMEに明示する。配布IPA/Flutter source/Cloud設定を変更せず、画像からの資格情報取得・使用も行わない。
+- Version画面でbuild6/Save disabled/手動公開を最終確認。現在⑤/⑥は完了、審査送信・一般公開の判断を残して停止。新規購入/一般メール停止、既存正規同期/テスター保護は継続する。App Accessibility保証は未申告、Relay/追加VoiceOverを新たな停止条件にしない。確認画面はGit外`proof/asc-build6-screenshots-uploaded.jpg`と`proof/asc-build6-submission-prepared.jpg`。
 
 ### ⑤既存Apple検証用アカウントの削除実行結果（本人承認済み1UID）
 
@@ -73,11 +79,11 @@
 - **Apple認可の実績**：本人は事前のHamCare連携確認→アプリ削除時の同Apple再認証→Apple設定での連携消失確認を行い、「Apple連携も消えた」と回答。一般削除のDB結果と独立して、本人による連携消失確認として記録する。SDKの失効生レスポンス/Appleサーバー応答を独立採取したとはしない。削除後の再ログイン/新規登録/別UID生成は行っていない。
 - **保全と残件**：Preview namespace/Preview連絡先とStripe Test Customer/解約済みSubscription/Sessionはhash一致、別審査UIDのAuth identity・billing全文も不変。通常の本人用/審査/外部テスターは削除対象外。本候補は本番Stripe契約なしであり、有料Subscriptionの実停止や「Apple失効成功後のStripe停止失敗→同UID再ログイン/削除再開」は既存Mockのみ・実機未確認として残す。一般購入/一般メール停止、配布IPA/ソース/バックエンドは維持する。
 
-年齢質問は親制御・年齢確認・自由Web閲覧・UGC・social/chat・位置共有・広告すべてNo、成熟/性的/暴力/賭博None、Medical Infrequent/Wellness Yesを保存した。App Privacyの音声endpoint非保持についての限定再評価根拠は既存`privacy_disclosure_checklist_ja.md`、Simulator/端末・提出情報の進捗は既存`ios_signing_physical_auth_20261018.md`にも追記する。旧スクリーンショットは現行画面の証拠として流用しない。今回のこの確認・保存工程ではコード/Cloud設定を変更していない。
+年齢質問は親制御・年齢確認・自由Web閲覧・UGC・social/chat・位置共有・広告すべてNo、成熟/性的/暴力/賭博None、Medical Infrequent/Wellness Yesを保存した。App Privacyの音声endpoint非保持についての限定再評価根拠は既存`privacy_disclosure_checklist_ja.md`、Simulator/端末・提出情報の進捗は既存`ios_signing_physical_auth_20261018.md`にも追記する。旧画像は履歴素材として保持し、現行の登録3枚と区別する。今回のこの確認・保存工程ではコード/Cloud設定を変更していない。
 
 ### 最終停止状態・本番変更の分類・復旧
 
-- 一般購入client false/server false/private、contact false、契約通知worker未配備。Preview・本人確認済み連絡先・無料テスター・既存飼育記録/体験開始・期限・利用枠を維持。実メール0、新規実契約/実請求0、実削除0、実Apple失効0。正規同期のbilling/receipt更新は上記の承認済み本番書込みとして分離する。
+- 一般購入client false/server false/private、contact false、契約通知worker未配備。Preview・無料テスター・対象外ユーザーの連絡先/飼育記録/体験開始・期限・利用枠を維持。実メール0、新規実契約/実請求0。①〜④の配備時点の実削除0とは区別し、⑤で本人承認済み検証用1UIDのAuth/データ/確認済み本番連絡先を削除し、Apple連携消失は本人の実機確認として記録する。正規同期のbilling/receipt更新も上記の承認済み本番書込みとして分離する。
 - Secret version1/単体Accessor、限定5関数、Webhook切替、Hosting49、private retry/Scheduler接続、Transporter送信と提出情報保存は**実施した設定・配備操作**であり「本番変更0件」としない。一般通知の過去outbox一括送信・イベント全体の一括再処理・権限の手動付与0。
 - 新Webhookに問題があれば、旧Secret/退避sourceの対応とlegacy同期を先に確認してから旧endpointを再開し、新endpointを止める。新旧を両方止めたまま審査契約の更新日を越えない。購入/一般メールは開かない。Hostingは対象helperの`--execute --restore`で厳密な45map/configの`22b8c97c2532f11c`へ復旧できるが、①の同期継続を止める操作とは連動させない。復旧の実行は今回0。
 - 秘密値・実UID・受信者・確認リンク・パスワードはGit/報告に含めない。Relay実配送と追加VoiceOverは既存の非ブロッキング方針を維持する。
