@@ -143,10 +143,13 @@ export function createWebBillingPortalEngine(d: WebBillingPortalDependencies) {
           assertLiveObject(sub); ref(sub.id, 'sub');
           if (ref(sub.customer, 'cus') !== customerId || !KNOWN_STATUSES.has(sub.status)) fail();
           binding(sub.metadata, uid, anchoredCustomer && billing?.stripeSubscriptionId === sub.id);
-          const mode = (sub as Stripe.Subscription & Data).billing_mode;
-          if (mode !== undefined && mode !== null && mode.type !== 'classic') fail();
           if (!Array.isArray(sub.items?.data) || sub.items.data.length !== 1 || sub.items.has_more ||
               sub.items.data[0].quantity !== 1 || typeof sub.cancel_at_period_end !== 'boolean') fail();
+          const mode = (sub as Stripe.Subscription & Data).billing_mode;
+          const ownedLegacy=ref(sub.items.data[0].price,'price')===config.legacyPriceId&&
+            anchoredCustomer&&billing?.stripeSubscriptionId===sub.id;
+          if (mode !== undefined && mode !== null && mode.type !== 'classic' &&
+              !(ownedLegacy&&mode.type==='flexible')) fail();
           const item = sub.items.data[0] as Stripe.SubscriptionItem & Data;
           const start = (sub as Stripe.Subscription & Data).current_period_start ?? item.current_period_start;
           const end = (sub as Stripe.Subscription & Data).current_period_end ?? item.current_period_end;

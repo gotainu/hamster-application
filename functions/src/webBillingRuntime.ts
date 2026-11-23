@@ -7,8 +7,10 @@ import {authorizeWebBillingIdentity, authorizeWebBillingManagementIdentity, Bill
 import {createWebBillingCheckout, WebBillingCheckoutStore} from './webBillingCheckout';
 import {createWebBillingCustomerResolver} from './webBillingCustomer';
 import {createWebBillingPortalEngine} from './webBillingPortal';
-import {createWebBillingWebhook, verifyWebBillingEvent, WebBillingWebhookError} from './webBillingWebhook';
+import {createWebBillingWebhook} from './webBillingWebhook';
 import {createWebBillingWebhookStore} from './webBillingWebhookStore';
+import {createWebBillingWebhookRouter} from './webBillingWebhookRouter';
+import {createLegacyWebBillingWebhook} from './legacyWebBillingWebhook';
 import {accountDeletionRef} from './accountDeletion';
 
 type Data = Record<string, any>;
@@ -28,6 +30,11 @@ export interface WebBillingRuntimeDependencies {
   purchaseEnabled?(): boolean;
   /** Paused signed events return retryable failure without claims or DB writes. */
   webhookEnabled?(): boolean;
+  /** Explicit transitional modes; verify_only never claims a DB receipt. */
+  webhookMode?(): unknown;
+  /** Independent old endpoint binding, used only by the continuity route. */
+  rawLegacyWebhookConfig?(): unknown;
+  legacyWebhookEnabled?(): boolean;
   stripeFactory?(key: string): Stripe;
   now?(): Date;
 }
@@ -156,10 +163,33 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
       return {ok:true,portalUrl:result.url}; // Preserve the existing callable DTO.
     },
     async webhook(raw:Buffer,signature:unknown) {
-      const config=configured(), client=stripe(config.secretKey);
-      const event=verifyWebBillingEvent(client,raw,signature,config.webhookSecret,now);
-      if (d.webhookEnabled?.()!==true) throw new WebBillingWebhookError('processing_paused',true);
-      return createWebBillingWebhook({config,stripe:client,store:createWebBillingWebhookStore(d.db,()=>now().getTime()),readFacts,now}).process(event);
+      let current: {config:ReturnType<typeof configured>;client:Stripe}|undefined;
+      let legacy: {secretKey:string;webhookSecret:string;client:Stripe}|undefined;
+      const currentSource=()=>{
+        if(!current){const config=configured();current={config,client:stripe(config.secretKey)};}
+        return current;
+      };
+      const legacySource=d.rawLegacyWebhookConfig ? ()=>{
+        const value=d.rawLegacyWebhookConfig!();
+        if(!object(value)||Object.keys(value).sort().join(',')!=='secretKey,webhookSecret'||
+          typeof value.secretKey!=='string'||!/^sk_live_[A-Za-z0-9]{1,240}$/.test(value.secretKey)||
+          typeof value.webhookSecret!=='string'||!/^whsec_[A-Za-z0-9]{1,240}$/.test(value.webhookSecret)) throw new BillingConfigurationError();
+        legacy={secretKey:value.secretKey,webhookSecret:value.webhookSecret,client:stripe(value.secretKey)};
+        return {stripe:legacy.client,secret:legacy.webhookSecret};
+      }:undefined;
+      return createWebBillingWebhookRouter({
+        ...(legacySource?{legacySource,legacyEnabled:()=>d.legacyWebhookEnabled?.()===true,
+          processLegacy:async event=>{
+            if(!legacy)throw new BillingConfigurationError();
+            return createLegacyWebBillingWebhook({db:d.db,stripe:legacy.client}).process(event);
+          }}:{}),
+        source:()=>{const {config,client}=currentSource();return {stripe:client,secret:config.webhookSecret};},
+        mode:()=>d.webhookMode?d.webhookMode():'process',enabled:()=>d.webhookEnabled?.()===true,
+        process:async event=>{
+          const {config,client}=currentSource();
+          return createWebBillingWebhook({config,stripe:client,store:createWebBillingWebhookStore(d.db,()=>now().getTime()),readFacts,now}).process(event);
+        },now,
+      }).handle(raw,signature);
     },
   };
 }

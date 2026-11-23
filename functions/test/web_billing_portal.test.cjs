@@ -70,6 +70,19 @@ test('an existing legacy coupon, Customer balance and discount stay intact durin
   f.options.customer.discount={coupon:{percent_off:100,duration:'forever'}};
   await f.create();assert.deepEqual(f.calls.forbidden,[]);
 });
+test('owned existing flexible old500 with a forever 100 percent coupon keeps management unchanged',async()=>{
+  const f=fixture();f.options.price=price(true);f.options.subscriptions[0].items.data[0].price=copy(f.options.price);
+  f.options.subscriptions[0].billing_mode={type:'flexible',flexible:{proration_discounts:'included'}};
+  f.options.subscriptions[0].discount={coupon:{percent_off:100,duration:'forever'}};
+  f.options.subscriptions[0].discounts=['di_synthetic'];
+  const before=copy(f.options.subscriptions[0]);await f.create();
+  assert.deepEqual(f.options.subscriptions[0],before);assert.deepEqual(f.calls.forbidden,[]);assert.equal(f.calls.session.length,1);
+});
+test('flexible mode never bypasses the existing legacy subscription anchor',async()=>{
+  const f=fixture();f.options.price=price(true);f.options.subscriptions[0].items.data[0].price=copy(f.options.price);
+  f.options.subscriptions[0].billing_mode={type:'flexible'};
+  f.options.source.data.stripeSubscriptionId='sub_synthetic_foreign';await rejects(f);
+});
 test('configured legacy Price without the exact current stored subscription is refused',async()=>{
   const f=fixture();f.options.price=price(true);f.options.subscriptions[0].items.data[0].price=copy(f.options.price);
   f.options.source.data.stripeSubscriptionId='sub_synthetic_other';await rejects(f);

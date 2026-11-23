@@ -7,6 +7,13 @@ import {
 
 export const MAX_STRIPE_SYNC_ATTEMPTS = 5;
 
+export interface StripeSubscriptionPersistence {
+  ref: FirebaseFirestore.DocumentReference;
+  before: FirebaseFirestore.DocumentSnapshot;
+  data: FirebaseFirestore.UpdateData<FirebaseFirestore.DocumentData>;
+  subscription: Stripe.Subscription;
+}
+
 function timestamp(seconds: unknown): FirebaseFirestore.Timestamp | null {
   return typeof seconds === 'number' && Number.isFinite(seconds)
     ? admin.firestore.Timestamp.fromMillis(seconds * 1000)
@@ -46,6 +53,9 @@ export async function syncStripeSubscription(params: {
   uid: string;
   subscriptionId: string;
   checkoutSessionId?: string | null;
+  /** A compatibility caller may add an atomic account-deletion fence while
+   * reusing the deployed canonical selection, mapping and retry behavior. */
+  persist?(input: StripeSubscriptionPersistence): Promise<void>;
 }): Promise<Stripe.Subscription> {
   const {db, stripe, uid, subscriptionId, checkoutSessionId} = params;
   const ref = db.doc(`users/${uid}/billing/subscription`);
@@ -97,7 +107,8 @@ export async function syncStripeSubscription(params: {
     try {
       // Even an identical notification advances the version. Skipping this
       // write would let an older in-flight response overwrite this refresh.
-      if (before.exists) await ref.update(data, {lastUpdateTime: before.updateTime!});
+      if (params.persist) await params.persist({ref,before,data,subscription});
+      else if (before.exists) await ref.update(data, {lastUpdateTime: before.updateTime!});
       else await ref.create(data);
       return subscription;
     } catch (error) {

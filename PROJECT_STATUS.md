@@ -1,5 +1,13 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-23 Apple提出準備①〜⑥を再開（一般購入・一般メールは停止維持）
+
+- **承認と現在地**：`54970b2802f8fcc483b336186149bea32baae42d`から、既存契約の同期を維持するWebhook切替、本番Web接続、提出アプリ用backend、本人内部TestFlight、限定実機確認、提出情報保存まで承認済み。審査送信・公開・実請求・既存契約条件変更・merge/pushは含めない。下の旧「Webhookも停止」計画は今回の同期継続方針で更新する。
+- **①の実装**：同じURLで旧署名と新署名を別Secretで検証する最小routerを追加。旧署名は実配備済みのcanonical選択/CASを再利用して同期し、新JSONの不備では停止しない。新署名の`verify_only`は503/`verification_only`/Retry-After60でclaim・receipt・billing・outboxを消費しない。新通常処理はmode=processと有効化trueの両方が必要。旧同期にも原子的な削除フェンスを追加。旧500円の同UID/Customer/Subscription anchorが一致する場合だけPortalのflexible契約を認め、550円新規契約の制約は維持。strict TypeScript・直接関連291件PASS。
+- **実行済み設定**：新Acacia/7event endpoint `we_1Uel9zK6h5kxGn4c1ZwNaGlN`を1件作成し直ちにdisabled。旧`we_1U4IAnK6h5kxGn4cDdYtGpsy`はenabled/既存受信処理を維持。完全JSON `HAMCARE_LIVE_WEB_BILLING_CONFIG:1`と既存compute SAへのSecret単体Accessorを登録。Price/Portal再作成なし、旧署名値の新用途流用なし、秘密値はGit/報告へ出さない。
+- **進行区分**：①切替検証中、②Live adapter/画面接続実装中、③app用削除関数の限定配備中（事前の削除要求0件、再試行worker未配備を確認）、④既存成功SDK/署名を再利用して準備中、⑤専用の破棄可能Appleアカウントは未確定・本人確認待ち、⑥App Store Connectの開発者アカウント認証待ち。既存本人/審査/テスターは削除対象にしない。
+- **保持**：連絡先実配送・同UID確認済み保存・復帰の再試験0、contact false/確認済み原本/履歴を維持。通知workerは未配備で一般メールを送らない。0円審査契約はactive・100%forever・最新0円Paid・期間末解約予約なしで再照合。11/27 10:03:01 JSTは現期間末であり自動解約日としない。自然更新後の実績は事前検証と区別する。
+
 ## 2026-11-23 本番550円設定を作成・購入停止版のみ先行配備（審査0円の同期保護で残工程を保留）
 
 - **承認/開始**：`b9d6e160eb940f1d0f6d483d0d7391d882ed44b9`/同専用branch、開始時clean。本人が設定/3関数停止配備・記録を承認し、0円審査契約の同期へ影響があればその工程と依存変更だけを保留する条件を追加した。連絡先確認は完了扱いで再試験0。

@@ -1,5 +1,21 @@
 # HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
 
+## 2026-11-23 Apple提出準備：既存同期を維持する引継ぎ（実行中）
+
+本人が`54970b2802f8`を基準に①〜⑥を一括承認した。**一般購入はfalse/private、一般メールは停止のまま、既存契約の正規同期は稼働維持**が現在の方針。以下が下段の「新旧Webhook両停止」計画に優先する。審査送信・一般公開・既存契約条件変更・実課金は今回行わない。
+
+1. 現行`stripewebhook-00010-kuq`のソース/設定と旧endpointを退避。旧`we_1U4IAnK6h5kxGn4cDdYtGpsy`（Dahlia/5event、署名`STRIPE_WEBHOOK_SECRET:3`）はenabledで継続する。
+2. 新`we_1Uel9zK6h5kxGn4c1ZwNaGlN`をAcacia/指定7event/同URLで作成し、直ちにdisabledへ更新済み。署名は新endpointの生成値だけを`HAMCARE_LIVE_WEB_BILLING_CONFIG:1`へ格納。550円Price/専用Portal/既存Live公開可能キーを再利用し、`legacyPriceId`は旧500円を明記。既存compute SAにこのSecretだけのAccessorを追加済み。新旧の署名は混用しない。
+3. 同URLの継続版を、Webhookだけ旧API key/旧署名/新JSONの3bindingで配備する。`HAMCARE_LEGACY_WEBHOOK_ENABLED=true`,`HAMCARE_WEBHOOK_MODE=verify_only`,`HAMCARE_WEBHOOK_ENABLED=false`。旧HMACは従来同期、新HMACだけ検証専用503/固定code/Retry-After60。署名を確認しただけでDB receiptを消費しない。旧経路は新JSON欠損に依存しない。Checkoutのprivate IAMをWebhookへ適用しない。
+4. 新endpointを有効化し、審査契約に対応する既存イベント1件をStripeの正規再送で限定確認する。claim/receipt/billing/outboxが増えず、意図した`verification_only`になることを確認。実eventの元API版を使って署名先を推定せず、別々のHMACだけで受信元を決定する。
+5. `HAMCARE_WEBHOOK_MODE=process`かつ`HAMCARE_WEBHOOK_ENABLED=true`へ切替。旧継続は維持したまま同じ正規eventを再送し、既存の新engineのclaim・UID lease・Stripe正本再取得・CAS・outbox重複防止を通して同期。Stripeと同UID billingのCustomer/Subscription/Price/status/period/0円条件を照合する。一般通知workerを配備せず、過去メールの送信を開始しない。
+6. 新経路の処理済み証跡と正本一致を確認してから旧endpointだけdisabledへ。その後legacy有効フラグをfalseへ。旧停止UTC/JST、新旧ID/API版/event/Secret参照、両経路を確認した結果を追記する。自然更新前の検証を11/27更新後PASSと記録しない。
+7. Checkoutは専用JSON参照へ接続するが`HAMCARE_WEB_PURCHASE_ENABLED=false`/privateを全revisionで維持。Portalは本人認証/同UID既存Customerの管理だけを接続する。review0のflexible許可は旧Price/既存anchor一致に限定し、購入ガードは緩和しない。
+
+**停止・復旧**：旧endpointを止めるまでは旧処理を生かす。新経路の署名・設定・正本照合で失敗した場合は新endpointをdisabledにし、旧署名の処理を継続する。旧停止後の復旧ではlegacy継続フラグ/旧Secretが正常なことを先に確認し、旧endpoint再開→新endpoint停止の順で同期を確保する。購入/一般メールは開けない。billing手書き・権限手動付与・契約取消/日付変更で代替しない。
+
+コード検証はstrict TypeScript・直接関連291件PASS。旧配備sourceの継続処理と、実在する審査契約の構造だけを使った合成fixture（旧500円/0円Invoice/100%forever/flexible/metadata結合/期間維持/削除fence）を確認した。実ID/UID/受信先/Secretはfixtureや文書へ含めない。ここまでの新規書込みはWebhook/Secret/IAM設定であり、契約/請求変更ではない。正規同期によるbilling/処理記録の更新は承認範囲だが、実行前の本節では未確認として扱う。
+
 ## 2026-11-23 本番550円準備を一部実行（審査用0円契約の同期保護により切替を保留）
 
 本人が`b9d6e160eb940f1d0f6d483d0d7391d882ed44b9`からの設定作成・3関数停止配備・記録を一括承認した。ただし「旧Webhook停止で既存の審査用0円契約等へ影響があれば、その工程と依存変更だけ保留」を実行条件に追加した。開始HEAD/branchは同承認ID/`feature/web-first-stripe-checkout`、開始時clean。以下は実績であり、事前の3関数切替計画を全て実行したとは扱わない。

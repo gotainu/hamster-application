@@ -178,6 +178,22 @@ test('legacy old500 stays on its owned original Price, including 100% coupon inv
   assert.equal(s.billing().amount,500);assert.equal(s.billing().stripePriceId,OLD);assert.equal(s.billing().legacyPrice,true);
   assert.equal(s.billing().plan,'paid');assert.equal(s.billing().latestInvoicePaymentStatus,'no_payment_required');
 });
+test('existing flexible old500 review shape retains its zero invoice and original period through the new engine',async()=>{
+  const oldBilling={provider:'stripe',stripeCustomerId:CUSTOMER,stripeSubscriptionId:SUB,stripePriceId:OLD,
+    stripeLivemode:true,plan:'paid',status:'active'};
+  const s=setup({mapping:false,billing:oldBilling,sub:{metadata:{firebaseUid:UID},
+    billing_mode:{type:'flexible',flexible:{proration_discounts:'included'}},
+    items:{data:[{quantity:1,current_period_start:START,current_period_end:END,price:{id:OLD}}]},
+    discount:{coupon:{percent_off:100,duration:'forever'}},discounts:['di_syntheticReview'],trial_start:null,trial_end:null},
+    invoice:{total:0,amount_due:0,amount_paid:0,discounts:['di_syntheticReview'],total_discount_amounts:[{amount:500}]}});
+  Object.assign(s.remote.price,{id:OLD,unit_amount:500,tax_behavior:'exclusive'});
+  const original=structuredClone(s.remote);
+  await s.engine.process(s.event('invoice.payment_succeeded'));
+  assert.equal(s.billing().plan,'paid');assert.equal(s.billing().legacyPrice,true);assert.equal(s.billing().amount,500);
+  assert.equal(s.billing().currentPeriodEnd.toMillis(),END*1000);assert.equal(s.billing().latestInvoiceAmountPaid,0);
+  assert.equal(s.billing().latestInvoicePaymentStatus,'no_payment_required');assert.equal(s.hooks().length,0);
+  assert.deepEqual(s.remote,original);
+});
 test('legacy Price never creates a newly unanchored subscription',async()=>{
   const s=setup({sub:{items:{data:[{quantity:1,price:{id:OLD}}]}}});Object.assign(s.remote.price,{id:OLD,unit_amount:500,tax_behavior:'exclusive'});
   await rejected(s,undefined,'subscription_price_invalid');

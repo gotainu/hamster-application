@@ -41,6 +41,9 @@ const ENVELOPE_KEY_SECRET = defineSecret('ENVELOPE_KEY');
 // Dedicated Live-only configuration is bound, but not registered or read at startup.
 const LIVE_WEB_BILLING_CONFIG = defineSecret('HAMCARE_LIVE_WEB_BILLING_CONFIG');
 const LIVE_BILLING_CONTACT_MAIL_CONFIG = defineSecret(LIVE_BILLING_CONTACT_MAIL_SECRET);
+// Preserve the old endpoint's independent credentials during same-URL cutover.
+const LEGACY_STRIPE_API_KEY = defineSecret('STRIPE_SECRET_KEY');
+const LEGACY_STRIPE_WEBHOOK_SECRET = defineSecret('STRIPE_WEBHOOK_SECRET');
 const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET');
 
 // Contact verification defaults to disabled and cannot enable new purchase
@@ -67,6 +70,9 @@ const webBilling = createProductionWebBillingRuntime({
   db, auth:admin.auth(), rawConfig:()=>process.env.HAMCARE_LIVE_WEB_BILLING_CONFIG,
   purchaseEnabled:()=>process.env.HAMCARE_WEB_PURCHASE_ENABLED==='true',
   webhookEnabled:()=>process.env.HAMCARE_WEBHOOK_ENABLED==='true',
+  webhookMode:()=>process.env.HAMCARE_WEBHOOK_MODE,
+  legacyWebhookEnabled:()=>process.env.HAMCARE_LEGACY_WEBHOOK_ENABLED==='true',
+  rawLegacyWebhookConfig:()=>({secretKey:process.env.STRIPE_SECRET_KEY,webhookSecret:process.env.STRIPE_WEBHOOK_SECRET}),
 });
 const billingOptions = {region:'asia-northeast1',secrets:[LIVE_WEB_BILLING_CONFIG],
   timeoutSeconds:60,maxInstances:10,memory:'256MiB' as const,cors:WEB_BILLING_ORIGIN};
@@ -81,7 +87,7 @@ export const createStripeCustomerPortalSession = onCall(billingOptions,async req
   try {return await webBilling.portal(req);}
   catch (error:unknown) {const safe=safeWebBillingError(error);throw new HttpsError(safe.code,safe.message);}
 });
-export const stripeWebhook = onRequest({region:'asia-northeast1',secrets:[LIVE_WEB_BILLING_CONFIG],
+export const stripeWebhook = onRequest({region:'asia-northeast1',secrets:[LIVE_WEB_BILLING_CONFIG,LEGACY_STRIPE_API_KEY,LEGACY_STRIPE_WEBHOOK_SECRET],
   timeoutSeconds:60,maxInstances:10,memory:'256MiB'},async(req,res)=>{
   res.set('Cache-Control','no-store, max-age=0');
   res.set('X-Content-Type-Options','nosniff');
@@ -92,9 +98,10 @@ export const stripeWebhook = onRequest({region:'asia-northeast1',secrets:[LIVE_W
   catch(error:unknown) {
     // No token, UID, Customer/Subscription ID, email or raw SDK error in logs.
     const retryable=!(error instanceof WebBillingWebhookError) || error.retryable;
-    if (error instanceof WebBillingWebhookError && error.code==='processing_paused') res.set('Retry-After','60');
+    const pauseCode=error instanceof WebBillingWebhookError && ['processing_paused','verification_only'].includes(error.code)?error.code:null;
+    if (pauseCode) res.set('Retry-After','60');
     logger.warn('Production billing webhook stopped',{retryable});
-    res.status(retryable?503:400).json({ok:false,message:WEB_BILLING_UNAVAILABLE});
+    res.status(retryable?503:400).json({ok:false,...(pauseCode?{code:pauseCode}:{}),message:WEB_BILLING_UNAVAILABLE});
   }
 });
 
