@@ -1,29 +1,73 @@
-# HamCare：本番切替Runbook（停止準備配備済・購入公開未実行）
+# HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
-## 2026-11-23 Apple提出準備：既存同期を維持する引継ぎ（実行中）
+## 2026-11-23 Apple提出準備①〜④の実行結果（⑤実機・⑥提出情報は継続）
 
-本人が`54970b2802f8`を基準に①〜⑥を一括承認した。**一般購入はfalse/private、一般メールは停止のまま、既存契約の正規同期は稼働維持**が現在の方針。以下が下段の「新旧Webhook両停止」計画に優先する。審査送信・一般公開・既存契約条件変更・実課金は今回行わない。
+本人の`54970b2802f8`を基準とする①〜⑥一括承認を実行した。**現在の正本は、一般購入false/private・一般メール停止・新Webhookの正規同期process稼働**である。この実績が、下段に履歴として残す「新旧Webhook両停止」「Live adapter未実装」「Hosting45不変」等の旧計画・保留記録に優先する。App Storeへの審査送信・ストア公開・新規実契約・実課金・契約条件変更は今回行っていない。
 
-1. 現行`stripewebhook-00010-kuq`のソース/設定と旧endpointを退避。旧`we_1U4IAnK6h5kxGn4cDdYtGpsy`（Dahlia/5event、署名`STRIPE_WEBHOOK_SECRET:3`）はenabledで継続する。
-2. 新`we_1Uel9zK6h5kxGn4c1ZwNaGlN`をAcacia/指定7event/同URLで作成し、直ちにdisabledへ更新済み。署名は新endpointの生成値だけを`HAMCARE_LIVE_WEB_BILLING_CONFIG:1`へ格納。550円Price/専用Portal/既存Live公開可能キーを再利用し、`legacyPriceId`は旧500円を明記。既存compute SAにこのSecretだけのAccessorを追加済み。新旧の署名は混用しない。
-3. 同URLの継続版を、Webhookだけ旧API key/旧署名/新JSONの3bindingで配備する。`HAMCARE_LEGACY_WEBHOOK_ENABLED=true`,`HAMCARE_WEBHOOK_MODE=verify_only`,`HAMCARE_WEBHOOK_ENABLED=false`。旧HMACは従来同期、新HMACだけ検証専用503/固定code/Retry-After60。署名を確認しただけでDB receiptを消費しない。旧経路は新JSON欠損に依存しない。Checkoutのprivate IAMをWebhookへ適用しない。
-4. 新endpointを有効化し、審査契約に対応する既存イベント1件をStripeの正規再送で限定確認する。claim/receipt/billing/outboxが増えず、意図した`verification_only`になることを確認。実eventの元API版を使って署名先を推定せず、別々のHMACだけで受信元を決定する。
-5. `HAMCARE_WEBHOOK_MODE=process`かつ`HAMCARE_WEBHOOK_ENABLED=true`へ切替。旧継続は維持したまま同じ正規eventを再送し、既存の新engineのclaim・UID lease・Stripe正本再取得・CAS・outbox重複防止を通して同期。Stripeと同UID billingのCustomer/Subscription/Price/status/period/0円条件を照合する。一般通知workerを配備せず、過去メールの送信を開始しない。
-6. 新経路の処理済み証跡と正本一致を確認してから旧endpointだけdisabledへ。その後legacy有効フラグをfalseへ。旧停止UTC/JST、新旧ID/API版/event/Secret参照、両経路を確認した結果を追記する。自然更新前の検証を11/27更新後PASSと記録しない。
-7. Checkoutは専用JSON参照へ接続するが`HAMCARE_WEB_PURCHASE_ENABLED=false`/privateを全revisionで維持。Portalは本人認証/同UID既存Customerの管理だけを接続する。review0のflexible許可は旧Price/既存anchor一致に限定し、購入ガードは緩和しない。
+### ①既存契約の通常同期を維持したWebhook切替：完了
 
-**停止・復旧**：旧endpointを止めるまでは旧処理を生かす。新経路の署名・設定・正本照合で失敗した場合は新endpointをdisabledにし、旧署名の処理を継続する。旧停止後の復旧ではlegacy継続フラグ/旧Secretが正常なことを先に確認し、旧endpoint再開→新endpoint停止の順で同期を確保する。購入/一般メールは開けない。billing手書き・権限手動付与・契約取消/日付変更で代替しない。
+1. 旧source/設定/署名参照を退避し、新Acacia/7event endpoint `we_1Uel9zK6h5kxGn4c1ZwNaGlN`を作成直後disabledにした。完全JSON `HAMCARE_LIVE_WEB_BILLING_CONFIG:1`と既存compute SAのSecret単体Accessorを登録。新署名は新endpoint生成値、旧署名は`STRIPE_WEBHOOK_SECRET:3`を使い、値や用途を混用しない。550円Price/非default Portalは既存作成物を再利用し、再作成しなかった。
+2. 継続版`stripewebhook-00011-pez`は旧署名を同期継続、新署名だけverify_onlyとした。既存canonical eventに対する**管理者作成HMAC probe**は503/`verification_only`/Retry-After60、receipt未消費/billing・outbox不変。これはStripeからの配送ではない。
+3. 続けて、同じ既存イベントのStripe CLI正規再送を受け付け、実配送の503を2要求確認した。verification中のreceipt不存在とbilling・outbox不変を別途GET照合した。この段階も同期完了とは扱わない。
+4. 新処理を`HAMCARE_WEBHOOK_MODE=process`/`HAMCARE_WEBHOOK_ENABLED=true`にして、対象の既存実イベント1件を正規再送。UID/Customer/Subscriptionの結合、Stripe正本再取得、同UID lease/CAS/削除フェンスを経てreceipt processedを確認。同じ審査用契約の旧Price/status active/契約期間、100%forever割引、最新0円Paid Invoiceが一致し、審査用通知outboxは0件だった。
+5. 新同期を確認した後、旧`we_1U4IAnK6h5kxGn4cDdYtGpsy`をdisabledへ変更。確認時刻は**2026-11-23 09:58:30.471 JST / 00:58:30.471 UTC**。その後legacy=false、新process=trueで最終revisionを配備・照合した。旧署名Secret/旧Price/割引・契約は削除・変更しない。
 
-コード検証はstrict TypeScript・直接関連291件PASS。旧配備sourceの継続処理と、実在する審査契約の構造だけを使った合成fixture（旧500円/0円Invoice/100%forever/flexible/metadata結合/期間維持/削除fence）を確認した。実ID/UID/受信先/Secretはfixtureや文書へ含めない。ここまでの新規書込みはWebhook/Secret/IAM設定であり、契約/請求変更ではない。正規同期によるbilling/処理記録の更新は承認範囲だが、実行前の本節では未確認として扱う。
+| 経路 | 版・event・署名参照 | 最終状態 |
+|---|---|---|
+| 旧Live endpoint | `2026-05-27.dahlia`/既存5event/`STRIPE_WEBHOOK_SECRET:3` | disabled、legacy処理false。署名原本は復旧用に保持 |
+| 新Live endpoint | `2025-02-24.acacia`/指定7event/`HAMCARE_LIVE_WEB_BILLING_CONFIG:1`内の新署名 | enabled、mode=process/処理true。固定同URLで正規同期済み |
 
-### ②本番Webの停止接続（実装完了・Hosting反映前）
+**書込みの区別**：設定作成・Secret/IAM・Functions/Hosting/Schedulerは本番構成変更である。また、processでbillingのschema/canonical情報・処理済みreceipt/同期記録を更新したため、**本番Firestore書込み0件ではない**。これは承認済みの通常同期で、契約・Customer・Checkout Session・Invoice・割引・契約期間の作成変更は0件。管理者probe/verify_onlyの書込み0と、process正規同期の書込みを混同しない。11/27 10:03:01 JSTは現在期間末であり、自然更新後の権限同期はまだ未確認。
 
-- 固定Live Callableは`createStripeCheckoutSession`の`{data:{flow:'web',action,...}}`と`createStripeCustomerPortalSession`の既存protocolを使用。本番専用adapter/DTOを追加し、PreviewのHTTP DTO・Test key・保存先を流用しない。Firebase認証世代と同UIDを毎回確認し、メール・UID・Stripe参照・token・client secretを表示用projectionへ渡さない。Portal bearer URLをDOM/履歴/ログへ保存しない。
-- `LIVE_PURCHASE_ENABLED=false`を固定し、review/createをdispatch前でも拒否、画面にも停止案内を表示。server false/privateと独立した追加の停止であり、URLや画面操作で解除できない。一般受付の別承認時には、このbuild設定もサーバー/対象者制限と合わせて見直す。status/既存billing再読取/Portalは別経路として接続し、連絡先不足だけで既存契約管理を拒否しない。
-- `/billing/success/`は固定`/account/?checkout=return`へ復帰。queryは表示きっかけだけで成功証拠にせず、同UIDのstatusとbillingを再読取する。403/不明/期限切れactiveは完了としない。
-- Hostingは既存45ファイルを基準に11差替え・新assets4、合計49ファイルのoverlay予定。既存34のhashを維持し、contact停止HTML/JSは差替えない。対象はaccount/index、account-view/account/checkout-model/checkout-view、billing/success、LP、Terms、特商法、Support、Privacyと新4module。Privacyは既存の音声に関する5箇所を保持。削除申請ページなど他の既存公開ファイルを一括デプロイで消さない。
-- CSP変更は`/account/**`と`/billing/success/**`だけ。本番の固定Callable2件、既存contact/Auth/Firestore、Stripe SDK/frame/APIに必要な接続に限定し、Preview APIを許可しない。successページは外部通信なしで固定復帰する。既存CSP以外のHosting設定を保持する。
-- 関連Node407/407、LP静的86/86、360/390pxのMock account/planはscrollWidth=clientWidthで表示確認。実Auth/Stripe/メール送信0。account静的172/176で既存policy再export2件・index全文比較・今回Sync全文比較の4件はFAILのまま。正確な検査名と現実装の根拠はPROJECT_STATUS同日欄に記録し、旧baseline不一致だけを消す検査無効化はしない。実画面・本番Hosting結果は反映後に追記する。
+### 限定5関数の実配備照合：完了
+
+以下のrevision・source commit・実配備archiveをGET比較し、5関数すべてsource一致。Checkout private/IAM検査を維持し、他の公開transportは既存の本人認証/署名を維持した。
+
+| Function | 最終revision | 配備元 / source照合 | 呼出し境界 |
+|---|---|---|---|
+| `createStripeCheckoutSession` | `createstripecheckoutsession-00007-lob` | `90d8f237d8bf` / 168ファイル | private/IAM検査有効 |
+| `stripeWebhook` | `stripewebhook-00013-zew` | `90d8f237d8bf` / 168ファイル | public/署名検証 |
+| `createStripeCustomerPortalSession` | `createstripecustomerportalsession-00010-duf` | `90d8f237d8bf` / 168ファイル | public transport/本人認証 |
+| `deleteMyAccountAndData` | `deletemyaccountanddata-00007-kuh` | `54970b2802f8` / 164ファイル | public transport/本人認証 |
+| `retryAccountDeletions` | `retryaccountdeletions-00001-soq` | `54970b2802f8` / 164ファイル | private/IAM検査有効 |
+
+- 課金3関数のsource archive SHA256：`251873473c38e1c0fb3d52cd4412829cb056bc91888fba0b183d3242dac2d056`。
+- app削除2関数のsource archive SHA256：`60cc57226f10058f4089b4ac2ffb5e3a224d4f544a51c9e79243aada45de29ca`。
+- 専用JSONはversion1を固定参照。Webhookだけは旧継続/復旧のため既存API key/旧署名bindingも維持する。Secret値をソース・Git・診断へ含めない。
+- 匿名probeはCheckout403、Portal401、アプリ内削除401、retry worker403。いずれも副作用経路へ入らず、起動失敗や資格情報不足を停止制御PASSに読み替えない。実削除要求を作成していない。
+
+### ②本番Webの停止接続：実装・Hosting反映完了
+
+- 配備元は`d9109f8008fb51aef77f440d7d540b27072ed391`。固定Git archiveからのoverlayで、Hosting`22b8c97c2532f11c`→`58e5ed12aaa990f6`。**49ファイル＝既存11差替え＋新4＋既存34hash保持**。source全体の一括deployは行わず、削除申請ページ等の既存ファイルを保持した。
+- 対象はaccount/index、account-view/account/checkout-model/checkout-view、billing/success、LP、Terms、特商法、Support、Privacyと新4module。contact停止HTML/JSは差替えない。cloneで再生成された`/__/firebase/init.js`と`init.json`は元hashへ復元し、finalize前後・release後に全49map/configを照合した。
+- CSPは既存`/account/**`の許可先を固定Live Callable2件・contact/Auth/Firestore・必要なStripe SDK/frame/APIへ限定更新し、`/billing/success/**`の固定復帰用ruleを追加。他の設定・非CSP headerを保全し、Preview APIを許可しない。
+- Live専用Callable envelope/flat DTO、同じ認証世代/UIDでのbilling再読取、専用Portalへ接続した。契約・権限の正本はFirebase UIDのまま。`/billing/success/`は固定`/account/?checkout=return`へ戻り、queryは確認のきっかけだけとする。URL到達や403/不明結果/期限切れactiveで完了表示しない。Preview DTO・Test key・保存先へのfallbackなし。
+- `LIVE_PURCHASE_ENABLED=false`でreview/createを画面/dispatch前でも閉じ、server false/privateを重ねて維持。既存契約のPortalは新規申込・連絡先補完から独立する。購入の一般受付は、後続の別承認で対象者制限・server/IAM/build設定を揃えるまで開始しない。
+- LP/規約/特商法/FAQは月額550円と既定の解約/返金方針へ整合。Privacyは現行連絡先の取扱いと一般送信停止を説明し、公開済み音声開示5箇所を保持した。本人連絡先実配送・同UID確認済み原本・既存履歴は再試験/移行/書換えなし。
+- 検証：関連Node407/407、LP静的86/86、Hosting helper Mock20/20。Chrome local Mockのaccount/planは360/390pxでscrollWidth=clientWidth。本番の匿名account画面で停止bannerを確認した。**今回のスマホ実Live表示・ログイン後表示・実決済は未確認**であり、Mock結果を実機PASSにしない。
+- account静的172/176。未解消4件の正確な検査名と旧baseline/再exportの理由はPROJECT_STATUS同日欄を参照。実認証条件とsource比較は上記別検証で維持し、失敗を隠す検査無効化はしていない。
+
+### ③アプリ内安全削除backend・再試行Scheduler：配備・接続完了
+
+- `54970b2802f8`から既存のStripe停止確認・削除フェンス・データ削除を行う`deleteMyAccountAndData`、同要求の安全な再試行を行う`retryAccountDeletions`を限定配備した。新Web削除申請API/運営経路は配備していない。
+- Schedulerは`firebase-schedule-retryAccountDeletions-asia-northeast1`、`*/15 * * * *`、`Asia/Tokyo`、最終ENABLED。workerはprivateで、既存compute SAの継承Invokerを再利用。worker IAM追加0、project IAM追加0。通知workerとは別であり、一般メール送信を開始しない。
+- 作成後にURI末尾の表記差分を検知し、PAUSEDへ停止。同じ宛先/認証/IAMであることを厳密照合して採用後にresume。接続直前のqueueは0（未解決/不明0）、手動dispatch0。workerの配備/接続は稼働状態だが、実削除や実Apple失効の検証ではなく、実アカウント削除0件。
+- 停止/復旧はまずSchedulerをPAUSEDにし、privateを維持したまま同じ失敗要求の状態とworker sourceを確認する。Auth/Firestoreの直接削除や削除フェンス解除で代替しない。既存の再試行状態を消して処理済みにしない。
+
+### ④〜⑥の到達点と本人操作待ち
+
+| 段階 | 確認できた到達点 | 未実施・未確認 |
+|---|---|---|
+| ④本人内部TestFlight：配信完了 | `1.0.1 (6)` IPA、`54970b2802f8`固定397入力のsource hash・署名PASS。10:05 JSTにTransporter Delivered/処理完了。既存2〜5と同じStandard OS/TLS・独自暗号なし・France Noの根拠で輸出コンプライアンスを保存し、既存「本人実機確認」グループへ6を追加。15:30 JSTに1 Tester/5 Builds、6 Testing/90日を実UI確認。外部配信/新規招待/審査送信なし | 本人端末でのTestFlight更新・更新版の実機確認は本人操作待ち。内部配信完了を端末動作PASSとは扱わない |
+| ⑤Apple削除/更新実機 | 本人に専用の破棄可能Appleアカウントを確認し「ない」と回答 | 実Apple失効、失効後の同UID再ログイン/削除再開、今回更新版の本人実機。既存本人/審査/テスターは削除に流用しない |
+| ⑥提出情報保存 | Description/Review Notes/電話番号保存、公開方式Manual維持。審査用targetと既存記録は一致 | 以前のAuth REST検査はブラウザ読取で伏字化された値を使用した無効な検査で、INVALID_LOGIN_CREDENTIALSは本人パスワード不正の根拠にならない。本人は既存パスワードの再入力・保存済み。実ログインは未確認で、TestFlight実機で確認する。追加のパスワードREST試行なし。Build selection/スクリーンショット/App Privacy読取は未実施。審査送信なし |
+
+### 最終停止状態・本番変更の分類・復旧
+
+- 一般購入client false/server false/private、contact false、契約通知worker未配備。Preview・本人確認済み連絡先・無料テスター・既存飼育記録/体験開始・期限・利用枠を維持。実メール0、新規実契約/実請求0、実削除0、実Apple失効0。正規同期のbilling/receipt更新は上記の承認済み本番書込みとして分離する。
+- Secret version1/単体Accessor、限定5関数、Webhook切替、Hosting49、private retry/Scheduler接続、Transporter送信と提出情報保存は**実施した設定・配備操作**であり「本番変更0件」としない。一般通知の過去outbox一括送信・イベント全体の一括再処理・権限の手動付与0。
+- 新Webhookに問題があれば、旧Secret/退避sourceの対応とlegacy同期を先に確認してから旧endpointを再開し、新endpointを止める。新旧を両方止めたまま審査契約の更新日を越えない。購入/一般メールは開かない。Hostingは対象helperの`--execute --restore`で厳密な45map/configの`22b8c97c2532f11c`へ復旧できるが、①の同期継続を止める操作とは連動させない。復旧の実行は今回0。
+- 秘密値・実UID・受信者・確認リンク・パスワードはGit/報告に含めない。Relay実配送と追加VoiceOverは既存の非ブロッキング方針を維持する。
 
 ## 2026-11-23 本番550円準備を一部実行（審査用0円契約の同期保護により切替を保留）
 
