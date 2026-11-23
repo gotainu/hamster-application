@@ -1,3 +1,4 @@
+import {projectLiveBilling,projectLivePortalSession} from './live-checkout-model.mjs';
 import { isVerifiedAccountIdentity } from './account-identity.mjs';
 import { createCheckoutController, clearPreviewBilling, renderPreviewBilling } from './checkout-view.mjs';
 import { projectPreviewBilling, projectPreviewPortalSession, portalErrorMessage } from './checkout-model.mjs';
@@ -6,6 +7,10 @@ import { projectBillingContact, billingContactError } from './billing-contact-mo
 
 /** Presentation only. Firebase identifiers and credentials stay inside the service. */
 export async function mountAccountPage(service, { checkoutService = null, contactService = null, resumeCheckout = false, resumePlan = false } = {}) {
+  const live=checkoutService?.testMode===false;
+  const purchaseEnabled=!live || checkoutService.purchaseEnabled===true;
+  const projectBilling=live?projectLiveBilling:projectPreviewBilling;
+  const projectPortal=live?projectLivePortalSession:projectPreviewPortalSession;
   const element = (id) => document.getElementById(id);
   const panels = ['loading-panel', 'login-panel', 'verification-panel', 'account-panel', 'plan-panel', 'checkout-panel'];
   const personalFields = ['verification-email', 'account-nickname', 'account-email', 'account-method', 'account-billing', 'account-trial', 'unavailable-fields', 'plan-nickname', 'plan-email', 'plan-method', 'plan-billing', 'plan-trial', 'plan-customer-check', 'plan-checkout-check', 'plan-route-title', 'plan-route-detail'];
@@ -55,7 +60,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     clearPortal();
     element('account-portal-return-status').textContent = '';
     element('account-portal-return-status').hidden = true;
-    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix); element(prefix + '-refresh').disabled = true; }
+    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix,live?'契約状態はまだ確認していません。':'Preview契約状態はまだ確認していません。'); element(prefix + '-refresh').disabled = true; }
     checkout?.clear();
     checkoutService?.clear();
     contactRead++;
@@ -133,9 +138,14 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     element('plan-checkout-check').textContent = review.checkoutCheck;
     element('plan-route-title').textContent = review.title;
     element('plan-route-detail').textContent = review.detail;
-    element('plan-fields').disabled = !review.canSelectPlan;
+    element('plan-fields').disabled = !purchaseEnabled || !review.canSelectPlan;
     element('plan-management').hidden = review.route === 'review';
-    if (!review.canSelectPlan) {
+    if (!purchaseEnabled) {
+      element('plan-route-title').textContent='新規の有料申込は現在停止しています';
+      element('plan-route-detail').textContent='正式公開の準備中です。現在の契約状態は確認でき、契約済みの場合は契約管理をご利用いただけます。';
+      element('plan-checkout').disabled=true;
+      element('plan-selection-status').textContent='新規のお申し込みは受け付けていません。';
+    } else if (!review.canSelectPlan) {
       element('plan-selected-name').textContent = '現在の契約の確認を優先します';
       element('plan-selected-amount').textContent = '上記は新規プランの参考価格です';
       element('plan-selection-status').textContent = 'プラン選択はできません。Webの契約管理の案内またはサポートで現在の契約を確認してください。';
@@ -199,7 +209,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
       if (!destroyed && generation === epoch && request === contactRead && user === currentUser) {
         contactChecking = false;
         element('review-plan').disabled = busy || Boolean(currentUser?.isNewUser) || currentSummary?.appAccountExists !== true;
-        element('plan-checkout').disabled = !checkout || busy || !element('premium-monthly').checked || previewReading || Boolean(previewModel?.portalManageable) || !currentSummary?.planReview?.canSelectPlan;
+        element('plan-checkout').disabled = !purchaseEnabled || !checkout || busy || !element('premium-monthly').checked || previewReading || Boolean(previewModel?.portalManageable) || !currentSummary?.planReview?.canSelectPlan;
       }
     }
   }
@@ -215,7 +225,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
       element('premium-monthly').checked = false;
       element('plan-checkout').disabled = true;
       if (!element('plan-panel').hidden) {
-        element('plan-route-title').textContent = '登録済みのPreview契約を管理してください';
+        element('plan-route-title').textContent = live?'現在の契約を管理してください':'登録済みのPreview契約を管理してください';
         element('plan-route-detail').textContent = '新しい申し込みは行いません。アカウント確認へ戻り、支払方法・請求・解約を管理してください。';
       }
     } else if (currentSummary && !element('plan-panel').hidden) {
@@ -230,17 +240,17 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     clearPortal();
     const returnStatus = element('account-portal-return-status');
     if (fromPortal) { returnStatus.hidden = false; returnStatus.textContent = 'Stripeの契約管理画面から戻りました。契約状態を再確認しています。'; }
-    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix, 'Preview契約状態を確認しています。'); element(prefix + '-refresh').disabled = true; }
+    for (const prefix of previewPrefixes) { clearPreviewBilling(prefix, live?'契約状態を確認しています。':'Preview契約状態を確認しています。'); element(prefix + '-refresh').disabled = true; }
     try {
       const raw = await checkoutService.getPreviewBilling();
       if (destroyed || generation !== epoch || request !== previewRead || !isVerifiedAccountIdentity(currentUser)) return;
-      const model = projectPreviewBilling(raw);
+      const model = projectBilling(raw);
       for (const prefix of previewPrefixes) renderPreviewBilling(prefix, model);
       renderPortal(model);
       if (fromPortal) returnStatus.textContent = 'Stripeの契約管理画面から戻りました。最新の契約状態を読み直しました。反映待ちの場合は、時間をおいて再確認してください。';
     } catch {
       if (destroyed || generation !== epoch || request !== previewRead) return;
-      for (const prefix of previewPrefixes) clearPreviewBilling(prefix, 'Preview契約状態を確認できません。時間をおいて再確認するか、サポートへお問い合わせください。');
+      for (const prefix of previewPrefixes) clearPreviewBilling(prefix, live?'契約状態を確認できません。時間をおいて再確認するか、サポートへお問い合わせください。':'Preview契約状態を確認できません。時間をおいて再確認するか、サポートへお問い合わせください。');
       if (fromPortal) returnStatus.textContent = 'Stripeの契約管理画面から戻りましたが、契約状態を確認できませんでした。時間をおいて再確認してください。';
     } finally {
       if (!destroyed && generation === epoch && request === previewRead) {
@@ -267,7 +277,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     try {
       const response = await checkoutService.createPreviewPortalSession();
       if (destroyed || generation !== epoch || currentBillingRead !== previewRead || !isVerifiedAccountIdentity(currentUser) || !previewModel?.portalManageable) return;
-      const url = projectPreviewPortalSession(response);
+      const url = projectPortal(response);
       // Never put this short-lived destination in DOM, browser storage or logs.
       window.location.assign(url);
       navigating = true;
@@ -496,7 +506,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     if (contactService && previewReading) { status.textContent = '契約状態の確認が終わってからお進みください。'; return; }
     const generation = epoch, user = currentUser;
     // Existing Preview contracts remain manageable without a new contact gate.
-    if (contactService && !previewModel?.portalManageable && !(await checkContactBeforePurchase())) return;
+    if (purchaseEnabled && contactService && !previewModel?.portalManageable && !(await checkContactBeforePurchase())) return;
     if (destroyed || generation !== epoch || currentUser !== user) return;
     // Re-read the same UID-scoped documents; do not rely on stale account text.
     await renderUser(currentUser, { focus: true, plan: true });
@@ -509,7 +519,7 @@ export async function mountAccountPage(service, { checkoutService = null, contac
   element('back-to-account').addEventListener('click', onBack);
   const onPlanChoice = () => {
     const option = element('premium-monthly');
-    if (busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
+    if (!purchaseEnabled || busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || option.value !== PREMIUM_MONTHLY.key) {
       option.checked = false;
       return;
     }
@@ -517,14 +527,14 @@ export async function mountAccountPage(service, { checkoutService = null, contac
     element('plan-selected-name').textContent = PREMIUM_MONTHLY.name;
     element('plan-selected-amount').textContent = `月額${PREMIUM_MONTHLY.taxInclusiveYen}円`;
     element('plan-selection-status').textContent = '月額プランを選択しました。内容の確認のみで、申し込みは行われていません。';
-    element('plan-checkout').disabled = !checkout;
+    element('plan-checkout').disabled = !purchaseEnabled || !checkout;
     // Choosing a plan itself sends no request. Checkout requires a fresh review.
   };
   element('premium-monthly').addEventListener('change', onPlanChoice);
 
   if (checkoutService) checkout = createCheckoutController({service: checkoutService, onShow: () => setPanel('checkout-panel', 'checkout-title'), onBack: () => { if (isVerifiedAccountIdentity(currentUser)) { setPanel('plan-panel', 'plan-title'); void refreshPreviewBilling(); } }, onBillingUpdate: acceptPreviewBilling});
   const onCheckout = async () => {
-    if (busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || !element('premium-monthly').checked) return;
+    if (!purchaseEnabled || busy || contactChecking || !isVerifiedAccountIdentity(currentUser) || currentUser.isNewUser || currentSummary?.appAccountExists !== true || previewReading || previewModel?.portalManageable || !currentSummary?.planReview?.canSelectPlan || !element('premium-monthly').checked) return;
     const generation = epoch, user = currentUser;
     if (contactService && !(await checkContactBeforePurchase())) return;
     if (destroyed || generation !== epoch || currentUser !== user || busy || previewReading || previewModel?.portalManageable || !element('premium-monthly').checked) return;

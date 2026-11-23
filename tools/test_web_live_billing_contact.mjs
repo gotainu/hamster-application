@@ -57,5 +57,6 @@ test('allowed return is fixed to HamCare plan view, without query-selected desti
   assert.match(view,/setAttribute\('href',BILLING_CONTACT_PLAN_RETURN\)/);
   assert.doesNotMatch(entry+view,/get\(['"](?:return|redirect|continue|next)['"]\)|localStorage|sessionStorage|console\./);
   assert.match(account,/deployment\.testMode \? createPreviewCheckoutService/);
-  assert.match(account,/\}\}\) : null/);
+  assert.match(account,/\}\}\) : createLiveCheckoutService/);
+  assert.doesNotMatch(account,/resumeCheckout:deployment\.testMode/);
 });

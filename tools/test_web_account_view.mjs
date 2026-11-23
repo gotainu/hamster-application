@@ -513,3 +513,19 @@ test('contact return query cannot bypass missing verified contact',async()=>{
  const h=await setup({contactService,resumePlan:true});h.emit(h.user);await flush();
  assert.equal(h.el('plan-panel').hidden,true);assert.equal(h.el('plan-checkout').disabled,true);h.cleanup();
 });
+
+const liveRawBilling=()=>({live:true,syncState:'synced',verifiedBinding:true,portalManageable:true,billing:{plan:'paid',status:'active',amount:550,currency:'jpy',interval:'month',cancelAtPeriodEnd:true,currentPeriodEnd:{seconds:1798000000},syncedAtMillis:1795374000000}});
+test('Live intake remains disabled while existing Portal is usable without the stopped contact gate',async()=>{
+ let contacts=0,portals=0;
+ const checkoutService={testMode:false,purchaseEnabled:false,getPreviewBilling:async()=>liveRawBilling(),createPreviewPortalSession:async()=>{portals++;return {ok:true,portalUrl:'https://billing.stripe.com/p/session/live_synthetic'};},clear(){}};
+ const h=await setup({checkoutService,contactService:{environment:'live',clear(){},getStatus:async()=>{contacts++;throw {code:'contact_service_unavailable'};}}});
+ h.emit(h.user);await flush();await flush();assert.equal(h.el('account-portal-open').hidden,false);assert.equal(h.el('account-portal-open').disabled,false);
+ h.el('account-portal-open').dispatch('click');await flush();assert.equal(portals,1);assert.deepEqual(h.navigation,['https://billing.stripe.com/p/session/live_synthetic']);
+ assert.equal(contacts,1);assert.equal(h.el('plan-checkout').disabled,true);h.cleanup();
+});
+test('Live plan conditions remain readable without contact confirmation but new purchase stays closed',async()=>{
+ let reviews=0;
+ const h=await setup({checkoutService:{testMode:false,purchaseEnabled:false,getPreviewBilling:async()=>({live:true,syncState:'none'}),reviewPreviewCheckout:async()=>{reviews++;},clear(){}},contactService:{environment:'live',clear(){},getStatus:async()=>{throw {code:'contact_service_unavailable'};}}});
+ h.emit(h.user);await flush();await flush();h.el('review-plan').dispatch('click');await flush();await flush();assert.equal(h.el('plan-panel').hidden,false);assert.equal(h.el('plan-fields').disabled,true);assert.match(h.el('plan-route-title').textContent,/停止/);
+ h.el('premium-monthly').checked=true;h.el('premium-monthly').dispatch('change');h.el('plan-checkout').dispatch('click');await flush();assert.equal(reviews,0);assert.equal(h.el('plan-checkout').disabled,true);h.cleanup();
+});

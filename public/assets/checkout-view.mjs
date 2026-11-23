@@ -1,9 +1,10 @@
+import {projectLiveCheckoutReview,projectLiveCheckoutSession,projectLiveCheckoutStatus,projectLiveBilling} from './live-checkout-model.mjs';
 import { PREMIUM_MONTHLY } from './plan-model.mjs';
 import { projectCheckoutReview, projectCheckoutSession, projectCheckoutStatus, projectPreviewBilling, checkoutErrorMessage } from './checkout-model.mjs';
 
 let stripeScriptPromise;
 export async function loadStripeSdk(publishableKey) {
-  if (!/^pk_test_[A-Za-z0-9]{8,}$/.test(publishableKey)) throw { code: 'preview/mode-mismatch' };
+  if (!/^pk_(?:test|live)_[A-Za-z0-9]{8,}$/.test(publishableKey)) throw { code: 'preview/mode-mismatch' };
   if (typeof window.Stripe !== 'function') {
     stripeScriptPromise ??= new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -32,6 +33,11 @@ export function renderPreviewBilling(prefix, model) {
 
 /** Tokens stay in the account service. Card fields stay exclusively in Stripe's iframe. */
 export function createCheckoutController({ service, onShow, onBack, loadStripe = loadStripeSdk, onBillingUpdate = () => {}, timers = globalThis }) {
+  const live = service.testMode === false;
+  const projectReview = live ? projectLiveCheckoutReview : projectCheckoutReview;
+  const projectSession = live ? projectLiveCheckoutSession : projectCheckoutSession;
+  const projectStatus = live ? projectLiveCheckoutStatus : projectCheckoutStatus;
+  const projectBilling = live ? projectLiveBilling : projectPreviewBilling;
   const el = id => document.getElementById(id);
   const personal = ['checkout-account-name', 'checkout-account-email', 'checkout-plan-name', 'checkout-amount', 'checkout-card-date', 'checkout-first-charge-date', 'checkout-first-charge-amount', 'checkout-trial-note'];
   const terms = el('checkout-terms');
@@ -52,13 +58,13 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
   const current = generation => !destroyed && epoch === generation;
 
   function controls() {
-    el('checkout-start').disabled = phase !== 'review' || !terms.checked;
+    el('checkout-start').disabled = phase !== 'review' || !terms.checked || (live && service.purchaseEnabled !== true);
     el('checkout-start').hidden = phase !== 'review';
     terms.disabled = phase !== 'review';
     el('checkout-back').disabled = busy();
     el('checkout-cancel').disabled = busy() || !sessionKnown || terminal() || stripeOperationComplete;
     el('checkout-refresh').disabled = busy() || syncRunning || (terminal() && !stripeOperationComplete);
-    el('checkout-refresh').textContent = stripeOperationComplete ? 'Preview契約状態を再確認する' : sessionKnown ? '支払い状況を再確認する' : '申込内容を再確認する';
+    el('checkout-refresh').textContent = stripeOperationComplete ? live ? '契約状態を再確認する' : 'Preview契約状態を再確認する' : sessionKnown ? '支払い状況を再確認する' : '申込内容を再確認する';
     el('checkout-panel').setAttribute('aria-busy', String(busy()));
   }
   function setPhase(value, message = '') {
@@ -93,7 +99,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     epoch++;
     stopBillingSync();
     stripeOperationComplete = false;
-    clearPreviewBilling('checkout-preview');
+    clearPreviewBilling('checkout-preview',live?'契約状態はまだ確認していません。':'Preview契約状態はまだ確認していません。');
     el('checkout-preview-panel').hidden = true;
     destroyEmbedded();
     review = null;
@@ -129,7 +135,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     let attempts = 0;
     const isCurrent = () => current(generation) && run === syncEpoch;
     el('checkout-preview-panel').hidden = false;
-    const pending = projectPreviewBilling({ testMode: true, syncState: 'pending' });
+    const pending = projectBilling(live ? {live:true,syncState:'pending'} : { testMode: true, syncState: 'pending' });
     renderPreviewBilling('checkout-preview', pending);
     el('checkout-result-title').textContent = pending.title;
     el('checkout-result-copy').textContent = pending.copy;
@@ -139,7 +145,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
       if (!isCurrent()) return;
       stopBillingSync();
       el('checkout-result-title').textContent = '契約状態の確認に時間がかかっています';
-      el('checkout-result-copy').textContent = '支払い処理は完了している可能性がありますが、契約状態の確認に時間がかかっています。再確認するか、サポートへお問い合わせください。Preview専用のため、HamCareアプリの本番利用権限には反映されません。';
+      el('checkout-result-copy').textContent = '支払い処理は完了している可能性がありますが、契約状態の確認に時間がかかっています。再確認するか、サポートへお問い合わせください。'+(live ? '' : 'Preview専用のため、HamCareアプリの本番利用権限には反映されません。');
       setPhase('sync-timeout');
     };
     syncDeadlineTimer = timers.setTimeout(timeout, 30000);
@@ -149,10 +155,10 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
       try {
         const raw = await service.getPreviewBilling();
         if (!isCurrent()) return;
-        const model = projectPreviewBilling(raw);
+        const model = projectBilling(raw);
         renderPreviewBilling('checkout-preview', model);
         onBillingUpdate(model);
-        if (model.state === 'synced') {
+        if (model.state === 'synced' && (!live || model.outcome === 'active')) {
           stopBillingSync();
           el('checkout-result-title').textContent = model.title;
           el('checkout-result-copy').textContent = model.copy;
@@ -162,7 +168,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
         }
       } catch {
         if (!isCurrent()) return;
-        clearPreviewBilling('checkout-preview', 'Preview契約状態を取得できません。反映を再確認しています。');
+        clearPreviewBilling('checkout-preview', live ? '契約状態を取得できません。反映を再確認しています。' : 'Preview契約状態を取得できません。反映を再確認しています。');
       }
       if (!isCurrent()) return;
       if (attempts >= 6) { timeout(); return; }
@@ -204,9 +210,9 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     try {
       const response = await service.reviewPreviewCheckout();
       if (!current(generation)) return;
-      review = projectCheckoutReview(response, service.isVerifiedMissingEmailReview);
+      review = projectReview(response, live ? service.isVerifiedResponse : service.isVerifiedMissingEmailReview);
       renderReview(review);
-      setPhase('review', '内容と規約をご確認ください。まだテスト決済は開始していません。');
+      setPhase('review', live ? '内容と規約をご確認ください。まだ支払い操作は開始していません。' : '内容と規約をご確認ください。まだテスト決済は開始していません。');
       el('checkout-title').focus();
     } catch (cause) {
       if (!current(generation)) return;
@@ -221,30 +227,39 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     if (busy()) { completionPending = true; return; }
     const generation = epoch;
     clearError();
-    setPhase('checking', 'Stripe Test Modeの支払い状況を確認しています。');
+    setPhase('checking', live ? '支払い状況と契約の反映を確認しています。' : 'Stripe Test Modeの支払い状況を確認しています。');
     try {
       const response = await service.getPreviewCheckoutStatus();
       if (!current(generation)) return;
-      presentStatus(projectCheckoutStatus(response));
+      presentStatus(projectStatus(response));
     } catch (cause) {
       if (!current(generation)) return;
       setPhase('error');
       showError(cause);
+      if (live) {
+        // A success URL or a stopped status API never establishes payment. Still
+        // read this session's own server billing, without showing purchase success.
+        try {
+          const model=projectBilling(await service.getPreviewBilling());
+          if (!current(generation)) return;
+          el('checkout-preview-panel').hidden=false;renderPreviewBilling('checkout-preview',model);onBillingUpdate(model);
+        } catch { if(current(generation)) clearPreviewBilling('checkout-preview','契約状態を確認できません。アカウントから再確認してください。'); }
+      }
     }
   }
   async function start() {
-    if (destroyed || phase !== 'review' || !review || !terms.checked) return;
+    if (destroyed || phase !== 'review' || !review || !terms.checked || (live && service.purchaseEnabled !== true)) return;
     const generation = epoch;
     const reviewToken = review.reviewToken;
     clearError();
-    setPhase('creating', 'Stripe Test Modeの安全な支払い画面を準備しています。');
+    setPhase('creating', live ? 'Stripeの安全な支払い画面を準備しています。' : 'Stripe Test Modeの安全な支払い画面を準備しています。');
     // A lost response does not prove that the server did not create a Session.
     // From dispatch onward, status/cancel must reconcile the result before return.
     sessionKnown = true;
     try {
       const raw = await service.createPreviewCheckout({ planKey: PREMIUM_MONTHLY.key, reviewToken, termsAccepted: true });
       if (!current(generation)) return;
-      const session = projectCheckoutSession(raw);
+      const session = projectSession(raw);
       const stripe = await loadStripe(session.publishableKey);
       if (!current(generation)) return;
       const instance = await stripe.initEmbeddedCheckout({
@@ -259,7 +274,7 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
       destroyEmbedded();
       embedded = instance;
       el('checkout-payment').hidden = false;
-      setPhase('embedded', 'Stripe Test Modeです。実際のカードは使わず、公式のテスト用カードだけをご利用ください。');
+      setPhase('embedded', live ? 'カード情報はStripeが処理します。申込内容をご確認ください。' : 'Stripe Test Modeです。実際のカードは使わず、公式のテスト用カードだけをご利用ください。');
       embedded.mount(el('checkout-embed'));
       if (completionPending) { completionPending = false; void checkStatus(); }
     } catch (cause) {
@@ -279,11 +294,11 @@ export function createCheckoutController({ service, onShow, onBack, loadStripe =
     const generation = epoch;
     clearError();
     destroyEmbedded();
-    setPhase('canceling', '支払い画面を閉じ、テスト決済の状況を確認しています。');
+    setPhase('canceling', live ? '支払い画面を閉じ、支払い状況を確認しています。' : '支払い画面を閉じ、テスト決済の状況を確認しています。');
     try {
       const response = await service.cancelPreviewCheckout();
       if (!current(generation)) return;
-      const value = projectCheckoutStatus(response);
+      const value = projectStatus(response);
       if (value.state === 'canceled' || value.state === 'expired') {
         if (back) { clear(); await onBack(); } else presentStatus(value);
       } else presentStatus(value);

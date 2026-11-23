@@ -70,6 +70,7 @@ export function projectCheckoutStatus(raw) {
 
 /** Never echo Stripe/Firebase payloads, resource IDs, or arbitrary backend messages. */
 export function checkoutErrorMessage(error) {
+  if (['live/purchase_closed','live/unavailable'].includes(error?.code)) return '新規の有料申込は現在停止しています。契約がある場合は、アカウント画面で現在の状態をご確認ください。';
   if (['contact_verification_required','contact_auth_email_unverified','contact_state_invalid','contact_identity_invalid'].includes(error?.code)) return '有料申込の前に連絡用メールの確認を完了してください。アカウント確認へ戻り、連絡先の状態をご確認ください。';
   const code = typeof error?.code === 'string' ? error.code.split('/').pop().replaceAll('-', '_') : '';
   switch (code) {

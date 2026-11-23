@@ -7,6 +7,8 @@
 - **実行済み設定**：新Acacia/7event endpoint `we_1Uel9zK6h5kxGn4c1ZwNaGlN`を1件作成し直ちにdisabled。旧`we_1U4IAnK6h5kxGn4cDdYtGpsy`はenabled/既存受信処理を維持。完全JSON `HAMCARE_LIVE_WEB_BILLING_CONFIG:1`と既存compute SAへのSecret単体Accessorを登録。Price/Portal再作成なし、旧署名値の新用途流用なし、秘密値はGit/報告へ出さない。
 - **進行区分**：①切替検証中、②Live adapter/画面接続実装中、③app用削除関数の限定配備中（事前の削除要求0件、再試行worker未配備を確認）、④既存成功SDK/署名を再利用して準備中、⑤専用の破棄可能Appleアカウントは未確定・本人確認待ち、⑥App Store Connectの開発者アカウント認証待ち。既存本人/審査/テスターは削除対象にしない。
 - **保持**：連絡先実配送・同UID確認済み保存・復帰の再試験0、contact false/確認済み原本/履歴を維持。通知workerは未配備で一般メールを送らない。0円審査契約はactive・100%forever・最新0円Paid・期間末解約予約なしで再照合。11/27 10:03:01 JSTは現期間末であり自動解約日としない。自然更新後の実績は事前検証と区別する。
+- **②実装・限定検証完了／Hosting待ち**：本番専用Callable envelope/flat DTO adapter、同UIDのbilling再読取、専用Portal、固定success復帰先を接続。URLだけで成功を表示せず、期限切れactiveや保存値だけでも同期完了にしない。Preview fallbackなし。一般購入はclient固定false・画面無効化とserver false/privateの重ね合わせを維持。LP/規約/特商法/Privacyを現行550円・解約/返金方針へ整合し、公開Privacyの既存音声開示5箇所を保持。関連Node407/407、LP静的86/86、Mock画面360/390で横はみ出しなし。独立レビューの期限/Portal URL形式の2点も最小修正済み。実Live決済や完成済み連絡先確認は再試験していない。
+- **静的検査を未解消のまま記録**：account検査172/176。FAILは`server Apple policy binds Admin UID/disabled and exact current token provider`と`server non-Apple policy retains both actual verified-email checks`（共有policyへ抽出/再export後も旧inline文字列を要求）、`production billing/Auth source unchanged functions/src/index.ts`と`production billing/Auth source unchanged functions/src/stripeSubscriptionSync.ts`（旧baselineとの全文一致を要求）。実条件は`webBillingShared.ts`のAdmin UID/disabled/provider/二重verified判定と現行直接testで維持。Syncの差は今回の同tx削除fence用persist接続で、契約条件/権限評価の緩和なし。FAILをPASSとせず、検査無効化もしない。今回の停止Web・同期継続配備を止める欠落は見つかっていない。
 
 ## 2026-11-23 本番550円設定を作成・購入停止版のみ先行配備（審査0円の同期保護で残工程を保留）
 

@@ -16,6 +16,15 @@
 
 コード検証はstrict TypeScript・直接関連291件PASS。旧配備sourceの継続処理と、実在する審査契約の構造だけを使った合成fixture（旧500円/0円Invoice/100%forever/flexible/metadata結合/期間維持/削除fence）を確認した。実ID/UID/受信先/Secretはfixtureや文書へ含めない。ここまでの新規書込みはWebhook/Secret/IAM設定であり、契約/請求変更ではない。正規同期によるbilling/処理記録の更新は承認範囲だが、実行前の本節では未確認として扱う。
 
+### ②本番Webの停止接続（実装完了・Hosting反映前）
+
+- 固定Live Callableは`createStripeCheckoutSession`の`{data:{flow:'web',action,...}}`と`createStripeCustomerPortalSession`の既存protocolを使用。本番専用adapter/DTOを追加し、PreviewのHTTP DTO・Test key・保存先を流用しない。Firebase認証世代と同UIDを毎回確認し、メール・UID・Stripe参照・token・client secretを表示用projectionへ渡さない。Portal bearer URLをDOM/履歴/ログへ保存しない。
+- `LIVE_PURCHASE_ENABLED=false`を固定し、review/createをdispatch前でも拒否、画面にも停止案内を表示。server false/privateと独立した追加の停止であり、URLや画面操作で解除できない。一般受付の別承認時には、このbuild設定もサーバー/対象者制限と合わせて見直す。status/既存billing再読取/Portalは別経路として接続し、連絡先不足だけで既存契約管理を拒否しない。
+- `/billing/success/`は固定`/account/?checkout=return`へ復帰。queryは表示きっかけだけで成功証拠にせず、同UIDのstatusとbillingを再読取する。403/不明/期限切れactiveは完了としない。
+- Hostingは既存45ファイルを基準に11差替え・新assets4、合計49ファイルのoverlay予定。既存34のhashを維持し、contact停止HTML/JSは差替えない。対象はaccount/index、account-view/account/checkout-model/checkout-view、billing/success、LP、Terms、特商法、Support、Privacyと新4module。Privacyは既存の音声に関する5箇所を保持。削除申請ページなど他の既存公開ファイルを一括デプロイで消さない。
+- CSP変更は`/account/**`と`/billing/success/**`だけ。本番の固定Callable2件、既存contact/Auth/Firestore、Stripe SDK/frame/APIに必要な接続に限定し、Preview APIを許可しない。successページは外部通信なしで固定復帰する。既存CSP以外のHosting設定を保持する。
+- 関連Node407/407、LP静的86/86、360/390pxのMock account/planはscrollWidth=clientWidthで表示確認。実Auth/Stripe/メール送信0。account静的172/176で既存policy再export2件・index全文比較・今回Sync全文比較の4件はFAILのまま。正確な検査名と現実装の根拠はPROJECT_STATUS同日欄に記録し、旧baseline不一致だけを消す検査無効化はしない。実画面・本番Hosting結果は反映後に追記する。
+
 ## 2026-11-23 本番550円準備を一部実行（審査用0円契約の同期保護により切替を保留）
 
 本人が`b9d6e160eb940f1d0f6d483d0d7391d882ed44b9`からの設定作成・3関数停止配備・記録を一括承認した。ただし「旧Webhook停止で既存の審査用0円契約等へ影響があれば、その工程と依存変更だけ保留」を実行条件に追加した。開始HEAD/branchは同承認ID/`feature/web-first-stripe-checkout`、開始時clean。以下は実績であり、事前の3関数切替計画を全て実行したとは扱わない。

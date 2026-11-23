@@ -232,3 +232,13 @@ test('back during Webhook wait cancels polling without canceling the completed s
   const x=setup({service:{async getPreviewCheckoutStatus(){return {testMode:true,state:'complete',paymentStatus:'paid'};},async getPreviewBilling(){x.calls.billing++;return {testMode:true,syncState:'pending',billing:null};}}});
   await x.controller.resume();await settle();x.elements['checkout-back'].event();await settle();assert.equal(x.calls.back,1);assert.equal(x.calls.cancel,0);assert.equal(x.clock.tasks.size,0);await x.clock.advance(30000);assert.equal(x.calls.billing,1);
 });
+
+test('Live return rechecks status and own billing; stopped API never becomes purchase success',async()=>{
+ let reads=0,statusReads=0;
+ const x=setup({service:{testMode:false,purchaseEnabled:false,getPreviewCheckoutStatus:async()=>{statusReads++;throw {code:'live/purchase_closed'};},getPreviewBilling:async()=>{reads++;return {live:true,syncState:'none'};}}});
+ await x.controller.resume();assert.equal(statusReads,1);assert.equal(reads,1);assert.match(x.elements['checkout-error'].textContent,/停止/);assert.doesNotMatch(x.elements['checkout-result-title'].textContent,/完了/);assert.equal(x.calls.create.length,0);x.controller.destroy();
+});
+test('Live flat review uses live projector and immutable purchase flag still blocks Session',async()=>{
+ const x=setup({service:{testMode:false,purchaseEnabled:false,reviewPreviewCheckout:async()=>({ok:true,planKey:'premium_monthly',unitAmount:550,currency:'jpy',interval:'month',reviewToken:'synthetic_review_123456789',termsVersion:'web550-v1',maskedEmail:'go***@example.com',nickname:'テスト',chargeTiming:'immediate',firstChargeAtSeconds:1795374000})}});
+ await x.controller.open();assert.equal(x.elements['checkout-account-email'].textContent,'go***@example.com');x.consent();assert.equal(x.elements['checkout-start'].disabled,true);x.elements['checkout-start'].event();await settle();assert.equal(x.calls.create.length,0);x.controller.destroy();
+});

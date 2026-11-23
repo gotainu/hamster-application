@@ -20,6 +20,26 @@ def baseline(path, revision=AUTH_BASE):
 
 def auth_entry_without_checkout(source):
     """Only exact reviewed Checkout/contact mounts and profile reads may differ."""
+    # Normalize only the exact reviewed production adapter integration. Its
+    # transport, gates and CSP receive separate checks below; Auth remains pinned.
+    source=(source
+        .replace("import {createLiveCheckoutService} from './live-checkout-service.mjs';\n", '')
+        .replace("import {configureLiveBillingPage,configurePreviewBillingPage} from './live-checkout-view.mjs';\n", '')
+        .replace('  if (deployment.testMode) configurePreviewBillingPage(); else configureLiveBillingPage();\n', '')
+        .replace("""  // Use an explicit Live adapter; never re-point the Preview transport. Intake
+  // remains closed independently of authentication and contract management.
+""", """  // Live purchase/Portal activation is a separate approved rollout. A canonical
+  // contact flow must never fall back to the Preview billing endpoints.
+""")
+        .replace("""  }}) : createLiveCheckoutService({auth,origin:location.origin,readOwnProfiles:async uid=>{
+    const [owner,pet]=await Promise.all([dbSDK.getDoc(dbSDK.doc(db,'users',uid,'owner_profiles','main')),dbSDK.getDoc(dbSDK.doc(db,'users',uid,'pet_profiles','main_pet'))]);
+    return {ownerExists:owner.exists(),petExists:pet.exists()};
+  },readOwnBilling:async uid=>{
+    const snap=await dbSDK.getDoc(dbSDK.doc(db,'users',uid,'billing','subscription'));
+    return snap.exists()?{kind:'found',data:snap.data()}:{kind:'missing'};
+  }});
+""", '  }}) : null;\n')
+        .replace('resumeCheckout,resumePlan', 'resumeCheckout:deployment.testMode && resumeCheckout,resumePlan'))
     source=(source
         .replace("import { resolveBillingContactEnvironment } from './billing-contact-environment.mjs';\n", '')
         .replace('  const deployment = resolveBillingContactEnvironment(location.origin);\n', '')
@@ -82,7 +102,7 @@ def main():
     check('no custom card controls or signup form',not re.search(r'type=["\'](?:tel|number)["\']|createUserWithEmailAndPassword|card-number',html) and not any(re.search(r'cc-number|cc-exp|cc-csc|cvc',json.dumps(a),re.I) for t,a in nodes if t in {'input','select','textarea'}))
     check('only original inputs and scoped Checkout/Apple consent checkboxes', {(a.get('id'),a.get('type')) for t,a in nodes if t=='input'} == {('email','email'),('password','password'),('premium-monthly','radio'),('checkout-terms','checkbox'),('apple-linking-consent','checkbox')})
     check('only original login form', [a.get('id') for t,a in nodes if t=='form']==['email-form'])
-    scripts=sorted((PUBLIC/'assets').glob('account*.mjs'))+sorted((PUBLIC/'assets').glob('plan*.mjs'))+sorted((PUBLIC/'assets').glob('checkout*.mjs'))+sorted((PUBLIC/'assets').glob('billing-contact*.mjs'))+[PUBLIC/'assets/firebase-web-config.mjs']
+    scripts=sorted((PUBLIC/'assets').glob('account*.mjs'))+sorted((PUBLIC/'assets').glob('plan*.mjs'))+sorted((PUBLIC/'assets').glob('checkout*.mjs'))+sorted((PUBLIC/'assets').glob('billing-contact*.mjs'))+sorted((PUBLIC/'assets').glob('live-checkout*.mjs'))+[PUBLIC/'assets/billing-return.mjs']+[PUBLIC/'assets/firebase-web-config.mjs']
     code='\n'.join(p.read_text() for p in scripts)
     check('no business writers or linking',not re.search(r'\b(?:setDoc|updateDoc|addDoc|deleteDoc|writeBatch|runTransaction|httpsCallable|linkWithCredential|linkWithPopup|createUserWithEmailAndPassword|sendEmailVerification|sendPasswordResetEmail)\s*\(',code))
     auth_service=(PUBLIC/'assets/account-service.mjs').read_text()
@@ -92,11 +112,11 @@ def main():
     storage_calls=re.findall(r'(?:appleContext\.)?storage\??\.(?:getItem|setItem|removeItem)\(([^)]*)\)',auth_service)
     check('every consent storage access uses its one fixed key',bool(storage_calls) and all(arguments.split(',')[0].strip()=='APPLE_REDIRECT_CONSENT_KEY' for arguments in storage_calls))
     check('no credential or error logging',not re.search(r'console\s*\.|onLog\s*\(',code))
-    non_checkout='\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','checkout-view.mjs','billing-contact-service.mjs','billing-contact-environment.mjs'})
+    non_checkout='\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','checkout-view.mjs','billing-contact-service.mjs','billing-contact-environment.mjs','live-checkout-service.mjs'})
     check('no business API outside isolated Checkout/contact modules',not re.search(r'checkout\.stripe|api\.stripe|firebase-functions|firebase-analytics|cloudfunctions\.net|run\.app',non_checkout))
     check('no direct Stripe API or Analytics',not re.search(r'api\.stripe|firebase-functions|firebase-analytics',code))
     network=r'\b(?:fetch|fetchRequest|XMLHttpRequest|WebSocket|EventSource)\s*\(|\.sendBeacon\s*\('
-    check('backend transport exists only in fixed Checkout/contact services',not re.search(network,'\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','billing-contact-service.mjs'})))
+    check('backend transport exists only in fixed Checkout/contact services',not re.search(network,'\n'.join(p.read_text() for p in scripts if p.name not in {'checkout-service.mjs','billing-contact-service.mjs','live-checkout-service.mjs'})))
     check('no secret keys or real Price/Product IDs in public modules',not re.search(r'\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{12,}\b|\b(?:price|prod)_[A-Z0-9][A-Za-z0-9]{7,}\b',code))
     check('no permanent test card numbers in public modules',not re.search(r'\b(?:4242424242424242|4000002500003155|4000000000000002)\b',code))
     check('standard session persistence only','browserSessionPersistence' in code and 'browserLocalPersistence' not in code)
@@ -122,7 +142,7 @@ def main():
     check('Task7 does not change Preview CSP or hosting configuration',(ROOT/'firebase.preview.json').read_bytes()==baseline('firebase.preview.json',APPLE_BASE))
     entry=(PUBLIC/'assets/account.mjs').read_text()
     check('Auth entry unchanged except exact Checkout/contact mounts, profile reads and Apple opt-in',auth_entry_without_checkout(entry)==baseline('public/assets/account.mjs').decode())
-    check('real account entry always supplies environment-bound verified contact service',all(value in entry for value in ("import { createBillingContactService } from './billing-contact-service.mjs';",'createBillingContactService({auth,environment:deployment.environment,origin:location.origin})','await mountAccountPage(service, {checkoutService, contactService, resumeCheckout:deployment.testMode && resumeCheckout,resumePlan});','deployment.testMode ? createPreviewCheckoutService')))
+    check('real account entry always supplies environment-bound verified contact service',all(value in entry for value in ("import { createBillingContactService } from './billing-contact-service.mjs';",'createBillingContactService({auth,environment:deployment.environment,origin:location.origin})','await mountAccountPage(service, {checkoutService, contactService, resumeCheckout,resumePlan});','deployment.testMode ? createPreviewCheckoutService')))
     check('configured Apple provider is explicitly enabled only at the public entry','appleSignInEnabled: true' in entry and 'appleSignInEnabled: false' not in entry and entry.count('appleSignInEnabled:')==1)
     apple=next((a for t,a in nodes if t=='button' and a.get('id')=='apple-signin'),{})
     check('Apple button is a disabled official local image with safe explanation',apple.get('type')=='button' and 'disabled' in apple and 'apple-signin-note' in apple.get('aria-describedby','').split() and any(t=='img' and a.get('src')=='/assets/landing/apple-sign-in-ja.png' and a.get('alt')=='Appleでサインイン' for t,a in nodes))
@@ -222,8 +242,24 @@ def main():
     check('fixed Auth and Stripe payment frames',original_frames|{'https://js.stripe.com'} <= actual_frames <= approved_frames)
     check('image origins limited to local and Stripe',set(directives.get('img-src',[]))=={"'self'",'https://*.stripe.com'})
     check('auth CSP is isolated from landing',any(r['source']=='/' and any(h['key']=='Content-Security-Policy' and "connect-src 'none'" in h['value'] for h in r['headers']) for r in rules))
-    for path in ['firebase.json','firestore.rules','functions/package.json','functions/package-lock.json','functions/src/index.ts','functions/src/stripeSubscriptionSync.ts','functions/src/stripeSubscriptionPriority.ts','functions/src/featureTrials.ts','functions/src/trialPolicy.ts']:
+    for path in ['firestore.rules','functions/package.json','functions/package-lock.json','functions/src/index.ts','functions/src/stripeSubscriptionSync.ts','functions/src/stripeSubscriptionPriority.ts','functions/src/featureTrials.ts','functions/src/trialPolicy.ts']:
         check('production billing/Auth source unchanged '+path,(ROOT/path).read_bytes()==baseline(path,CHECKOUT_BASE))
+    # Production connection adds scoped headers only. Preview rules and all
+    # non-Hosting configuration retain their reviewed authority.
+    production=json.loads((ROOT/'firebase.json').read_text())
+    previous=json.loads(baseline('firebase.json',CHECKOUT_BASE))
+    without_headers=json.loads(json.dumps(production));without_headers['hosting'].pop('headers',None)
+    check('production non-CSP configuration unchanged',without_headers==previous)
+    live_rules=production['hosting'].get('headers',[])
+    check('production CSP limited to account and fixed success return', [r.get('source') for r in live_rules]==['/account/**','/billing/success/**'])
+    live_headers={h['key']:h['value'] for h in live_rules[0]['headers']}
+    live_directives={p[0]:set(p[1:]) for d in live_headers['Content-Security-Policy'].split(';') if (p:=d.split())}
+    live_endpoints={'https://asia-northeast1-hamster-breeding-app.cloudfunctions.net/'+name for name in ['createStripeCheckoutSession','createStripeCustomerPortalSession']}
+    check('production CSP exact Live and Auth/Stripe connect allowlist',live_directives.get('connect-src')==original_connect|live_endpoints|{'https://asia-northeast1-hamster-breeding-app.cloudfunctions.net/billingContactEmail/','https://api.stripe.com','https://checkout.stripe.com'})
+    check('production CSP preserves narrow SDK and iframe allowlists',live_directives.get('script-src')==set(directives['script-src']) and live_directives.get('frame-src')==set(directives['frame-src']) and all(live_directives.get(k)=={"'none'"} for k in ['default-src','base-uri','form-action','frame-ancestors','object-src']))
+    live_service=(PUBLIC/'assets/live-checkout-service.mjs').read_text()
+    check('Live adapter endpoints are fixed and intake explicitly closed', all(value in live_service for value in ("origin !== LIVE_ORIGIN",'export const LIVE_PURCHASE_ENABLED = false',"['review','create'].includes(action)","body:JSON.stringify({data:portal ? {} : {flow:'web',action,...extra}})")) and live_service.count('.cloudfunctions.net/')==2)
+    check('Live adapter uses same-UID billing and no identifiers as request input', all(value in live_service for value in ('readOwnBilling(context.uid)','b.firebaseUid !== context.uid','auth.currentUser === user','auth.currentUser?.uid === uid',"proofs=new WeakMap()")) and not re.search(r'localStorage|sessionStorage|console\.|setDoc|updateDoc|new URLSearchParams',live_service))
     backend=(ROOT/'preview-functions/src/index.ts').read_text()
     engine=(ROOT/'preview-functions/src/engine.ts').read_text()
     portal=(ROOT/'preview-functions/src/portal.ts').read_text()
