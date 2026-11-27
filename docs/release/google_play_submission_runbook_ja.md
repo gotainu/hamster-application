@@ -1,5 +1,48 @@
 # Hamster Care Google Play登録手順
 
+## 2026-11-27 現在のAlpha・製品版アクセス・iOS build6との差分（読み取りのみ）
+
+対象`com.gotainu.hamster`。12:11 JSTまでに既存Dashboard/Alpha/テスター数/製品版/Bundle Explorerを読み取った。申請・保存・新リリース・AAB作成/配信・一般公開は実行しない。以下が現在の正本で、旧11/9のAlpha未送信・旧11/21の実装待ちは当時の記録として保持する。
+
+| 確認項目 | 現在確認できた状態 |
+|---|---|
+| 実opt-in | 少なくとも12人。Dashboardの12人以上opt-inタスク完了。今回確認した画面に正確な現在人数は非表示であり、正確な人数は未確認 |
+| 12人以上・14日以上 | 両タスク完了（Console判定）。各人の継続日数や達成日を推定しない |
+| 製品版アクセス申請可否 | 「本番環境へのアクセスを申請」ボタン有効。今回は押さない |
+| 申請・承認 | 製品版画面は「製品版へのアクセスがまだありません」。申請中/承認済み表示なし、アクセス未付与。過去の申請履歴全体を調査済みとはしない |
+| 現Alpha | 有効、日本1か国、`5 (1.0.1) UI polish Alpha`、選択テスターに公開。Alpha画面の公開時刻は11/9 20:10 |
+| 配信バンドル | `5.aab (1.0.1)`、versionCode5、versionName1.0.1、artifactId`4860249410283073647`、minSdk24/targetSdk36 |
+| Android固定元 | `402737048c36b0e592475c764fe05a25abf0454b` |
+| iOS承認版固定元 | `54970b2802f8fcc483b336186149bea32baae42d`、1.0.1(6)。11/24 16:19 JST承認メール受領は本人報告。手動公開/一般公開保留 |
+
+Alpha用許可リスト27人、internal-testers1人は配信対象リストの登録数であり、実opt-in28人とは扱わない。重複除外済みの総数でもない。招待・メール送信済み人数やインストール数を実opt-inへ代用しない。
+
+Android AABの既存記録は`hamcare-1.0.1-code5-ui-polish-signed.aab`、172,392,335 bytes、SHA256 `49d8019de8d3cf44bdd09c72515cc95d9908d5cc5bb58aeb276042617f651171`。既存固定入力manifest/署名/88PNG/lock一致の結果を再利用し、今回再build・再署名・再テストは行わない。11/9内部track code5公開と、当時のAlpha未送信は別の履歴で、本日のAlpha公開実読を現在値とする。
+
+### iOS build6までの共通Flutter改修の反映状況
+
+`4027370`→`54970b2`の共通Flutter差分は15ファイル、次の4コミット。`android/`・`ios/`・assets/icons・pubspec/lock差分は0であり、今回の共通差分を取り込むためのSDK更新は不要。
+
+| 機能 | 既存の導入コミット・主な対象 | 現Alpha code5 |
+|---|---|---|
+| 購入CTA/価格/Checkout/Web誘導撤去 | `d23820c42c4b`。利用状況画面、PaidFeatureGate/Guard、Settings/Tabs/レポート/クイック記録等 | 未反映 |
+| Customer Portal入口撤去 | `6e85a3c25640`。Settings/利用状況画面 | 未反映 |
+| 復帰時の契約状態再取得・再確認 | `d23820c42c4b`。同UIDのstream再購読、利用状況の読取専用UI/再確認 | 追加改善は未反映。元のBillingStatusRepo/model・21日体験読取は両版で同一 |
+| Stripe停止を含む有料削除の画面接続 | `e1fe0524dbb9`。settings/account_delete_service/account_deletion_guard | clientの課金停止説明/同意flag/長時間処理・再試行表示は未反映 |
+| Apple連携ユーザーの削除処理 | `6940aec7ca6d`。apple_account_deletion_service/settings | 未反映。自動失効APIはiOS/macOS限定、AndroidのApple連携ユーザーは手動解除案内。非Appleユーザーに再認証を要求しない |
+
+共有本番の`deleteMyAccountAndData`/`retryAccountDeletions`は11/23に`54970b2`から配備済み。旧Androidも同じCallableを呼ぶので、サーバーのStripe照合・停止確認・排他・fence/retryは適用される。ただし旧clientは`stopBillingConfirmed`を送らず、該当有料契約では`paid_confirmation_required`で削除を安全停止する。したがって「backend済み＝Android有料削除フロー済み」とせず、無料ユーザーの既存処理と区別する。今回有料契約・削除・権限・テスターを変更していない。
+
+### Android正式候補へ残る作業（今回未実行）
+
+1. 上記実装済み共通改修を含むソースを固定し、Playの使用済みversionCodeを照合して新番号を決定する。6を未使用と決めつけない。
+2. 既存署名/Bundle ID/lockを再利用してAABを作成し、source/署名/manifestを照合する。共通コードの再実装や既存全E2Eのやり直しは不要。
+3. 後続のテスト配信でAndroidに関係する更新保持、購入/価格/Portal/Web誘導なし、復帰時状態再取得、削除説明・同意・再試行表示を限定確認する。実削除が必要なら破棄承認済みの専用UIDに限定する。iOSのApple失効失敗後再開はMock-onlyという残件を実機PASSへ変えない。
+4. 掲載/画像/Data safety/公開Web削除URL/審査用情報・戦略C説明を候補AABの差分に合わせて確認する。現code5のConsoleにedge-to-edge注意表示があるため後続Android表示確認へ含めるが、今回新たな不具合確定/修正/SDK更新はしない。
+5. 条件達成と製品版アクセス付与を分離し、テスト内容/フィードバック/公開準備の申請回答を用意する。本人承認後にアクセス申請し、承認後に正式提出・一般公開を別判断で進める。Appleの今回build承認をGoogleの承認へ代用しない。
+
+証拠はGit外`/private/tmp/hamcare-release-state-20261127/`のsafe JSONと4画面。確認URL：[Dashboard](https://play.google.com/console/u/0/developers/7040110575286467511/app/4976014731630589144/app-dashboard)、[Alpha](https://play.google.com/console/u/0/developers/7040110575286467511/app/4976014731630589144/tracks/4700032976627342279)、[製品版](https://play.google.com/console/u/0/developers/7040110575286467511/app/4976014731630589144/tracks/production)。今回は読み取りと既存文書の更新だけで、一般購入/一般メール停止、既存の正規同期・無料体験・テスター権限を維持する。
+
 ## 2026-11-21 残存方針の確定（未提出・未配備）
 
 価格は月額550円、返金は「利用者都合による支払済み料金の返金は原則として行いません。ただし、重複課金、当方のシステムによる誤請求、その他法令上返金が必要となる場合は個別に対応します。」に確定。期間末解約・期限まで利用・次回請求停止・日割りなしを返金と分離する。特商法は請求開示方式、窓口は既存Gmail、VOは不要。認証はFirebase、重要な契約/サポート通知はGmail APIを初回採用するが、本番通知は未実装。Relay実配送未確認は非ブロッキング。旧Live500円と既存契約は保持、新550円Priceは別承認後の新規申込だけへ。
@@ -8,7 +51,7 @@
 
 
 <!-- hamcare-pricing-play-gate-20261119:start -->
-## 2026-11-21 現在の提出ゲート：戦略C草案・提出不可
+## 2026-11-21時点の提出ゲート（履歴）：戦略C草案・提出不可
 
 本手順書の以下の節は作業当時の記録を含みます。今回の変更は公開前文面の整合だけで、Google Play Consoleへの保存・審査送信・既存Alpha更新・一般公開を行いません。
 

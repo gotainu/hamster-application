@@ -1,7 +1,13 @@
 # HamCare iOS署名・実機認証準備（2026-10-18）
 
+## 2026-11-27 現在地：iOS 1.0.1 (6) 審査通過済み・一般公開は保留
+
+- **審査承認**：本人から、Appleの審査承認メールを **2026-11-24 16:19 JST** に受領したと正式報告を受けた。Ham Care iOS `1.0.1 (6)`は審査通過済みとして管理する。根拠は本人のメール受領報告であり、今回App Store Connectの審査状態を独立再取得したものではない。`Pending Developer Release`の実画面を確認済みとは扱わない。
+- **対象と公開境界**：build6の元ソースは`54970b2802f8fcc483b336186149bea32baae42d`、提出IDは`7cb33b63-2b1e-45ab-aba8-2e07247d1490`。前回確認した手動公開の設定を維持し、一般公開はまだ行わない。購入受付・一般メール送信の停止、既存テスター・体験・契約・権限を変更しない。
+- **今回の範囲**：既存リリース記録の更新だけ。完了済み試験の再実行、新build・再送信・公開・ストア/バックエンド設定変更は0。以下の11/23の`Waiting for Review`・承認未確認は送信時点の履歴であり、現在の審査通過状態に優先しない。11/23の送信日時・元コミット・限定検証の根拠は履歴として保持する。
+
 <!-- hamcare-apple-submit-build6-20261123:start -->
-## 2026-11-23 iOS 1.0.1 (6) App Review送信完了（Waiting for Review・手動公開）
+## 2026-11-23 iOS 1.0.1 (6) App Review送信完了（当時の履歴：Waiting for Review・手動公開）
 
 - **App Review実送信完了**：本人が`80077499a75c`の提出準備完了を承認した後、Ham Care / iOS `1.0.1 (6)`を2026-11-23 **18:17 JST**にSubmit for Reviewで1回送信した。Add for Review→Ready for Reviewは中間状態であり、続く`1 Item Submitted`をDOMで確認、Version画面の`Waiting for Review`と提出詳細の`Items Submitted (1)`/`1.0.1 (6)`/`Waiting for Review`を確認して実送信完了とした。Date Submittedの実表示は`Nov 23, 2026 at 6:17 PM`。Submission IDは`7cb33b63-2b1e-45ab-aba8-2e07247d1490`、[提出詳細](https://appstoreconnect.apple.com/apps/6826783734/distribution/reviewsubmissions/details/7cb33b63-2b1e-45ab-aba8-2e07247d1490)。主証跡はGit外`/private/tmp/hamcare-app-review-submit-20261123/submission-details.jpg`と`submission-result-safe.json`。`submit-confirmation.jpg`も提出詳細画面の保存であり、`1 Item Submitted`ダイアログ画像とは扱わない。
 - **送信時の境界**：送信直前・直後のVersion画面で`Manually release this version`選択を確認し、手動公開を維持。保存済みbuild/掲載文/現行3画像/App Privacy/Content Rights/審査資格情報/Review Notesを使用し、再編集・再撮影・再buildは0。⑤の正常削除と本人Apple連携消失は既存記録だけを照合し、⑤に関する再試験/追加の本人確認は0。ASCのセッション切れは本人の管理用再サインインで解消した。今回の送信工程ではCloud/Stripe/業務データ操作/他ストア変更/merge/pushは0であり、先行⑤の承認済み実削除1UIDを取り消す記録ではない。一般購入false/private、一般メール停止、審査用0円契約・既存正規Webhook同期・無料テスター等の既存設定は維持。送信を妨げるエラーや対象の未送信項目はなし。審査開始/承認は未確認、一般公開は未実施で、審査開始/結果を待たず本工程を完了する。
