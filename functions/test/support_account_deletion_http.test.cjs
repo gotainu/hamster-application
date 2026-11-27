@@ -4,6 +4,56 @@ const {fakeFirestore,loadStarSource}=require('./support/star_source_loader.cjs')
 const load=loadStarSource();
 const {createSupportDeletionHttp,SUPPORT_DELETION_ORIGIN}=load('supportAccountDeletionHttp');
 const {createSupportDeletion}=load('supportAccountDeletion');
+// Execute the real native declarations, including their pre-handler guards.
+// Loading only the factory would miss failures before supportDeletion is called.
+function nativeWrapper(name,runtime) {
+  const ts=require('typescript'),vm=require('node:vm');
+  const filename=path.join(__dirname,'../src/index.ts');
+  const source=ts.createSourceFile(filename,fs.readFileSync(filename,'utf8'),ts.ScriptTarget.Latest,true);
+  const declaration=source.statements.filter(ts.isVariableStatement)
+    .flatMap(statement=>[...statement.declarationList.declarations])
+    .find(node=>ts.isIdentifier(node.name)&&node.name.text===name);
+  assert.ok(declaration&&ts.isCallExpression(declaration.initializer));
+  assert.equal(declaration.initializer.expression.getText(source),'onRequest');
+  assert.equal(declaration.initializer.arguments.length,2);
+  assert.ok(ts.isArrowFunction(declaration.initializer.arguments[1]));
+  const compiled=ts.transpileModule('const '+declaration.getText(source)+'; module.exports = '+name+';',
+    {compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText;
+  const module={exports:{}};
+  vm.runInNewContext(compiled,{module,supportDeletion:runtime,SUPPORT_DELETION_ORIGIN,
+    LIVE_WEB_BILLING_CONFIG:{},onRequest:(_options,handler)=>handler},{filename,timeout:1000});
+  return module.exports;
+}
+for(const [name,route] of [['confirmSupportAccountDeletion','confirm'],['supportAccountDeletionOperator','operator']]) {
+  test('native HTTP wrapper: '+name+' handles absent rawBody and keeps size/auth guards',async()=>{
+    let enabled=true,entered=0;
+    const forbidden=()=>assert.fail('No authentication, storage or deletion expected');
+    const runtime=createSupportDeletionHttp({enabled:()=>{entered++;return enabled;},
+      core:{db:{doc:forbidden},getUser:forbidden,runDeletion:forbidden,resumeDeletion:forbidden},
+      auth:{verifyIdToken:forbidden,getUser:forbidden}});
+    const handler=nativeWrapper(name,runtime);
+    const headers={origin:SUPPORT_DELETION_ORIGIN};
+    const invoke=async request=>{
+      const response={code:200,headers:{},set(key,value){this.headers[key]=value;return this;},
+        status(code){this.code=code;return this;},json(body){this.body=body;return this;}};
+      await handler(request,response);
+      assert.equal(response.headers['Cache-Control'],'no-store, max-age=0');
+      return response;
+    };
+    for(const method of ['GET','POST']) {
+      const request={method,headers,query:{}};
+      assert.equal((await invoke(request)).code,400);
+      enabled=false;assert.equal((await invoke(request)).code,503);enabled=true;
+    }
+    const before=entered;
+    assert.equal((await invoke({method:'POST',headers,query:{},rawBody:Buffer.alloc(4097)})).code,400);
+    assert.equal(entered,before,'Oversized input must stop before the factory');
+    const body=route==='confirm'?{action:'inspect',requestId:'0'.repeat(48),proof:'0'.repeat(64)}:
+      {action:'execute',requestId:'0'.repeat(48)};
+    assert.equal((await invoke({method:'POST',headers,query:{},body,rawBody:Buffer.from(JSON.stringify(body))})).code,
+      route==='confirm'?401:400);
+  });
+}
 async function fixture(apple=false) {
   let now=1_795_305_600_000,calls=[];
   const {db}=fakeFirestore();const uid='synthetic-existing';

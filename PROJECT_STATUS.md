@@ -1,5 +1,10 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 ⑥削除後段の反映・⑦GitHub保存（継続中）
+
+- **承認済み範囲の続行**：本人が削除申請後段2API/確認ページ・manual_review追加1回の本番反映と、既存68commit/286fileのmain統合/pushを承認。実削除/実メール/一般購入・一般送信は含めず、12/3 19:05 JST後の本人Live550円・通知1件は別承認待ち。
+- **mainの保存**：別worktreeで`fc8051c02de9`の68commit/286fileをfast-forwardし、**16:28:12 JST**にGitHub mainへ通常push・実remote hash一致。既存mainとremote変更を保護し、GitHub Actions workflow/Webhooks/Apps/Environments/Pagesとlocal hookに自動本番配備経路なしを確認。元source tag/bundle/dirty20files不変。今回の直接修正・実行記録は確定後に差分だけ追加統合する。
+- **限定配備と新しい入口不具合**：fc805から既存削除2関数と新support2APIを限定配備し、専用SA/単体IAM・初回停止503/正常起動を確認した。active無害probeの本文なしGETで新confirm wrapperの`req.rawBody.length`が500になったため、Hosting未反映のままconfirmの公開Invokerを一時除去。Firestore4collectionの前後fingerprint不変、実申請作成/削除/送信0。新2wrapper各1行だけをoptional rawBody参照へ修正し、実index.ts宣言ASTからcallbackを実行する新2件がPASS（既存9件skip）、差分検査PASS。既存core/認証・Stripe停止/権限は変更せず、この修正を新2APIだけ再反映してから公開を続ける。初回500をPASSへ読み替えない。
 ## 2026-11-27 ⑤通知停止配備完了・⑥運用準備・⑦Git統合準備
 
 - **今回の到達点**：`3cd9469`を基準に承認された通知worker/Secret/限定IAM/Schedulerの停止配備と正常callback確認が完了。④の本人Live550円は**2026-12-03 19:05 JSTの正規体験自然終了後**に行う方針で、今回は決済/実メール0。購入private/masterfalse/scopeclosed、contact送信false/statusfalse、一般通知false/closed/PAUSEDを維持。Apple承認・手動公開、Android Alpha code6/製品版アクセス申請審査待ちの状態は変更していない。

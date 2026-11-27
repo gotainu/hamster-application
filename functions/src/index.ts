@@ -1640,7 +1640,7 @@ export const confirmSupportAccountDeletion = onRequest(
   async(req,res)=>{
     res.set('Cache-Control','no-store, max-age=0');
     res.set('Referrer-Policy','no-referrer');
-    if(req.rawBody.length>4096) {res.status(400).json({ok:false});return;}
+    if((req.rawBody?.length ?? 0)>4096) {res.status(400).json({ok:false});return;}
     const reply=await supportDeletion.confirm(req);
     res.status(reply.status).json(reply.body);
   },
@@ -1650,7 +1650,7 @@ export const supportAccountDeletionOperator = onRequest(
     memory:'1GiB',secrets:[LIVE_WEB_BILLING_CONFIG],cors:false},
   async(req,res)=>{
     res.set('Cache-Control','no-store, max-age=0');
-    if(req.rawBody.length>4096) {res.status(400).json({ok:false});return;}
+    if((req.rawBody?.length ?? 0)>4096) {res.status(400).json({ok:false});return;}
     const reply=await supportDeletion.operator(req);
     res.status(reply.status).json(reply.body);
   },
