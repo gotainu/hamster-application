@@ -1,6 +1,6 @@
-# 契約通知outboxとGmail Worker（2026-11-21・本番未配備）
+# 契約通知outboxとGmail Worker（2026-11-27・本番停止配備済み）
 
-開始点は承認済み`81ac23933fda`。本書は今回の通知実装に限った設計・運用記録であり、[本番切替Runbook](web_billing_live_cutover_runbook_ja.md)の実行承認ではない。本番Functions、Live Stripe、live Hosting、Flutter、ストアは変更しない。外部テスターへ送信せず、Previewの実送信は本人所有UIDと宛先だけに限定する。最終テスト件数と5種類各1通の実送信結果は、確認後に本書末尾と`PROJECT_STATUS.md`へ記録する。
+開始点は承認済み`81ac23933fda`。11/21の設計/Preview配送と11/27の停止本番配備を区別する。最新の実行範囲・状態は本節と[既存Runbook](web_billing_live_cutover_runbook_ja.md)を正本とし、旧「本番未配備/変更しない」は当時の記録。**一般送信/実Live通知は未開始**、Preview5通/本番連絡先確認の受信をLive通知配送の根拠へ転用しない。
 
 ## 2026-11-27 停止配備と本人向けLive通知1件の準備
 
@@ -9,13 +9,23 @@
 - **新しい通知scope**：`HAMCARE_BILLING_NOTIFICATIONS_SCOPE=closed|limited|general`を明示。未設定/closedとoverall enabled=falseはSecret値/Auth/outbox/予算/Gmailの前で停止。generalは既存の固定`HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS`を必須とし、limited用の5値が残る場合は拒否する。
 - **本人1通知だけ**：limitedは`HAMCARE_BILLING_NOTIFICATIONS_LIMITED_NOT_BEFORE_MILLIS`/`...LIMITED_EXPIRES_AT_MILLIS`（UTC秒境界・最大6時間）、`...LIMITED_UID_SHA256`/`...LIMITED_RECIPIENT_SHA256`各1件、`...LIMITED_NOTIFICATION_ID`（正規outboxの既存64hex ID1件）を必須化。通知種別は`contract_registered`固定、日次枠1、batch1。一般cutoffを読まず・消費せず、期限切れ/欠損/不正からgeneralへfallbackしない。
 - **queueと送信境界**：limitedは対象1文書だけをGETし、他UID/他ID/別通知種別/Preview/古い・不明event/期限外をclaimせず変更しない。transaction内とsend intent後、OAuth後の不可逆Gmail HTTP直前も同じUID/確認済み現在宛先/選択doc/期限を再照合する。既存予算・lease・送信済み/uncertainによる再送抑止をそのまま使う。一般queueのscan/移行/削除/新Indexは不要。
-- **本人が支払う日の手順**：本人の決済開始前に専用開始時刻Bを記録する。実決済→署名Webhook→同UID active同期後、正規producerが作った契約開始通知1件をread-only照合し、本人UID/確認済み宛先/IDを非公開固定する。実送信の明示承認後にだけ、Scheduler PAUSEDのままlimited・有限window・日次1で認証付き手動実行1回を行い、受信/ブランド/本文550円/スマホ表示を本人確認する。Gmail受付だけで配送完了としない。終了/失敗/不明時はenabledfalse/scopeclosedへ戻し、未知結果を安易に再送しない。現在は日時/hash/ID未設定で、実送信0。
+- **本人が支払う日の手順**：本人の決済開始前に専用開始時刻Bを記録する。実決済→署名Webhook→同UID active同期後、正規producerが作った契約開始通知1件をread-only照合し、本人UID/確認済み宛先/IDを非公開固定する。実送信の明示承認後にだけ、通常はScheduler PAUSEDを維持した認証付き直接呼出しで、limited・有限window・日次1の手動実行1回を行い、受信/ブランド/本文550円/スマホ表示を本人確認する。Gmail受付だけで配送完了としない。終了/失敗/不明時はenabledfalse/scopeclosedへ戻し、未知結果を安易に再送しない。現在は日時/hash/ID未設定で、実送信0。
 - **一般開始とは分ける**：本人の契約開始通知1件のsent記録は維持する。本人決済/期間末解約等の他の通知を一般開始時に一括後送せず、一般用Tを本人の最終eventより厳密に後へ固定する既存手順を維持する。一般開始はexplicit general＋limited5値除去＋固定T＋別承認が必要で、limitedの期限が来ても開始しない。
 - **停止配備の固定値**：worker enabled=false/scope=closed、一般T/limited5値未設定、日次50、Secret固定v4を使用する。contactは既存送信false/statusfalse/v3/日次1を維持し、一般連絡先開始時にv4/共通50へ合わせる。v4は既存Live送信専用資格情報を再利用した正規schemaで、旧本人限定contact markerだけを除去。旧Secret/Preview/認可/履歴を消さない。Secretのenabled=trueは独立flagの送信許可ではない。
 
-変更したDispatcher15件＋新limited40件＝55件PASS。加えて変更箇所に直結する既存Runtime3ケースだけを選びPASS（他46件は未実行）。これはMock/ローカルの結果で、Live配送・worker正常起動・停止配備のPASSではない。実配備結果は確認後にこの節へ追記する。
+変更したDispatcher15件＋新limited40件＝55件PASS。加えて変更箇所に直結する既存Runtime3ケースだけを選びPASS（他46件は未実行）。これはMock/ローカルの結果で、Live配送のPASSではない。隔離strict型検査/配備compileもPASS。以下の実停止callbackとは根拠を分ける。
 
-## 2026-11-27 本番稼働前の追加安全制御（ローカル完了・配備未実行）
+### 停止本番反映の実績（11月27日）
+
+- **正規Live mail v4**を15:44:58 JSTに既存Live v3の資格情報をメモリ内再利用して登録。Secret値/認可は変更せず、Previewと旧版を保持、既存Secret単体Accessorのまま。contactはv3/日次1/sendfalse/statusfalseを維持。
+- producer `stripeWebhook`を`3cd9469`から**`stripewebhook-00014-zop`**へ限定更新（15:47:04〜15:48:02 JST）。既存正常同期/署名・API版/3Secret参照/主要同期7source/IAM/resources不変、ACTIVE/Ready・170hash一致。不正署名400だけ確認し、実event再処理は行わない。
+- worker `processBillingNotificationOutbox`を**`6d88f870ecf4430b972e31a7582cc628e12e8bf9`**から**`processbillingnotificationoutbox-00001-gab`**へprivate配備（15:54:47〜15:56:21 JST）。170file実archive一致、ACTIVE/Ready、日次50/UTC日、false/closed/一般cutoff・limited5値なし、Secret固定v4。同compute SAへworker単体Invokerだけ追加し、project/Secret IAM差分0。
+- Schedulerは`firebase-schedule-processBillingNotificationOutbox-asia-northeast1`、15分/Asia/Tokyo/retry0/OIDC、最終**PAUSED**。無認証403と別に、認証済みcallback **1回HTTP200/state=disabled（16:02:12.955 JST）**を確認。PAUSED RunJobは400で未実行だったため、アプリfalse/closedのまま未来cron→短時間resume/強制1回→finally pause/15分復帰で検証した。通常cronの自動実行はなし。後のPATCHでlastAttemptが消えたためCloud Loggingを実行根拠とする。
+- callback前後でoutbox **0件**、既存送信枠 **6件**の選択field digest不変。claim/予算消費/Gmail呼出し/実メール0。16:09 JST最終照合で購入/contact/Hosting不変・全送信停止を再確認。配備後非request warningは意図的不正署名probe1件、予期しないwarning/error0。Secret/Function/IAM/Schedulerは実変更済みなので本番構成変更0とは記録しない。
+
+上限/監視/復旧はRunbook最新⑤節へ集約。Goが一般開始時の初回2batch・初日毎時・以後毎営業日にqueue状態/最古pending/count/cooldown/起動・OAuth・Scheduler失敗とGmail不達を手動確認する。自動alert/自動pause/バウンス読取りは未実装。停止はScheduler PAUSED＋workerfalse/closed、履歴/uncertain/counterを維持。本人1通知のScheduler操作が必要なら、PAUSED RunJobの拒否を前提に未来cron/強制1回/再pauseを当日の範囲へ含める。実送信と12月3日以降の本人決済・配送は別承認待ちで、現在の日時/hash/IDは未設定のまま。
+
+## 前工程の記録：2026-11-27 本番稼働前の追加安全制御（当時は配備未実行）
 
 既存のPreview本人5通の実配送確認は再実行しない。対象worker/対応Schedulerの未作成と本番outbox0件は、前回の追加安全制御実装時点に限定read-onlyで確認した結果である。今回の本人550円確認に向けた手順追記では本番の再読取りを行っておらず、新しい現在値の確認とはしない。本番準備/一般稼働の具体的な承認対象は[既存Runbook](web_billing_live_cutover_runbook_ja.md)の最新④⑤節を正本とする。旧日付の未実装/Secret未登録の記述は当時の履歴であり、現在のLive contact実配送・mail v3の存在と区別する。
 
@@ -146,11 +156,11 @@ Previewは本人UIDごと5枠/日、確認メールと共用する全体10枠/�
 
 `sent`はGmail APIが受付応答を返し、その応答をoutboxへ保存できた状態であり、最終配送・受信・迷惑メール回避の保証ではない。バウンスは別の運用確認対象。送信専用権限のため自動バウンス読取りは未実装で、本人が送信元の受信通知を確認する。連続した不達や再認可の必要が判明した場合は運用停止して原因確認し、billing同期は継続する。[Gmail APIの受付と送信制限](https://developers.google.com/workspace/gmail/api/guides/handle-errors)
 
-## 未実施・公開前に残す確認
+## 公開前に残す確認（11月27日更新）
 
-- 本番Worker/Secret/IAM/Schedulerの配備と実値確認。本番通知とPreview連絡先確認の送信枠、有人Gmail利用を合わせた実運用予算決定。
-- OAuth同意画面の実際の公開状態とrefresh tokenの長期利用可否。外部アプリのTesting状態では通常7日でrefresh tokenが失効する条件があるため、今回の送信成功だけで無人の長期運用GOとしない。現在の公開状態は今回照会・変更していない。[Google refresh token expiration](https://developers.google.com/identity/protocols/oauth2/#expiration)
-- 本番の独立連絡先確認producerとGmail通知接続。既存Preview連絡先の本番への暗黙移行はしない。
+- 本番Worker/Secret/IAM/Schedulerは上記の停止状態で反映・確認済み。一般連絡先もv4/共通50へ揃える反映、一般cutoff固定/有効化は別承認待ち。本人限定のLive通知実配送は未実施。
+- OAuthは既存の「外部・本番/送信専用認可あり」の確認を再利用し、今回再同意/スコープ変更/認可取消をしない。将来の認可失効や長期無人運用の実績は今回の停止callbackで確認できない。[Google refresh token expiration](https://developers.google.com/identity/protocols/oauth2/#expiration)
+- 本番の独立連絡先確認は実配送・確認済み保存・復帰まで完了済み。新しい契約通知のLive実配送は未確認。既存Preview連絡先を本番へ暗黙移行しない。
 - 本人Relayアドレスを確保した後の配送確認。登録済み送信元と両Relayドメイン対応は維持し、実配送未確認を成功扱いしない。
 - result unknown/バウンス/認可取消/恒久失敗の有人確認手順、通知の送信後/失敗後の保持削除、退会連携。保持期間/TTLは今回勝手に追加しない。
 - 本番新550円と既存500円の実データ互換性、公開管理ページ/アイコン配信、Live契約・同期・通知の実E2E。今回の合成試験と本人PreviewメールをLiveの証明に使わない。

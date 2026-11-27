@@ -1,5 +1,61 @@
 # HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
+## 2026-11-27 ⑤通知の停止本番配備完了・⑥運用・⑦Git統合準備
+
+本節が最新状態。基準`3cd9469`から必要な通知Function/Secret/限定IAM/Schedulerの停止配備を本人が承認。**実メール0、実決済0、一般購入/一般メール/正式公開は停止のまま**。④の本人Live550円は12月3日19:05 JSTの無料体験自然終了後に別承認で行う。体験終了/権限の書換え、完了済み連絡先・課金・Apple/Android E2Eの再試験は行わない。下段の「worker未配備/未承認」は当時の履歴とする。
+
+### ⑤実際に反映した構成と正常停止の証拠
+
+配備先は`hamster-breeding-app`/`asia-northeast1`。producerとworkerは関数名指定で各1件ずつ。現行source/revision/設定/非公開データをGit外へ退避し、両archive170filesと配備用manifestを全hash照合した。
+
+| 対象 | 実施した変更・配備元 | 最終状態と成功判定 |
+|---|---|---|
+| `HAMCARE_LIVE_BILLING_MAIL_CONFIG` | 15:44:58 JSTに**v4**登録。既存Live v3の送信専用資格情報をメモリ内再利用し、本人限定contact marker/hash欄だけ除去した正規Live schema | readback一致、旧v1〜v3/Preview/認可/資格情報不変。OAuth refresh/Gmail呼出しなし。Secretのenabled=trueは送信許可ではない |
+| `stripeWebhook` | `3cd9469ba1559fe2891209460449f44fe6c708e6`（0caとFunctions byte一致）から15:47:04〜15:48:02 JST。`00013-zew`→**`stripewebhook-00014-zop`**。通知の正規event時刻保存だけを接続 | ACTIVE/Ready、主要同期7source/環境/IAM/resources/3Secret固定参照は不変。process=true/legacy=false、署名/API版/通常同期維持、不正署名400。正規event再処理なし |
+| `processBillingNotificationOutbox` | **`6d88f870ecf4430b972e31a7582cc628e12e8bf9`**から15:54:47〜15:56:21 JST、新規private **`processbillingnotificationoutbox-00001-gab`** | ACTIVE/Ready。Node22/256Mi/CPU1/timeout120/min0/max1/concurrency1、compute runtime/build SA。Secret固定v4、独立した削除修正は配備sourceへ含めず |
+| worker送信制御 | `HAMCARE_BILLING_NOTIFICATIONS_ENABLED=false`、`HAMCARE_BILLING_NOTIFICATIONS_SCOPE=closed`、`HAMCARE_BILLING_MAIL_DAILY_LIMIT=50` | 一般cutoff/limited5値すべて未設定。flag/scopeでAuth/outbox/予算/Gmailより前にdisabled。50はUTC日のアプリ枠で送信承認ではない |
+| IAM | 既存`797691641198-compute@developer.gserviceaccount.com`へ**新worker単体**の`roles/run.invoker`だけを追加 | public/allAuthenticatedUsersなし・IAM check有効。project IAMとmail Secret IAMは配備前後同一。既存Secret単体Accessor/Cloud Scheduler serviceAgent権限を再利用、追加API/広域roleなし |
+| Scheduler | `firebase-schedule-processBillingNotificationOutbox-asia-northeast1`を作成。`*/15 * * * *`/Asia/Tokyo/retry0/attempt deadline180s、同compute SAのOIDC | **PAUSED**。targetはworker URI末尾`/`、audienceは元のCloud Run service URI。root slash以外のhost/path変更なし。自動定期実行なし |
+| 実停止callback | 無認証POST403とは別に、OIDC認証済みcallbackを**1回だけ**実行 | **16:02:12.955 JST、HTTP200・`state=disabled`**。outbox0件/送信枠6件の前後選択field digest不変、claim/予算消費/Gmail0。起動失敗を停止成功とはしていない |
+| 維持対象 | Checkout `00008-cex` private/masterfalse/scopeclosed、contact `00008-woy` sendfalse/statusfalse/v3/日次1、Hosting **`014eda18e04632c8`** | 16:09 JSTにsource/設定/IAM/Hostingをread-only再照合し不変。通常同期/審査0円契約/テスター/Preview、Apple手動公開/Android Alpha・アクセス申請状態を変更せず |
+
+**Schedulerの診断で起きたこと**：最初のPAUSED状態の`RunJob`はHTTP400（ENABLEDが必要）でcallback未実行だった。アプリfalse/closedを維持して、PAUSEDのまま未来の1月1日cronへ変更→短時間resume→手動run1回受付→finallyでpause→15分cronへ復帰した。Schedulerのstateはoutput-onlyなので作成payloadでPAUSEDを仮定しない。後のschedule更新でlastAttemptTimeが消えたが、Cloud Loggingの認証付きPOST200とdisabled log各1件を実行根拠とする。これは送信有効化ではない。[Scheduler Job schema](https://docs.cloud.google.com/scheduler/docs/reference/rest/v1/projects.locations.jobs)、[HTTP/OIDC](https://docs.cloud.google.com/scheduler/docs/http-target-auth)
+
+配備後の非request WARN/ERRORは、15:49:09 JSTの意図した不正署名400に対応する`Production billing webhook stopped`/retryable=false **1件**だけ。予期しないもの0。停止callback自身のWARN/ERROR0。署名付き正規eventの再生、Stripe変更、contact/billing/体験/権限/削除の検証書込みは0。通常Webhookの自然な同期までプロジェクト全体で書込み0と断定しない。本番構成は上表のとおり変更済みであり「本番変更0件」ではない。復旧不要。退避と実配備証拠はGit外`/Users/gota/hamcare-deploy-staging/live-notification-stopped-20261127/`。
+
+### ⑤上限・監視・停止と12月3日の本人1通知（実送信未承認）
+
+- **通常の初期値**：通知50/UTC日、一般連絡先開始時はcontactもv4/同じ50へ整合する（contactは今回v3/1/停止のまま）。初回込み5attempt、送信前の明確な一時失敗のみ基本1分〜最大1時間の指数backoff、lease120秒、一般batch5。15分Schedulerなので1分後の実行を保証しない。quotaは最低24時間とproviderの長いRetry-After、rate limitは既存sender cooldownを尊重し、UTC日付変更でresetしない。認可取消/恒久失敗/uncertainは自動再送しない。
+- **Goの手動監視**：一般開始後の初回2batch終了時・初日1時間ごと・以後毎営業日に、Cloud Run `processbillingnotificationoutbox`の`Billing notification batch finished`の`jsonPayload.state`/`jsonPayload.summary.counts.*`、`Billing notification worker unavailable`、Scheduler403/5xx、最古pending/failed/blocked/uncertain/held、共通count/`_sender`期限を確認する。Gmailの受信箱/迷惑メール/バウンスも本人が確認し、受信箱自動読取り/自動alert/自動pauseを実装済みとしない。異常時はその都度確認し、受付だけを配送完了としない。個人値/token/MIMEをログへ出さない。
+- **停止・復旧**：Scheduler pause＋worker enabledfalse/scopeclosed、必要ならcontact sendfalseへ。実行中/受付済み送信の取消保証ではないので、claimed/sending/uncertainを照合する。queue/attempt/sent/history/counter/cooldownは保持。共用OAuth取消、過去job再投入、receipt消去を復旧代替にしない。Webhook/Portal/権限同期は維持し、workerの退避source/固定Secret版/設定/IAMを対で戻す。一般cutoffは再配備/retryの時刻へ動かさない。
+- **本人1通知の新制御**：配備済みlimitedは`...LIMITED_NOT_BEFORE_MILLIS`/`...LIMITED_EXPIRES_AT_MILLIS`（UTC秒境界、最大6時間）、`...LIMITED_UID_SHA256`/`...LIMITED_RECIPIENT_SHA256`各1件、`...LIMITED_NOTIFICATION_ID`（既存64hex outbox IDそのもの）を必須とし、正規Liveの`contract_registered`1件・日次1/batch1に限定する。対象1文書だけ読取り、別UID/ID/type/環境/旧event/期限外はclaimしない。transaction内とOAuth後のGmail HTTP直前にも現在Auth/確認済み連絡先/同じsend intent/期限を照合する。一般cutoffは読み替えず、limited期限切れでもgeneralへ移らない。
+- **当日の順序**：別承認で本人購入1契約/初回550円と通知1通を具体化する。12月3日19:05後に既存本人UID/体験自然終了/同UIDアプリ・確認済み連絡先を照合→決済前にlimited用開始Bを記録→本人実決済→正規Webhook/paid550/billingactiveを確認→producerの契約開始outbox1件を読み取りで固定→limited設定で認証付き手動1回→受信/From/本文550円/スマホ表示→false/closedへ復帰。Gmail受付だけで配送PASSとせず、結果不明は追加送信しない。通常はScheduler PAUSEDを維持して認証付き直接実行。既存Schedulerを使う場合はPAUSED RunJobが拒否されるため、上記未来cronの強制1回・finally pauseを使う必要があり、その一時操作を当日の設定範囲へ含める。
+- **過去通知の誤送信防止**：本人の契約開始sentだけ保持し、その他の本人検証通知/古いPreviewや不明eventは一般開始時に一括後送しない。本人の最後の正規eventより厳密に後のUTC秒境界Tを一般cutoffへ固定し、general明示・limited5値除去・別承認がそろうまで一般送信しない。現在outbox0件でもこの条件を外さない。無期限の一般開始時刻を今の停止配備時刻に固定しない。
+
+直接Mock55/55＋影響Runtime3ケース、隔離strict型検査/配備compile PASS。旧149件・Preview5通・本番連絡先配送・購入/削除E2Eは再実行していない。新しいLive契約通知の実受信/実支払い/アプリ権限反映は12月3日以降の残件。
+
+### ⑥公開後運用の到達点と必要な反映
+
+[既存窓口/開示運用](commercial_disclosure_operations_20261121.md)と[既存削除運用](web_account_deletion_support_20261121.md)へ担当Go・頻度・完了判定・途中連絡・保持整理を具体化した。新しい管理表/自動受付/自動保持処理は作っていない。
+
+| 項目 | 準備できたこと | 公開前に残る実作業 |
+|---|---|---|
+| 問い合わせ/開示 | 共通窓口、毎営業日の受信箱/迷惑メール/未完了確認、開示は保存可能メールで遅滞なく提供。秘密情報を要求せず、本名等をGitへ転載しない | 事業者情報の非公開正本の準備・連絡可能性、Go不在時の受信確認体制を本人が確認 |
+| 課金/権限不整合 | 同UIDとStripe最新状態/正規receipt/billingを読取照合→通常同期の原因確認。追加購入/体験reset/権限手動付与を代替にしない | 本人550円の実同期・両アプリ反映は未確認 |
+| メール障害 | 上記有限retry/unknown隔離/手動監視・停止復旧 | 本人Live通知の実配送と、一般有効化の別承認。自動alert/バウンス取込みは未実装 |
+| メール経由の削除 | メール受付公開済み、本人確認/意思/運営dry-run→既存Stripe停止/フェンス/cleanupのコードあり。アプリ削除/15分retryは11/23配備済み | **Web本人確認/運営実行2API・限定運営IAM・確認Web/CSPは未配備**。メールだけでは完了不可。下記範囲の別反映が必要 |
+| 削除manual_review | **`4f1da40eb54a980fa15f8df02d37708858354d78`**で既存CLI/private operatorへfresh5分review＋別ackによる追加1回をローカル準備。累積MAX12後なら13まで、Stripe停止確認/排他/フェンス不変。14/14直接Mock＋統合strict型検査PASS | 本番のcore/運営経路はこの変更へ未更新。無制限resetせず追加失敗はmanual_review。今回実削除0 |
+| 保持期限整理 | Goが週最初の営業日に、完了窓口履歴90日/未確認失効30日だけを既存手順で手動整理。処理中/再試行/復活防止/会計は対象外 | 実運用開始/TTLは未実施。一般問い合わせ/開示履歴期間は未確定（法定/紛争除外の完了90日後最小化を推奨案として保留） |
+
+**support削除の次の具体的配備範囲（今回未実行）**：既存`confirmSupportAccountDeletion`（認証済み同UID/意思確認、60秒/max2/256Mi）と`supportAccountDeletionOperator`（private、540秒/max1/1Gi、既存billing Secret固定v1）を名前指定。`HAMCARE_SUPPORT_DELETION_ENABLED`は初回falseで正常停止確認し、同じ確認Webとの有効化は別途整合する。CLIは専用`@hamster-breeding-app.iam.gserviceaccount.com`運営SAを要求するためcompute SAの使い回しを仮定せず、当該operatorのInvokerと操作者のそのSAだけのimpersonation権限へ限定する。既存runtimeの削除権限を再利用し、広域Owner/Adminを追加しない。`/account-deletion/confirm/index.html`＋既存`support-deletion.css`/`support-deletion.mjs`/`support-deletion-service.mjs`を公開map保全の上で部分反映し、当該確認routeだけのFirebase認証/confirm API用CSPを追加する（既存`/account/**`ではこのrouteを覆わない）。新しい削除API/任意UID実行を作らず、確認APIの別UID拒否・private運営拒否・同じ申請再開を配備後に限定確認する。最新manual-review coreの反映は既存`deleteMyAccountAndData`/`retryAccountDeletions`への影響を別途明示し、メール配備とまとめて更新しない。メール受信だけでAuth直接削除せず、未配備の確認リンクを送らない。
+
+### ⑦main/GitHub統合の準備（merge/push未実行）
+
+- remote **`github`**がGitHub、`origin`は別のlocal repository。local main=`github/main`=`0055e93ed003514217c95bd747389c7245c97b8b`、`origin/main=e1ffa57`。実GitHub mainだけfetchして比較し、main/index/既存dirtyは変更しない。`feature/web-first-stripe-checkout`はmainの子孫で、3cd時点65commit/285file＋今回の2codecommit/記録commit、**計68commit/286file**が正式リリース向け統合範囲（今回の記録commitを含む）。分割した古いmainへアプリだけcherry-pickしてbackend依存を落とさない。
+- Apple承認iOS1.0.1(6)/Android1.0.1(code6)元sourceは**`54970b2802f8fcc483b336186149bea32baae42d`**。local保全tag **`preserve/hamcare-ios-build6-android-code6`**を作成し未push。その後のlib/test/ios/android/pubspec関連diff0。Git外bundleへ同source/main/feature ancestryを保存、bundle verify PASS。追加記録を含めた最終bundleもGit外へ更新して保全する。
+- merge-treeシミュレーション衝突0、mainへのfast-forward可能。未送信65commitの682blob版/約54MBとcommit本文の限定秘密情報パターン検査で候補0、その後2commitの20blob版/本文だけを追加照合して候補0。専用scannerによる完全保証ではなく、fixture password等は分類済み。最後の記録差分も追加検査し、Secret値/UID/宛先を出力しない。
+- 既存README/未追跡`docs/owner-guide/`20file hashとPROJECT_STATUSの元のowner-guide案内1行を保護し、今回commitへ混ぜない。main merge/pushの承認前に、最新GitHub main差分・最終feature commit/対象file・dirty保全を再照合して統合範囲を提示する。現在はlocal準備と保全だけで、main/remote変更0。保全根拠はGit外`/Users/gota/hamcare-deploy-staging/github-integration-preparation-20261127/`。
+
 ## 2026-11-27 実行結果：本人確認用の停止配備（2関数・3assets）
 
 本人の追加承認により、上段の最小範囲だけを実行した。一般メール側のA3/A4/A6、一般受付C、実550円決済は未実行である。本節が下段の「本番未反映/未承認」の旧準備記録に優先する。配備元は`0ca48100057285c8bc383df92e2f27e008e77094`、project `hamster-breeding-app`、region `asia-northeast1`、branch `feature/web-first-stripe-checkout`。
@@ -557,18 +613,18 @@ strict TypeScriptと今回直接関連のMock回帰**490/490 PASS**。購入flag
 - **Relay**：登録済み2送信元と過去のSPF確認を維持。実Relay配送は未確認で**非ブロッキング**。他の準備を止めず、本人のRelay宛先が確保できたら本番前又は公開直後に確認する。Stripeメールが届かなくても、HamCare管理下の登録済み送信元から重要通知を送る構成を正本とする。必要な場合だけ本人へ受信可能な連絡先の再確認を案内し、個人実メールを必須化しない。
 - **連絡先**：契約・Customerの正本はFirebase UID。確認済み通常メールとApple Relayを使用し、本当にメールがない場合だけ独立連絡先を補完・確認してから新規契約を認める。メール一致でUID/Customerの紐付け・統合をしない。体験3ケースと元の終了日時を維持する。
 
-## Go/No-Go（方針と実装を区別）
+## Go/No-Go（2026-11-27更新・既存の完了記録を反映）
 
 | 項目 | 現在の状態 | 根拠・実施上の注意 |
 |---|---|---|
-| 正式価格 | GO | 月額550円、実請求550円。Live Price新設は未実施 |
-| 返金方針 | GO | 上記文を正式決定、公開前HTMLへ反映。公開は未実施 |
+| 正式価格 | GO（構成作成済み） | 月額550円。Live Price `price_1Uek2xK6h5kxGn4c9ji94qtp`作成済み、本人実550円は12/3自然体験終了後・別承認待ち |
+| 返金方針 | GO | 正式文を11/23の停止Webへ反映済み。一般購入受付は停止、実返金は今回なし |
 | 解約方針 | GO | 期間末解約、期間末まで利用、日割りなし |
 | 特商法表示方式 | 条件照合済み・実体制確認後GO | CAA Q15/Q17と照合、公開前文面を用意。遅滞ない実開示体制は運営者の確認待ち |
 | バーチャルオフィス | 不要 | 初回は契約しない。将来検討のみ |
 | サポート窓口 | GO | 既存Gmailを共用、ブランド表示を維持 |
 | Firebase認証メール | GO（既存機能） | 通常メール確認・再設定経路あり。Relay実配送は別項目 |
-| Gmail API | 初回リリース採用・一般送信停止 | 本人限定の本番確認はcd624d4で完了。contact false/日次1/mail v3を維持し、通知Worker未配備。一般用設定/一般OAuth検証・通知稼働は別工程 |
+| Gmail API | 採用・通知worker停止配備済み | 既存本番本人連絡先確認完了。contact false/日次1/v3を維持。通知worker false/closed/PAUSED・正規Live v4/日次50で正常disabled callback確認済み。実通知・一般送信は未開始 |
 | Apple Relay送信元登録 | GO（過去の登録証拠） | 2送信元登録・SPF確認済み。今回設定再確認/変更なし |
 | Relay実配送 | 未確認・非ブロッキング | 本人所有の宛先確保時に確認、成功したとは記録しない |
 | 連絡先補完 | Preview GO | 既存の実配送1件と確認済み連絡先・UIDガードの証拠を維持 |
@@ -576,12 +632,12 @@ strict TypeScriptと今回直接関連のMock回帰**490/490 PASS**。購入flag
 | Stripe Test | GO（既存検証） | 550円、体験/即時、Webhook、Portalの既存証拠。今回追加決済なし |
 | Safari E2E | GO（既存Test E2E） | 既存Apple購入・同期・Portal・期間末解約PASS。今回の本番検証ではない |
 | Android Chrome表示 | GO（既存表示検証） | 連絡先ページの実機表示/入力PASS。Androidの購入E2E全体とは区別 |
-| Live Stripe | 550円Price/専用Portal構成を作成済・切替一部保留 | 2026-11-23実績を参照。Checkout停止版のみ先行配備。審査用0円契約の同期保護で旧Webhook/Portal handler/新専用Secretは維持・保留。購入・契約接続は未実施 |
-| live Hosting | 準備2ページだけ追加済 | 旧13hash不変＋32追加。LP/法務/一般購入公開は未実施。新旧版は冒頭に記録 |
-| Flutter CTA撤去 | 新規購入・Portal導線ともコード撤去済・未配信 | [Portal撤去記録](flutter_customer_portal_removal_20261121.md)。Webの契約管理とアプリの権限読取りは維持。本人確認では現在有料契約者0人。[削除前の請求停止](account_deletion_billing_safety_20261121.md)と[Apple失効統合](apple_account_deletion_revocation_20261121.md)はコード・ローカル試験準備済、未配備/未配信。専用実機失効E2E・配備/監視等は残件 |
-| Web削除申請 | メール→本人確認→運営実行のコード接続/限定試験済・未配備 | 固定された既存UID/作成日時、1回限りリンク、同じ申請の意思確認、IAM privateのdry-run/実行。既存Stripe停止/削除フェンス/workerを再利用。未確認申請は実行不可。公開窓口はPreviewのみ、実機Apple失効・運営IAM・本番削除の確認は残件 |
-| Apple審査 | 戦略C版は未提出 | Case103009817213は回答済み、事前承認なし・実提出後判断 |
-| Google審査 | 戦略C版は未提出 | 既存Alphaの審査提出・配信履歴はある。Google審査を一度もしていないという意味ではない |
+| Live Stripe | 構成/正規同期接続済み・購入停止 | 550円Price/専用Portal/新Webhookと固定Secret作成済み。11/23に審査0円契約の正規同期を引継ぎ、今回producerのみ追加反映。本人実550円/新規購入は未実施。契約条件変更なし |
+| live Hosting | 停止Web/法務/削除案内反映済み | 現行51path/version `014eda18e04632c8`。購入停止assetsと既存LP/法務を保全。今回Hosting変更なし、一般購入未開始 |
+| Flutter CTA撤去 | iOS build6/Android code6反映・限定実機PASS | 購入/価格/Web購入/Portal誘導を撤去、権限読取は維持。Apple承認版とAndroid Alphaで確認済み。安全削除backendは11/23反映済み、承認された旧Apple検証用アカウントの削除/連携解除も完了。Apple失効後Stripe失敗→同UID再開は別の未確認項目 |
+| Web削除申請 | 公開メール受付済み・後段は未配備 | 同UID本人確認/意思→private dry-run/既存安全削除のコード・Mockあり。2API/運営IAM/確認Web・CSP未配備。manual_reviewの追加1回再開もローカル準備までで、メールだけの削除完了不可 |
+| Apple審査 | iOS1.0.1(6)承認済み・未公開 | 2026-11-24 16:19 JST承認メール受領、手動公開維持。Case103009817213自体は回答済み/事前承認なし。今回ストア操作なし |
+| Google審査 | Alpha code6配信済み・製品版アクセス申請審査待ち | 11/27に正式Play code5→6更新の限定実機確認完了、14:30 JSTアクセス申請送信済み。製品版トラック提出/一般公開は未実施 |
 
 既存の実機・Test証拠は [戦略Cリリース記録](japan_store_payment_and_ios_readiness_20261018.md) に保存。新しい外部確認を実施したという記録にしない。
 
@@ -604,7 +660,7 @@ strict TypeScriptと今回直接関連のMock回帰**490/490 PASS**。購入flag
 | 新確認Function・private運営Function | `HAMCARE_SUPPORT_DELETION_ENABLED`未設定では停止。運営は`invoker:private`、専用SAに当該サービスだけのRun Invoker、担当者のToken Creatorも当該SA限定。不要な広域Admin権限なし。publicendpointはcanonicalOrigin/失効検査/最新Auth/UID固定 | allUsers/allAuthenticatedUsersの運営権限、ブラウザから運営API、任意UID実行、token/リンクのログ | enableをfalse、運営Invokerを外し新規実行を止める。データをrestoreしたと扱わず既存要求を照合 |
 | Web本人確認画面/法務/公開窓口 | Web側enable定数を承認済みリリースだけで有効化し、canonical限定。最小CSPは既存Firebase SDK12.17.1/Auth/当該endpointだけ。Previewはfalse/connect-noneを維持。申請は匿名、後段は本人認証と意思確認 | Previewの本番API接続、UID/メール/tokenのURL漏れ、profile/pet登録/購入を削除条件化 | 有効化前のWeb版へ戻し、公開窓口とサポートで受付継続。申請/停止済み記録は消さない |
 | 専用合成/本人承認済み削除用アカウントの配備後確認 | private IAM拒否、別UID拒否、同意/課金停止/cleanup/完了判定を確認。実Apple失効は専用アカウントの別承認後だけ | テスター/既存本人アカウントの無承認削除、Mockを実機PASS扱い | 検証停止、対象/実施済み工程を照合。不可逆な削除をコードrollbackで取り消せるとしない |
-| 運営手順/保持/案内/監視 | dry-run→対象/範囲/キャッシュ契約状態確認→明示実行→completedフェンス+Auth不存在照合。毎日pending/古いrunning/retryable/manual_review/worker失敗を確認。完了連絡は照合後 | 受付メールだけで削除、直接Auth削除、billingStopped手動偽装、未確定の全消去期限を約束 | 個別対応へ切替え、未完了を案内し再確認。返信目安・履歴保持の推奨案を運営承認後に公開文面へ反映 |
+| 運営手順/保持/案内/監視 | dry-run→対象/範囲/キャッシュ契約状態確認→明示実行→completedフェンス+Auth不存在照合。毎日pending/古いrunning/retryable/manual_review/worker失敗を確認。完了連絡は照合後 | 受付メールだけで削除、直接Auth削除、billingStopped手動偽装、未確定の全消去期限を約束 | 個別対応へ切替え、未完了を案内し再確認。確定済み返信目安・窓口90日/30日の対象と例外を維持し、未稼働の整理を稼働済みにしない |
 
 申請リンク24時間・再認証5分・review5分は実装済みの認証期限であり、申請データの自動削除ではない。初回返信はJSTの土日祝を除く原則3営業日以内、本人確認と削除意思確認後は原則7暦日以内が完了目安。遅延理由/見通しを知らせ、その後7日ごとに連絡する方針が確定。完了窓口履歴90日/期限切れ未確認30日は窓口のメール/添付・support申請・CLI受付/リンク/reviewファイルだけを対象とし、処理中・既存再試行/停止証跡・完了フェンス・会計へ一括適用しない。担当Go、毎営業日の期限確認と週最初の営業日の手動整理確認を予定し、本番運用/自動purge/TTLは未開始。会計の法定期間は記録種別ごとに確認し、Apple実失効後のStripe失敗→同UID再ログイン/再開も実機未確認を維持する。
 
