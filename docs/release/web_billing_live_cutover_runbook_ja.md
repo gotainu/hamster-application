@@ -1,8 +1,35 @@
 # HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
+## 2026-11-27 ⑥削除申請の後段本番接続完了・⑦main統合/push
+
+本人が本節の後段API/確認Web/追加1回再開/直接IAM・Hostingと、既存68commit/286fileのmain統合/pushを承認。実削除・実メール・一般購入/一般通知の有効化は対象外。下段のsupport未配備は準備時点の記録とし、本節が現在地。12月3日19:05 JSTの正規体験自然終了後の本人550円1回/通知1件は別承認まで実行しない。
+
+| 対象 | 実際の配備元・Revision/設定 | 維持条件・限定確認 |
+|---|---|---|
+| `deleteMyAccountAndData` | `fc8051c02de9`、**deletemyaccountanddata-00008-sor** | Auth必須/既存削除core/Stripe停止確認とmanual resume追加1回を反映。1Gi=1024Miの同容量、CPU1/540秒/max20/concurrency80、Secret固定v1/IAM/env保全 |
+| `retryAccountDeletions` | 同fc805、**retryaccountdeletions-00002-wof** | max1/concurrency1/1Gi相当/540秒/Secret固定v1。既存ENABLED・15分/JST/OIDC/retry設定不変。試験用の強制runなし |
+| `supportAccountDeletionOperator` | **`faccdfce50f33722d0b9f3d11f7a53773aff5554`**、**supportaccountdeletionoperator-00003-zun** | private、1Gi相当/540秒/max1/concurrency1、既存compute runtime/build SAとbilling Secret固定v1。support flag true、既定review/確認済み申請/fresh5分review/別ack/追加1回のみ |
+| `confirmSupportAccountDeletion` | 同faccdfc、**confirmsupportaccountdeletion-00003-der** | 256Mi/60秒/max2/concurrency1、Secret不要。公開transportだがFirebase Auth・同UID/作成時刻・1回限りproof/意思確認必須。support flag true |
+| 運営権限 | 新専用SA **`hamcare-deletion-operator@hamster-breeding-app.iam.gserviceaccount.com`** | 当該operator単体Run Invokerだけ。現在の運営者へ当該SA単体Token Creator、project/Secret IAM不変。SAへFirestore/Auth削除roleなし。IAM反映遅延後に同じ限定権限だけでOIDC成功、追加広域grantなし |
+| 確認Web/CSP | **178ff2689650346f**。`/account-deletion/confirm/index.html`/`support-deletion.css`/`support-deletion.mjs`/`support-deletion-service.mjs`の4path追加 | 旧51hash/8ページとCSP保持、計55path。確認routeだけFirebase12.17.1/Auth/confirm APIを許可、operator/Stripe/Preview接続なし。Live派生serviceの`ENABLE_SUPPORT_DELETION`1定数だけtrue（repo既定false維持）、実HTTPのCSP/4file byteを確認。ブラウザ実画面はMacロックで未確認 |
+
+**実施順と発見記録**：現行4関数/設定/IAM/既存retry Scheduler/sourceとHostingを非公開退避→隔離170file compile→既存2関数/新2APIを1件ずつ限定配備→専用SA/単体IAM→新2APIのfalse停止503→support flagのみtrue。service環境更新はbuild/source metadataも再生成したため、metadataの全文一致だけを条件にせず、不変のresource/runtime/Secretと実archive全hashを確認した。
+
+active無害probeの本文なしGETでconfirm wrapperが500を返したため、**Hosting未反映のまま公開Invokerを一時除去**。原因は新2wrapperの`req.rawBody.length`で、各1行を`(req.rawBody?.length ?? 0)>4096`へ最小修正した。実index.tsのonRequest宣言をAST抽出して実callbackを実行する回帰2件PASS（旧9件skip）、compile PASS。faccdfcから新2APIだけprivateのまま再配備し170file hash一致後にconfirmだけ公開へ復帰した。初回500/旧revision ERROR1件は保持、修正後の未解消WARN/ERROR0。障害を消してPASSへ置換せず、余分なcore/Stripe/SDK変更はしない。
+
+**最終の無害probe17件PASS**：publicの401/403/別origin・query・client UID・operator actionの400、GET/bodylessPOST/4097byteの400。privateの無認証403、専用OIDCで不正action/本文なし/不適切ack400と**不存在申請の既定review409（readだけ）**。通常アプリ削除は未認証401。最初に確認した設計上の停止503と、IAM拒否/active認証拒否/正常起動を区別する。support0/既存削除completed2/outbox0/送信枠6の前後fingerprint不変。実create/有効execute/resume/本人Apple操作/実メール/Stripe呼出し/worker強制run0。既存課金/認証/実削除E2Eは再実行しない。限定確認で実削除成功・Apple失効成功を新たに証明したとはしない。
+
+**運用の使い方**：[既存削除運用](web_account_deletion_support_20261121.md)のCLIへ上記専用SAを指定する。リンク/input/reviewはGit外0600・新規exclusive。メール受信だけで本人扱いにせず、既存Auth/同UID/作成時刻に結び付いた申請・意思確認後にdry-run→対象/範囲/契約snapshot→明示execute。manual_reviewは原因確認→fresh review→`--resume-manual --ack=RESUME_VERIFIED_DELETION`で追加1回だけ、失敗後は再停止。Stripe停止未確認の削除、任意UID差替え、Auth直接削除、attempt resetをしない。completedフェンス＋Auth不存在を照合して完了案を人が返信する。今回は実申請/実削除/返信を行っていない。
+
+**停止・復旧**：新supportだけ停止する場合はconfirmのpublic Invoker除去＋support専用flagfalse/既存確認Web停止派生へ戻す。operatorの専用Invoker除去で新しい運営実行も止める。進行済み要求/フェンス/停止証跡は保持し、通常アプリ削除と既存retryを一律停止しない。新2API/source/設定/Invoker・Hostingは今回の退避へ対で戻せるが、実削除のデータ復元を保証しない。購入/メール停止・正規Webhook/Portalは維持。今回の一時閉鎖は入口修正時だけで、最後は承認された新経路を接続済み。
+
+**⑦GitHub**：2026-11-27 **16:28:12 JST**、別worktreeのmainを0055e93から固定fc8051cへfast-forwardし通常push、実GitHub main一致。68commit/286fileをそのまま反映し、force/他branch/tag pushなし。GitHub Webhooks0/Installed Apps0/Environments0/Pages disabled/Actions workflow実体0/local executable hook0をread-only確認し、pushで自動本番配備が発生する経路なし。今回の直接修正faccdfcと本記録だけを追加ff/pushする。元Apple/Android source54970b2のtagと旧bundleを保持し、新最終bundleもGit外に保存。dirty20files/owner-guide案内1行を保護、秘密情報検査は追加差分だけ行い旧68commitを再監査しない。
+
+**本人のみに残る運用事項**：開示用氏名/住所/電話の正確な非公開原本と提供体制、Go不在時の窓口担当/方法、一般問い合わせ/開示完了履歴の保存方針（法定・課金・紛争・未完了を除き完了90日後の最小化を推奨案）を一括確認中。未回答を準備/採用済みとせず値をGit/公開ページへ転載しない。削除申請の3営業日/7暦日/遅延7日/完了90日・未確認失効30日の既定方針は維持、週初営業日の手動整理を稼働済みとはしない。[既存窓口手順](commercial_disclosure_operations_20261121.md)参照。Google Playは16:24 JSTに引き続き製品版アクセス申請審査中、製品版非アクティブ。Apple承認/手動公開/Android Alphaに操作なし。根拠はGit外`/Users/gota/hamcare-deploy-staging/support-deletion-rollout-20261127/`。
+
 ## 2026-11-27 ⑤通知の停止本番配備完了・⑥運用・⑦Git統合準備
 
-本節が最新状態。基準`3cd9469`から必要な通知Function/Secret/限定IAM/Schedulerの停止配備を本人が承認。**実メール0、実決済0、一般購入/一般メール/正式公開は停止のまま**。④の本人Live550円は12月3日19:05 JSTの無料体験自然終了後に別承認で行う。体験終了/権限の書換え、完了済み連絡先・課金・Apple/Android E2Eの再試験は行わない。下段の「worker未配備/未承認」は当時の履歴とする。
+本節は⑤の停止配備時点の記録。最新の⑥反映と⑦統合は冒頭節を優先する。基準`3cd9469`から必要な通知Function/Secret/限定IAM/Schedulerの停止配備を本人が承認。**実メール0、実決済0、一般購入/一般メール/正式公開は停止のまま**。④の本人Live550円は12月3日19:05 JSTの無料体験自然終了後に別承認で行う。体験終了/権限の書換え、完了済み連絡先・課金・Apple/Android E2Eの再試験は行わない。下段の「worker未配備/未承認」は当時の履歴とする。
 
 ### ⑤実際に反映した構成と正常停止の証拠
 
@@ -635,7 +662,7 @@ strict TypeScriptと今回直接関連のMock回帰**490/490 PASS**。購入flag
 | Live Stripe | 構成/正規同期接続済み・購入停止 | 550円Price/専用Portal/新Webhookと固定Secret作成済み。11/23に審査0円契約の正規同期を引継ぎ、今回producerのみ追加反映。本人実550円/新規購入は未実施。契約条件変更なし |
 | live Hosting | 停止Web/法務/削除案内反映済み | 現行51path/version `014eda18e04632c8`。購入停止assetsと既存LP/法務を保全。今回Hosting変更なし、一般購入未開始 |
 | Flutter CTA撤去 | iOS build6/Android code6反映・限定実機PASS | 購入/価格/Web購入/Portal誘導を撤去、権限読取は維持。Apple承認版とAndroid Alphaで確認済み。安全削除backendは11/23反映済み、承認された旧Apple検証用アカウントの削除/連携解除も完了。Apple失効後Stripe失敗→同UID再開は別の未確認項目 |
-| Web削除申請 | 公開メール受付済み・後段は未配備 | 同UID本人確認/意思→private dry-run/既存安全削除のコード・Mockあり。2API/運営IAM/確認Web・CSP未配備。manual_reviewの追加1回再開もローカル準備までで、メールだけの削除完了不可 |
+| Web削除申請 | 後段API/確認Web/限定運営IAM反映・無害probe PASS | 同UID本人確認/意思→private dry-run→既存安全削除/追加1回再開を本番接続済み。実create/execute/削除は今回なし。メールだけで本人扱いにせず既存運用手順を使う |
 | Apple審査 | iOS1.0.1(6)承認済み・未公開 | 2026-11-24 16:19 JST承認メール受領、手動公開維持。Case103009817213自体は回答済み/事前承認なし。今回ストア操作なし |
 | Google審査 | Alpha code6配信済み・製品版アクセス申請審査待ち | 11/27に正式Play code5→6更新の限定実機確認完了、14:30 JSTアクセス申請送信済み。製品版トラック提出/一般公開は未実施 |
 

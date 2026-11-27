@@ -1,4 +1,14 @@
-# Webアカウント削除申請・本人確認の運用（2026-11-27準備更新）
+# Webアカウント削除申請・本人確認の運用（2026-11-27本番接続更新）
+
+## 2026-11-27 本番後段の接続・無害限定確認完了
+
+- 現在はメール受付→既存Web認証/同UIDの本人確認・削除意思→専用private operator dry-run→既存Stripe停止/削除へ接続済み。confirm **confirmsupportaccountdeletion-00003-der**/operator **supportaccountdeletionoperator-00003-zun**のsupport flag true、確認URLは`https://hamster-breeding-app.web.app/account-deletion/confirm/`。公開申請と後段のログインを区別し、メール未設定/Relay/プロフィールなしも対象。ログインできない人には下段の復旧・個別対応を使い、未確認の削除経路を作らない。
+- CLIへ **`hamcare-deletion-operator@hamster-breeding-app.iam.gserviceaccount.com`**を指定する。権限はoperator単体Invoker、運営者のそのSA単体Token Creatorのみ。リンク/入力/reviewは非公開0600・新規exclusive、既定review。申請対象と既存Auth作成時刻を運営の非公開画面で照合し、メール本文/UID入力を実行対象へ差し替えない。
+- 追加1回だけのmanual_review再開は既存アプリ削除/worker/新operatorに反映済み。累積attempt/排他/Stripe停止確認/フェンスを維持し、fresh5分review＋別ack、MAX12後なら13まで、追加失敗後はmanual_review。通常のretry Schedulerは元のENABLED/15分/JST/OIDCを維持。実在ユーザーの要求を試験用に作成/再開していない。
+- 最初の本文なしGET500を発見しconfirmを一時privateへ閉じ、**faccdfc**のwrapper2行だけの修正/実wrapper回帰2件/strict compile/実archive170file一致後に公開復帰。修正後の無害probe17件PASS、前後support0/既存削除completed2/outbox0/枠6不変、旧500記録は保持。実申請create/有効execute/resume/実削除/メール/Apple操作なし。実運営の削除完了・Apple失効の新E2Eは未実施として残す。
+- Hosting **178ff2689650346f**の4path追加・既存51hash保全、確認route限定CSPを実HTTP照合。Live派生JSのenable1定数はtrue、repo既定falseは維持。停止/退避/Revision/根拠は[Runbook最新実行記録](web_billing_live_cutover_runbook_ja.md)へ集約。担当Go・返信/途中連絡・週初営業日の対象限定90日/30日手動整理は下段を再利用し、TTL/履歴整理を実施済みとしない。
+
+以下の同日準備節は**反映前の履歴**。「2API未配備」「ローカルまで」は上段の実反映で更新済みであり、実申請/実削除は今回行っていない。
 
 ## 2026-11-27 公開後の入口・再試行・手動完了の現在地
 
