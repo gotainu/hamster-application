@@ -10,6 +10,7 @@
 - **一般化の準備**：mail新versionに既存gmail.send資格情報を再利用し、本人限定marker/hashを除去する案。共通50通/UTC日を初期案とし、旧履歴/counter/永久予約はresetしない。contact一般化の公開差分は停止段落を外す既存HTML1件、JS/CSS/CSP追加不要。バウンス自動検知は未実装で、送信元受信箱の運営確認→停止→本人連絡先/再送可否確認が必要。一般設定/送信開始とは区別する。
 - **承認対象と停止**：[既存Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)にA停止配備（Checkout/producer/contact/workerの関数名指定、Secret固定版、限定IAM/Scheduler PAUSED・cutoff未設定、停止assets2件）、B本人UID1件のLive実確認、C一般受付/contact/通知稼働を別承認として具体化。全停止masterfalseと、新規のみ停止scopeclosedを区別し、Webhook/Portalは維持。通知cutoffは一般送信の初回有効化時に確定し、準備〜有効化の間の通知を勝手に後送しない。通知停止後も実行中/受付済み送信は取り消せないので状態照合・uncertain保全を手順化する。
 - **限定検証**：購入runtime96/96、通知関連149/149 PASS。Web直接テスト39/39、全変更統合後83 TS sourceの隔離noEmitもPASS。合成DOM/Mockと実Live/実機E2Eを区別する。既存の全体E2E/490テスト/連絡先再送を繰り返さない。
+- **準備コードの現在地**：`ab7d7c28297db60f6f51beae358618b97c9c7e5f`に今回のscope/通知gate/過去通知保留/Web表示整合と限定テスト・既存文書更新を保存。配備元は同commitへ固定できる状態で、本番へは未反映。既存README/owner-guideとPROJECT_STATUSの既存案内1行は未コミットのまま保持。
 - **本番変更の分類**：本作業の本番操作はread-onlyと公開GETだけ。追加設定/配備/Stripe変更・実決済・送信・削除・体験/テスター権限変更0。既存Webhookの通常同期は稼働維持。Apple手動公開/未公開、購入/一般メール停止、既存dirty/素材を保護し、merge/pushなし。
 
 ## 2026-11-27 Android正式候補code6作成／Alpha審査中・実更新確認待ち

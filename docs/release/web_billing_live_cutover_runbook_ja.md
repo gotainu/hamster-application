@@ -26,14 +26,14 @@
 
 ### 本人限定contactから一般運用への切替内容（未実行）
 
-- 同じ`HAMCARE_LIVE_BILLING_MAIL_CONFIG`の**新version**へ正規Live設定を用意する。既存本人送信専用`gmail.send`の同じ資格情報を再利用し、`limitedContactTest`と本人UID/宛先hashの2fieldを除去する。Preview Secret/認可・v3・永久予約/既存counter/送信履歴を保持し、コピー移行・reset・新規認可を勝手に行わない。Secretのenabledだけでは送信許可とせず、contact/workerの独立flagを必須とする。
+- 同じ`HAMCARE_LIVE_BILLING_MAIL_CONFIG`の**新version**へ正規Live設定を用意する。既存本人送信専用`gmail.send`の同じ資格情報を再利用し、`enabled:true`、`environment:live`、既存固定`from`と`clientId`/`clientSecret`/`refreshToken`だけの正規schemaにする。`limitedContactTest`と`allowedSubjectHashes`/`allowedRecipientHashes`を除去する。Preview Secret/認可・v3・永久予約/既存counter/送信履歴を保持し、コピー移行・reset・新規認可を勝手に行わない。Secretのenabledだけでは送信許可とせず、contact/workerの独立flagを必須とする。OAuthは既存の本人1mailbox送信専用認可を再利用し、配信先の一般化を別ユーザーへのOAuth認可拡大やGoogleのアプリ審査取得とは記録しない。新scope/consent/資格情報rotationは今回の計画に含めず、将来の認可失効は停止運用で扱う。
 - `billingContactEmail`は現在false/日次1/v3。一般化時に初めて`HAMCARE_BILLING_CONTACT_ENABLED=true`へ。日次枠はcontactとworkerで共通`billing_notification_delivery_limits`を使用し、両Functionの`HAMCARE_BILLING_MAIL_DAILY_LIMIT`を同じ有限値へ揃える。**初期案50通/UTC日**（実送信の許可ではない）。連絡先確認の既存60秒/3回時/5回24時間/UID制限、結果不明時の自動再送禁止を保持する。
 - contactの必要なHosting差分は`/account/contact/index.html`1件だけ。Live title/footerを保持し、静的な準備中段落を除去してbannerを正規の案内へ戻す。既存contact JS/CSS5件は公開版とrepoでbyte一致。新API/JS/CSS/CSPは不要。停止配備段階では現在の停止HTMLを保持する。
 - 本人Live購入対象は**未確定**。本番未契約で本人所有の既存UIDと、確認済みAuthメール/正規Relayまたは同UIDのLive確認済み連絡先を確定する。通常利用・審査用0円・外部テスターを自動選択せず、削除済みE2E UIDやPreview連絡先を流用しない。既存連絡先フローの再送・再試験をこの準備の条件へ追加しない。
 
 ### 次回承認の具体的対象・適用順序（今回は未実行）
 
-配備先は`hamster-breeding-app`／`asia-northeast1`、既存branch `feature/web-first-stripe-checkout`。配備元は今回の準備コードを含む固定コミット（完了報告のID）とし、依存/compileも固定して既存の隔離・関数名指定配備を再利用する。下のA/B/Cは承認単位を区別し、Aの承認でB/Cを開始しない。
+配備先は`hamster-breeding-app`／`asia-northeast1`、既存branch `feature/web-first-stripe-checkout`。Aの配備元は今回の停止準備コードを含む固定コミット`ab7d7c28297db60f6f51beae358618b97c9c7e5f`とし、依存/compileも固定して既存の隔離・関数名指定配備を再利用する。下のA/B/Cは承認単位を区別し、Aの承認でB/Cを開始しない。
 
 | 順 | 対象と変更内容 | 停止維持・成功条件 | 停止/復旧 |
 |---|---|---|---|
@@ -45,18 +45,31 @@
 | A6 通知worker | `processBillingNotificationOutbox`だけ新規限定配備。`HAMCARE_BILLING_NOTIFICATIONS_ENABLED=false`、共通日次50案、cutoff未設定、新メールSecret版 | Node22/256Mi/timeout120/max1/batch5。private worker、同compute SA。15分/Asia/Tokyoの`firebase-schedule-processBillingNotificationOutbox-asia-northeast1`をOIDCで接続し**PAUSED**にする。必要なら当該worker単体のInvokerだけ付与、project権限は増やさない。停止callbackと起動/Secret権限を別確認 | Scheduler PAUSED＋flagfalseを維持。queue/counterを消去/resetせず、workerを同条件で復旧 |
 | A7 停止Web | 最新51file/mapを保全して購入service/viewの必要2assetsだけ停止既定値でoverlay。既存CSP・contact停止HTML・他ファイルは維持 | 本番API参照、client enabled=false/scope=closed。停止案内/リンク/固定550円を確認。Preview API/Test fallbackなし | この工程直前のHosting版へ戻す。11/23/古い49file版へ一括巻戻ししない |
 | B 本人Live限定 | 別承認で未契約本人UID1件を確定。server mastertrue/scope=limited/hash1件、Checkout公開transport、Web enabledtrue/scope=limitedを整合。worker/contactは停止のまま | 対象外UIDはDB/Stripe前拒否。本人が実カードで承認済みの最小契約を操作し、550円/実Invoice/正規Webhook/billing/権限/Portal/期間末解約を確認。体験は実状態に従い、開始/延長/resetしない | まずscopeclosedで新規を止め、status/cancel・Portal/正規同期を維持。実契約の取消/返金や有効Session失効は別の明示承認 |
-| C 一般稼働 | Bの結果後の別承認。新規purchase scope=general/限定値除去/Web general、contact true＋上記HTML1件。一般通知の初回有効化直前に承認したUTC秒境界epochを初めてcutoffへ設定し、時刻到達後にworker true＋Scheduler resume | 最初にcutoff/queueの件数・状態を読取照合。C前のjob/event（B本人Liveで発生した通知も含む）はheldにし、勝手に後送しない。cutoffは以後retry/再配備で固定。承認対象外の過去通知/uncertainを再送せず、quota/受信/重要通知の監視開始。一般購入・一般送信開始を明示的に記録 | 購入scopeclosed、contact false/停止HTML、通知Scheduler pause＋flagfalse。Webhook/Portalは維持 |
+| C 一般稼働 | Bの結果後の別承認。新規purchase scope=general/限定値除去/Web general、contact true＋上記HTML1件。一般通知の初回有効化直前に承認したUTC秒境界epochを初めてcutoffへ設定し、時刻到達後にworker true＋Scheduler resume。公開文面4HTML＋購入assets2件も整合 | 最初にcutoff/queueの件数・状態を読取照合。C前のjob/event（B本人Liveで発生した通知も含む）はheldにし、勝手に後送しない。cutoffは以後retry/再配備で固定。承認対象外の過去通知/uncertainを再送せず、quota/受信/重要通知の監視開始。一般購入・一般送信開始を明示的に記録 | 購入scopeclosed、contact false/停止HTML、通知Scheduler pause＋flagfalse。Webhook/Portalは維持 |
 
 Aではcutoffを準備配備時刻へ固定しない。falseのままcutoff未設定で停止できる実装を使い、Cの一般通知開始時に初めて確定する。Bの通知実配送はこの停止準備や本人購入の確認でPASSとせず、必要な個別後送は別承認で扱う。
 
 Aの各対象は**名前を指定して1関数ずつ**。`createStripeCustomerPortalSession`、削除/AI/体験/通常Auth/他Functions、Stripe Product/Price/Portal/Webhook設定、Rules/Index、Flutter/ストアを一括再配備しない。既存課金Secretはv1、mailは新versionを固定参照し、`latest`やPreview fallbackを使わない。環境を丸ごと置換せず、既存署名/通常同期設定を保全して上記差分だけを適用する。
 
+### Cの公開内容差分（未承認・未配備）
+
+Cで必要な公開pathは、購入service/viewの2assetsと次の4HTML。停止配備Aでは2assetsだけをfalse/closedで反映し、下記HTMLを一般受付文へ変更しない。B/Cの静的bool/scope変更もAに含めない。現行Hosting全map/configを保全してpath限定overlayし、Cのために未公開のソース全体を一括公開しない。
+
+| path | 最小の公開内容変更 |
+|---|---|
+| `/index.html` | OG/受付banner/会員案内/料金枠/FAQの6置換で停止文→一般受付。月額550円element・返金方針・現在のAndroid Alpha/iOS公開準備案内を保持 |
+| `/privacy/index.html` | 停止の補足だけを除き、既定の連絡先確認・契約/請求/解約の重要通知用途へ2置換。広告メール用途や新しい第三者提供を追加しない |
+| `/account/index.html` | head/meta/受付bannerの9置換。旧Preview/Test文とOG画像の旧Preview hostをcanonicalへ整合。同じ画像のbyte一致を確認し参照先だけ変更。header以降/data-live-copy/HTML構造/href/srcは維持 |
+| `/account/contact/index.html` | 上記の一般用1HTML。停止段落除去とneutral案内、既存Live title/footer/API/JS/CSS維持 |
+
+一般公開用3HTMLはLive現行HTMLをGET固定して準備し、全置換前後・hash/保持QAをGit外`/Users/gota/hamcare-deploy-staging/live-launch-readiness-20261127/variants/general-public-copy/manifest-safe.json`と`copy-only-changes.patch`へ保存。contactの候補も同`variants/contact-general-index.html`へ保持した。公開前に現在の各baseline hashを再照合し、不一致なら上書きせず承認済み差分を再生成・確認する。新画像/全面デザイン変更/CSP追加0。LPに残すストアの配信案内は、一般Web購入を始めるときの実際のインストール可否と合わせて確認し、ストアの一般公開を自動実行しない。
+
 ### 送信上限・監視・未処理通知・障害時の運用
 
 - Gmail個人枠は通常の手動メールや他clientとも共有されるため、アプリの50/UTC日案はGoogleの上限や配送保証ではない。[Google公式の送信制限](https://support.google.com/mail/answer/22839)と[APIエラー処理](https://developers.google.com/workspace/gmail/api/guides/handle-errors)に従い、429/403制限は共通sender cooldown（quotaは最低24時間・長いRetry-After優先）で延期する。日付変更を口実に枠/停止期限をresetしない。1batch5、初回込み最大5attempt、送信前の明確な一時拒否のみ有限指数backoffを再利用する。
 - 状態はpending/claimed/sending/sent/failed_retryable/failed_permanent/blocked/uncertain/heldを件数で確認。今回outboxは0件。稼働前の件数・最古時刻を読み、過去通知を手書きで新規化せず、failed/held/uncertainをsentへ偽装しない。過去通知を再送する必要があれば対象・理由・現在の契約状態を個別照合して別承認を得る。
-- 初日・送信開始直後と毎営業日の運営確認：outbox最古pending/failed/blocked/uncertain/held、共通日次count/`_sender`停止期限、worker起動/Secret/OAuthエラーを集計。UID/宛先/本文/Tokenを診断出力しない。Gmail受付200と利用者の受信完了を区別する。
-- 認可失効/恒久エラーでは自動再送せず、Scheduler PAUSED＋通知flagfalse、必要ならcontact falseへ。429は既存cooldownを尊重。Gmail受付後の5xx/timeout/lease切れはuncertainのまま有人照合し、安易に再送しない。
+- 運営担当は本人（Go）。初回2batchの終了時・開始当日は1時間ごと・以後毎営業日に確認する運用案（Cの承認対象）：outbox最古pending/failed/blocked/uncertain/held、共通日次count/`_sender`停止期限、worker起動/Secret/OAuthエラーを集計。UID/宛先/本文/Tokenを診断出力しない。Gmail受付200と利用者の受信完了を区別する。
+- 認可失効/恒久エラーでは当該通知を自動再送しない。運営が検知したらScheduler PAUSED＋通知flagfalse、必要ならcontact falseへ変更する（Scheduler自体の自動pauseや自動alertを実装済みとはしない）。429は既存cooldownを尊重。Gmail受付後の5xx/timeout/lease切れはuncertainのまま有人照合し、安易に再送しない。
 - 停止は**次の実行を止める**制御であり、旧revision実行中batch・予約済み/受付済みの1件を取消す保証ではない。停止後にclaimed/sending/uncertainと受付結果を照合する。共用OAuthを取消してPreviewや通常Gmailを停止させない。
 - `gmail.send`のみではバウンスの受信箱を自動監視しない。運営が送信元受信箱の不達通知を確認し、停止→対象連絡先/本人の新連絡先確認→再送可否を個別判断する。バウンス自動検知・宛先自動抑止は未実装とする。独自domain/transactional mailへの移行とRelay実配送は既存の将来/非ブロッキング項目、追加VoiceOverも一般受付の新条件へ加えない。
 
