@@ -1,5 +1,16 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 本人Live確認に向けた停止配備完了（2関数・3assets／自然体験終了待ち）
+
+- **承認と配備元**：本人が`0ca4810`の購入/連絡先2関数＋画面用3ファイルの本番反映、停止での限定確認、本人1アカウントの検証準備を承認。同じ`feature/web-first-stripe-checkout`から`0ca48100057285c8bc383df92e2f27e008e77094`を隔離し、既存lock一致の依存で配備用compile。src84/compiled83/package等3の170ファイルだけを両配備archiveと全hash照合。.env/資格情報/依存実体/テストを同梱せず、既存dirtyは保護。
+- **2関数のみ本番反映**：`hamster-breeding-app`/`asia-northeast1`。Checkoutは15:14:43〜15:15:45 JST、`createstripecheckoutsession-00007-lob`→**`createstripecheckoutsession-00008-cex`**。contactは15:15:45〜15:17:35 JST、`billingcontactemail-00007-vah`→**`billingcontactemail-00008-woy`**。両ACTIVE/Cloud Run Ready、既存SA/CPU/memory/timeout/max/concurrency/Invoker binding/Secret固定版（billing v1/mail v3）を保全。追加環境差分はpurchase scope=closedとcontact status=falseだけ。新API/Secret版/IAM拡大/Rules/Index/他Function変更0。
+- **停止の限定確認**：購入master=false/private/IAM check有効・scopeclosed/hash未設定を維持し、Functions/Runの2経路とも403。403はIAM拒否の証拠であり、handler実行の証明とはしない。contactはsend=false/status=false/日次1でstatus/request/confirm各503＋`contact_service_unavailable`を確認。正常起動と設計上の停止を区別し、停止確認ではAuth/DB/Gmail/Stripe処理へ進めない。対象2serviceの開始後non-request ERRORは0。既存32件Mock/型検査は再実行せず、今回必要な配備compile/実配備byte/実停止だけを確認した。
+- **Hosting3assetsのみ**：**15:19:13.849 JST**（release APIのUTCから換算、運用scriptの秒表示15:19:14）に`a2d4e7fbc0e3426a`→**`014eda18e04632c8`**。`live-checkout-service.mjs`/`live-checkout-view.mjs`/`live-checkout-model.mjs`だけを0caの停止既定値で差替え。全51path、他48hash、予約init2件、ServingConfig/CSP、既存8ページのbytes/CSPを保全し、3assetsの公開byteも一致（公開確認11件）。account/contact HTMLは変更せず、contactの停止案内は仕様どおり残る。通常再読込では旧停止JSがcacheに残ったためhard reloadで新しい停止文を確認。旧版も停止設定であり受付拡大なし。Bの反映時も再読込/公開byteを照合する。
+- **本人候補・待機方針**：現存する本人所有根拠＋UIDを復元できる記録から、自然に体験終了した別候補は特定できなかった。過去Task4の本人Test操作履歴だけをUIDへ推測対応させず、Auth/外部テスター一覧やメールから所有推定は行わない。他候補の不存在を断定しない。本人の指定方針に従い、既知候補の**2026-12-03 19:05 JSTの正規体験終了後**を優先予定とする。現在前面の確認タブはログイン画面で、ログアウト/再登録を実行していない。同UID/owner+pet/正規Live連絡先/Stripe現状態を決済直前に照合する。体験期限・既存権限・プロフィールは書換えない。
+- **本人限定の安全境界**：exact1件のUID SHA256 allowlistと失効確認済み認証UIDをサーバーで照合するruntimeは配備済み。今はmasterfalse/private/closedのため全員拒否で、対象UID未確定のままlimited/generalを開かない。本人の自然終了後のログインでUIDを非公開固定してから、本人限定scope・status読取のみを整合させる。sender/worker停止は維持。今の段階で有効Sessionを作っても期限切れになるため、review/Customer/Session/Subscription作成・カード入力・550円決済は0。実支払いは本人操作で別途行う。
+- **通知worker準備**：既存通知文書へ、producer通常同期を維持した限定更新→正規Live mail新version→private worker false/cutoff未設定/PAUSED Schedulerの順と、B後の固定cutoff・queue監視・障害停止を整理。worker/producer/Secret/IAM/Schedulerの本番変更や一般送信はこの2関数承認へ含めず、今回は未実行。前回のworker未配備/queue0件を現在の再照会結果とは扱わない。
+- **本番変更と業務データ**：本番構成は上記2関数/source/revision/build/2環境変数追加/Hosting version・3assetsを変更済みであり「本番変更0件」としない。停止確認による本番Firestore/contact/billing/体験/権限の書込み、Stripe書込み・実メール・実決済・実削除は0。既存正規Webhookの通常同期を止めず、既存テスター/Preview/Apple承認・手動公開を維持。復旧不要、旧source/設定/Hostingは非公開退避済み。Git外根拠は`/Users/gota/hamcare-deploy-staging/live-owner-stopped-20261127/`、候補確認は既存tmpのsafe記録。記録を今回1コミットにし、merge/pushなし。
+
 ## 2026-11-27 ④Web購入・⑤メールの継続準備（本人550円確認前・本番未反映）
 
 - **引継ぎ**：Android限定実機確認と製品版アクセス申請は`fc72fc9`で完了扱い。`ab7d7c2`/`6ea42e5`の購入scope/通知停止/cutoff/過去通知保留/一般用公開候補と既存の配送・課金・認証の試験を再利用する。Googleのアクセス審査待ちに依存せず、未完了の本人Live確認準備だけを追加。一般購入/一般メール停止、Apple手動公開を維持する。

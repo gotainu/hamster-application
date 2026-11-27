@@ -1,5 +1,30 @@
 # HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
+## 2026-11-27 実行結果：本人確認用の停止配備（2関数・3assets）
+
+本人の追加承認により、上段の最小範囲だけを実行した。一般メール側のA3/A4/A6、一般受付C、実550円決済は未実行である。本節が下段の「本番未反映/未承認」の旧準備記録に優先する。配備元は`0ca48100057285c8bc383df92e2f27e008e77094`、project `hamster-breeding-app`、region `asia-northeast1`、branch `feature/web-first-stripe-checkout`。
+
+- **配備元と退避**：既存source zip/世代、2関数の環境・Secret参照版・Run IAM・resource、Hosting全map/config/公開8ページを非公開退避。承認commitだけを隔離し、lock一致依存のcompileからsrc84/compiled83/その他3＝170ファイルを配備。両Functionの実GCS source zipと承認artifactの全170hashを照合。環境ファイル・node_modules・テスト・資格情報の同梱なし。配備は`gcloud functions deploy`で関数名を1件ずつ指定、Firebase全体deployはしない。
+- **Checkout**：15:14:43〜15:15:45 JST、`createStripeCheckoutSession`/service `createstripecheckoutsession`を`00007-lob`→**`00008-cex`**へ更新。master=false、追加scope=closed、UID hash allowlist未設定、private Invoker/IAM check有効を配備中も維持。billing Secret固定v1と既存runtime/build SA、Node22/256Mi/1CPU/60秒/max20/concurrency80を保全。
+- **contact**：15:15:45〜15:17:35 JST、`billingContactEmail`/service `billingcontactemail`を`00007-vah`→**`00008-woy`**へ更新。send=false、追加`HAMCARE_BILLING_CONTACT_STATUS_ENABLED=false`、日次1、mail Secret固定v3。既存public transport/認証・同UID照合とSA、Node22/256Mi/1CPU/60秒/max1/concurrency5を保全。Secret新version・Accessor追加・公開権限の拡大は0。
+- **正常起動/停止**：両Function ACTIVE・Run Ready・IAM binding完全一致・変更環境キー2件だけを照合。購入Functions/Runへ空のreview要求を各1回→403。これはprivate IAMの拒否でありhandlerの実行証明にはしない。contact status/request/confirmへ正規Originから各1回→503＋`contact_service_unavailable`。起動/Secretエラーを停止成功へ読み替えない。対象serviceの開始後non-request ERROR0を読取確認。停止呼出しは顧客・契約・メール・業務データの処理へ進んでいない。旧Mock32件/型検査や全体E2Eは繰り返さない。
+- **Hosting**：releaseTime **2026-11-27 06:19:13.849Z＝15:19:13.849 JST**、`a2d4e7fbc0e3426a`→**`014eda18e04632c8`**。`/assets/live-checkout-service.mjs`・`/assets/live-checkout-view.mjs`・`/assets/live-checkout-model.mjs`だけを停止既定値でoverlay。51path/他48hash/予約init2件/ServingConfig/CSPを厳密保全。既存8ページの本文/headersと新3assetsの公開bytesを全11件確認。HTML/画像/法務/CSP・他ページ変更0。復旧不要。
+- **画面**：管理Chromeのaccountをhard reloadし新しい購入停止banner、contactのメール停止banner、accountへの戻りリンクを確認。通常reloadでは旧停止assetsがcacheに残ったが、旧・新とも受付停止のまま。決済準備の反映時にはhard reloadと公開byteを照合し、cacheを理由に新規Session作成を繰り返さない。添付画像のcontactエラーは送信/確認受付停止に対応した表示で、本人限定準備時の独立したstatus読取とは別。本工程でstatus/送信は開かない。
+- **未変更の境界**：IAM/新API/Rules/Index/Secret値/Stripe設定/契約/本番billing/体験/既存テスター/Preview/通知worker・producer/削除/Flutter/ストアは変更0。上記FunctionとHostingの構成変更を業務データと分ける。既存Webhookの正常同期は維持する。
+
+### 本人の決済操作までの残件（自然終了待ち）
+
+別の自然終了済み本人候補は、現存する所有根拠と非公開UID対応がそろう記録からは特定できなかった。過去の本人Test決済履歴だけで現UIDを推定せず、審査用0円/外部テスター/削除済みApple E2Eは除く。本人指定のfallbackに従い、既知候補の**12月3日19:05 JSTに表示される正規体験終了日時を過ぎた後**に確認する。実際の`endsAt`秒とサーバー時刻を直前に照合し、分表示だけで数十秒早く開始しない。終了日時/体験状態/利用枠/既存権限は書換えない。自動的な購入有効化・予約Session・日付到達による自動課金は設定しない。
+
+1. 本人が本番`https://hamster-breeding-app.web.app/account/`へ、候補の**HamCareメール/パスワード**でログインする。Apple Developer管理用・TestFlight受信用・審査用0円アカウントではない。現在の前面タブはログイン画面で、今回は再入力/再試験を求めていない。
+2. 運営が認証済みUIDとiOS/Android双方のアプリUIDを非公開照合し、同UIDのowner/pet、正規終了したtrial、削除フェンスなし、確認済みAuth/Relay/Live contact、Stripe未契約/未完了Sessionなしを読み取る。不足を根拠なく補わず、別UIDの契約/体験は触らない。
+3. 対象UID SHA256を厳密1件に固定し、closed/private/masterfalseの下で限定設定を準備する。本人の操作開始時にだけserver limited/本人hash/mastertrueと正規Invoker、静的Web true/limited、contact status読取trueを整合させる。一般scope/連絡先のrequest/confirm・worker送信は開かない。この段階が未完了なら「決済可能」と案内しない。
+4. 本人へ「本番account→月額プラン→本人限定の申込内容確認」を案内し、serverのimmediate/550 JPY・月次自動更新を確認後、本人が規約同意→Stripe iframeの実カードで**1契約・初回550円**を操作する。review保存/Sessionはこの直前に正規発行し、体験終了前に作成しない。実支払いは運営が代行しない。想定外の0円/金額/UID/タイムアウトで停止し、再送・重複契約をしない。
+5. 決済後はLive paid550 Invoice→署名Webhook処理→同UID canonical billing activeを確認し、**iOS 1.0.1(6)とAndroid 1.0.1/code6の両方**でserver-confirmedな有料状態/機能アクセスを確認する。新AI/レポート生成は不要。Web専用Portalで期間末解約→正規同期/cancel_at_period_end/期間末まで利用可能を確認する。返金/即時終了は勝手に行わない。
+6. 新規受付をscopeclosedへ戻し、契約管理/status/cancel/正規Webhookを維持する。contact statusfalse/送信false、worker停止を確認。Bのoutboxを保持し、一般メール開始時に後送しない。請求/会計記録や有効な契約を削除して後始末扱いにしない。
+
+Git外の実行根拠/復旧元は`/Users/gota/hamcare-deploy-staging/live-owner-stopped-20261127/`。Hosting失敗時は直前`a2d4e7fbc0e3426a`を再release、Function失敗時は各旧source/環境を対で戻し、購入private/falseとcontact停止を維持する。今回復旧の実施なし。通知workerの別承認準備は[既存通知記録](billing_notification_outbox_20261121.md)を参照し、本番稼働済みとは扱わない。
+
 ## 2026-11-27 正式ローンチ④Web購入・⑤一般メールの稼働前準備（本番変更未実行）
 
 この節は、同日のAndroid Alpha審査待ちと並行した準備の現在地である。Apple提出時の④TestFlight〜⑥提出情報とは工程番号の意味が異なる。既存の本番Price/Portal/Webhook/Web接続、本番contact実配送、Test購入/Portal、iOS共通機能の結果を再利用し、再試験しない。一般受付開始・実決済・一般送信・本番の追加設定/配備は**別承認まで実行しない**。
@@ -77,7 +102,7 @@ Android code6の限定実機確認と製品版アクセス申請は`fc72fc9`で�
 2. **即時550円の条件**：本番の契約/Customer/未完了Sessionを対象1件だけで読み取り確認する。21日体験は未開始（原本missing）または正規期限切れで、購入レビューが`chargeTiming=immediate`/550 JPY/月次/初回550円となることが必要。体験中なら当日0円の検証へすり替えず、別候補または本来の終了日時を選ぶ。体験期限/利用枠/有料権限を手修正しない。
 3. **受付は本人のみ**：承認後、private/masterfalseのまま新runtimeを先に配備して正常起動を確認し、その後に限定hash1件＋scope=limitedを確定、mastertrue・正規Invoker・静的Web true/limitedを整合させる。scope generalは設定しない。status読取true、contact送信false、通知false/Scheduler PAUSED（未配備なら未配備のまま）。Bだけに必要な最小反映はCheckout/contactの2関数と上記3assetsであり、一般メールSecret化/worker配備をBの必須条件へ増やさない。本人限定の本番確認を明示する`/account/index.html`のhead metadata/静的banner9置換もBの公開差分へ含め、認証/規約/フォーム本文は維持する。Webhook producerの新時刻フィールドは一般通知準備の直接依存として別途Aで扱う。
 4. **操作・課金件数**：本人の明示承認後に、本人が正規Webの契約条件・550円・自動更新へ同意し、Stripe iframe内で実カードによる**1契約・初回550円**を操作する。カード情報や認証コードは画面だけに入力する。承認前のreview見積り保存、Customer/Session/Subscription作成、実カード入力はしない。Stripe側で領収書/請求メールの自動配送が設定されている場合は、本人宛へ発生し得ることをBの承認内容へ含め、HamCareの一般通知worker停止と区別する。共有のStripeメール設定を勝手に変更しない。想定外の金額/体験0円/別アカウント/既存契約/タイムアウトで止め、再クリックや追加契約で確認しない。
-5. **Webからアプリまでの証拠**：完了ページだけではPASSにしない。Live Invoiceのpaid/550 JPY/同Customer・Subscription、署名検証されたWebhookの処理完了・UID対応、同UIDの`users/{uid}/billing/subscription`の正規active/paid・将来の契約期間末を照合する。続けて配布済みアプリの同UIDで「利用状況」を再取得し、サーバー確定の有料状態と既存の「変化」または「相談」画面へのアクセスを確認する。AI送信/新レポート生成は不要。カレンダーが開くことだけを有料権限反映の証拠にしない。
+5. **Webからアプリまでの証拠**：完了ページだけではPASSにしない。Live Invoiceのpaid/550 JPY/同Customer・Subscription、署名検証されたWebhookの処理完了・UID対応、同UIDの`users/{uid}/billing/subscription`の正規active/paid・将来の契約期間末を照合する。続けて配布済みiOS 1.0.1(6)とAndroid 1.0.1/code6の両方の同UIDで「利用状況」を再取得し、サーバー確定の有料状態と既存の「変化」または「相談」画面へのアクセスを確認する。AI送信/新レポート生成は不要。カレンダーが開くことだけを有料権限反映の証拠にしない。
 6. **管理・停止復帰**：Webから専用Portalへ進み、550円請求履歴と帰還を確認する。期間末解約予約まで行う場合はBの承認内容へ明記し、`cancel_at_period_end=true`/期間末まで利用可能/次回請求停止を確認する。新規受付はscope=closedを先に適用し、mastertrue/public transportのstatus/cancel、既存Portal、正規Webhookを残す。全masterfalse/privateへの緊急停止と区別する。contact送信false・statusfalse、通知falseを確認し、不要な追加Sessionがないかを読む。発行済みSessionは新規受付停止だけでは失効しない。実取消/返金/Session失効は承認内容にない限り行わない。
 7. **記録と後始末**：1契約/初回550円の実施時刻、Webhook/billing/アプリの対応と表示、期間末解約の実施有無・最終状態を既存文書へ記録する。解約予約後も期間末までは有効なので「テスト有効契約を即時終了済み」と記録しない。本人が継続利用するか期間末終了させるかをB承認時に確定し、契約/会計記録を削除しない。今回の準備だけではBの実績を作らない。
 

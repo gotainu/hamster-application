@@ -22,6 +22,14 @@
 - **C後の新しい出来事**：同じ本人契約であっても、C後に実際に生じる更新・解約等は新しい正規通知である。B以前の通知の誤後送とは区別し、本人UIDだけを理由に将来の正規通知を一括抑止しない。
 - **上限と障害時**：一般用メール設定と共通日次50通案は未承認・未適用のまま。失敗・不達を確認したら既存手順でScheduler PAUSED＋通知flagfalse、必要ならcontactの送信も停止する。受付済み送信を取消せるとせず、claimed/sending/uncertain・共通枠・不達通知を照合する。共有OAuthの取消や過去カウンタのresetで停止・復旧を代替しない。
 
+### 通知の後続配備に向けた運用チェック（今回の承認外・未実行）
+
+最新の停止反映承認は`0ca4810`のCheckout/contactの2関数と必要3assetsに限る。通知producer、worker、メールSecret、IAM、Schedulerの本番変更・通知送信は含まれない。以下は既存実装を配備する前の手順整理であり、新しいコードの追加や再試験を必要とする判断ではない。
+
+1. **producerと設定を先に固定**：別承認後、`stripeWebhook`だけを正規event時刻付きproducerへ更新する。既存のendpoint/API版/署名Secretと正常なbilling同期を維持し、過去イベントの一括再処理はしない。一般用メールは既存の本人送信専用資格情報を再利用する正規Live新versionを固定参照し、本人限定contact試験設定・Previewとの取り違えを防ぐ。旧version/認可/送信履歴は保持する。
+2. **送信停止のまま接続**：別承認後、`processBillingNotificationOutbox`を`HAMCARE_BILLING_NOTIFICATIONS_ENABLED=false`・cutoff未設定で限定配備する。既存サービスアカウントとSecret単体権限を優先し、privateのまま対応Scheduler `firebase-schedule-processBillingNotificationOutbox-asia-northeast1`（15分・Asia/Tokyo・OIDC）へ接続してPAUSEDにする。送信枠はcontactと同じ承認済みの有限値へ揃える。正常起動/Secret mountと意図したdisabled応答を分けて確認し、起動失敗を停止制御の成功とは扱わない。
+3. **初回稼働と停止の判定**：一般通知の別承認前に、最新outboxの件数・状態・最古時刻と共通counter/`_sender`停止期限を非公開で確認する。本人購入Bの最終eventより後の固定Tを使い、T到達後の有効化だけを次の承認対象とする。稼働後はheld/failed/uncertain等の件数と結果を確認し、障害時はScheduler PAUSED＋通知flagfalseへ戻す。過去通知の再投入、カウンタreset、共有OAuth取消で復旧を代替しない。今回、これらの本番確認・変更・送信は実行していない。
+
 ## データと実行の境界
 
 | 処理 | 実装と責務 |
