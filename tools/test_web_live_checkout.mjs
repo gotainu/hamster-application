@@ -68,6 +68,7 @@ test('same-UID billing read supports Apple without Auth email and strips IDs',as
   assert.deepEqual(h.reads,['synthetic-owner']);assert.equal(h.calls.length,0);assert.equal(model.statusLabel,'契約中');assert.equal(model.portalManageable,true);
   assert.doesNotMatch(JSON.stringify(raw)+JSON.stringify(model),/synthetic-owner|cus_synthetic|sub_synthetic|firebaseUid|stripeCustomerId/);
 });
+test('missing Live billing copy is independent of intake scope',()=>{assert.equal(projectLiveBilling({live:true,syncState:'none'}).copy,'契約完了とは扱っていません。現在の申込受付状況と、プランの内容をご確認ください。');});
 test('absent contact doc is irrelevant to ordinary billing reads and existing management',async()=>{const h=harness({billing:billing()});const m=projectLiveBilling(await h.service.getPreviewBilling());assert.equal(m.portalManageable,true);assert.equal(h.calls.length,0);});
 test('Preview billing or another UID binding is rejected instead of displayed',async()=>{
   for(const value of [{firebaseUid:'synthetic-other'},{testMode:true},{previewFirebaseUid:'synthetic-owner'},{stripeLivemode:false}]){

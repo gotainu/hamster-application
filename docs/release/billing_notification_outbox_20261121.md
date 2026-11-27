@@ -4,7 +4,7 @@
 
 ## 2026-11-27 本番稼働前の追加安全制御（ローカル完了・配備未実行）
 
-既存のPreview本人5通の実配送確認は再実行しない。今回、対象worker/対応Schedulerの未作成と本番outbox0件を限定read-only確認した。本番準備/一般稼働の具体的な承認対象は[既存Runbook](web_billing_live_cutover_runbook_ja.md)の最新④⑤節を正本とする。旧日付の未実装/Secret未登録の記述は当時の履歴であり、現在のLive contact実配送・mail v3の存在と区別する。
+既存のPreview本人5通の実配送確認は再実行しない。対象worker/対応Schedulerの未作成と本番outbox0件は、前回の追加安全制御実装時点に限定read-onlyで確認した結果である。今回の本人550円確認に向けた手順追記では本番の再読取りを行っておらず、新しい現在値の確認とはしない。本番準備/一般稼働の具体的な承認対象は[既存Runbook](web_billing_live_cutover_runbook_ja.md)の最新④⑤節を正本とする。旧日付の未実装/Secret未登録の記述は当時の履歴であり、現在のLive contact実配送・mail v3の存在と区別する。
 
 - 独立`HAMCARE_BILLING_NOTIFICATIONS_ENABLED`の未設定/falseはアプリcallbackのSecret値/Auth/DB/Gmail参照前で停止。trueには固定`HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS`（UTC秒境界epoch millis・末尾000・未来不可）が必要。再配備やretryごとに現在時刻へ動かさない。platformのSecret mount/権限は別途必要。
 - Live workerへ本人限定contact用`limitedContactTest`入りの設定を渡さない。正規Live Secretの新versionを用意する計画で、既存資格情報・Preview認可・旧v3・送信枠/履歴は保持する。contactと通知は共通の有限枠（初期50/UTC日案）を使う。
@@ -12,7 +12,15 @@
 - expired sendingは従来どおりuncertainを優先。通常retry/重複抑止/Preview・現在Auth/連絡先解決を維持。新worker独自の削除要求フェンスを追加したものではなく、既存のproducer transactionフェンスと、削除済みAuthの宛先拒否を区別する。
 - 停止時はScheduler PAUSED＋通知flagfalse。これは次回実行を止める制御で、実行中/予約済み/受付済み送信の取消保証ではない。停止後のclaimed/sending/uncertainを照合し、結果不明の再送やcounter resetを行わない。gmail.sendのみのためバウンス受信箱の自動監視/自動宛先抑止は未実装。運営の不達通知確認・停止・個別連絡先確認を必要とする。
 
-今回の限定Mockは149/149 PASS、依存/SDK更新・本番配備/設定/実メール変更0。最終の統合型検査結果はPROJECT_STATUSとRunbookへ記録する。
+追加安全制御実装時の限定Mockは149/149 PASS、依存/SDK更新・本番配備/設定/実メール変更0。今回の手順追記では、既存試験の再実行、本番再読取り、Secret参照、配備・設定変更・実送信はすべて0。最終の統合型検査結果はPROJECT_STATUSとRunbookの既存記録を再利用する。
+
+### 本人の実550円確認Bから一般通知開始Cまで（未実行）
+
+- **本人確認B**：別承認後の本人購入・アプリ権限確認中も、通知workerとメールのrequest/confirmは停止を維持する。連絡先のstatusだけを独立flagで読めるようにする場合も、送信許可にはしない。正規Webhookで生成される支払成功・解約予約等のoutboxは保持し、本人購入の成功を本番通知の実配送PASSに読み替えない。
+- **cutoffの確定**：Bの対象実操作が完了した後、その最新の正規Stripe event時刻を照合し、それより**厳密に後**のUTC秒境界を固定Tとして予約する。同じ秒への切捨てやB開始時刻を使って、Bの通知を送信対象へ含めない。Tの値は`HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS`へ設定するepoch millis（末尾000）。worker=falseのまま準備し、別承認されたCでT到達後に限りtrueとScheduler resumeへ進む。その後の再配備・通常再試行でTを動かさない。
+- **Bの通知を後送しない**：Cの初回稼働前に対象outboxの件数・状態を読み、稼働後の初回scanではB以前のjob/eventが`held_before_dispatch_start`へ保留されたことを件数で確認する。既存の二つの時刻判定により、C後に遅れてenqueueされた古いeventも対象外になる。pending/failed/held/uncertainの削除、sentへの偽装、時刻の手書き補完、cutoffを下げた一括後送を行わない。必要な個別後送は対象と理由を照合し、別承認で扱う。
+- **C後の新しい出来事**：同じ本人契約であっても、C後に実際に生じる更新・解約等は新しい正規通知である。B以前の通知の誤後送とは区別し、本人UIDだけを理由に将来の正規通知を一括抑止しない。
+- **上限と障害時**：一般用メール設定と共通日次50通案は未承認・未適用のまま。失敗・不達を確認したら既存手順でScheduler PAUSED＋通知flagfalse、必要ならcontactの送信も停止する。受付済み送信を取消せるとせず、claimed/sending/uncertain・共通枠・不達通知を照合する。共有OAuthの取消や過去カウンタのresetで停止・復旧を代替しない。
 
 ## データと実行の境界
 

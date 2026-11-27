@@ -32,7 +32,7 @@ export function projectLiveCheckoutStatus(raw) {
 export function projectLiveBilling(raw, {nowMs=Date.now()} = {}) {
   if (!record(raw) || raw.live!==true || !['none','pending','synced'].includes(raw.syncState)) fail();
   const empty={state:raw.syncState,outcome:'pending',title:'契約状態を確認しています',copy:'サーバーに保存された同じアカウントの情報を表示します。この画面だけでは利用権限を変更しません。',statusLabel:'確認待ち',planLabel:'未確認',amountLabel:'未確認',firstChargeLabel:'未記録',nextChargeLabel:'未記録',periodStartLabel:'未記録',periodEndLabel:'未記録',trialEndLabel:'未記録',cancelLabel:'未確認',syncedAtLabel:'未記録',entitlementLabel:'アプリで確認してください',portalManageable:false,managementCardVisible:false,accessLabel:'アプリで確認してください'};
-  if (raw.syncState==='none') return {...empty,outcome:'none',title:'契約の保存記録はありません',copy:'契約完了とは扱っていません。新規のお申し込みは現在停止しています。',statusLabel:'保存記録なし'};
+  if (raw.syncState==='none') return {...empty,outcome:'none',title:'契約の保存記録はありません',copy:'契約完了とは扱っていません。現在の申込受付状況と、プランの内容をご確認ください。',statusLabel:'保存記録なし'};
   if (raw.syncState==='pending') return empty;
   const b=raw.billing,labels={active:'契約中',trialing:'体験期間中・契約登録済み',past_due:'お支払いの確認が必要です',unpaid:'未払い',paused:'契約一時停止',incomplete:'申込未完了',incomplete_expired:'申込期限切れ',canceled:'解約済み',none:'未契約'};
   if (!record(b) || !labels[b.status] || !['paid','none'].includes(b.plan) || (b.cancelAtPeriodEnd!==undefined && typeof b.cancelAtPeriodEnd!=='boolean')) fail();

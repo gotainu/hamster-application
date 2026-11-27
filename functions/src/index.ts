@@ -50,6 +50,7 @@ const SWITCHBOT_MANUAL_POLL_SECRET = defineSecret('SWITCHBOT_MANUAL_POLL_SECRET'
 // intake. No Preview credential, contact or endpoint fallback is provided.
 const billingContact = createProductionBillingContactRuntime({db,auth:admin.auth(),
   enabled:()=>process.env.HAMCARE_BILLING_CONTACT_ENABLED==='true',
+  statusEnabled:()=>process.env.HAMCARE_BILLING_CONTACT_STATUS_ENABLED==='true',
   rawConfig:()=>process.env.HAMCARE_LIVE_BILLING_MAIL_CONFIG,
   dailyLimit:()=>Number(process.env.HAMCARE_BILLING_MAIL_DAILY_LIMIT),
 });

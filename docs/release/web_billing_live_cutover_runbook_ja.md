@@ -33,7 +33,7 @@
 
 ### 次回承認の具体的対象・適用順序（今回は未実行）
 
-配備先は`hamster-breeding-app`／`asia-northeast1`、既存branch `feature/web-first-stripe-checkout`。Aの配備元は今回の停止準備コードを含む固定コミット`ab7d7c28297db60f6f51beae358618b97c9c7e5f`とし、依存/compileも固定して既存の隔離・関数名指定配備を再利用する。下のA/B/Cは承認単位を区別し、Aの承認でB/Cを開始しない。
+配備先は`hamster-breeding-app`／`asia-northeast1`、既存branch `feature/web-first-stripe-checkout`。Aの配備元は`ab7d7c28297db60f6f51beae358618b97c9c7e5f`に後述の送信停止中のstatus読取・表示修正を加えた確定コミット（本タスク完了報告のhash）とし、依存/compileも固定して既存の隔離・関数名指定配備を再利用する。下のA/B/Cは承認単位を区別し、Aの承認でB/Cを開始しない。
 
 | 順 | 対象と変更内容 | 停止維持・成功条件 | 停止/復旧 |
 |---|---|---|---|
@@ -41,19 +41,57 @@
 | A2 Checkout | `createStripeCheckoutSession`だけ今回runtimeへ更新。`HAMCARE_WEB_PURCHASE_ENABLED=false`、scope=closed、allowlist未設定 | 既存private/IAM checkを配備中も維持、Live Secret v1再利用。Functions/Run403と正常起動を区別、Customer/Session作成0 | private/masterfalseを維持して同関数source/設定を対で戻す |
 | A3 producer | `stripeWebhook`だけ新しいevent時刻付きoutbox生成へ更新 | 新endpoint/Acacia/署名Secret v1/public transport、`HAMCARE_WEBHOOK_ENABLED=true`/mode=process/legacy=falseを維持。既存の正常同期を止めない。新規購入/一般メールfalse、既存契約条件不変 | 通常同期を維持する退避source/設定へ戻す。新旧Webhook両停止や審査権限手動付与で代替しない |
 | A4 一般用メール設定 | `HAMCARE_LIVE_BILLING_MAIL_CONFIG`新versionへ上記正規Live JSON。既存compute SA `797691641198-compute@developer.gserviceaccount.com`の同Secret単体Accessorを再利用 | 資格情報は既存の送信専用認可、値非表示。旧v3/Preview不変。一般用設定を用意しても独立送信flagはfalse | 旧Secretは消去/失効せず、各参照版を退避元へ戻す |
-| A5 contact | `billingContactEmail`だけ新メール版/共通日次50案へ固定参照で更新、`HAMCARE_BILLING_CONTACT_ENABLED=false` | status/request/confirmの正規停止応答。mount/起動エラーを停止成功と扱わない。既存連絡先/送信履歴不変。停止HTML維持 | contact false、同関数のsource/Secret版/環境を対で戻す |
+| A5 contact | `billingContactEmail`だけ新メール版/共通日次50案へ固定参照で更新、`HAMCARE_BILLING_CONTACT_ENABLED=false`、`HAMCARE_BILLING_CONTACT_STATUS_ENABLED=false` | status/request/confirmの正規停止応答。mount/起動エラーを停止成功と扱わない。既存連絡先/送信履歴不変。停止HTML維持 | contact false、同関数のsource/Secret版/環境を対で戻す |
 | A6 通知worker | `processBillingNotificationOutbox`だけ新規限定配備。`HAMCARE_BILLING_NOTIFICATIONS_ENABLED=false`、共通日次50案、cutoff未設定、新メールSecret版 | Node22/256Mi/timeout120/max1/batch5。private worker、同compute SA。15分/Asia/Tokyoの`firebase-schedule-processBillingNotificationOutbox-asia-northeast1`をOIDCで接続し**PAUSED**にする。必要なら当該worker単体のInvokerだけ付与、project権限は増やさない。停止callbackと起動/Secret権限を別確認 | Scheduler PAUSED＋flagfalseを維持。queue/counterを消去/resetせず、workerを同条件で復旧 |
-| A7 停止Web | 最新51file/mapを保全して購入service/viewの必要2assetsだけ停止既定値でoverlay。既存CSP・contact停止HTML・他ファイルは維持 | 本番API参照、client enabled=false/scope=closed。停止案内/リンク/固定550円を確認。Preview API/Test fallbackなし | この工程直前のHosting版へ戻す。11/23/古い49file版へ一括巻戻ししない |
-| B 本人Live限定 | 別承認で未契約本人UID1件を確定。server mastertrue/scope=limited/hash1件、Checkout公開transport、Web enabledtrue/scope=limitedを整合。worker/contactは停止のまま | 対象外UIDはDB/Stripe前拒否。本人が実カードで承認済みの最小契約を操作し、550円/実Invoice/正規Webhook/billing/権限/Portal/期間末解約を確認。体験は実状態に従い、開始/延長/resetしない | まずscopeclosedで新規を止め、status/cancel・Portal/正規同期を維持。実契約の取消/返金や有効Session失効は別の明示承認 |
+| A7 停止Web | 最新51file/mapを保全して購入service/viewと未契約表示modelの計3assetsだけ停止既定値でoverlay。既存CSP・contact停止HTML・他ファイルは維持 | 本番API参照、client enabled=false/scope=closed。停止案内/リンク/固定550円を確認。Preview API/Test fallbackなし | この工程直前のHosting版へ戻す。11/23/古い49file版へ一括巻戻ししない |
+| B 本人Live限定 | 別承認で未契約本人UID1件を確定。server mastertrue/scope=limited/hash1件、Checkout公開transport、Web enabledtrue/scope=limitedを整合。contactは送信false/status読取のみtrue、worker停止のまま | 対象外UIDはDB/Stripe前拒否。本人が実カードで承認済みの最小契約を操作し、550円/実Invoice/正規Webhook/billing/権限/Portal/期間末解約を確認。体験は実状態に従い、開始/延長/resetしない | まずscopeclosedで新規を止め、status/cancel・Portal/正規同期を維持。実契約の取消/返金や有効Session失効は別の明示承認 |
 | C 一般稼働 | Bの結果後の別承認。新規purchase scope=general/限定値除去/Web general、contact true＋上記HTML1件。一般通知の初回有効化直前に承認したUTC秒境界epochを初めてcutoffへ設定し、時刻到達後にworker true＋Scheduler resume。公開文面4HTML＋購入assets2件も整合 | 最初にcutoff/queueの件数・状態を読取照合。C前のjob/event（B本人Liveで発生した通知も含む）はheldにし、勝手に後送しない。cutoffは以後retry/再配備で固定。承認対象外の過去通知/uncertainを再送せず、quota/受信/重要通知の監視開始。一般購入・一般送信開始を明示的に記録 | 購入scopeclosed、contact false/停止HTML、通知Scheduler pause＋flagfalse。Webhook/Portalは維持 |
 
 Aではcutoffを準備配備時刻へ固定しない。falseのままcutoff未設定で停止できる実装を使い、Cの一般通知開始時に初めて確定する。Bの通知実配送はこの停止準備や本人購入の確認でPASSとせず、必要な個別後送は別承認で扱う。
 
 Aの各対象は**名前を指定して1関数ずつ**。`createStripeCustomerPortalSession`、削除/AI/体験/通常Auth/他Functions、Stripe Product/Price/Portal/Webhook設定、Rules/Index、Flutter/ストアを一括再配備しない。既存課金Secretはv1、mailは新versionを固定参照し、`latest`やPreview fallbackを使わない。環境を丸ごと置換せず、既存署名/通常同期設定を保全して上記差分だけを適用する。
 
+### 2026-11-27 続行：本人550円確認の実行条件と、送信停止中の連絡先読取
+
+Android code6の限定実機確認と製品版アクセス申請は`fc72fc9`で完了し、Googleのアクセス審査待ちは④⑤の準備を停止する条件にしない。本人は実550円を支払ってWeb契約→アプリ権限反映を確認する意向と、候補となる既存アカウントがあることを回答した。**実決済・本人限定受付の有効化・本番追加変更はまだ未承認**。その後本人が候補へログインし、Web画面では契約保存記録なし・メール/パスワード認証、体験は**2026-12-03 19:05 JSTまで継続中**と確認。現時点の即時550円用には選定せず、別候補か本来の体験終了後かの本人回答を待つ。ニックネームは未設定で、最終の同UID/owner+pet/Stripe状態/確認済み連絡先を未確認のままPASSにしない。Git外`/private/tmp/hamcare-owner-live-preparation-20261127/candidate-screen-safe.json`へ個人値なしの表示根拠を保存。プラン/レビュー/申込/メールの操作はしていない。
+
+**今回見つかった接続不足**：購入前の`account-view.mjs`は確認済みAuthメールの有無にかかわらず`contactService.getStatus()`を必須とする。一方、既存`billingContactEmail`のenabled=falseはstatusも503にする。そのため、上段のB「contact falseのまま購入」は、そのままでは進めない。購入前の確認や認証を省略せず、同じAPIへ独立したread-only statusフラグ`HAMCARE_BILLING_CONTACT_STATUS_ENABLED`（既定false）を追加する。送信flag=falseでも、明示したstatusだけを認証・同UID・本番保存先で読み取れるようにし、request/confirmは従来どおり副作用前に停止する。status経路はメール資格情報・送信枠・Gmailを参照せず、旧本人限定Secretの期限や別UID設定に依存しない。送信経路を一般化したものではない。
+
+この修正を含む次回停止配備Aでは、`HAMCARE_BILLING_CONTACT_ENABLED=false`と`HAMCARE_BILLING_CONTACT_STATUS_ENABLED=false`を併記する。本人確認Bでだけstatusをtrue、送信をfalseとし、終了時statusもfalseへ戻す。購入用UID限定とcontactの同UID読取を別に適用し、未確認連絡先を許可せず、メール確認を再送しない。既存enabled=trueの通常/本人限定確認フローは変更しない。
+
+また未契約表示モデルの「新規申込は停止しています」という固定文を受付可否に中立な説明へ変更する。停止の正本はservice/viewとサーバーのmaster/scope/IAMに残す。今回の新規差分はこの表示1文・独立status経路・その直接テストに限定し、既存96/149/39件や配送E2Eを理由なく再実行しない。配備元は`ab7d7c2`を引き継いだ今回の確定コミット（完了報告のhash）。Hostingの対象は従来のservice/viewに**`/assets/live-checkout-model.mjs`を加えた計3assets**へ更新し、初回はfalse/closedのまま反映する。本番にはまだ未反映。
+
+#### 次の本番反映を分ける場合の最小範囲（未承認・未実行）
+
+本人550円確認を先に進める場合は、上段Aの一般メール準備を一括実施する必要はない。最初の停止反映は、今回の確定コミットから`createStripeCheckoutSession`と`billingContactEmail`の**2関数だけ**を名前指定で配備し、最新Hosting全map/configを保全してservice/view/modelの**3assetsだけ**をfalse/closedで反映する。プロジェクト`hamster-breeding-app`/`asia-northeast1`、既存runtime SA・billing Secret固定v1・mail Secret固定v3・日次1を再利用し、Secret新version/IAM拡大/新API/CSP/Rules/Indexを追加しない。Checkoutはprivate＋masterfalse/scopeclosed/hash未設定、contactはsendfalse/statusfalseのまま。正常起動とCheckout403・contact3操作の正規停止503を分けて確認し、Customer/Session・送信・contact書込を発生させない。問題時は直前source/環境/Hosting版を対で復旧し、購入停止を維持する。
+
+その後のB承認対象には、対象1UID hash・即時550円条件・限定受付有効化・本人による1契約/初回550円・正規同期/アプリ反映・Portalと期間末解約の範囲・停止復帰をまとめる。上記2関数の停止配備を承認しただけでは、Bや一般稼働Cは開始しない。
+
+一般メール側に残る停止反映は、既存A3/A4/A5/A6のproducer `stripeWebhook`、正規Live mail Secret新version、contactの新固定参照版/共通日次枠、`processBillingNotificationOutbox`と当該worker単体Invoker/PAUSED Schedulerであり、共通上限50案を含めて別の具体的承認対象とする。本人用contact v3を一般workerへ渡さず、送信false・新statusもfalse、cutoff未設定で反映する。本人の実購入を一般メール準備/開始の承認へ読み替えない。
+
+限定検証は今回追加分だけを実施：status経路の新規Mock31/31、未契約copyの新規1/1（既存39はskip）、統合strict TypeScript noEmit PASS。未公開B候補3assetsの構文と2定数/9 metadata-banner差分・Auth本文保全も確認。旧96/149/39件、連絡先実配送、購入/削除の既存E2Eは再実行しない。statusのMock成功を本番配備・実起動のPASSへ置き換えない。
+
+#### Bの開始条件・本人操作・成功判定
+
+1. **対象固定**：本人が本番`/account/`で既存HamCareアカウントへログインする。Apple Developer管理用・TestFlight受信用・審査用0円アカウントではない。Webの認証結果に基づくUID1件と、アプリの同UIDを非公開で照合し、owner/pet両プロフィール、削除フェンスなし、確認済みAuth/正式Relayまたは同UIDのLive確認済みcontactを確認する。UID/メール/Tokenをチャット・Git・診断出力へ載せず、allowlistは当該UIDのSHA2561件だけを秘密でない設定の非公開退避先へ保存する。削除済みApple Web E2E Ownerは再利用しない。
+2. **即時550円の条件**：本番の契約/Customer/未完了Sessionを対象1件だけで読み取り確認する。21日体験は未開始（原本missing）または正規期限切れで、購入レビューが`chargeTiming=immediate`/550 JPY/月次/初回550円となることが必要。体験中なら当日0円の検証へすり替えず、別候補または本来の終了日時を選ぶ。体験期限/利用枠/有料権限を手修正しない。
+3. **受付は本人のみ**：承認後、private/masterfalseのまま新runtimeを先に配備して正常起動を確認し、その後に限定hash1件＋scope=limitedを確定、mastertrue・正規Invoker・静的Web true/limitedを整合させる。scope generalは設定しない。status読取true、contact送信false、通知false/Scheduler PAUSED（未配備なら未配備のまま）。Bだけに必要な最小反映はCheckout/contactの2関数と上記3assetsであり、一般メールSecret化/worker配備をBの必須条件へ増やさない。本人限定の本番確認を明示する`/account/index.html`のhead metadata/静的banner9置換もBの公開差分へ含め、認証/規約/フォーム本文は維持する。Webhook producerの新時刻フィールドは一般通知準備の直接依存として別途Aで扱う。
+4. **操作・課金件数**：本人の明示承認後に、本人が正規Webの契約条件・550円・自動更新へ同意し、Stripe iframe内で実カードによる**1契約・初回550円**を操作する。カード情報や認証コードは画面だけに入力する。承認前のreview見積り保存、Customer/Session/Subscription作成、実カード入力はしない。Stripe側で領収書/請求メールの自動配送が設定されている場合は、本人宛へ発生し得ることをBの承認内容へ含め、HamCareの一般通知worker停止と区別する。共有のStripeメール設定を勝手に変更しない。想定外の金額/体験0円/別アカウント/既存契約/タイムアウトで止め、再クリックや追加契約で確認しない。
+5. **Webからアプリまでの証拠**：完了ページだけではPASSにしない。Live Invoiceのpaid/550 JPY/同Customer・Subscription、署名検証されたWebhookの処理完了・UID対応、同UIDの`users/{uid}/billing/subscription`の正規active/paid・将来の契約期間末を照合する。続けて配布済みアプリの同UIDで「利用状況」を再取得し、サーバー確定の有料状態と既存の「変化」または「相談」画面へのアクセスを確認する。AI送信/新レポート生成は不要。カレンダーが開くことだけを有料権限反映の証拠にしない。
+6. **管理・停止復帰**：Webから専用Portalへ進み、550円請求履歴と帰還を確認する。期間末解約予約まで行う場合はBの承認内容へ明記し、`cancel_at_period_end=true`/期間末まで利用可能/次回請求停止を確認する。新規受付はscope=closedを先に適用し、mastertrue/public transportのstatus/cancel、既存Portal、正規Webhookを残す。全masterfalse/privateへの緊急停止と区別する。contact送信false・statusfalse、通知falseを確認し、不要な追加Sessionがないかを読む。発行済みSessionは新規受付停止だけでは失効しない。実取消/返金/Session失効は承認内容にない限り行わない。
+7. **記録と後始末**：1契約/初回550円の実施時刻、Webhook/billing/アプリの対応と表示、期間末解約の実施有無・最終状態を既存文書へ記録する。解約予約後も期間末までは有効なので「テスト有効契約を即時終了済み」と記録しない。本人が継続利用するか期間末終了させるかをB承認時に確定し、契約/会計記録を削除しない。今回の準備だけではBの実績を作らない。
+
+本人限定の公開候補はGit外`/Users/gota/hamcare-deploy-staging/live-launch-readiness-20261127/variants/owner-limited/`へ用意した。serviceの変更は静的enabled=true/scope=limitedの2定数だけ、viewは今回ソースと同一。account HTMLは前回固定した公開baselineから上記9置換だけを行い、header以降のAuth/規約/購入フォームをbyte一致で保全した。未公開manifestはbaseline hash/変換数/候補hashだけを記録し、UID/資格情報を含めない。source全体のHosting deployではなく、B承認後に最新公開mapを退避し、baseline一致を確認して該当pathだけをoverlayする。現行repoの静的serviceはfalse/closedのままで、候補の準備を有効化実績へ読み替えない。
+
+#### B中のメールと一般稼働Cへの接続
+
+B中に正規Webhookが作った契約開始・支払成功・解約予約等のoutboxは、worker停止のまま保持する。sentへの書換/消去/一般開始時の一括後送を行わず、本番通知の実配送PASSにも数えない。Cの固定cutoffは、Bの最後の操作とそのStripe event時刻より**厳密に後**のUTC秒境界Tを選び、同じ秒への切捨てでBを含めない。worker=falseで先にTを固定し、T到達後だけtrue/resumeする。古い時刻・欠落をheldへ回す既存動作と、送信結果不明のuncertainを維持する。C後に同じ契約で実際に新しく発生する更新/解約等は新規の正規通知であり、B以前の後送とは区別する。
+
+一般メールは、前回記録時点でworker未配備・Scheduler不存在・outbox0件。今回は再照会していないため最新件数へ読み替えない。本番workerの停止配備/新Secret版/限定IAM/PAUSED Schedulerと、一般用日次枠50案・一般contact/通知の初回有効化は別途承認待ち。新送信基盤や追加scopeを用意せず、既存の有限retry/重複抑止/uncertain/共有枠/手動不達確認を再利用する。
+
 ### Cの公開内容差分（未承認・未配備）
 
-Cで必要な公開pathは、購入service/viewの2assetsと次の4HTML。停止配備Aでは2assetsだけをfalse/closedで反映し、下記HTMLを一般受付文へ変更しない。B/Cの静的bool/scope変更もAに含めない。現行Hosting全map/configを保全してpath限定overlayし、Cのために未公開のソース全体を一括公開しない。
+Cで必要な公開pathは、購入service/viewの2assetsと次の4HTML。停止配備Aではservice/view/model計3assetsだけをfalse/closedで反映し、下記HTMLを一般受付文へ変更しない。B/Cの静的bool/scope変更もAに含めない。現行Hosting全map/configを保全してpath限定overlayし、Cのために未公開のソース全体を一括公開しない。
 
 | path | 最小の公開内容変更 |
 |---|---|

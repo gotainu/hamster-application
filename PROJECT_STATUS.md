@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 ④Web購入・⑤メールの継続準備（本人550円確認前・本番未反映）
+
+- **引継ぎ**：Android限定実機確認と製品版アクセス申請は`fc72fc9`で完了扱い。`ab7d7c2`/`6ea42e5`の購入scope/通知停止/cutoff/過去通知保留/一般用公開候補と既存の配送・課金・認証の試験を再利用する。Googleのアクセス審査待ちに依存せず、未完了の本人Live確認準備だけを追加。一般購入/一般メール停止、Apple手動公開を維持する。
+- **直接の不足を修正**：現Webは購入前にcontact statusを必須とする一方、送信停止フラグがstatusも503にしていたため、「メール停止のまま本人が購入」は既存手順だけでは進めなかった。既存APIに独立`HAMCARE_BILLING_CONTACT_STATUS_ENABLED`（既定false）を追加し、送信false/status trueのときだけ、失効確認済み認証・同UID/provider・owner/pet・削除フェンス・本番の確認済み連絡先を読取する。mail config/日次枠/Gmail/Firestore書込みを伴わない。request/confirmは送信falseで副作用前に503。既存send=trueの通常/限定認可条件は変更しない。新API/認証方式/クライアント側の確認省略は追加しない。
+- **表示の最小整合**：未契約表示モデルの停止固定文1件を受付状況に中立な説明へ変更。実際の受付可否は静的service/viewとserver master/scope/IAMで引き続き制御する。repoの静的設定はfalse/closedを維持。停止反映のHosting対象は既存2assetsにmodel1件を加えた計3assetsで、今回未公開。
+- **本人550円の対象**：本人が候補の既存アカウントで本番Webへログインした。画面はメール/パスワード認証のアカウント確認・契約保存記録なしだが、**21日体験は2026-12-03 19:05 JSTまで継続中**。現時点の即時550円用には確定せず、別の未開始/終了済み候補か、この候補の正規体験終了後とするかを本人へ確認中。ニックネームは未設定で、同UID/owner+pet/Stripe現状態/連絡先の最終照合を未実施のままPASSにしない。審査用0円・外部テスター・削除済みApple Web E2E Ownerを使わず、UID/連絡先/TokenをチャットやGitへ出さない。実決済は次の明示承認後。
+- **実確認手順**：[既存Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)へ、本人UID1件のlimited受付→サーバーレビュー即時550円→本人の1契約/初回550円→Invoice paid/正規Webhook/同UID canonical billing active→アプリのサーバー確定利用状況・有料画面へのアクセス→Web Portal/期間末解約（承認時に確定）→scopeclosed・メール停止復帰を具体化。体験中を当日0円で代替しない。体験/権限を書換えず、AI送信/レポート生成も不要。期間末解約後のactiveと即時終了を混同しない。
+- **未公開候補**：Git外`/Users/gota/hamcare-deploy-staging/live-launch-readiness-20261127/variants/owner-limited/`へ、serviceの2定数だけをtrue/limitedにした候補、同view/model、account HTMLのhead metadata/静的banner9置換を準備。UIDなし。Auth/規約/フォーム本文のbyte保全・候補hashを確認。これは本番の配備/受付開始ではなく、最新公開baseline再照合と別承認後にpath限定で使う。
+- **メール準備**：一般用Secret/worker/PAUSED Scheduler/共通日次50案は未承認・未反映のまま。本人購入にworker配備や一般用Secret化を必須追加しない。Bの通知は送らず保持し、Cの固定cutoffをB最後の正規eventより厳密に後のUTC秒境界へ設定する。B通知の一括後送/削除/sent偽装なし。C後の本当の更新/解約通知は通常通知と区別。worker未配備/Scheduler不存在/outbox0件は前回の根拠で、今回再読取した現在値ではない。
+- **限定検証と次の反映**：status新規Mock31/31、表示文言の新規1/1（既存39はskip）、統合strict TypeScript noEmit PASS。未公開候補3assetsの構文・2定数/9コピー差分・Auth本文保全もPASS。本人確認を先に行う最小の停止配備はCheckout/contactの2関数と停止3assetsで、既存Secret v1/v3・日次1・IAM/CSPを再利用できる。一般メールSecret/worker/producer更新は別の停止反映としてRunbookへ分離し、一般化50案や実送信を本人購入の前提へ増やさない。両配備とも未承認・未実行。
+- **本番境界/未確認**：今回は本番候補画面のログイン・契約/体験表示の読み取りだけで、設定/配備/Secret/IAM/Stripe操作・実決済・メール送信・契約作成・アカウント削除0。候補の最終照合と、新status経路の本番起動・本人Live550円/アプリ反映・通知workerの本番配送は未確認として維持する。既存テスター/Preview/体験/契約/利用権限を変更せず、main merge/pushなし。既存README/owner-guide素材と本書の既存案内1行は保護する。
+
 ## 2026-11-27 Android正式Play code5→6の限定確認完了・製品版アクセス申請送信済み
 
 - **更新の実測**：USB接続した本人Androidで、更新前1.0.1/code5→更新後1.0.1/code6・非Debug・導入元Google Playをread-only照合。初回導入日時は不変で、最終更新は2026-11-27 14:24:49。14:26:59 JST取得のpackage metadataと本人の正式Play更新報告を合わせ、古いcode2 debugを更新確認に流用しない。Git外根拠は`/private/tmp/hamcare-android-physical-update-20261127/after-safe.json`。
