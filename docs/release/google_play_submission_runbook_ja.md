@@ -12,6 +12,21 @@
 - **13:25 JSTに既存Alphaの更新1件だけを送信**。実表示は「審査中の変更」およびクイックチェック残り約14分。送信操作完了と配信完了を分け、code6はまだ選択テスターへ公開済みとしない。管理対象の公開は既存オフを維持し、承認後は既存Alphaへ配信する。製品版トラック・テスター登録/参加・国/地域は変更しない。
 - 署名AABと同一内容のupload署名APKも隔離用に生成したが、Play署名と異なるので既存Play code5への上書き・更新保持検証には使用しない。実Android確認は公式Play更新後に行う。元AABの検証記録はGit外stagingの`audit/`、Console送信記録は`/private/tmp/hamcare-android-release-20261127/alpha-code6-submission.txt`/`.jpg`。
 
+### 実インストール版の取り違えと、カレンダー／レポートの限定照合
+
+本人がMacのエミュレータで記録カレンダー・うちの子レポートが見当たらないと指摘したため、他の大規模試験へ広げず、表示中の版と固定ソースを照合した。既存`HamCare_Prelaunch_A_20261004`は**versionName1.0.1／versionCode2、debuggable=true、installSourceなし、署名prefix52ab9f417a100880**。この起動環境へ今回code6をインストールしていない。debug/code2の画面をcode6の画面として扱わず、既存アプリ・データを削除/上書きしない。
+
+| 固定code6の根拠 | 限定結果 |
+|---|---|
+| `lib/widgets/main_drawer.dart` 131–145、`tabs.dart` 382–410/462–463 | 「記録カレンダー」「うちの子レポート」のDrawer入口、Calendar→DailyStarsScreenとReport遷移、HomeヘッダCalendarが存在 |
+| Home/MainDrawer/record_calendar_action/daily_stars/personality_report_entry/child_report_navigation/personality_report_history/personality_reports_repo/analysis_progress_cardの9ファイル | code5 `402737`／code6 `54970`／今回ソースの全byte一致 |
+| `personality_report_screen.dart`のcode5→code6差分 | 末尾の購入プランCTAを削除。レポート本体・履歴・入口の撤去ではない |
+| 既存表示条件 | Home新着レポート/進捗カードはread errorやデータ状態で非表示になり得る。Drawerの両機能入口には当該条件なし |
+
+今回4コミット・15lib変更から両機能を削除した差分は見つからない。ただし、このソース比較を実配信code6の表示・更新保持PASSに読み替えない。公式Alphaはcode6「審査中。」、code5「選択したテスターに公開されました」の表示を保存した。実更新/認証/保持/削除説明の限定確認はcode6配信後に行い、その前の製品版アクセス最終適用は保留する。本人の「古いかもしれない」という回答を確認成功にしない。
+
+根拠はGit外`/private/tmp/hamcare-android-submission-scope-20261127/calendar-report-source-comparison-safe.json`、staging auditの読み取り端末照合、`/private/tmp/hamcare-android-release-20261127/alpha-code6-under-review.txt`/`.jpg`と`alpha-and-listing-submission.txt`。実アカウント削除・課金・AI送信・体験変更なし。
+
 ### 共通Flutterの限定Widget／Mock検証
 
 既存の`strategy_c_navigation_test.dart`、`subscription_usage_screen_test.dart`、`settings_account_deletion_test.dart`から、今回のAndroid差分に直接関係する**7件を実行し、7/7 PASS**。テストや期待値の変更、SDK更新、実アカウントの認証・AI送信・課金・削除は行っていない。
@@ -41,6 +56,14 @@
 - 公開後は新3URLと既存10重要URLがすべてHTTP200、本文hash/CSP一致。復旧は不要だった。問題時は退避元versionへのreleaseで戻せるが、今回は実行していない。source全体の一括Hosting deployは行わない。
 - 最新ページは、ログイン・再インストール不要のメール受付、メール未設定Apple/Relayからの申請、後段の本人確認、削除対象と保持情報、継続請求停止確認後の削除を説明する。メール送信だけでは本人確認・削除完了としない。ページとcopy moduleにAuth/API呼出し・新削除フォームはなく、未配備のWeb本人確認APIに依存せず静的受付が成立する。**運営Web本人確認・削除実行経路の本番配備や、その実完了を確認済みとはしない**。
 - 今回の本番変更はHostingの公開versionと3ファイル。Functions・Rules/Index・Secret/IAM・Stripe・購入/メールflagの変更0件、実メール・実削除0件、本番Firestore等の業務データ書込み0件。一般購入・一般メール停止、既存契約の正規同期、テスター・体験・利用権限を維持した。実行記録はGit外`/private/tmp/hamcare-deletion-page-overlay-20261127/execution/`。
+
+### 正式提出向けのConsole差分（保存・公開は別承認）
+
+11/27、管理Consoleの日本語デフォルト掲載を読み取り確認。掲載名`Ham Care`、簡単な説明49文字、詳しい説明691文字、既存アイコン/feature graphic、スマートフォン4画像（01_today、03_changes、02_record、04_consultation）は登録済み。画像の撮り直しや変更は行わない。
+
+詳しい説明には旧仕様の「購入前にアプリ内で料金と条件を表示し、解約後も支払済み期間の終了まで利用できます。」が残っており、code6の購入導線撤去と一致しない。この1か所だけを「アプリ内には新規購入・契約管理への案内はありません。契約済みの方は、同じHamCareアカウントで利用できます。解約手続き後も、契約期間が終了するまでは利用できます。」へ置換する733文字の最小原稿をGit外に用意した。公開掲載の修正は当初の「未反映差分の整理」を越えるため、本人へこの1か所のみの保存/反映を確認し、「この掲載文1か所の修正・反映を承認する」と回答を得た。承認後、この733文字を保存・送信した。既存のアプリ名・簡単な説明・4画像・アイコン・feature graphic・既存AIラベル申告は保持。Googleから進行中審査のやり直しが必要と案内されたため、承認済み掲載修正をAlpha更新と合わせて1回送信し直した。公開の概要にはAlpha更新と日本語「詳しい説明を変更」の2変更だけが表示される。審査の再開始は閉鎖テストの終了や新AAB再作成ではない。公開反映完了はまだ未確認。
+
+既存のrepo掲載原稿は月額550円の確定方針へ税抜表現だけを整理済みだが、その戦略C原稿全体をConsoleへ上書きしたとは扱わない。新規のWeb購入CTAやURLを今回追加しない。製品版アクセス承認後に正式提出へ使用するAABは、code6の確認結果と同じ固定成果物を使用する案で、新codeを理由なく再作成しない。
 
 ### Data Safety・掲載情報の限定差分
 
