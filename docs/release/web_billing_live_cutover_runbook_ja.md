@@ -1,5 +1,16 @@
 # HamCare：本番切替Runbook（一般購入・一般メール停止／既存契約同期稼働）
 
+## 2026-11-27 公開削除案内の3ファイル限定反映
+
+本人の明示承認後、2026-11-27 **13:15:21.190 JST**に、既存`54970b2802f8fcc483b336186149bea32baae42d`の承認済み`/account-deletion/index.html`だけを差し替え、必要な`/assets/account-deletion.css`と`/assets/account-deletion.mjs`を追加した。旧ページに残る登録メール限定・アプリ内Portalによる事前解約案内を現行仕様へ直す公開内容の反映であり、新しいWeb削除APIや本人確認/運営実行経路の配備ではない。
+
+- Hostingは`58e5ed12aaa990f6`（49ファイル）→**`a2d4e7fbc0e3426a`（51ファイル）**。この公開版が以下の11/23時点の49ファイル版に優先する。現version/full map/ServingConfigを保存し、3path以外の既存48hash・全ServingConfig/CSP・予約`/__/firebase/init.js`/`init.json`を厳密に維持。共有assetsは本番とbyte一致しており、source全体をdeployしない。
+- mergeのローカルMock6/6、直前dry-run、finalize前後/release後の全51map/configを確認。公開3URL＋既存10重要URLは全HTTP200・本文hash/CSP一致。復旧不要。問題時は退避済みの`58e5ed12aaa990f6`をreleaseして戻し、購入/メール停止を維持する。
+- 最新ページは匿名のmailto受付と公開メールのコピーだけで成立し、Auth/API呼出しを行わない。後段の本人確認と削除意思確認・既存安全削除の運用は必要で、静的ページの公開を未配備のsupport deletion APIの稼働・実削除E2Eの完了と扱わない。
+- 本番構成変更はHosting versionと承認3ファイル。Functions、Rules/Index、Secret/IAM、Stripe、購入/メールflagsは変更せず、一般購入・一般メール停止と既存契約の正規同期を維持。実メール/実削除0件、本番Firestore等の業務データ書込み0件。既存テスター・Auth・プロフィール・体験・権限・Previewへの変更なし。
+
+公開URLは`https://hamster-breeding-app.web.app/account-deletion/`。記録はGit外`/private/tmp/hamcare-deletion-page-overlay-20261127/execution/`、Androidの限定Widget/Mock7/7と実Android未確認の区別は[Google Play手順書](google_play_submission_runbook_ja.md#2026-11-27-android候補の限定確認公開削除案内の差分反映)を参照。製品版トラックへの正式提出・一般公開はこの作業では行っていない。
+
 ## 2026-11-23 Apple提出準備①〜⑥完了（審査送信・公開は未実施）
 
 本人の`54970b2802f8`を基準とする①〜⑥一括承認を実行した。**現在の正本は、一般購入false/private・一般メール停止・新Webhookの正規同期process稼働**である。この実績が、下段に履歴として残す「新旧Webhook両停止」「Live adapter未実装」「Hosting45不変」等の旧計画・保留記録に優先する。App Storeへの審査送信・ストア公開・新規実契約・実課金・契約条件変更は今回行っていない。

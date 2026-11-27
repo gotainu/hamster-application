@@ -1,5 +1,16 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 Android正式候補code6作成／Alpha更新と製品版アクセス申請準備（進行中）
+
+- **承認・境界**：本人がAndroid正式候補の作成、既存Alphaへの配信、関連する限定確認後の製品版アクセス申請を承認。製品版トラックへの正式提出・一般公開は含まない。Apple 1.0.1 (6)は審査通過済み・手動公開保留、一般購入と一般メール送信は停止を維持する。
+- **候補の固定入力**：Consoleの全App Bundleがcode1〜5であることを照合し、未使用code6／versionName1.0.1を採用。Apple承認build6と同じ`54970b2802f8fcc483b336186149bea32baae42d`を隔離ビルドし、共通Flutter15ファイル・4コミットの変更を含む。作業ブランチは`feature/web-first-stripe-checkout`、準備基準HEADは`f02d54ab946f`。アプリ機能の追加やSDK/依存更新は行わない。
+- **署名成果物**：`/Users/gota/hamcare-deploy-staging/android-strategy-c-20261127/artifacts/hamcare-1.0.1-code6-strategy-c-signed.aab`（172,403,352 bytes、SHA256 `d0e3f3f84a5141168cffb2c8fbd574225fbec7b546416091e3c6eedf14c217f7`）。package `com.gotainu.hamster`、min24／target36、非Debug、既存upload証明書、JAR署名・Bundletool・ZIP CRC・固定入力を確認。既存標準88PNG＋分析用1PNG、Caveat、code5との権限一致。既存の成功済みAndroidネイティブビルドrecipeを隔離環境で再適用し、repoのFlutter・署名・Firebase設定は変更しない。詳細はGit外stagingの`audit/android-code6-final-result.json`。
+- **限定した提出情報照合**：ConsoleのApp content要注意0、Data Safetyの12type・音声の収集/任意/ephemeral No、Privacy/アカウント削除URLと審査用ログインの登録を読み取り確認。回答変更/保存は行わない。部分データ削除「はい」は設定のAI相談履歴実削除と公開Privacyに根拠があり維持するが、新削除ページに部分削除の手順を明示する小さな文面補足は正式提出前の残件。根拠と案は既存Play手順書へ記録。
+- **検証の区別**：今回関連するWidget/Mock7件はPASS。これは実Android更新保持の確認ではない。upload署名の隔離APKをPlay署名code5への上書きに使わず、公式Alphaの更新経路で確認する。実アカウント削除・AI追加送信・実決済・体験リセットは行わない。
+- **公開削除URL**：本人の追加承認に従い、2026-11-27 13:15:21.190 JST、`/account-deletion/index.html`差替えと専用CSS/JS各1件追加の計3ファイルをLive反映。Hosting版`58e5ed12aaa990f6`→`a2d4e7fbc0e3426a`。既存48ファイルとServingConfig/CSPを保全し計51ファイル。公開3URLと既存重要10URLの200/hash/CSP、管理Chromeで本文とメールコピー成功を確認。Functions/Rules/Index/IAM/API・業務データ・購入/送信停止設定は変更0。公開URLは https://hamster-breeding-app.web.app/account-deletion/ 。復旧不要。運営のWeb本人確認/削除API配備済みとは扱わない。
+- **申請回答**：募集の難易度は本人回答「とても難しい」、初年度インストール見込みは本人回答「0～1万」。Formsの参加報告10回答（重複回答可）・自由記述8件を匿名集計し、人数10人と取り違えない。AI共通枠の実報告と有限枠拡大による復旧を使い、距離直接入力・過去日入力・手動温湿度等は未実装の改善候補として分ける。テーマ保持等の指摘を修正済みとは記録しない。詳細は[既存クローズドテスト計画](docs/release/google_play_closed_test_plan_ja.md)。
+- **進行状況（13:25 JST）**：code6のアップロード/解析完了、リリース名`6 (1.0.1) Strategy C Alpha`を保存し、Alpha更新1件だけを審査送信。Console実表示は「審査中の変更」かつクイックチェック残り約14分であり、まだ選択テスターへ新code6が配信済みとはしない。管理対象の公開は既存どおりオフ、Alpha内100%の更新で製品版公開ではない。対応端末数の増減は全フォームファクタで0。製品版アクセス申請は下書き段階で未送信。公式Alphaの反映・Android限定確認と、最新の条件達成を確認してから申請する。既存テスター・閉鎖テスト・無料体験・データを維持。掲載説明の価格表現はローカル原稿を「月額550円」に統一し、Consoleの正式掲載変更/製品版提出は別段階として区別する。
+
 ## 2026-11-27 正式リリース準備再開：iOS承認済み／Android現配信と差分を読取確認
 
 - **Appleの現在地**：本人が2026-11-24 **16:19 JST**にApp Review承認メールを受領したと報告したため、Ham Care iOS **1.0.1 (6)は審査通過済み**とする。元ソースは`54970b2802f8fcc483b336186149bea32baae42d`。手動公開を維持し、一般公開は保留。今回ASCの独立再取得や公開操作は行っておらず、未観測のステータス文字列を推測しない。11/23のWaiting for Reviewは当時の履歴として保持する。[既存iOS提出記録](docs/release/ios_signing_physical_auth_20261018.md)。

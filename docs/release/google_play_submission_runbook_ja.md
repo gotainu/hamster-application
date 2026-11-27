@@ -1,8 +1,64 @@
 # Hamster Care Google Play登録手順
 
+## 2026-11-27 Android候補の限定確認・公開削除案内の差分反映
+
+以下は、同日12:11までの読み取り記録に続く実施結果である。Apple承認版build6の固定元`54970b2802f8fcc483b336186149bea32baae42d`と同じ共通Flutter改修を再利用し、完了済みの認証・課金・iOS削除E2Eは繰り返していない。**製品版トラックへの正式提出・一般公開は未実施**。AAB/Alpha・製品版アクセス申請の進捗は、既存PROJECT_STATUSとクローズドテスト計画の後続実績に従う。
+
+### Android 1.0.1/code6のビルド・Alpha送信
+
+- 既存code1〜5の使用をConsoleで確認し、未使用code6を採番。Apple承認build6の固定ソース`54970b2802f8`を使用し、`lib/assets/icons`324入力と`pubspec.lock`はbyte一致。Flutter3.47.7/Dart3.13.5、既存Android Studio JBR、Gradle8.14/AGP8.11.1/Kotlin2.2.20/NDK27.0.12077973。既存のcode5成功recipeを隔離stagingで再現した。ネイティブ差分は`android/settings.gradle.kts`（AGP/Kotlin）、`android/gradle/wrapper/gradle-wrapper.properties`（Gradle）、`android/app/build.gradle.kts`（既存Alpha同様min24・隔離unsigned後に既存upload署名）、`android/gradle.properties`（メモリ/worker制限・既存Flutter互換）の4件だけ。repoのアプリコード・lock・署名/Firebase設定は変更していない。
+- 正式AABはGit外`/Users/gota/hamcare-deploy-staging/android-strategy-c-20261127/artifacts/hamcare-1.0.1-code6-strategy-c-signed.aab`、172,403,352 bytes、SHA256 `d0e3f3f84a5141168cffb2c8fbd574225fbec7b546416091e3c6eedf14c217f7`。既存upload証明書、manifest（package/1.0.1/6/min24/target36/nonDebug）、JAR署名、Bundletool1.18、ZIP CRC、署名前後の全非署名entry不変、標準88PNG＋既存分析用1PNG、Caveat、旧code5と権限一致を確認。
+- Consoleがcode6を解析し、コード/target/API/ABIを表示。リリース名`6 (1.0.1) Strategy C Alpha`、日本語ノート、既存Alpha内100%で保存。既存code5を併記追加せず新code6だけを使用。対応端末の減少/追加は全フォームファクタ0。
+- **13:25 JSTに既存Alphaの更新1件だけを送信**。実表示は「審査中の変更」およびクイックチェック残り約14分。送信操作完了と配信完了を分け、code6はまだ選択テスターへ公開済みとしない。管理対象の公開は既存オフを維持し、承認後は既存Alphaへ配信する。製品版トラック・テスター登録/参加・国/地域は変更しない。
+- 署名AABと同一内容のupload署名APKも隔離用に生成したが、Play署名と異なるので既存Play code5への上書き・更新保持検証には使用しない。実Android確認は公式Play更新後に行う。元AABの検証記録はGit外stagingの`audit/`、Console送信記録は`/private/tmp/hamcare-android-release-20261127/alpha-code6-submission.txt`/`.jpg`。
+
+### 共通Flutterの限定Widget／Mock検証
+
+既存の`strategy_c_navigation_test.dart`、`subscription_usage_screen_test.dart`、`settings_account_deletion_test.dart`から、今回のAndroid差分に直接関係する**7件を実行し、7/7 PASS**。テストや期待値の変更、SDK更新、実アカウントの認証・AI送信・課金・削除は行っていない。
+
+| 確認した条件 | 結果 |
+|---|---|
+| Home→Drawer→Settings→利用状況が到達可能（light/dark） | 2/2 PASS |
+| billing読取エラー時に古い状態を隠し、読取専用で再確認 | 1/1 PASS |
+| 復帰時に契約・体験の両streamを再取得し、体験を書き換えない | 1/1 PASS |
+| 狭い画面とキーボード表示下でも有料削除説明・確認が操作でき、課金停止同意を送る | 1/1 PASS |
+| 削除ボタンの連打で確認・呼出しを重複させない | 1/1 PASS |
+| サーバーで契約が判明した場合は追加の有料削除確認を経て再試行 | 1/1 PASS |
+
+これはWidget host／Mockでの限定検証であり、**実Android端末のcode5からの更新保持・起動・認証・実削除E2EのPASSではない**。Android実機での必要な限定確認は別に記録する。既存ListTile debug診断の扱いは既存harnessのままで、検査の無効化や既存失敗のPASSへの読み替えは行っていない。実行ログはGit外`/private/tmp/hamcare-android-submission-scope-20261127/flutter-limited-tests.log`。
+
+### 公開アカウント削除URL：承認済み3ファイルを反映済み
+
+公開URLは`https://hamster-breeding-app.web.app/account-deletion/`を維持。反映前は旧2026-09-12文面で、「登録メールアドレスから」の申請や、撤去済みのアプリ内Portalによる事前解約案内が残っていた。本人の「この3ファイルの公開反映を承認する」という明示承認後、**2026-11-27 13:15:21.190 JST**に次の3ファイルだけをHostingへ反映した。
+
+| 対象 | 操作・固定ソース |
+|---|---|
+| `/account-deletion/index.html` | 既存1件差替え。`54970b2802f8`の承認済みHTMLをbyte不変で使用 |
+| `/assets/account-deletion.css` | 新規1件追加。同じ固定ソースを使用 |
+| `/assets/account-deletion.mjs` | 新規1件追加。同じ固定ソースを使用。公開窓口メールのコピーだけを実行 |
+
+- Hostingは`58e5ed12aaa990f6`（49ファイル）→`a2d4e7fbc0e3426a`（51ファイル）。実行前に現version・全map・ServingConfigと既存10重要URLを退避。mergeのMock6/6と直前dry-runを通し、finalize前後・release後に全51mapを照合した。**承認3path以外の既存48hash、ServingConfig/CSP、予約`/__/firebase/init.js`と`init.json`を維持**。共有CSS・正本outline画像・背景・fontは本番と固定ソースが一致しており再配備しない。
+- 公開後は新3URLと既存10重要URLがすべてHTTP200、本文hash/CSP一致。復旧は不要だった。問題時は退避元versionへのreleaseで戻せるが、今回は実行していない。source全体の一括Hosting deployは行わない。
+- 最新ページは、ログイン・再インストール不要のメール受付、メール未設定Apple/Relayからの申請、後段の本人確認、削除対象と保持情報、継続請求停止確認後の削除を説明する。メール送信だけでは本人確認・削除完了としない。ページとcopy moduleにAuth/API呼出し・新削除フォームはなく、未配備のWeb本人確認APIに依存せず静的受付が成立する。**運営Web本人確認・削除実行経路の本番配備や、その実完了を確認済みとはしない**。
+- 今回の本番変更はHostingの公開versionと3ファイル。Functions・Rules/Index・Secret/IAM・Stripe・購入/メールflagの変更0件、実メール・実削除0件、本番Firestore等の業務データ書込み0件。一般購入・一般メール停止、既存契約の正規同期、テスター・体験・利用権限を維持した。実行記録はGit外`/private/tmp/hamcare-deletion-page-overlay-20261127/execution/`。
+
+### Data Safety・掲載情報の限定差分
+
+既存の[プライバシー申告チェックリスト](privacy_disclosure_checklist_ja.md)にあるPlay12type保存済み・診断必須への10/27修正を再利用。音声は既に「収集・任意・ephemeral No」に含まれており、現在音声ONのため旧「OFF」説明を現状の根拠にしない。今回の共通Flutter改修は購入導線撤去と安全な削除等で、新SDK/新しい収集typeを追加しない。契約状態・Stripe識別子を引き続き扱うため、購入導線撤去だけを理由にPurchase history/User IDsを削除しない。Appleの音声非収集判断をGoogleへ流用しない。[GoogleのData Safety定義](https://support.google.com/googleplay/android-developer/answer/10787469?hl=en)では端末外への一時転送もフォーム上の開示対象となる。
+
+その後、担当rootがConsoleを再読取りし、保存12type、音声=収集yes/共有no/一時的no/任意/アプリ機能yes、購入履歴等の継続を確認した。Privacy/削除URLは現行公開URL、審査用ログイン詳細は登録済み、App content要注意0。**変更・保存は行っていない**。UIの要注意0を実装全体の適合保証や新セッションでのログイン成功へ読み替えない。証跡はGit外`/private/tmp/hamcare-android-release-20261127/data-safety-preview.txt`。
+
+同じ再読取りで、任意申告「アカウント全体を削除せず特定データの削除をリクエストできる=はい」も同じ`/account-deletion/`を使用していることを確認。限定調査では次のように整理した。
+
+- **部分削除機能は存在する**：Settingsの「AI相談履歴を削除」から`AiChatHistoryRepo.deleteAllHistory()`へ進み、認証中の同じUIDのmain messages/archive messages/archives/feedbackを実削除する。Auth/プロフィール/飼育記録/契約は削除しない。`firestore.rules`の当該AI collectionはowner deleteを許可する。相談一覧の「削除」は非表示処理なので、この根拠に混用しない。今回の実操作・本番Rules再配備・実データ削除は0件。
+- **公開Privacyにも根拠がある**：6節はAI相談履歴のみの削除、8節は窓口への訂正・削除等の請求を案内している。このため既存の「はい」を直ちに架空申告と判断する根拠はなく、この項目単独でAlpha更新・製品版アクセス準備を止める実装不具合は確認していない。
+- **正式提出前の案内差分**：退避済み旧9/12 HTMLにあった「アカウントを残して一部のデータを削除する」（AI履歴・画像の手順）が、今回の承認済み新HTMLには含まれていない。アカウント削除のメール受付は機能するが、同じURLを部分削除入口として使う説明が不十分。最小案はこのページにAI相談履歴のみを削除する既存操作と、アプリを利用できない場合の削除対象を明記したサポート相談を追記すること。アカウント全体の削除と混同させず、未確認の部分削除自動処理や会計記録等の全消去は約束しない。これは**未反映の文面改善案**であり、今回の承認3ファイル反映に追加して公開したとは記録しない。Consoleの回答を無根拠に「いいえ」へ変えたり、新しい削除APIを作ったりしない。
+
+公開Privacy/Support/TermsはHTTP200かつ現行repoと完全一致。メール受付を外部削除導線とする構成と、再インストールを申請条件にしない説明は[Google公式削除要件](https://support.google.com/googleplay/android-developer/answer/13327111?hl=en)に基づく。購入導線のない利用形態は[Google公式Payments FAQ](https://support.google.com/googleplay/android-developer/answer/10281818?hl=en)のconsumption-only説明を参照し、アプリ内購入/Portal/Web購入CTAを再導入しない。掲載原稿に残っていた「税込/税抜500円」は正式な「月額550円」への未反映差分として担当へ引き継ぎ、Consoleへの実保存は別に記録する。
+
 ## 2026-11-27 現在のAlpha・製品版アクセス・iOS build6との差分（読み取りのみ）
 
-対象`com.gotainu.hamster`。12:11 JSTまでに既存Dashboard/Alpha/テスター数/製品版/Bundle Explorerを読み取った。申請・保存・新リリース・AAB作成/配信・一般公開は実行しない。以下が現在の正本で、旧11/9のAlpha未送信・旧11/21の実装待ちは当時の記録として保持する。
+対象`com.gotainu.hamster`。12:11 JSTまでに既存Dashboard/Alpha/テスター数/製品版/Bundle Explorerを読み取った。この読み取り時点では申請・保存・新リリース・AAB作成/配信・一般公開を実行していない。以下は当該確認時点の状態であり、同日後続の実施記録と区別する。旧11/9のAlpha未送信・旧11/21の実装待ちは当時の記録として保持する。
 
 | 確認項目 | 現在確認できた状態 |
 |---|---|
