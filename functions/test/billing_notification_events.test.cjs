@@ -54,3 +54,13 @@ test('verified legacy contract facts remain 500 instead of being rewritten to 55
   const n=records([hook('first_charge')],{amount:500,legacyPrice:true,latestInvoiceAmountPaid:500,latestInvoiceTotal:500})[0];
   const message=renderBillingNotification({type:n.type,mode:'live',snapshot:n.snapshot});assert.match(message.text,/500円/);assert.doesNotMatch(message.text,/550円/);
 });
+
+test('canonical Stripe time is preserved separately from later enqueue time',()=>{
+  const eventCreatedSeconds=NOW/1000-3600;
+  const n=records([hook('first_charge')],{sourceEventCreatedSeconds:eventCreatedSeconds})[0];
+  assert.equal(n.createdAtMillis,NOW);assert.equal(n.eventCreatedAtMillis,eventCreatedSeconds*1000);
+  assert.equal(n.snapshot.sourceEventCreatedSeconds,undefined);assert.equal(n.snapshot.eventCreatedAtMillis,undefined);
+});
+test('unknown canonical event time is not replaced with enqueue time',()=>{
+  const n=records([hook('first_charge')])[0];assert.equal(n.eventCreatedAtMillis,undefined);
+});

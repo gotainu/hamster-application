@@ -5,6 +5,11 @@ export const LIVE_PORTAL_ENDPOINT = 'https://asia-northeast1-hamster-breeding-ap
 export const LIVE_ORIGIN = 'https://hamster-breeding-app.web.app';
 // Opening intake requires a separate approved change, as well as server/IAM gates.
 export const LIVE_PURCHASE_ENABLED = false;
+// Static deployment copy only. The authenticated server remains the permission
+// boundary; never publish a UID/allowlist or derive this scope from the browser.
+export const LIVE_PURCHASE_SCOPE = 'closed';
+export const LIVE_PURCHASE_AVAILABLE = LIVE_PURCHASE_ENABLED === true &&
+  (LIVE_PURCHASE_SCOPE === 'limited' || LIVE_PURCHASE_SCOPE === 'general');
 const verifiers = new WeakSet();
 export function confirmsLiveResponse(raw, verify) {
   return typeof verify === 'function' && verifiers.has(verify) && verify(raw) === true;
@@ -44,7 +49,7 @@ export function createLiveCheckoutService({auth, readOwnProfiles, readOwnBilling
     }
   }
   async function request(action, extra = {}, portal = false) {
-    if (!portal && ['review','create'].includes(action) && !LIVE_PURCHASE_ENABLED) throw {code:'live/purchase_closed'};
+    if (!portal && ['review','create'].includes(action) && !LIVE_PURCHASE_AVAILABLE) throw {code:'live/purchase_closed'};
     return withIdentity(async context => {
       const controller = new AbortController(); pending.add(controller);
       try {
@@ -60,7 +65,7 @@ export function createLiveCheckoutService({auth, readOwnProfiles, readOwnBilling
         context.requireCurrent();
         if (!response.ok || envelope?.error) {
           if (envelope?.error?.status === 'UNAUTHENTICATED') throw {code:'unauthenticated'};
-          if (!portal && !LIVE_PURCHASE_ENABLED) throw {code:'live/purchase_closed'};
+          if (!portal && !LIVE_PURCHASE_AVAILABLE) throw {code:'live/purchase_closed'};
           throw {code:'live/unavailable'};
         }
         const value = envelope?.result;
@@ -78,7 +83,8 @@ export function createLiveCheckoutService({auth, readOwnProfiles, readOwnBilling
   }
   let lastReview = null;
   const service = {
-    testMode:false,purchaseEnabled:LIVE_PURCHASE_ENABLED,
+    testMode:false,purchaseEnabled:LIVE_PURCHASE_AVAILABLE,
+    purchaseScope:LIVE_PURCHASE_AVAILABLE ? LIVE_PURCHASE_SCOPE : 'closed',
     async reviewPreviewCheckout() {lastReview=await request('review',{planKey:'premium_monthly'});return lastReview;},
     createPreviewCheckout({reviewToken,termsAccepted}) {
       const proof=lastReview && reviewTerms.get(lastReview);

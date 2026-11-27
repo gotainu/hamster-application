@@ -44,6 +44,8 @@ function fixture(options={}) {
   vm.runInThisContext(`(function(exports,require,module){${code}\n})`,{filename:file})(mod.exports,name=>imports[name]??require(name),mod);
   const runtime=mod.exports.createProductionWebBillingRuntime({db,auth,now:()=>new Date(NOW),
     ...(options.omitPurchaseSwitch?{}:{purchaseEnabled:()=>Object.hasOwn(options,'purchaseEnabled')?options.purchaseEnabled:true}),
+    ...(options.omitPurchaseScope?{}:{purchaseScope:()=>Object.hasOwn(options,'purchaseScope')?options.purchaseScope:'general'}),
+    ...(Object.hasOwn(options,'purchaseAllowedUidHashes')?{purchaseAllowedUidHashes:()=>options.purchaseAllowedUidHashes}:{}),
     ...(options.omitWebhookSwitch?{}:{webhookEnabled:()=>Object.hasOwn(options,'webhookEnabled')?options.webhookEnabled:true}),
     ...(Object.hasOwn(options,'webhookMode')?{webhookMode:()=>options.webhookMode}:{}),
     ...(Object.hasOwn(options,'legacyConfig')?{rawLegacyWebhookConfig:()=>options.legacyConfig,
@@ -256,6 +258,63 @@ test('purchase switch closes the first request but leaves existing Portal and si
   assert.deepEqual(await f.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),{result:'synced'});
   assert.equal(f.calls.portal.length,1);assert.equal(f.calls.webhook.length,1);assert.equal(f.calls.checkout.length,0);assert.equal(f.calls.write.length,0);
 });
+const purchaseOwnerHash=require('node:crypto').createHash('sha256').update(UID).digest('hex');
+for(const [name,options]of [
+  ['missing scope',{omitPurchaseScope:true}],['closed scope',{purchaseScope:'closed'}],
+  ['invalid scope',{purchaseScope:'GENERAL'}],['boolean scope',{purchaseScope:true}],
+  ['limited missing hash',{purchaseScope:'limited'}],['limited empty string',{purchaseScope:'limited',purchaseAllowedUidHashes:''}],
+  ['limited invalid JSON',{purchaseScope:'limited',purchaseAllowedUidHashes:'not-json'}],
+  ['limited empty list',{purchaseScope:'limited',purchaseAllowedUidHashes:'[]'}],
+  ['limited raw array',{purchaseScope:'limited',purchaseAllowedUidHashes:[purchaseOwnerHash]}],
+  ['limited raw UID',{purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify([UID])}],
+  ['limited uppercase hash',{purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify([purchaseOwnerHash.toUpperCase()])}],
+  ['limited multiple hashes',{purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify([purchaseOwnerHash,'a'.repeat(64)])}],
+  ['general with stale limited config',{purchaseScope:'general',purchaseAllowedUidHashes:JSON.stringify([purchaseOwnerHash])}],
+  ['general with empty array config',{purchaseScope:'general',purchaseAllowedUidHashes:'[]'}],
+])test('new purchase scope fails closed before configuration, identity, DB or Stripe: '+name,async()=>{
+  const f=fixture(options);
+  for(const action of ['review','create'])await assert.rejects(f.runtime.checkout(f.request({flow:'web',action,planKey:'premium_monthly'})),cfg.BillingConfigurationError);
+  assert.equal(f.calls.config,0);
+  for(const name of ['factory','verify','user','read','write','checkout','portal','webhook','signature'])assert.deepEqual(f.calls[name],[],name);
+});
+for(const action of ['review','create'])test('limited new purchase allows only the server-verified owner for '+action,async()=>{
+  const f=fixture({purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify([purchaseOwnerHash])});
+  assert.deepEqual(await f.runtime.checkout(f.request({flow:'web',action,planKey:'premium_monthly'})),{ok:true,action});
+  assert.deepEqual(f.calls.verify,[['synthetic-token',true]]);assert.deepEqual(f.calls.user,[UID]);
+  assert.equal(f.calls.checkout.length,1);assert.equal(f.calls.checkout[0][1].uid,UID);
+  assert.deepEqual(f.calls.write,[]);
+});
+test('limited purchase cannot authorize another verified UID with a caller-supplied target or scope',async()=>{
+  const f=fixture({purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify(['a'.repeat(64)])});
+  await assert.rejects(f.runtime.checkout(f.request({flow:'web',action:'create',planKey:'premium_monthly',
+    uid:'syntheticOther',purchaseScope:'general',allowedUidHash:purchaseOwnerHash})),cfg.BillingConfigurationError);
+  assert.deepEqual(f.calls.verify,[['synthetic-token',true]]);assert.deepEqual(f.calls.user,[UID]);
+  for(const name of ['factory','read','write','checkout'])assert.deepEqual(f.calls[name],[],name);
+});
+for(const options of [{revoked:true},{user:{uid:'syntheticOther'}},{token:{uid:'syntheticOther'}}])
+  test('limited owner hash never replaces verified Firebase identity',async()=>{
+    const f=fixture({...options,purchaseScope:'limited',purchaseAllowedUidHashes:JSON.stringify([purchaseOwnerHash])});
+    await assert.rejects(f.runtime.checkout(f.request()));
+    for(const name of ['factory','read','write','checkout'])assert.deepEqual(f.calls[name],[],name);
+  });
+test('explicit general scope works only with the limited configuration cleared',async()=>{
+  for(const purchaseAllowedUidHashes of [undefined,'']) {
+    const f=fixture({purchaseScope:'general',purchaseAllowedUidHashes});
+    assert.deepEqual(await f.runtime.checkout(f.request()),{ok:true,action:'review'});
+    assert.equal(f.calls.checkout.length,1);assert.deepEqual(f.calls.write,[]);
+  }
+});
+for(const options of [{purchaseScope:'closed'},{omitPurchaseScope:true},
+  {purchaseScope:'limited',purchaseAllowedUidHashes:'[]'}])
+  test('new-intake scope does not strand an existing status/cancel or Portal/webhook flow',async()=>{
+    const f=fixture(options);
+    for(const action of ['status','cancel'])assert.deepEqual(await f.runtime.checkout(f.request({flow:'web',action})),{ok:true,action});
+    assert.deepEqual(await f.runtime.portal(f.request(null,{origin:undefined})),{ok:true,portalUrl:'https://billing.stripe.com/p/session/live_syntheticRuntime'});
+    assert.deepEqual(await f.runtime.webhook(Buffer.from('{}'),'t='+NOW/1000+',v1=synthetic'),{result:'synced'});
+    assert.deepEqual(f.calls.checkout.map(x=>x[0]),['status','cancel']);
+    assert.equal(f.calls.portal.length,1);assert.equal(f.calls.webhook.length,1);assert.deepEqual(f.calls.write,[]);
+  });
+
 test('deployed purchase and webhook bindings require the exact true environment string',()=>{
   const file=path.resolve(__dirname,'../src/index.ts'),source=fs.readFileSync(file,'utf8');
   const parsed=ts.createSourceFile(file,source,ts.ScriptTarget.ES2020,true,ts.ScriptKind.TS),variables=new Map();
@@ -263,10 +322,11 @@ test('deployed purchase and webhook bindings require the exact true environment 
     if(ts.isIdentifier(d.name)&&d.initializer)variables.set(d.name.text,d.initializer.getText(parsed));
   const init=variables.get('webBilling');
   for(const value of [undefined,'false','TRUE','1',' true ','true']) {
-    const env=value===undefined?{}:{HAMCARE_WEB_PURCHASE_ENABLED:value,HAMCARE_WEBHOOK_ENABLED:value},m={exports:{}};
+    const env={...(value===undefined?{}:{HAMCARE_WEB_PURCHASE_ENABLED:value,HAMCARE_WEBHOOK_ENABLED:value}),HAMCARE_WEB_PURCHASE_SCOPE:'limited',HAMCARE_WEB_PURCHASE_UID_SHA256_ALLOWLIST:'["'+purchaseOwnerHash+'"]'},m={exports:{}};
     const compiled=ts.transpileModule('module.exports='+init+';', {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
     vm.runInNewContext(compiled,{module:m,process:{env},db:{},admin:{auth:()=>({})},createProductionWebBillingRuntime:d=>d});
     assert.equal(m.exports.purchaseEnabled(),value==='true');assert.equal(m.exports.webhookEnabled(),value==='true');
+    assert.equal(m.exports.purchaseScope(),'limited');assert.equal(m.exports.purchaseAllowedUidHashes(),env.HAMCARE_WEB_PURCHASE_UID_SHA256_ALLOWLIST);
   }
 });
 for(const [name,options]of [['missing',{omitWebhookSwitch:true}],['false',{webhookEnabled:false}],

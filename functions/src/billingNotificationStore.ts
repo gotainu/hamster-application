@@ -23,8 +23,11 @@ function terminal(value:Record<string,any>,status:string,at:number,category:stri
  * Stripe capability. dispatchAtMillis exists only for work eligible for scans;
  * a single-field range index suffices (no broad scan or composite index needed).
  * The database and clock are injected; construction does not initialize Admin. */
-export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, environment:BillingNotificationEnvironment):BillingNotificationStore {
-  if (!['live','preview'].includes(environment)) fail();
+export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, environment:BillingNotificationEnvironment,
+  liveDispatchNotBeforeMillis?:number):BillingNotificationStore {
+  if (!['live','preview'].includes(environment) ||
+      (environment==='live' && (!isBillingNotificationMillis(liveDispatchNotBeforeMillis) || liveDispatchNotBeforeMillis%1000!==0)) ||
+      (environment==='preview' && liveDispatchNotBeforeMillis!==undefined)) fail();
   const collection=environment==='live'?BILLING_NOTIFICATION_OUTBOX:PREVIEW_BILLING_NOTIFICATION_OUTBOX;
   const ref=(id:string)=>{if(!isBillingNotificationHash(id))fail();return db.doc(collection+'/'+id);};
   return {
@@ -65,6 +68,18 @@ export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, e
             // remove dispatch so a successor can never send it a second time.
             tx.set(target,terminal(value,'uncertain',nowMillis,'delivery_uncertain'));return {kind:'uncertain'};
           }
+        }
+        if (environment==='live' && (value.createdAtMillis<Number(liveDispatchNotBeforeMillis) ||
+            !isBillingNotificationMillis(value.eventCreatedAtMillis) || value.eventCreatedAtMillis<Number(liveDispatchNotBeforeMillis))) {
+          // Do not backfill old pending mail, including old events reprocessed
+          // after launch. Keep the full record without consuming an attempt or
+          // pretending it was sent. Removing dispatch lets later bounded scans
+          // reach eligible jobs; no composite index or broad scan is needed.
+          const held:Record<string,any>={...value,status:'held_before_dispatch_start',
+            holdReason:'before_dispatch_start',heldAtMillis:nowMillis,updatedAtMillis:nowMillis};
+          // Keep prior retry/error and delivery evidence for operator review.
+          delete held.dispatchAtMillis;delete held.leaseUntilMillis;delete held.leaseToken;delete held.attemptId;
+          tx.set(target,held);return {kind:'held'};
         }
         if ((value.attempts??0)>=maxAttempts) {
           tx.set(target,terminal(value,'failed_permanent',nowMillis,'attempt_limit'));return {kind:'exhausted'};

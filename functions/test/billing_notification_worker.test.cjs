@@ -30,13 +30,13 @@ function fakeDb(){
 }
 function record(extra={}){return {id:ID,schemaVersion:1,environment:'preview',trustedSource:'preview_fixture',templateVersion:'billing-v1',
   type:'contract_registered',firebaseUid:UID,transitionKey:'synthetic-transition',eventHash:HASH('synthetic-event'),snapshot:{amount:550},
-  status:'pending',createdAtMillis:NOW,attempts:0,nextAttemptAtMillis:NOW,dispatchAtMillis:NOW,...extra};}
+  status:'pending',createdAtMillis:NOW,eventCreatedAtMillis:NOW,attempts:0,nextAttemptAtMillis:NOW,dispatchAtMillis:NOW,...extra};}
 function fixture(options={}){
   const f=fakeDb();let clock=NOW,serial=0;
   const environment=options.environment??'preview',collection=environment==='live'?BILLING_NOTIFICATION_OUTBOX:PREVIEW_BILLING_NOTIFICATION_OUTBOX;
   const path=collection+'/'+ID;
   f.docs.set(path,record({environment,trustedSource:environment==='live'?'stripe_webhook':'preview_fixture',...options.record}));
-  const store=createBillingNotificationStore(f.db,environment),calls={recipient:[],render:[],send:[],budget:[],allow:[]};
+  const store=createBillingNotificationStore(f.db,environment,environment==='live'?(options.cutoff??NOW):undefined),calls={recipient:[],render:[],send:[],budget:[],allow:[]};
   const dependencies={config:{environment,maxAttempts:5,baseDelayMillis:60000,maxDelayMillis:3600000,leaseMillis:120000,batchSize:5,...options.config},
     store,resolveRecipient:async uid=>{calls.recipient.push(uid);return {email:'synthetic@example.test',source:'auth_verified'};},
     render:n=>{calls.render.push(clone(n));return {subject:'【HamCare】合成通知',text:'月額550円',html:'<p>月額550円</p>',templateVersion:'billing-v1'};},
@@ -196,4 +196,61 @@ test('fractional due schedule is blocked as corrupt instead of repeatedly scanne
 test('cross-environment claim and invalid paths are rejected without writes',async()=>{
   const f=fixture();await assert.rejects(f.store.claim({id:ID,environment:'live',leaseToken:'owner',attemptId:'attempt',nowMillis:NOW,leaseUntilMillis:NOW+120000,maxAttempts:5}));
   await assert.rejects(f.store.claim({id:'users/synthetic/billing/subscription',environment:'preview',leaseToken:'owner',attemptId:'attempt',nowMillis:NOW,leaseUntilMillis:NOW+120000,maxAttempts:5}));assert.equal(f.writes.length,0);
+});
+
+for (const extra of [
+  {createdAtMillis:NOW-1},
+  {eventCreatedAtMillis:NOW-1},
+  {createdAtMillis:NOW+1,eventCreatedAtMillis:NOW-1000},
+  {eventCreatedAtMillis:undefined},
+]) test('Live holds old or unproven event before any attempt or delivery '+JSON.stringify(extra),async()=>{
+  const f=fixture({environment:'live',record:extra}),before=f.state();
+  const result=await f.worker().runOnce();assert.equal(result.counts.held,1);
+  assert.equal(f.state().status,'held_before_dispatch_start');assert.equal(f.state().attempts,before.attempts);
+  assert.equal(f.state().dispatchAtMillis,undefined);assert.equal(f.state().heldAtMillis,NOW);
+  assert.deepEqual(f.state().snapshot,before.snapshot);assert.equal(f.calls.recipient.length,0);
+  assert.equal(f.calls.send.length,0);assert.equal(f.calls.budget.length,0);
+  assert.deepEqual(await f.worker().runOnce(),{processed:0,counts:{}});
+  assert.equal(await f.store.finish({id:ID,leaseToken:'stale',attemptId:'stale',
+    outcome:{status:'sent',atMillis:NOW,messageIdHash:HASH('false-sent')}}),false);
+});
+test('held old jobs cannot starve bounded scans or remove a newer job',async()=>{
+  const f=fixture({environment:'live',config:{batchSize:1}}),oldId=HASH('old-prelaunch');
+  const old=record({id:oldId,environment:'live',trustedSource:'stripe_webhook',createdAtMillis:NOW-1000,
+    eventCreatedAtMillis:NOW-1000,dispatchAtMillis:NOW-1000});
+  f.docs.set(f.collection+'/'+oldId,old);
+  assert.equal((await f.worker().runOnce()).counts.held,1);assert.equal(f.calls.send.length,0);
+  assert.equal((await f.worker().runOnce()).counts.sent,1);assert.equal(f.calls.send.length,1);
+  assert.equal(f.docs.get(f.collection+'/'+oldId).status,'held_before_dispatch_start');
+  assert.equal(f.docs.get(f.collection+'/'+oldId).eventHash,old.eventHash);
+});
+test('old sending with an expired lease remains uncertain instead of being relabeled held',async()=>{
+  const f=fixture({environment:'live',record:{status:'sending',createdAtMillis:NOW-1000,eventCreatedAtMillis:NOW-1000,
+    attempts:1,leaseToken:'prior-owner',attemptId:'prior-attempt',leaseUntilMillis:NOW,dispatchAtMillis:NOW}});
+  assert.equal((await f.worker().runOnce()).counts.uncertain,1);
+  assert.equal(f.state().status,'uncertain');assert.equal(f.state().leaseToken,'prior-owner');assert.equal(f.calls.send.length,0);
+});
+test('expired old pre-send claim is held while preserving retry history',async()=>{
+  const f=fixture({environment:'live',record:{status:'claimed',createdAtMillis:NOW-1000,eventCreatedAtMillis:NOW-1000,
+    attempts:2,leaseToken:'prior-owner',attemptId:'prior-attempt',leaseUntilMillis:NOW,dispatchAtMillis:NOW}});
+  assert.equal((await f.worker().runOnce()).counts.held,1);assert.equal(f.state().attempts,2);
+  assert.equal(f.state().leaseToken,undefined);assert.equal(f.calls.send.length,0);
+});
+test('holding old retry preserves the prior failure and schedule evidence',async()=>{
+  const f=fixture({environment:'live',record:{status:'failed_retryable',createdAtMillis:NOW-1000,eventCreatedAtMillis:NOW-1000,
+    attempts:2,lastErrorCategory:'rate_limited',nextAttemptAtMillis:NOW,dispatchAtMillis:NOW}});
+  assert.equal((await f.worker().runOnce()).counts.held,1);assert.equal(f.state().attempts,2);
+  assert.equal(f.state().lastErrorCategory,'rate_limited');assert.equal(f.state().nextAttemptAtMillis,NOW);
+  assert.equal(f.state().holdReason,'before_dispatch_start');assert.equal(f.calls.send.length,0);
+});
+test('Live cutoff does not move forward during normal finite retries',async()=>{
+  const f=fixture({environment:'live'});f.dependencies.send=async input=>{f.calls.send.push(input);throw {category:'rate_limited',delivery:'not_sent',retryable:true};};
+  await f.worker().runOnce();f.advance(60000);
+  f.dependencies.send=async input=>{f.calls.send.push(input);return {messageIdHash:HASH('retry-ok')};};
+  await f.worker().runOnce();assert.equal(f.state().status,'sent');assert.equal(f.state().attempts,2);assert.equal(f.calls.send.length,2);
+});
+test('store requires explicit Live cutoff and rejects mixing it into Preview',()=>{
+  const f=fakeDb();assert.throws(()=>createBillingNotificationStore(f.db,'live'));
+  assert.throws(()=>createBillingNotificationStore(f.db,'live',0));
+  assert.throws(()=>createBillingNotificationStore(f.db,'preview',NOW));assert.equal(f.writes.length,0);
 });

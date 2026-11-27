@@ -69,6 +69,8 @@ export const billingContactEmail = onRequest({region:'asia-northeast1',
 const webBilling = createProductionWebBillingRuntime({
   db, auth:admin.auth(), rawConfig:()=>process.env.HAMCARE_LIVE_WEB_BILLING_CONFIG,
   purchaseEnabled:()=>process.env.HAMCARE_WEB_PURCHASE_ENABLED==='true',
+  purchaseScope:()=>process.env.HAMCARE_WEB_PURCHASE_SCOPE,
+  purchaseAllowedUidHashes:()=>process.env.HAMCARE_WEB_PURCHASE_UID_SHA256_ALLOWLIST,
   webhookEnabled:()=>process.env.HAMCARE_WEBHOOK_ENABLED==='true',
   webhookMode:()=>process.env.HAMCARE_WEBHOOK_MODE,
   legacyWebhookEnabled:()=>process.env.HAMCARE_LEGACY_WEBHOOK_ENABLED==='true',

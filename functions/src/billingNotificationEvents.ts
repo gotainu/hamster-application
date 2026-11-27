@@ -34,6 +34,8 @@ export function billingNotificationsFromHooks(input:{billing:WebBillingSubscript
       transitionKey,billingEventKey:hook.transitionKey,eventHash:hook.eventHash,
       subscriptionId:hook.subscriptionId,invoiceId:hook.invoiceId,subscriptionStatus:b.status,
       recipientReference:uidHash,status:'pending',attempts:0,createdAtMillis:hook.createdAtMillis,
+      ...(Number.isSafeInteger(b.sourceEventCreatedSeconds) && b.sourceEventCreatedSeconds>0 && Number.isSafeInteger(b.sourceEventCreatedSeconds*1000)
+        ? {eventCreatedAtMillis:b.sourceEventCreatedSeconds*1000} : {}),
       nextAttemptAtMillis:hook.createdAtMillis,dispatchAtMillis:hook.createdAtMillis,idempotencyKey:id,snapshot});
   }
   return [...records.values()];

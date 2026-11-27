@@ -16,6 +16,8 @@ export interface BillingNotificationRuntimeDependencies {
   rawConfig():unknown;
   /** Required explicit operator budget for Live, not Gmail's published limit. */
   dailyLimit:number;
+  /** Live-only, explicitly approved fixed dispatch start; never a rolling now. */
+  liveDispatchNotBeforeMillis?:number;
   now?:()=>number;
   fetchRequest?:typeof fetch;
 }
@@ -24,15 +26,23 @@ export interface BillingNotificationRuntimeDependencies {
 export function createBillingNotificationRuntime(d:BillingNotificationRuntimeDependencies) {
   return {
     async runOnce() {
-      const config=parseBillingNotificationMailConfig(d.rawConfig(),d.environment);
       const now=d.now??Date.now;
+      if ((d.environment==='live' && (!Number.isSafeInteger(d.liveDispatchNotBeforeMillis) ||
+          Number(d.liveDispatchNotBeforeMillis)<=0 || Number(d.liveDispatchNotBeforeMillis)%1000!==0 || Number(d.liveDispatchNotBeforeMillis)>now())) ||
+          (d.environment==='preview' && d.liveDispatchNotBeforeMillis!==undefined)) {
+        throw new BillingNotificationMailError('configuration_invalid','not_sent',false);
+      }
+      const config=parseBillingNotificationMailConfig(d.rawConfig(),d.environment);
+      // The expired, one-person contact smoke configuration must never turn
+      // into an operational notification worker merely by deploying a schedule.
+      if (d.environment==='live' && config.limitedContactTest) throw new BillingNotificationMailError('configuration_invalid','not_sent',false);
       const reserveDelivery=createBillingNotificationBudget(d.db,d.environment,d.dailyLimit);
       const sender=createBillingNotificationGmailSender(config,{fetchRequest:d.fetchRequest,now:()=>new Date(now())});
       const digest=(v:string)=>createHash('sha256').update(v).digest('hex');
       const allowedRecipient=d.environment==='preview' ? (uid:string,email:string)=>
         config.allowedSubjectHashes!.includes(digest(uid)) && config.allowedRecipientHashes!.includes(digest(email)) : undefined;
       const worker=createBillingNotificationWorker({config:{environment:d.environment,...BILLING_NOTIFICATION_RETRY_POLICY},
-        store:createBillingNotificationStore(d.db,d.environment),reserveDelivery,now,allowedRecipient,
+        store:createBillingNotificationStore(d.db,d.environment,d.liveDispatchNotBeforeMillis),reserveDelivery,now,allowedRecipient,
         resolveRecipient:async uid=>{
           // Always current Admin evidence. Never search by email or use a
           // Stripe Customer's contact as Firebase account ownership proof.

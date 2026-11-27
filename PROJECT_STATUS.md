@@ -1,5 +1,17 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 正式ローンチ④Web購入・⑤一般通知の稼働前準備（本番変更未実行）
+
+- **引継ぎ**：カレンダー/うちの子レポートは旧code2 debugとの取り違えとして本人了承。機能修正/新規実装はしない。今回、Consoleの再読込でcode6が**11/27 13:56に選択テスターへ公開済み**となったことを確認。閉鎖テスト有効/日本1か国を維持。正式code5→6の更新前後のビルド/保持・両機能/CTAなし/契約再取得/削除説明を限定確認するため、本人AndroidのUSB接続・更新前の版読取を依頼中。実機結果を作らず、完了後に準備済み製品版アクセス申請を送信する。
+- **④再利用と不足**：Live550円Price/専用Portal/新Webhook通常同期/Live adapter/CSP/法務/連絡先実配送は再利用。Liveの実550円決済→正規billing/アプリ権限→Portal/解約往復は未確認。新たな試験/課金は行っていない。本人限定Live確認の対象は未確定で、削除済みApple E2E UID/連絡先や審査用0円UIDを推測利用しない。
+- **④最小修正**：master false/privateを維持したまま、serverに明示closed/limited/generalと本人UID SHA256の厳密1件allowlistを追加。limitedは失効確認済み認証のUIDからDB/Stripe前に拒否する。generalは明示指定＋限定値除去が必要。新規review/createとstatus/cancel/Portal/正規Webhookを分離。Web service/viewも静的enabled=false＋scopeclosedを既定とし、将来のlimited/generalで表示とdispatchを一致させる。公開UID/メールによる紐付けやURL/DOM切替を追加しない。
+- **⑤現在の本番**：対象worker GET404、対応Scheduler NOT_FOUND、`billing_notification_outbox`集計0件をread-only照合。contact false/日次1/mail v3の本人限定設定を維持。一般通知workerは未配備・配送未確認で、Preview本人5通の既存成功は再試験しない。
+- **⑤最小修正**：通知独立flagの厳密trueと固定cutoff必須を追加。false/不足時はアプリcallbackのSecret値/Auth/DB/Gmail参照前に停止（platformのSecret mount/権限まで不要ではない）。旧pending/古い再送event/時刻欠落はattempt/過去エラー理由等を保ってheld、送信/削除/sent偽装なし。既存uncertain/retry/共有予算/冪等/UID宛先を維持。本人限定contact設定を通知workerで拒否。新event時刻付きproducerのため`stripeWebhook`限定更新が直接依存となるが、本番配備は行わない。
+- **一般化の準備**：mail新versionに既存gmail.send資格情報を再利用し、本人限定marker/hashを除去する案。共通50通/UTC日を初期案とし、旧履歴/counter/永久予約はresetしない。contact一般化の公開差分は停止段落を外す既存HTML1件、JS/CSS/CSP追加不要。バウンス自動検知は未実装で、送信元受信箱の運営確認→停止→本人連絡先/再送可否確認が必要。一般設定/送信開始とは区別する。
+- **承認対象と停止**：[既存Runbook](docs/release/web_billing_live_cutover_runbook_ja.md)にA停止配備（Checkout/producer/contact/workerの関数名指定、Secret固定版、限定IAM/Scheduler PAUSED・cutoff未設定、停止assets2件）、B本人UID1件のLive実確認、C一般受付/contact/通知稼働を別承認として具体化。全停止masterfalseと、新規のみ停止scopeclosedを区別し、Webhook/Portalは維持。通知cutoffは一般送信の初回有効化時に確定し、準備〜有効化の間の通知を勝手に後送しない。通知停止後も実行中/受付済み送信は取り消せないので状態照合・uncertain保全を手順化する。
+- **限定検証**：購入runtime96/96、通知関連149/149 PASS。Web直接テスト39/39、全変更統合後83 TS sourceの隔離noEmitもPASS。合成DOM/Mockと実Live/実機E2Eを区別する。既存の全体E2E/490テスト/連絡先再送を繰り返さない。
+- **本番変更の分類**：本作業の本番操作はread-onlyと公開GETだけ。追加設定/配備/Stripe変更・実決済・送信・削除・体験/テスター権限変更0。既存Webhookの通常同期は稼働維持。Apple手動公開/未公開、購入/一般メール停止、既存dirty/素材を保護し、merge/pushなし。
+
 ## 2026-11-27 Android正式候補code6作成／Alpha審査中・実更新確認待ち
 
 - **承認・境界**：本人がAndroid正式候補の作成、既存Alphaへの配信、関連する限定確認後の製品版アクセス申請を承認。製品版トラックへの正式提出・一般公開は含まない。Apple 1.0.1 (6)は審査通過済み・手動公開保留、一般購入と一般メール送信は停止を維持する。

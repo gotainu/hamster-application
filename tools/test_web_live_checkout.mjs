@@ -1,22 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createLiveCheckoutService,LIVE_ORIGIN,LIVE_CHECKOUT_ENDPOINT,LIVE_PORTAL_ENDPOINT,LIVE_PURCHASE_ENABLED} from '../public/assets/live-checkout-service.mjs';
+import {createLiveCheckoutService,LIVE_ORIGIN,LIVE_CHECKOUT_ENDPOINT,LIVE_PORTAL_ENDPOINT,LIVE_PURCHASE_ENABLED,LIVE_PURCHASE_SCOPE,LIVE_PURCHASE_AVAILABLE} from '../public/assets/live-checkout-service.mjs';
+import {configurePreviewBillingPage} from '../public/assets/live-checkout-view.mjs';
 import {projectLiveCheckoutReview,projectLiveCheckoutSession,projectLiveCheckoutStatus,projectLiveBilling,projectLivePortalSession} from '../public/assets/live-checkout-model.mjs';
 const PROJECT='synthetic-live-adapter';
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
-function harness({apple=false,fetcher,billing}={}) {
+function harness({apple=false,fetcher,billing,makeService=createLiveCheckoutService}={}) {
   const uid='synthetic-owner',calls=[],reads=[];
   const user={uid,email:apple?null:'synthetic@example.test',emailVerified:!apple,providerData:apple?[{providerId:'apple.com',uid:'synthetic-subject'}]:[{providerId:'password'}]};
   user.getIdTokenResult=async()=>({token:'synthetic-bearer',signInProvider:apple?'apple.com':'password',claims:{sub:uid,aud:PROJECT,iss:'https://securetoken.google.com/'+PROJECT,email_verified:!apple,firebase:{sign_in_provider:apple?'apple.com':'password',identities:{'apple.com':['synthetic-subject']}}}});
   const auth={app:{options:{projectId:PROJECT}},currentUser:user};
-  const service=createLiveCheckoutService({auth,origin:LIVE_ORIGIN,readOwnProfiles:async()=>({ownerExists:true,petExists:true}),readOwnBilling:async target=>{reads.push(target);return billing??{kind:'missing'};},fetchRequest:async(url,options)=>{calls.push({url,options});return fetcher?fetcher(url,options):{ok:true,status:200,json:async()=>({result:{ok:true,checkoutStatus:'open',billingState:'pending'}})};}});
+  const service=makeService({auth,origin:LIVE_ORIGIN,readOwnProfiles:async()=>({ownerExists:true,petExists:true}),readOwnBilling:async target=>{reads.push(target);return billing??{kind:'missing'};},fetchRequest:async(url,options)=>{calls.push({url,options});return fetcher?fetcher(url,options):{ok:true,status:200,json:async()=>({result:{ok:true,checkoutStatus:'open',billingState:'pending'}})};}});
   return {auth,user,service,calls,reads};
 }
 const review=()=>({ok:true,planKey:'premium_monthly',unitAmount:550,currency:'jpy',interval:'month',reviewToken:'synthetic_review_proof_123',termsVersion:'web550-v1',maskedEmail:'go***@example.com',nickname:'テスト',chargeTiming:'immediate',firstChargeAtSeconds:1795374000});
 const billing=(overrides={})=>({kind:'found',data:{firebaseUid:'synthetic-owner',provider:'stripe',stripeLivemode:true,billingSyncVersion:1,stripeCustomerId:'cus_synthetic',stripeSubscriptionId:'sub_synthetic',plan:'paid',status:'active',amount:550,currency:'jpy',interval:'month',cancelAtPeriodEnd:false,currentPeriodEnd:{seconds:1798000000},syncedAtMillis:1795374000000,...overrides}});
 test('canonical factory has fixed Live origin and requires own-billing reader',()=>{
   assert.equal(LIVE_PURCHASE_ENABLED,false);
+  assert.equal(LIVE_PURCHASE_SCOPE,'closed');assert.equal(LIVE_PURCHASE_AVAILABLE,false);
   for(const origin of [undefined,'https://hamster-breeding-app--web-first-task1-lco08m60.web.app',LIVE_ORIGIN+'.evil.test','http://localhost:1234'])assert.throws(()=>createLiveCheckoutService({auth:{},origin,readOwnBilling:async()=>{}}));
   assert.throws(()=>createLiveCheckoutService({auth:{},origin:LIVE_ORIGIN}));
 });
@@ -124,4 +126,83 @@ test('public Privacy preserves existing audio purposes, processing and non-reten
  const html=await readFile(new URL('../public/privacy/index.html',import.meta.url),'utf8');
  for(const copy of ['音声入力情報（任意）','任意の音声入力の文字起こし','音声入力は任意です。','録音音声や未送信の変換結果を運営者のデータベースやログへ保存しません。','連絡先確認トークンはハッシュで保存','90日','30日'])assert.ok(html.includes(copy));
  assert.doesNotMatch(html,/本番向け通知は未実装|現在の実装は本人限定Preview/);
+});
+
+// Exercise separately built static deployment copies, rather than exposing a
+// runtime scope override in the public service or deriving access from the DOM.
+async function deploymentCopy(enabled,scope) {
+ const source=await readFile(new URL('../public/assets/live-checkout-service.mjs',import.meta.url),'utf8');
+ assert.ok(source.includes('export const LIVE_PURCHASE_ENABLED = false;'));
+ assert.ok(source.includes("export const LIVE_PURCHASE_SCOPE = 'closed';"));
+ const code=source.replace("from './account-identity.mjs'",'from '+JSON.stringify(new URL('../public/assets/account-identity.mjs',import.meta.url).href))
+  .replace('export const LIVE_PURCHASE_ENABLED = false;','export const LIVE_PURCHASE_ENABLED = '+(JSON.stringify(enabled)??'undefined')+';')
+  .replace("export const LIVE_PURCHASE_SCOPE = 'closed';",'export const LIVE_PURCHASE_SCOPE = '+(JSON.stringify(scope)??'undefined')+';');
+ const url='data:text/javascript;base64,'+Buffer.from(code).toString('base64');
+ const service=await import(url);
+ const viewSource=await readFile(new URL('../public/assets/live-checkout-view.mjs',import.meta.url),'utf8');
+ const view=await import('data:text/javascript;base64,'+Buffer.from(viewSource.replace("from './live-checkout-service.mjs'",'from '+JSON.stringify(url))).toString('base64'));
+ return {service,view};
+}
+const authoredLiveCopy=Array.from((await readFile(new URL('../public/account/index.html',import.meta.url),'utf8'))
+ .matchAll(/\bdata-live-copy="([^"]*)"/g),match=>match[1]);
+function copyDocument() {
+ const nodes=new Map(),copies=authoredLiveCopy.map(liveCopy=>({dataset:{liveCopy},textContent:''}));
+ const node=id=>{if(!nodes.has(id))nodes.set(id,{textContent:'',querySelectorAll:()=>[]});return nodes.get(id);};
+ return {documentElement:{dataset:{purchaseScope:'general'}},title:'',copies,node,
+  getElementById:node,querySelectorAll:selector=>selector==='[data-live-copy]'?copies:[]};
+}
+for(const [name,enabled,scope]of [
+ ['master false with limited',false,'limited'],['master false with general',false,'general'],
+ ['closed scope',true,'closed'],['missing scope',true,undefined],['invalid scope',true,'LIMITED'],
+ ['boolean scope',true,true],['whitespace scope',true,'general '],['non-boolean master','true','general'],
+])test('static Live deployment stays closed in adapter and view: '+name,async()=>{
+ const {service,view}=await deploymentCopy(enabled,scope),h=harness({makeService:service.createLiveCheckoutService});
+ h.user.getIdTokenResult=()=>{throw Error('must stop before identity');};
+ await assert.rejects(h.service.reviewPreviewCheckout(),e=>e.code==='live/purchase_closed');
+ assert.equal(h.service.purchaseEnabled,false);assert.equal(h.service.purchaseScope,'closed');assert.equal(h.calls.length,0);
+ const prior=globalThis.document,doc=copyDocument();globalThis.document=doc;
+ try {view.configureLiveBillingPage();assert.match(doc.node('billing-environment-notice').textContent,/申込は現在停止/);
+  assert.equal(doc.node('plan-checkout').textContent,'新規の有料申込は現在停止しています');
+  const stopped=doc.copies.filter(node=>node.dataset.liveCopy.includes('新規の有料申込は現在停止しています。'));
+  assert.equal(stopped.length,5);assert.ok(stopped.every(node=>node.textContent.includes('現在停止しています')));
+  assert.doesNotMatch(doc.node('billing-environment-notice').textContent,/メール|テスト|Test Mode/);
+ } finally {globalThis.document=prior;}
+});
+for(const scope of ['limited','general'])test('explicit static '+scope+' copy enables only Live review/create with matching copy',async()=>{
+ const {service,view}=await deploymentCopy(true,scope),h=harness({makeService:service.createLiveCheckoutService,
+  fetcher:async(_url,options)=>({ok:true,json:async()=>({result:JSON.parse(options.body).data.action==='review'?review():{ok:true,publishableKey:'pk_live_synthetic123456',clientSecret:'cs_live_synthetic_secret_synthetic'}})})});
+ const value=await h.service.reviewPreviewCheckout();
+ assert.equal(h.service.purchaseEnabled,true);assert.equal(h.service.purchaseScope,scope);
+ assert.throws(()=>h.service.createPreviewCheckout({reviewToken:value.reviewToken,termsAccepted:false}),e=>e.code==='live/review_mismatch');
+ await h.service.createPreviewCheckout({reviewToken:value.reviewToken,termsAccepted:true});
+ assert.equal(h.calls.length,2);assert.deepEqual(h.calls.map(x=>JSON.parse(x.options.body).data.action),['review','create']);
+ for(const call of h.calls){assert.equal(call.url,LIVE_CHECKOUT_ENDPOINT);assert.doesNotMatch(call.options.body,/purchaseScope|uidHash|allowlist|synthetic-owner/);}
+ const prior=globalThis.document,doc=copyDocument();globalThis.document=doc;
+ try {view.configureLiveBillingPage();const copy=doc.node('billing-environment-notice').textContent+doc.copies.map(x=>x.textContent).join(' ');
+  assert.doesNotMatch(copy,/現在停止|Test Mode|テスト専用/);
+  assert.doesNotMatch(doc.node('billing-environment-notice').textContent,/メール|送信/);
+  if(scope==='limited'){assert.match(copy,/指定された本人アカウントだけ/);assert.match(copy,/実際の契約・請求/);assert.match(copy,/一般の新規申込は準備中/);assert.match(doc.node('plan-checkout').textContent,/本人限定の本番/);}
+  else {assert.doesNotMatch(copy,/本人限定|準備中/);assert.equal(doc.node('plan-checkout').textContent,'支払い内容を確認する');}
+ } finally {globalThis.document=prior;}
+});
+test('browser hints or service arguments cannot open the static closed purchase gate',async()=>{
+ const priorLocation=globalThis.location,priorStorage=globalThis.localStorage;
+ globalThis.location={origin:LIVE_ORIGIN,search:'?purchaseScope=general&purchaseEnabled=true'};
+ globalThis.localStorage={getItem:()=> 'general'};
+ try {const h=harness({makeService:options=>createLiveCheckoutService({...options,purchaseEnabled:true,purchaseScope:'general'})});
+  await assert.rejects(h.service.reviewPreviewCheckout(),e=>e.code==='live/purchase_closed');assert.equal(h.calls.length,0);
+ } finally {globalThis.location=priorLocation;globalThis.localStorage=priorStorage;}
+});
+test('limited client cannot bypass a server refusal or fall back to Preview',async()=>{
+ const {service}=await deploymentCopy(true,'limited');const h=harness({makeService:service.createLiveCheckoutService,
+  fetcher:async()=>({ok:false,status:503,json:async()=>({error:{status:'UNAVAILABLE',message:'private server decision'}})})});
+ await assert.rejects(h.service.reviewPreviewCheckout(),e=>e.code==='live/unavailable');
+ assert.equal(h.calls.length,1);assert.equal(h.calls[0].url,LIVE_CHECKOUT_ENDPOINT);
+});
+test('Preview copy remains separate from the Live static scope',()=>{
+ const prior=globalThis.document,doc=copyDocument();globalThis.document=doc;
+ try {configurePreviewBillingPage();assert.equal(doc.documentElement.dataset.environment,'preview');
+  assert.match(doc.node('billing-environment-notice').textContent,/Stripe Test Mode専用/);
+  assert.match(doc.node('billing-environment-footer').textContent,/Preview/);
+ } finally {globalThis.document=prior;}
 });

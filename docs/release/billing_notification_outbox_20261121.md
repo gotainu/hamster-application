@@ -2,6 +2,18 @@
 
 開始点は承認済み`81ac23933fda`。本書は今回の通知実装に限った設計・運用記録であり、[本番切替Runbook](web_billing_live_cutover_runbook_ja.md)の実行承認ではない。本番Functions、Live Stripe、live Hosting、Flutter、ストアは変更しない。外部テスターへ送信せず、Previewの実送信は本人所有UIDと宛先だけに限定する。最終テスト件数と5種類各1通の実送信結果は、確認後に本書末尾と`PROJECT_STATUS.md`へ記録する。
 
+## 2026-11-27 本番稼働前の追加安全制御（ローカル完了・配備未実行）
+
+既存のPreview本人5通の実配送確認は再実行しない。今回、対象worker/対応Schedulerの未作成と本番outbox0件を限定read-only確認した。本番準備/一般稼働の具体的な承認対象は[既存Runbook](web_billing_live_cutover_runbook_ja.md)の最新④⑤節を正本とする。旧日付の未実装/Secret未登録の記述は当時の履歴であり、現在のLive contact実配送・mail v3の存在と区別する。
+
+- 独立`HAMCARE_BILLING_NOTIFICATIONS_ENABLED`の未設定/falseはアプリcallbackのSecret値/Auth/DB/Gmail参照前で停止。trueには固定`HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS`（UTC秒境界epoch millis・末尾000・未来不可）が必要。再配備やretryごとに現在時刻へ動かさない。platformのSecret mount/権限は別途必要。
+- Live workerへ本人限定contact用`limitedContactTest`入りの設定を渡さない。正規Live Secretの新versionを用意する計画で、既存資格情報・Preview認可・旧v3・送信枠/履歴は保持する。contactと通知は共通の有限枠（初期50/UTC日案）を使う。
+- 新しいproducerは正規billingの`sourceEventCreatedSeconds`から`eventCreatedAtMillis`を保存する。workerの切替には`stripeWebhook`のproducer限定更新が直接依存。旧producer/旧jobの欠落を手書きで埋めず、enqueue時刻/正規event時刻のどちらかがcutoff前又は不明なら`held_before_dispatch_start`へ保留する。attempts/以前のエラー理由/再試行時刻/snapshotを保ち、holdReason/heldAtを記録、dispatch/leaseの派生状態だけを除く。sent偽装・削除・自動再投入は行わない。
+- expired sendingは従来どおりuncertainを優先。通常retry/重複抑止/Preview・現在Auth/連絡先解決を維持。新worker独自の削除要求フェンスを追加したものではなく、既存のproducer transactionフェンスと、削除済みAuthの宛先拒否を区別する。
+- 停止時はScheduler PAUSED＋通知flagfalse。これは次回実行を止める制御で、実行中/予約済み/受付済み送信の取消保証ではない。停止後のclaimed/sending/uncertainを照合し、結果不明の再送やcounter resetを行わない。gmail.sendのみのためバウンス受信箱の自動監視/自動宛先抑止は未実装。運営の不達通知確認・停止・個別連絡先確認を必要とする。
+
+今回の限定Mockは149/149 PASS、依存/SDK更新・本番配備/設定/実メール変更0。最終の統合型検査結果はPROJECT_STATUSとRunbookへ記録する。
+
 ## データと実行の境界
 
 | 処理 | 実装と責務 |
@@ -27,6 +39,7 @@
 | `type`・`transitionKey`・`billingEventKey`・`eventHash` | 通知種別、意味のある遷移と署名済みeventの内部参照 |
 | `firebaseUid`・`uidHash`・契約/Invoice参照 | 契約主体をUIDで解決するための非公開内部情報。メール本文やログへ出さない |
 | `snapshot` | 月額・状態・支払確認・対象期間・次回日・元の体験終了日・解約予約など、enqueue時点の限定した不変field。メール、UID、Customer ID、本文、任意URLを含めない |
+| `eventCreatedAtMillis` | 正規Stripe event作成時刻。Live稼働cutoff判定用、処理/保存時刻で代用しない |
 | `status`・`attempts`・時刻・lease/attempt | 配送状態、有限再試行、同時実行の所有確認。時刻は`*AtMillis`、`leaseUntilMillis`等 |
 | `recipientSource`・`recipientReference` | 送信時に使った宛先種別と内部hash参照。メールアドレス全文は保存しない |
 | `sentAtMillis`・`messageIdHash`・`lastErrorCategory` | API受付確認時刻、Gmail Message IDのhash、安全な失敗分類。raw responseは保存しない |
@@ -47,6 +60,7 @@ Workerは後から最新billingを読み直して過去メールの金額・日�
 | `blocked_recipient_not_allowed` | Previewの本人UID/宛先allowlist不一致。送信しない |
 | `blocked_invalid_notification` | schema・template・環境等が不正。送信しない |
 | `uncertain` | Gmailが既に受け付けた可能性がある。自動再送しない |
+| `held_before_dispatch_start` | Live稼働前又はevent時刻不明。既存履歴を保ち、自動送信/自動再投入しない |
 
 送信前の`claimed`だけが期限切れなら再取得できる。`sending`の期限切れは新Workerへ引き継いで再送せず、`uncertain`へ隔離する。送信後のFirestore更新失敗も、既に保存した送信意図を残す。元の同じattemptに遅れて確かな成功応答が返った場合は、照合したうえで`sent`を記録できる。
 

@@ -30,7 +30,7 @@ function snapshot(extra={}){return {amount:550,legacyPrice:false,currency:'jpy',
   latestInvoicePaymentStatus:'paid',latestInvoiceAmountPaid:550,latestInvoiceTotal:550,canceledAtSeconds:null,cancelAtPeriodEnd:false,...extra};}
 function record(extra={}){return {id:ID,schemaVersion:1,environment:'preview',trustedSource:'preview_fixture',templateVersion:'billing-v1',
   type:'contract_registered',firebaseUid:UID,transitionKey:'synthetic-contract-registered',eventHash:hash('runtime-mail-event'),snapshot:snapshot(),
-  status:'pending',createdAtMillis:NOW,attempts:0,nextAttemptAtMillis:NOW,dispatchAtMillis:NOW,...extra};}
+  status:'pending',createdAtMillis:NOW,eventCreatedAtMillis:NOW,attempts:0,nextAttemptAtMillis:NOW,dispatchAtMillis:NOW,...extra};}
 const config=(extra={})=>({enabled:true,environment:'preview',from:'gotainu@gmail.com',clientId:'synthetic-client.apps.googleusercontent.com',
   clientSecret:'synthetic-client-secret',refreshToken:'synthetic-refresh-token-long',allowedSubjectHashes:[hash(UID)],allowedRecipientHashes:[hash(EMAIL)],...extra});
 function fixture(options={}){
@@ -40,7 +40,7 @@ function fixture(options={}){
   let raw=options.rawConfig===undefined?config():options.rawConfig;
   f.documents.set(collection+'/'+ID,record({environment:mode,trustedSource:mode==='live'?'stripe_webhook':'preview_fixture',...options.record}));
   const dependencies={db:f.db,auth:{async getUser(uid){calls.auth.push(uid);if(options.authError)throw options.authError;return clone(user);}},
-    environment:mode,rawConfig:()=>raw,dailyLimit:options.dailyLimit===undefined?10:options.dailyLimit,now:()=>clock,
+    environment:mode,...(mode==='live'?{liveDispatchNotBeforeMillis:NOW}:{}),rawConfig:()=>raw,dailyLimit:options.dailyLimit===undefined?10:options.dailyLimit,now:()=>clock,
     fetchRequest:async(url,request)=>{calls.fetch.push({url,request});
       if(String(url).includes('/token'))return new Response(JSON.stringify({access_token:'synthetic-access',token_type:'Bearer',scope:'https://www.googleapis.com/auth/gmail.send'}),{status:200});
       if(options.sendThrow)throw Error('Synthetic network failure');
@@ -190,4 +190,26 @@ test('loading actual notification runtime needs no Stripe or Admin SDK capabilit
     Module._load=function(name,...args){if(name==='stripe'||name==='firebase-admin'||name.startsWith('firebase-admin/')){attempted.push(name);throw Error('Forbidden billing/mail capability import');}return original.call(this,name,...args);};
     const isolated=loadStarSource();assert.equal(typeof isolated('billingNotificationRuntime').createBillingNotificationRuntime,'function');assert.deepEqual(attempted,[]);
   } finally {Module._load=original;}
+});
+
+for(const cutoff of [undefined,0,NOW+1,NOW-1,NaN]) test('Live missing or future fixed cutoff stops before Secret/queue/Auth/Gmail '+String(cutoff),async()=>{
+  const f=fixture({environment:'live'});f.dependencies.liveDispatchNotBeforeMillis=cutoff;
+  let secretReads=0;f.dependencies.rawConfig=()=>{secretReads++;return config();};
+  await assert.rejects(f.runtime().runOnce());assert.equal(secretReads,0);noAccess(f);
+});
+test('Live notification runtime refuses limited contact smoke Secret before queue claims',async()=>{
+  const f=fixture({environment:'live',rawConfig:config({environment:'live',
+    limitedContactTest:{expiresAtMillis:NOW+1000,maxTotalSends:1}}),dailyLimit:1});
+  await assert.rejects(f.runtime().runOnce());noAccess(f);
+});
+test('Preview cannot inherit Live dispatch cutoff',async()=>{
+  const f=fixture();f.dependencies.liveDispatchNotBeforeMillis=NOW;
+  await assert.rejects(f.runtime().runOnce());noAccess(f);
+});
+test('Live replayed old Stripe event is held even when enqueue time is current',async()=>{
+  const {allowedSubjectHashes,allowedRecipientHashes,...live}=config({environment:'live'});
+  const f=fixture({environment:'live',rawConfig:live,dailyLimit:1,record:{createdAtMillis:NOW,eventCreatedAtMillis:NOW-1000}});
+  assert.equal((await f.runtime().runOnce()).counts.held,1);assert.equal(f.state().status,'held_before_dispatch_start');
+  assert.equal(f.state().attempts,0);assert.equal(f.calls.auth.length,0);assert.equal(f.calls.fetch.length,0);
+  assert.ok(f.writes.every(([,path])=>path.startsWith('billing_notification_outbox/')));
 });

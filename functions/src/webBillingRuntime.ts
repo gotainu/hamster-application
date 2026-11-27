@@ -28,6 +28,10 @@ export interface WebBillingRuntimeDependencies {
   rawConfig(): unknown;
   /** Missing/false closes the entire purchase callable, including review/status. */
   purchaseEnabled?(): boolean;
+  /** Explicit scope gates only new review/create. Missing/invalid is closed. */
+  purchaseScope?(): unknown;
+  /** Limited Live confirmation accepts exactly one pre-approved UID SHA-256. */
+  purchaseAllowedUidHashes?(): unknown;
   /** Paused signed events return retryable failure without claims or DB writes. */
   webhookEnabled?(): boolean;
   /** Explicit transitional modes; verify_only never claims a DB receipt. */
@@ -79,6 +83,18 @@ export function createWebBillingCoordinationStore(db: FirebaseFirestore.Firestor
 export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependencies) {
   const now=d.now ?? (()=>new Date());
   const configured=()=>readWebBillingConfig(d.rawConfig());
+  function purchaseAccess(): {scope:'general'} | {scope:'limited';uidHash:string} {
+    const scope=d.purchaseScope?.(), raw=d.purchaseAllowedUidHashes?.();
+    // A limited configuration must never become unrestricted because a value
+    // is absent or malformed. Moving to general is an explicit separate step.
+    if (scope==='general' && (raw===undefined || raw==='')) return {scope};
+    if (scope!=='limited' || typeof raw!=='string' || raw.length>1024) throw new BillingConfigurationError();
+    let allowed:unknown;
+    try {allowed=JSON.parse(raw);} catch {throw new BillingConfigurationError();}
+    if (!Array.isArray(allowed) || allowed.length!==1 || typeof allowed[0]!=='string' ||
+        !/^[a-f0-9]{64}$/.test(allowed[0])) throw new BillingConfigurationError();
+    return {scope,uidHash:allowed[0]};
+  }
   const stripe=(key:string)=>(d.stripeFactory ?? (secret=>new Stripe(secret,{
     apiVersion:'2025-02-24.acacia',maxNetworkRetries:1,timeout:20000,telemetry:false,
   })))(key);
@@ -129,12 +145,17 @@ export function createProductionWebBillingRuntime(d: WebBillingRuntimeDependenci
       // Deployment, valid credentials and public transport must never open
       // intake implicitly. Do not touch configuration/Auth/Stripe/DB while shut.
       if (d.purchaseEnabled?.()!==true) throw new BillingConfigurationError();
-      const config=configured();
-      if (req.rawRequest?.headers.origin!==config.origin || !object(req.data) || req.data.flow!=='web') throw new BillingConfigurationError();
+      if (!object(req?.data) || req.data.flow!=='web') throw new BillingConfigurationError();
       const {flow,action,...input}=req.data;
       if (!['review','create','status','cancel'].includes(action) ||
         (['status','cancel'].includes(action) && Object.keys(input).length)) throw new BillingConfigurationError();
+      // Status/cancel never create a Customer or Session. Keep them available
+      // when only new intake is scoped closed; the master switch still wins.
+      const access=['review','create'].includes(action) ? purchaseAccess() : null;
+      const config=configured();
+      if (req.rawRequest?.headers.origin!==config.origin) throw new BillingConfigurationError();
       const {identity}=await authorize(req);
+      if (access?.scope==='limited' && createHash('sha256').update(identity.uid).digest('hex')!==access.uidHash) throw new BillingConfigurationError();
       if ((await accountDeletionRef(d.db,identity.uid).get()).exists) throw new BillingConfigurationError();
       const client=stripe(config.secretKey);
       const resolver=customers(client);

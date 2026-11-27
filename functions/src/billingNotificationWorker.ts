@@ -4,7 +4,7 @@ import {normalizeBillingEmail, validWebBillingUid} from './webBillingShared';
 export type BillingNotificationEnvironment = 'live' | 'preview';
 export type BillingNotificationType = 'contract_registered' | 'payment_success' | 'payment_failed' | 'cancel_reserved' | 'resumed' | 'canceled';
 export type BillingNotificationStatus = 'pending' | 'claimed' | 'sending' | 'failed_retryable' | 'sent' |
-  'failed_permanent' | 'blocked_no_verified_contact' | 'blocked_recipient_not_allowed' | 'blocked_invalid_notification' | 'uncertain';
+  'failed_permanent' | 'blocked_no_verified_contact' | 'blocked_recipient_not_allowed' | 'blocked_invalid_notification' | 'uncertain' | 'held_before_dispatch_start';
 export interface BillingNotificationRecord {
   id: string;
   schemaVersion: 1;
@@ -20,6 +20,8 @@ export interface BillingNotificationRecord {
   snapshot: Record<string, unknown>;
   status: BillingNotificationStatus;
   createdAtMillis: number;
+  /** Canonical Stripe event time, separate from enqueue/processing time. */
+  eventCreatedAtMillis?: number;
   attempts?: number;
   nextAttemptAtMillis?: number;
   dispatchAtMillis?: number;
@@ -39,7 +41,7 @@ export interface BillingNotificationMessage {subject: string; text: string; html
 export interface BillingNotificationClaim {
   kind: 'claimed'; notification: BillingNotificationRecord; leaseToken: string; attemptId: string;
 }
-export type BillingNotificationClaimResult = BillingNotificationClaim | {kind: 'skipped' | 'uncertain' | 'blocked' | 'exhausted'};
+export type BillingNotificationClaimResult = BillingNotificationClaim | {kind: 'skipped' | 'uncertain' | 'blocked' | 'exhausted' | 'held'};
 export interface BillingNotificationOutcome {
   status: 'sent' | 'failed_retryable' | 'failed_permanent' | 'blocked_no_verified_contact' |
     'blocked_recipient_not_allowed' | 'blocked_invalid_notification' | 'uncertain';
@@ -75,7 +77,7 @@ export class BillingNotificationWorkerError extends Error {
   }
 }
 const TYPES = new Set(['contract_registered','payment_success','payment_failed','cancel_reserved','resumed','canceled']);
-const STATUSES = new Set(['pending','claimed','sending','failed_retryable','sent','failed_permanent','blocked_no_verified_contact','blocked_recipient_not_allowed','blocked_invalid_notification','uncertain']);
+const STATUSES = new Set(['pending','claimed','sending','failed_retryable','sent','failed_permanent','blocked_no_verified_contact','blocked_recipient_not_allowed','blocked_invalid_notification','uncertain','held_before_dispatch_start']);
 const SOURCES = new Set(['auth_verified','apple_relay','user_supplied']);
 const ERROR_CATEGORIES = new Set(['configuration_invalid','recipient_not_allowed','invalid_recipient','request_invalid','authorization_revoked',
   'authorization_failed','oauth_temporary','rate_limited','quota_exceeded','sending_limit','gmail_temporary','delivery_uncertain','gmail_permanent']);
