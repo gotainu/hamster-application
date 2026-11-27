@@ -13,10 +13,16 @@ export const processBillingNotificationOutbox=onSchedule({region:'asia-northeast
   timeZone:'Asia/Tokyo',secrets:[mailConfig],maxInstances:1,timeoutSeconds:120,memory:'256MiB',retryCount:0},async()=>{
   try {
     const result=await dispatchLiveBillingNotifications({
-      enabled:process.env.HAMCARE_BILLING_NOTIFICATIONS_ENABLED,
-      notBeforeMillis:process.env.HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS,
-      nowMillis:Date.now(),run:async notBeforeMillis=>createBillingNotificationRuntime({
-        db:getFirestore(),auth:getAuth(),environment:'live',liveDispatchNotBeforeMillis:notBeforeMillis,
+      enabled:process.env.HAMCARE_BILLING_NOTIFICATIONS_ENABLED,scope:process.env.HAMCARE_BILLING_NOTIFICATIONS_SCOPE,
+      notBeforeMillis:()=>process.env.HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS,
+      limited:()=>({notBeforeMillis:process.env.HAMCARE_BILLING_NOTIFICATIONS_LIMITED_NOT_BEFORE_MILLIS,
+        expiresAtMillis:process.env.HAMCARE_BILLING_NOTIFICATIONS_LIMITED_EXPIRES_AT_MILLIS,
+        subjectHash:process.env.HAMCARE_BILLING_NOTIFICATIONS_LIMITED_UID_SHA256,
+        recipientHash:process.env.HAMCARE_BILLING_NOTIFICATIONS_LIMITED_RECIPIENT_SHA256,
+        notificationId:process.env.HAMCARE_BILLING_NOTIFICATIONS_LIMITED_NOTIFICATION_ID}),
+      nowMillis:Date.now(),run:async policy=>createBillingNotificationRuntime({
+        db:getFirestore(),auth:getAuth(),environment:'live',liveDispatchScope:policy.scope,liveDispatchNotBeforeMillis:policy.notBeforeMillis,
+        ...(policy.scope==='limited'?{liveLimitedSelection:policy}:{}),
         rawConfig:()=>process.env.HAMCARE_LIVE_BILLING_MAIL_CONFIG,
         dailyLimit:Number(process.env.HAMCARE_BILLING_MAIL_DAILY_LIMIT)}).runOnce()});
     logger.info('Billing notification batch finished',result);

@@ -40,7 +40,7 @@ function fixture(options={}){
   let raw=options.rawConfig===undefined?config():options.rawConfig;
   f.documents.set(collection+'/'+ID,record({environment:mode,trustedSource:mode==='live'?'stripe_webhook':'preview_fixture',...options.record}));
   const dependencies={db:f.db,auth:{async getUser(uid){calls.auth.push(uid);if(options.authError)throw options.authError;return clone(user);}},
-    environment:mode,...(mode==='live'?{liveDispatchNotBeforeMillis:NOW}:{}),rawConfig:()=>raw,dailyLimit:options.dailyLimit===undefined?10:options.dailyLimit,now:()=>clock,
+    environment:mode,...(mode==='live'?{liveDispatchScope:'general',liveDispatchNotBeforeMillis:NOW}:{}),rawConfig:()=>raw,dailyLimit:options.dailyLimit===undefined?10:options.dailyLimit,now:()=>clock,
     fetchRequest:async(url,request)=>{calls.fetch.push({url,request});
       if(String(url).includes('/token'))return new Response(JSON.stringify({access_token:'synthetic-access',token_type:'Bearer',scope:'https://www.googleapis.com/auth/gmail.send'}),{status:200});
       if(options.sendThrow)throw Error('Synthetic network failure');

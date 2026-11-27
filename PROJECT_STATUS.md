@@ -1,5 +1,14 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-27 ⑤通知停止配備・⑥運用・⑦Git統合準備（継続中）
+
+- **今回の承認**：本人が`3cd9469`を基準に通知worker/必要Secret・IAM・Schedulerの停止配備を承認。実送信/一般有効化/一般購入/正式公開/main merge・pushは対象外。④の本人Live550円は12月3日19:05 JSTの自然体験終了後と確定し、終了日時/権限を書換えず現在の購入private/false/closedと連絡先送信falseを維持する。
+- **通知の本人限定準備**：既存workerは明示enabled＋一般cutoffで全体queueへ進み、日次1だけでは本人限定にならなかった。新しい明示scope closed/limited/general（既定closed）と、limited専用の最大6時間・本人UID hash1件・確認済み宛先hash1件・正規producerの`contract_registered` outbox ID1件を追加。一般cutoffを読替えず、対象1文書だけを読取り、対象外/期限外はclaim前に無変更拒否。OAuth後・Gmail HTTP直前にも現在のUID/確認済み宛先/同じsend intent/期限を再照合し、日次枠1・既存lease/sent/uncertainを維持する。新API/Index/予算基盤・Gmail認可方式は追加しない。停止配備ではenabledfalse/scopeclosed・両cutoff/limited値未設定とする。
+- **新しい限定検証**：変更したDispatcher15件＋新limited40件の55件PASS。scopeと宛先接続が変わる既存Runtimeの3ケースも限定回帰PASS（他46件は実行対象外）。既存149件/Preview配送/本人連絡先/購入E2Eを一括再実行せず、変更箇所に直接関係するunitだけを実施。staged sourceを隔離したstrict型検査・配備用compileもPASS（170files、独立した削除修正は同梱しない）。本番worker起動/停止確認はこの後に実施する。
+- **設定とproducerの先行反映**：15:44:58 JSTに`HAMCARE_LIVE_BILLING_MAIL_CONFIG`正規Live **v4**を、既存Live v3の送信専用資格情報からメモリ内で派生・登録しreadback一致。旧v1〜v3/Preview/OAuth認可は維持、Secret単体の既存compute Accessorを再利用し権限追加0。contactはv3/日次1/送信・statusfalseを維持。producer `stripeWebhook`は3cd（0caとFunctions byte一致）から15:47:04〜15:48:02 JSTに**`stripewebhook-00014-zop`**へ更新。正常同期の主要7source/環境/署名Secret3参照/IAM/resources不変、ACTIVE/Ready、実archive170hash一致、不正署名400。正規event再処理/契約変更・実メール0。
+- **未配備の区別**：新workerの実配備とPAUSED Scheduler・限定Invokerは準備中。v4登録は送信許可ではなく、scope/flag/defaultを閉じる。日次上限は一般運用初期50/UTC日に確定し、本人1通知の実確認時だけ既存消費を保った日次1を使用する予定。送信失敗の5attempt/有限backoff/uncertain/共有sender cooldownは再利用し、カウンタresetや過去通知の再投入をしない。
+- **独立工程**：⑥は既存運用/削除文書を使い、未配備support Web削除2APIとmanual_reviewの安全な再開手段を稼働済みにしない。手動で足りる問い合わせ・開示・保持整理はGoの既存手順を具体化する。⑦はlocal mainと実GitHub remote `github/main`が`0055e93`で一致・3cdの祖先、65commit/285fileがfast-forward可能・merge-tree衝突0。Apple/Android元`54970b2`をGit外bundleで保全し、その後のFlutter/native関連差分0。未送信65commitの全682blob版・約54MBを値非出力の限定資格情報検査で候補0。現在作業の追加差分は確定後に追跡し、main/remoteへ送信しない。
+
 ## 2026-11-27 本人Live確認に向けた停止配備完了（2関数・3assets／自然体験終了待ち）
 
 - **承認と配備元**：本人が`0ca4810`の購入/連絡先2関数＋画面用3ファイルの本番反映、停止での限定確認、本人1アカウントの検証準備を承認。同じ`feature/web-first-stripe-checkout`から`0ca48100057285c8bc383df92e2f27e008e77094`を隔離し、既存lock一致の依存で配備用compile。src84/compiled83/package等3の170ファイルだけを両配備archiveと全hash照合。.env/資格情報/依存実体/テストを同梱せず、既存dirtyは保護。

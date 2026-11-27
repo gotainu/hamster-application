@@ -34,7 +34,7 @@ for(const enabled of [undefined,'','false'])test('disabled schedule never reads 
 });
 for(const cutoff of [undefined,'','0','-1','not-a-date',String(NOW+1),String(NOW-1),'9999999999999999'])
   test('enabled schedule with missing/invalid/future cutoff stops before capabilities '+String(cutoff),async()=>{
-    const f=scheduled({HAMCARE_BILLING_NOTIFICATIONS_ENABLED:'true',HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS:cutoff});
+    const f=scheduled({HAMCARE_BILLING_NOTIFICATIONS_ENABLED:'true',HAMCARE_BILLING_NOTIFICATIONS_SCOPE:'general',HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS:cutoff});
     await f.run();noCapabilities(f);assert.equal(f.calls.warn.length,1);
   });
 for(const enabled of ['TRUE','1',true])test('noncanonical enabled value cannot start delivery '+String(enabled),async()=>{
@@ -42,7 +42,7 @@ for(const enabled of ['TRUE','1',true])test('noncanonical enabled value cannot s
   await f.run();noCapabilities(f);assert.equal(f.calls.warn.length,1);
 });
 test('explicit fixed cutoff is passed unchanged to actual runtime boundary',async()=>{
-  const start=NOW-60000,f=scheduled({HAMCARE_BILLING_NOTIFICATIONS_ENABLED:'true',HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS:String(start),HAMCARE_BILLING_MAIL_DAILY_LIMIT:'50'});
+  const start=NOW-60000,f=scheduled({HAMCARE_BILLING_NOTIFICATIONS_ENABLED:'true',HAMCARE_BILLING_NOTIFICATIONS_SCOPE:'general',HAMCARE_BILLING_NOTIFICATIONS_NOT_BEFORE_MILLIS:String(start),HAMCARE_BILLING_MAIL_DAILY_LIMIT:'50'});
   await f.run();assert.equal(f.calls.run,1);assert.equal(f.calls.dependencies.liveDispatchNotBeforeMillis,start);
   assert.equal(f.calls.dependencies.dailyLimit,50);assert.equal(f.calls.warn.length,0);
   assert.equal(f.run.options.retryCount,0);assert.equal(f.run.options.maxInstances,1);

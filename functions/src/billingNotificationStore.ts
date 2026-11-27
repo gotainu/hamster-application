@@ -1,3 +1,5 @@
+import {createHash} from 'node:crypto';
+import {LimitedBillingNotificationSelection,validLimitedBillingNotificationSelection,limitedBillingNotificationWindowOpen} from './billingNotificationDispatch';
 import {
   BillingNotificationClaimResult, BillingNotificationEnvironment, BillingNotificationOutcome,
   BillingNotificationStore, BillingNotificationWorkerError, isBillingNotificationHash,
@@ -19,20 +21,42 @@ function terminal(value:Record<string,any>,status:string,at:number,category:stri
   return next;
 }
 
+/** This predicate is also used immediately before a limited provider call.
+ * Its binding is operator configuration, never a UID/address from a request. */
+export function matchesLimitedBillingNotification(value:unknown,id:string,selection:LimitedBillingNotificationSelection):boolean {
+  if(!validLimitedBillingNotificationSelection(selection) || id!==selection.notificationId ||
+      !validBillingNotificationRecord(value,id,'live'))return false;
+  return value.type==='contract_registered' && createHash('sha256').update(value.firebaseUid).digest('hex')===selection.subjectHash &&
+    value.createdAtMillis>=selection.notBeforeMillis && value.createdAtMillis<selection.expiresAtMillis &&
+    isBillingNotificationMillis(value.eventCreatedAtMillis) && value.eventCreatedAtMillis>=selection.notBeforeMillis &&
+    value.eventCreatedAtMillis<selection.expiresAtMillis;
+}
+
 /** Environment-specific outbox adapter only. It has no billing read/write or
  * Stripe capability. dispatchAtMillis exists only for work eligible for scans;
  * a single-field range index suffices (no broad scan or composite index needed).
  * The database and clock are injected; construction does not initialize Admin. */
 export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, environment:BillingNotificationEnvironment,
-  liveDispatchNotBeforeMillis?:number):BillingNotificationStore {
+  liveDispatchNotBeforeMillis?:number,limitedSelection?:LimitedBillingNotificationSelection,clock:()=>number=Date.now):BillingNotificationStore {
   if (!['live','preview'].includes(environment) ||
       (environment==='live' && (!isBillingNotificationMillis(liveDispatchNotBeforeMillis) || liveDispatchNotBeforeMillis%1000!==0)) ||
-      (environment==='preview' && liveDispatchNotBeforeMillis!==undefined)) fail();
+      (environment==='preview' && liveDispatchNotBeforeMillis!==undefined) ||
+      (limitedSelection!==undefined && (environment!=='live' || !validLimitedBillingNotificationSelection(limitedSelection) ||
+        limitedSelection.notBeforeMillis!==liveDispatchNotBeforeMillis))) fail();
   const collection=environment==='live'?BILLING_NOTIFICATION_OUTBOX:PREVIEW_BILLING_NOTIFICATION_OUTBOX;
   const ref=(id:string)=>{if(!isBillingNotificationHash(id))fail();return db.doc(collection+'/'+id);};
   return {
     async listDue(nowMillis,limit) {
       if (!isBillingNotificationMillis(nowMillis) || !Number.isSafeInteger(limit) || limit<1 || limit>20) fail();
+      if(limitedSelection) {
+        if(!limitedBillingNotificationWindowOpen(limitedSelection,nowMillis))return [];
+        const snap=await ref(limitedSelection.notificationId).get(),value=snap.data(),time=clock();
+        if(!limitedBillingNotificationWindowOpen(limitedSelection,time) || !matchesLimitedBillingNotification(value,limitedSelection.notificationId,limitedSelection) ||
+            !value || !['pending','failed_retryable','claimed','sending'].includes(value.status) ||
+            !isBillingNotificationMillis(value.dispatchAtMillis) || value.dispatchAtMillis>time ||
+            value.createdAtMillis>time || value.eventCreatedAtMillis>time)return [];
+        return [limitedSelection.notificationId];
+      }
       const result=await db.collection(collection).where('dispatchAtMillis','<=',nowMillis).orderBy('dispatchAtMillis','asc').limit(limit).get();
       return result.docs.map(doc=>doc.id);
     },
@@ -40,10 +64,13 @@ export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, e
       const {id,environment:requested,leaseToken,attemptId,nowMillis,leaseUntilMillis,maxAttempts}=input;
       if (requested!==environment || !token(leaseToken) || !token(attemptId) || !isBillingNotificationMillis(nowMillis) ||
         !isBillingNotificationMillis(leaseUntilMillis) || leaseUntilMillis<=nowMillis || !Number.isSafeInteger(maxAttempts) || maxAttempts<1 || maxAttempts>10) fail();
+      if(limitedSelection && (id!==limitedSelection.notificationId || !limitedBillingNotificationWindowOpen(limitedSelection,clock())))return {kind:'skipped'};
       const target=ref(id);
       return db.runTransaction(async tx=>{
         const snap=await tx.get(target);if(!snap.exists)return {kind:'skipped'};
         const value=snap.data()!;
+        if(limitedSelection && (!limitedBillingNotificationWindowOpen(limitedSelection,clock()) ||
+            !matchesLimitedBillingNotification(value,id,limitedSelection) || value.createdAtMillis>clock() || value.eventCreatedAtMillis>clock()))return {kind:'skipped'};
         if (!validBillingNotificationRecord(value,id,environment)) {
           tx.set(target,terminal(value,'blocked_invalid_notification',nowMillis,'notification_invalid'));return {kind:'blocked'};
         }
@@ -94,9 +121,11 @@ export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, e
       const {id,leaseToken,attemptId,nowMillis,leaseUntilMillis,recipientSource,recipientReference}=input;
       if (!token(leaseToken) || !token(attemptId) || !isBillingNotificationMillis(nowMillis) || !isBillingNotificationMillis(leaseUntilMillis) ||
         leaseUntilMillis<=nowMillis || !['auth_verified','apple_relay','user_supplied'].includes(recipientSource) || !isBillingNotificationHash(recipientReference)) fail();
+      if(limitedSelection && (id!==limitedSelection.notificationId || !limitedBillingNotificationWindowOpen(limitedSelection,clock())))return false;
       const target=ref(id);
       return db.runTransaction(async tx=>{
         const snap=await tx.get(target), value=snap.data();
+        if(limitedSelection && (!limitedBillingNotificationWindowOpen(limitedSelection,clock()) || !matchesLimitedBillingNotification(value,id,limitedSelection)))return false;
         if (!value || !validBillingNotificationRecord(value,id,environment) || value.status!=='claimed' ||
           value.leaseToken!==leaseToken || value.attemptId!==attemptId || !isBillingNotificationMillis(value.leaseUntilMillis) || value.leaseUntilMillis<=nowMillis) return false;
         tx.set(target,{...value,status:'sending',leaseUntilMillis,dispatchAtMillis:leaseUntilMillis,
@@ -111,9 +140,11 @@ export function createBillingNotificationStore(db:FirebaseFirestore.Firestore, e
         (outcome.lastErrorCategory!==undefined && !safeCategory(outcome.lastErrorCategory)) ||
         (outcome.status==='sent' && !isBillingNotificationHash(outcome.messageIdHash)) ||
         (outcome.status==='failed_retryable' && (!isBillingNotificationMillis(outcome.nextAttemptAtMillis) || outcome.nextAttemptAtMillis<=outcome.atMillis))) fail();
+      if(limitedSelection && id!==limitedSelection.notificationId)return false;
       const target=ref(id);
       return db.runTransaction(async tx=>{
         const snap=await tx.get(target), value=snap.data();
+        if(limitedSelection && !matchesLimitedBillingNotification(value,id,limitedSelection))return false;
         if (!value || !validBillingNotificationRecord(value,id,environment) || value.leaseToken!==leaseToken || value.attemptId!==attemptId ||
           !['claimed','sending','uncertain'].includes(value.status)) return false;
         // A worker may record late proof for its exact still-unreplaced send
