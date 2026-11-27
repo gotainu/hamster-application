@@ -3,6 +3,7 @@
 ## 2026-11-27 正式ローンチ④Web購入・⑤一般通知の稼働前準備（本番変更未実行）
 
 - **引継ぎ**：カレンダー/うちの子レポートは旧code2 debugとの取り違えとして本人了承。機能修正/新規実装はしない。今回、Consoleの再読込でcode6が**11/27 13:56に選択テスターへ公開済み**となったことを確認。閉鎖テスト有効/日本1か国を維持。正式code5→6の更新前後のビルド/保持・両機能/CTAなし/契約再取得/削除説明を限定確認するため、本人AndroidのUSB接続・更新前の版読取を依頼中。実機結果を作らず、完了後に準備済み製品版アクセス申請を送信する。
+- **Android実機の更新前照合（後続）**：本人がUSB接続したAndroid実機はread-only package metadataで1.0.1/code5・非Debug・Google Play導入を確認。初回導入/最終更新時刻を非公開baselineへ保存。本人の旧有料管理ボタン→Stripe Portal表示報告後も14:15 JST時点でcode5のままであり、code6の表示不具合/撤去漏れ又は更新成功とは判断しない。Playストアの「更新」有無を本人へ確認中。アプリ削除/ログアウト/データ消去/実解約を行わせない。根拠はGit外`/private/tmp/hamcare-android-physical-update-20261127/before-safe.json`と`portal-observation-version-safe.json`。Rootの診断はread-onlyで、本人によるPortal表示と実契約変更を混同しない。
 - **④再利用と不足**：Live550円Price/専用Portal/新Webhook通常同期/Live adapter/CSP/法務/連絡先実配送は再利用。Liveの実550円決済→正規billing/アプリ権限→Portal/解約往復は未確認。新たな試験/課金は行っていない。本人限定Live確認の対象は未確定で、削除済みApple E2E UID/連絡先や審査用0円UIDを推測利用しない。
 - **④最小修正**：master false/privateを維持したまま、serverに明示closed/limited/generalと本人UID SHA256の厳密1件allowlistを追加。limitedは失効確認済み認証のUIDからDB/Stripe前に拒否する。generalは明示指定＋限定値除去が必要。新規review/createとstatus/cancel/Portal/正規Webhookを分離。Web service/viewも静的enabled=false＋scopeclosedを既定とし、将来のlimited/generalで表示とdispatchを一致させる。公開UID/メールによる紐付けやURL/DOM切替を追加しない。
 - **⑤現在の本番**：対象worker GET404、対応Scheduler NOT_FOUND、`billing_notification_outbox`集計0件をread-only照合。contact false/日次1/mail v3の本人限定設定を維持。一般通知workerは未配備・配送未確認で、Preview本人5通の既存成功は再試験しない。
