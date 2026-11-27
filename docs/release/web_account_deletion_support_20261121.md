@@ -1,4 +1,26 @@
-# Webアカウント削除申請・本人確認の運用（2026-11-22更新、未配備）
+# Webアカウント削除申請・本人確認の運用（2026-11-27準備更新）
+
+## 2026-11-27 公開後の入口・再試行・手動完了の現在地
+
+- **使える入口と担当**：公開`/account-deletion/`のメール受付とコピー操作は11/27に反映済み。主担当Goが毎営業日に新着・返信期限・未完了/遅延案件を既存受付番号で確認する。申請時のログイン/再インストールは不要で、メール未設定Apple/Relay利用者も受け付ける。受付だけで本人確認済み・削除済みとせず、原則3営業日/本人確認と削除意思確認後7暦日/遅延7日ごとの既存方針を適用する。毎週最初の営業日に行う90日/30日対象の整理は後段の手動手順を再利用し、自動TTLが稼働済みとはしない。
+- **アプリ内の既存経路**：`deleteMyAccountAndData`と`retryAccountDeletions`は11/23に限定配備済み。再試行Schedulerの15分/Asia/Tokyo接続は既存配備記録を再利用し、今回再配備・実削除・新しい状態の照会は行わない。Goは公開後、毎営業日に`account_deletion_requests`の古いrunning、期限超過retryable、manual_reviewとScheduler/Function失敗を非公開で確認する。エラー文字列は`Account deletion needs operator review`、`Account deletion worker failed`。自動監視通知の設定・受信試験は確認済みと扱わず、最初はGoの手動確認を前提にする。
+- **メール申請の手動完了経路は未稼働**：既存`confirmSupportAccountDeletion`/`supportAccountDeletionOperator`、限定運営IAMと確認Web画面はコード・Mockまでで、本番未配備。現状のメール受付だけでは、アプリを使えない申請者を同UIDで確認し、既存Stripe停止付き削除まで安全に完了させる運営経路が足りない。新しい申請を運営の推測、メール一致、Auth直接削除、アプリ再インストールの要求で処理しない。公開後の実稼働前に、下段の既存2API/private IAM/Web接続を別の具体的承認範囲で配備・限定確認する必要がある。通知workerの本番配備と混ぜない。
+- **完了条件**：Goが同じ確認済み申請のdry-runで対象・削除範囲・契約snapshotを確認し、既存処理がStripe最新状態/停止を確認した後にcleanupを行う。`completed`フェンスとAuth不存在の再読取がそろって初めて削除完了。API受付、Apple失効、通知メールだけでは完了にしない。Auth削除後のcleanup再開では、利用者へ再ログインを要求せず永続要求を正本とする。実ユーザーのデータ/会計記録を運用文書の整備のために削除しない。
+
+### manual_reviewの明示再開（ローカル最小追加、本番未配備）
+
+従来の`manual_review`は通常のアプリ削除再操作/worker/既存operator executeでも再開せず、既存CLIにも安全な解除actionがなかった。この不足に対し、既存private operatorとCLI、本人確認済み申請、削除フェンスをそのまま使う明示再開をローカルで追加した。新しい公開削除APIや任意UIDの直接削除経路は作らない。
+
+1. Goが原因と現在状態を非公開で調査してから、通常の`--request=... --output=<非公開review>`でfresh dry-runを取得する。reviewは既存の5分期限・申請/UID/Auth作成時刻/契約/fence全体にboundで、停止理由、累積attempt、追加再開の使用有無、`manualResumeAllowed`も確認する。本人未確認/同意なし、不正・別UID・新規Auth再作成、古いreviewでは進めない。
+2. `manualResumeAllowed:true`の場合だけ、同じ申請IDで`--resume-manual --review-file=<直前review> --ack=RESUME_VERIFIED_DELETION`を明示する。通常`--execute`やそのackでは再開しない。CLIは専用運営SAの既存private endpointだけへ接続し、UIDを入力/差替えさせず、Admin SDKでDB/Authを直接消さない。実施前の対象/理由/権限確認はGoが行う。
+3. サーバーtransactionで同じmanual_review fence/UID/version/attempt/updatedAt/lease/digestを再照合して、**累積attemptをresetせず追加1回だけ**claimする。通常MAX12後なら13回目が上限。既存課金停止同意を検証済み申請から引き継ぎ、`billingStopped`を運営入力でtrueにせず、既存Stripe最新照合・停止確認と既存cleanupへ合流する。停止済みの正規証跡は維持し、新しいCustomer/契約/請求を作らず、停止済みの契約へキャンセルを無用に繰り返さない。
+4. 追加1回で失敗した場合は直ちにmanual_reviewを保持し、Goが原因調査と途中連絡に回す。途中中断後もworker/通常アプリから予算を復活させない。同じreview再使用、二重実行、別申請への流用、未知fenceは拒否する。追加再開を使い切った要求を無制限resetしたり、停止証跡/フェンスを消したりしない。完了を確認できないまま完了メールを送らない。
+
+これはローカルコード/選択した直接Mock検証までである。新しい再開actionも含め、Web本人確認/運営実行APIの本番配備、private IAMの許可/拒否、実ユーザーの再開は未確認。実Apple失効後のStripe停止失敗→同UID再ログイン/削除再開は引き続き実機未確認で、Mock成功と分ける。
+
+今回の直接検証は新manual resume12件と、変更に関係する通常の無料削除1件/Stripe一時失敗再開1件の**14/14 PASS**。既存28件は選択外とし、既存削除/課金/認証の全E2Eを繰り返さない。既存Node20とlock一致dependenciesを再利用し、SDK/依存追加、本番配備、実メール、実削除、Stripe Live操作は0。通知変更とこの削除再開を合わせた隔離strict TypeScript型検査もPASS。
+
+以下の2026-11-22接続実装・2026-11-21前工程は当時の記録であり、アプリ内2関数の配備済み実績や本節のローカル再開追加と区別する。
 
 ## 今回つながった経路
 

@@ -1,5 +1,5 @@
 import {createHash, randomBytes, timingSafeEqual} from 'node:crypto';
-import {accountDeletionRef} from './accountDeletion';
+import {accountDeletionRef,accountDeletionFenceDigest,canResumeAccountDeletion} from './accountDeletion';
 import {validWebBillingUid} from './webBillingShared';
 
 export const SUPPORT_DELETION_COLLECTION = 'support_account_deletion_requests';
@@ -22,11 +22,12 @@ export type SupportDeletionDependencies = {
   db:FirebaseFirestore.Firestore;
   getUser:(uid:string)=>Promise<SupportDeletionUser|null>;
   runDeletion:(uid:string)=>Promise<{ok:true}|{ok:false;reason:'processing'|'manual_review'}>;
+  resumeDeletion?:(uid:string,input:{requestId:string;fenceDigest:string})=>Promise<{ok:true}|{ok:false;reason:'processing'|'manual_review'}>;
   now?:()=>number;
 };
 type Request = {version:1;targetUid:string;authCreatedAt:number;intakeRef:string;createdAt:number;expiresAt:number;
   proofHash:string;status:'pending'|'verified'|'completed';verifiedAt?:number;consent?:true;paidConsent?:true;
-  appleAction?:'revoked_client_reported'|'manual_acknowledged'|'not_linked';completedAt?:number;lastResult?:string};
+  appleAction?:'revoked_client_reported'|'manual_acknowledged'|'not_linked';completedAt?:number;lastResult?:string;manualResumeAt?:number};
 function reject(reason:ConstructorParameters<typeof SupportDeletionError>[0]):never {throw new SupportDeletionError(reason);}
 function ref(d:SupportDeletionDependencies,id:string) {
   if (!validRequest(id)) reject('invalid_request');
@@ -140,19 +141,26 @@ export async function reviewSupportDeletion(d:SupportDeletionDependencies,reques
       hasCustomer:typeof billing.stripeCustomerId==='string',hasSubscription:typeof billing.stripeSubscriptionId==='string',
       cancelAtPeriodEnd:billing.cancelAtPeriodEnd===true},
     deletionState:typeof fence.status==='string'?fence.status:'not_started',billingStopped:fence.billingStopped===true||fence.status==='completed',
+    deletionAttempt:Number.isSafeInteger(fence.attempt)?fence.attempt:null,
+    manualResumeCount:fence.operatorResumeCount===undefined?0:Number.isSafeInteger(fence.operatorResumeCount)?fence.operatorResumeCount:null,
+    manualResumeAllowed:canResumeAccountDeletion(fence,value.targetUid),
+    deletionReason:['billing_unresolved','checkout_pending','paid_confirmation_required','invoice_review','in_progress','retryable','manual_review'].includes(fence.reason)?fence.reason:'none_or_unknown',
     authExists,completionConfirmed:fence.status==='completed'&&!authExists,
     appleAction:value.appleAction,reviewDigest:'v1.'+now+'.'+reviewHash(requestId,now,state),reviewExpiresAt:now+SUPPORT_DELETION_REVIEW_TTL_MS};
 }
 /** The only execution target is the immutable verified request's UID. No UID input.
  * Runtime must additionally enforce private IAM / operator allowlist and an enable switch. */
-export async function executeSupportDeletion(d:SupportDeletionDependencies,input:{requestId:string;reviewDigest:string}) {
+async function executeReviewedDeletion(d:SupportDeletionDependencies,input:{requestId:string;reviewDigest:string},manualResume:boolean) {
   const match=typeof input.reviewDigest==='string' && /^v1\.(\d{13})\.([a-f0-9]{64})$/.exec(input.reviewDigest);
   if (!match) reject('stale_review');
   const reviewedAt=Number(match[1]),now=(d.now??Date.now)();
   if (reviewedAt>now || now-reviewedAt>SUPPORT_DELETION_REVIEW_TTL_MS) reject('stale_review');
   const {value,state}=await reviewState(d,input.requestId);
   if (reviewHash(input.requestId,reviewedAt,state)!==match[2]) reject('stale_review');
-  const result=await d.runDeletion(value.targetUid);
+  if (manualResume && (!d.resumeDeletion || !canResumeAccountDeletion(state.fence,value.targetUid))) reject('invalid_request');
+  const result=manualResume
+    ? await d.resumeDeletion!(value.targetUid,{requestId:input.requestId,fenceDigest:accountDeletionFenceDigest(state.fence)})
+    : await d.runDeletion(value.targetUid);
   const after=await reviewState(d,input.requestId);
   const completed=result.ok && after.fence.status==='completed' && !after.authExists;
   if (result.ok && !completed) reject('completion_unconfirmed');
@@ -161,7 +169,14 @@ export async function executeSupportDeletion(d:SupportDeletionDependencies,input
   await d.db.runTransaction(async tx=>{
     const r=ref(d,input.requestId),current=record((await tx.get(r)).data());verified(current);
     if (current.targetUid!==value.targetUid || current.verifiedAt!==value.verifiedAt) reject('wrong_account');
-    tx.set(r,{...current,...(completed?{status:'completed',completedAt:now}:{}),lastResult:completed?'completed':result.ok?'processing':result.reason});
+    tx.set(r,{...current,...(completed?{status:'completed',completedAt:now}:{}),
+      ...(manualResume?{manualResumeAt:now}:{}),lastResult:completed?'completed':result.ok?'processing':result.reason});
   });
   return completed?{status:'completed' as const,completionConfirmed:true}:{status:result.ok?'processing':result.reason,completionConfirmed:false};
 }
+export const executeSupportDeletion=(d:SupportDeletionDependencies,input:{requestId:string;reviewDigest:string})=>
+  executeReviewedDeletion(d,input,false);
+/** Private operator only: one additional attempt after a fresh bound dry-run.
+ * Ordinary execute, public confirmation and scheduled retries cannot grant it. */
+export const resumeSupportDeletion=(d:SupportDeletionDependencies,input:{requestId:string;reviewDigest:string})=>
+  executeReviewedDeletion(d,input,true);

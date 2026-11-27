@@ -1,8 +1,9 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-const {fakeFirestore}=require('./support/star_source_loader.cjs');
-const {createSupportDeletionHttp,SUPPORT_DELETION_ORIGIN}=require('../lib/supportAccountDeletionHttp');
-const {createSupportDeletion}=require('../lib/supportAccountDeletion');
+const {fakeFirestore,loadStarSource}=require('./support/star_source_loader.cjs');
+const load=loadStarSource();
+const {createSupportDeletionHttp,SUPPORT_DELETION_ORIGIN}=load('supportAccountDeletionHttp');
+const {createSupportDeletion}=load('supportAccountDeletion');
 async function fixture(apple=false) {
   let now=1_795_305_600_000,calls=[];
   const {db}=fakeFirestore();const uid='synthetic-existing';
@@ -50,7 +51,7 @@ test('authless, other UID, disabled account and mismatched Apple subject rejecte
 });
 test('public endpoint cannot create, review, execute or supply arbitrary target',async()=>{
   const f=await fixture();
-  for(const action of ['create','review','execute'])assert.equal((await f.runtime.confirm(f.req({action,requestId:f.body.requestId}))).status,400);
+  for(const action of ['create','review','execute','resume_manual'])assert.equal((await f.runtime.confirm(f.req({action,requestId:f.body.requestId}))).status,400);
 });
 test('private handler defaults to review; unverified request and unacknowledged execute denied',async()=>{
   const f=await fixture();
@@ -67,4 +68,22 @@ test('native operator transport is private IAM, no Hosting rewrite, same existin
   for(const name of ['firebase.json','firebase.account-deletion-preview.json']) {
     assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'../../',name),'utf8'),/supportAccountDeletionOperator/);
   }
+});
+test('manual resume HTTP: only a verified private request with its separate acknowledgement can resume',async()=>{
+ const {createHash}=require('node:crypto'),f=await fixture();await f.runtime.confirm(f.req());
+ const key=createHash('sha256').update(f.user.uid).digest('hex');
+ f.core.db.documents.set('account_deletion_requests/'+key,{version:1,uid:f.user.uid,status:'manual_review',
+  attempt:12,paidConfirmed:true,billingStopped:false,lease:null,dueAt:null,requestedAt:1_795_305_590_000,updatedAt:1_795_305_599_999,reason:'retryable'});
+ f.core.db.getAll=async(...refs)=>Promise.all(refs.map(ref=>ref.get()));
+ f.core.resumeDeletion=async(uid,input)=>{assert.equal(uid,f.user.uid);assert.deepEqual(Object.keys(input).sort(),['fenceDigest','requestId']);f.calls.push('resume');return {ok:false,reason:'manual_review'};};
+ const req=body=>({method:'POST',headers:{},query:{},body});
+ const review=await f.runtime.operator(req({action:'review',requestId:f.body.requestId}));
+ assert.equal(review.status,200);assert.equal(review.body.manualResumeAllowed,true);
+ const body={action:'resume_manual',requestId:f.body.requestId,reviewDigest:review.body.reviewDigest,confirmText:'RESUME_VERIFIED_DELETION'};
+ assert.equal((await f.runtime.confirm(f.req(body))).status,400);
+ for(const bad of [{...body,confirmText:'EXECUTE_VERIFIED_DELETION'},{...body,targetUid:'other'},{...body,reviewDigest:undefined}])
+  assert.notEqual((await f.runtime.operator(req(bad))).status,200);
+ assert.ok(!f.calls.includes('resume'));assert.ok(!f.calls.includes('delete'));
+ assert.deepEqual(await f.runtime.operator(req(body)),{status:200,body:{status:'manual_review',completionConfirmed:false}});
+ assert.equal(f.calls.filter(x=>x==='resume').length,1);assert.ok(!f.calls.includes('delete'));
 });

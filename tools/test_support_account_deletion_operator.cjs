@@ -46,3 +46,20 @@ test('endpoint is fixed, no direct Admin or credentials in command output',()=>{
   assert.doesNotMatch(source,/firebase-admin|deleteUser|\.doc\(/);
   assert.match(source,/--impersonate-service-account=/);assert.match(source,/--audiences=/);
 });
+test('manual resume CLI requires its own acknowledgement and a bound eligible private review',()=>{
+ const p=file('manual-review.json',{requestId:id,reviewDigest:'bound-review',manualResumeAllowed:true});
+ const args=['--service-account='+sa,'--request='+id,'--resume-manual','--review-file='+p];
+ assert.throws(()=>parse(args));assert.throws(()=>parse([...args,'--ack=EXECUTE_VERIFIED_DELETION']));
+ assert.throws(()=>parse([...args,'--execute','--ack=RESUME_VERIFIED_DELETION']));
+ assert.throws(()=>parse([...args,'--target-uid=other','--ack=RESUME_VERIFIED_DELETION']));
+ assert.deepEqual(parse([...args,'--ack=RESUME_VERIFIED_DELETION']).body,{action:'resume_manual',requestId:id,reviewDigest:'bound-review',confirmText:'RESUME_VERIFIED_DELETION'});
+ const blocked=file('manual-blocked.json',{requestId:id,reviewDigest:'bound-review',manualResumeAllowed:false});
+ assert.throws(()=>parse(args.map(a=>a==='--review-file='+p?'--review-file='+blocked:a).concat('--ack=RESUME_VERIFIED_DELETION')));
+});
+test('manual resume CLI sends only request-bound execution input and safe result',async()=>{
+ const p=file('manual-send.json',{requestId:id,reviewDigest:'bound-review',manualResumeAllowed:true,uidHash:'private-review-only'});
+ const result=await run(['--service-account='+sa,'--request='+id,'--resume-manual','--review-file='+p,'--ack=RESUME_VERIFIED_DELETION'],{
+  token:async()=> 'synthetic-oidc',send:async body=>{assert.deepEqual(body,{action:'resume_manual',requestId:id,reviewDigest:'bound-review',confirmText:'RESUME_VERIFIED_DELETION'});return {status:'manual_review',completionConfirmed:false};}});
+ assert.deepEqual(result,{status:'manual_review',completionConfirmed:false});
+ assert.doesNotMatch(JSON.stringify(result),/uid|proof|token|requestId/);
+});

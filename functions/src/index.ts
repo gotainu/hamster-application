@@ -1630,6 +1630,8 @@ const supportDeletion = createSupportDeletionHttp({
     },
     runDeletion:(uid:string)=>runAccountDeletion(deletionDependencies,uid,
       {kind:'request',stopBillingConfirmed:true}),
+    resumeDeletion:(uid:string,input:{requestId:string;fenceDigest:string})=>runAccountDeletion(deletionDependencies,uid,
+      {...input,kind:'operator_resume',stopBillingConfirmed:true}),
   },
 });
 export const confirmSupportAccountDeletion = onRequest(

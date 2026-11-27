@@ -1,6 +1,6 @@
 import {authorizeWebBillingManagementIdentity} from './webBillingShared';
 import {createSupportDeletion, inspectSupportDeletion, confirmSupportDeletion,
-  reviewSupportDeletion, executeSupportDeletion} from './supportAccountDeletion';
+  reviewSupportDeletion, executeSupportDeletion, resumeSupportDeletion} from './supportAccountDeletion';
 
 export const SUPPORT_DELETION_ORIGIN = 'https://hamster-breeding-app.web.app';
 type Core = Parameters<typeof createSupportDeletion>[0];
@@ -66,6 +66,9 @@ export function createSupportDeletionHttp(d:Dependencies) {
         }
         if (b.action==='execute' && exact(b,['action','requestId','reviewDigest','confirmText']) && b.confirmText==='EXECUTE_VERIFIED_DELETION') {
           return {status:200,body:await executeSupportDeletion(d.core,b as any)};
+        }
+        if (b.action==='resume_manual' && exact(b,['action','requestId','reviewDigest','confirmText']) && b.confirmText==='RESUME_VERIFIED_DELETION') {
+          return {status:200,body:await resumeSupportDeletion(d.core,b as any)};
         }
         return {status:400,body:{ok:false}};
       } catch {

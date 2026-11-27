@@ -21,22 +21,25 @@ function parse(args) {
     if (!match || Object.hasOwn(flags,match[1])) throw new Error('invalid_arguments');
     flags[match[1]]=match[2]??true;
   }
-  if (Object.keys(flags).some(k=>!['service-account','request','create','input','output','execute','review-file','ack'].includes(k)) ||
+  if (Object.keys(flags).some(k=>!['service-account','request','create','input','output','execute','resume-manual','review-file','ack'].includes(k)) ||
       !/^[a-z][a-z0-9-]+@hamster-breeding-app\.iam\.gserviceaccount\.com$/.test(flags['service-account']||'')) throw new Error('invalid_arguments');
   if (flags.create===true) {
-    if (!flags.input || !flags.output || flags.execute || flags.request || flags['review-file'] || flags.ack) throw new Error('invalid_arguments');
+    if (!flags.input || !flags.output || flags.execute || flags['resume-manual'] || flags.request || flags['review-file'] || flags.ack) throw new Error('invalid_arguments');
     const input=privateJson(flags.input);
     if (Object.keys(input).sort().join(',')!=='intakeRef,targetUid') throw new Error('invalid_input');
     return {flags,body:{action:'create',...input}};
   }
   if (!requestId(flags.request) || flags.input || flags.create) throw new Error('invalid_arguments');
-  if (flags.execute===true) {
-    if (!flags['review-file'] || flags.ack!=='EXECUTE_VERIFIED_DELETION' || flags.output) throw new Error('explicit_review_required');
+  if (flags.execute===true || flags['resume-manual']===true) {
+    const resume=flags['resume-manual']===true;
+    if ((flags.execute && flags['resume-manual']) || !flags['review-file'] ||
+        flags.ack!==(resume?'RESUME_VERIFIED_DELETION':'EXECUTE_VERIFIED_DELETION') || flags.output) throw new Error('explicit_review_required');
     const review=privateJson(flags['review-file']);
     if (review.requestId!==flags.request || typeof review.reviewDigest!=='string') throw new Error('review_mismatch');
-    return {flags,body:{action:'execute',requestId:flags.request,reviewDigest:review.reviewDigest,confirmText:flags.ack}};
+    if (resume && review.manualResumeAllowed!==true) throw new Error('manual_resume_unavailable');
+    return {flags,body:{action:resume?'resume_manual':'execute',requestId:flags.request,reviewDigest:review.reviewDigest,confirmText:flags.ack}};
   }
-  if (flags.execute || flags['review-file'] || flags.ack || !flags.output) throw new Error('invalid_arguments');
+  if (flags.execute || flags['resume-manual'] || flags['review-file'] || flags.ack || !flags.output) throw new Error('invalid_arguments');
   return {flags,body:{action:'review',requestId:flags.request}};
 }
 async function run(args,{token,send,write=savePrivate}={}) {

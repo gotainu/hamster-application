@@ -5,7 +5,7 @@ const {createHash}=require('node:crypto');
 const {fakeFirestore,loadStarSource}=require('./support/star_source_loader.cjs');
 const load=loadStarSource();
 const core=load('supportAccountDeletion');
-const {runAccountDeletion,accountDeletionRef}=load('accountDeletion');
+const {runAccountDeletion,accountDeletionRef,accountDeletionFenceDigest}=load('accountDeletion');
 const key=x=>createHash('sha256').update(x).digest('hex');
 function fixture({apple=false,paid=false}={}) {
   const {db}=fakeFirestore();
@@ -28,7 +28,8 @@ function fixture({apple=false,paid=false}={}) {
     deleteData:async target=>{assert.equal(target,uid);deletes++;if(cleanupFails)throw Error('Auth temporary');users.delete(target);
       for(const p of [...db.documents.keys()])if(p==='users/'+target||p.startsWith('users/'+target+'/'))db.documents.delete(p);}};
   const d={db,getUser:async id=>users.get(id)??null,now:()=>time,
-    runDeletion:id=>runAccountDeletion(deletion,id,{kind:'request',stopBillingConfirmed:true})};
+    runDeletion:id=>runAccountDeletion(deletion,id,{kind:'request',stopBillingConfirmed:true}),
+    resumeDeletion:(id,input)=>runAccountDeletion(deletion,id,{kind:'operator_resume',stopBillingConfirmed:true,...input})};
   const identity=id=>({uid:id??uid,authTime:Math.floor(time/1000),appleLinked:apple});
   const create=()=>core.createSupportDeletion(d,{targetUid:uid,intakeRef:'support_01'});
   const confirm=(ticket,extra={})=>core.confirmSupportDeletion(d,{...ticket,confirmText:'DELETE_MY_ACCOUNT',stopBillingConfirmed:true,
@@ -159,4 +160,93 @@ test('concurrent confirmation consumes challenge exactly once',async()=>{
 test('expired verified request requires fresh confirmation unless existing deletion work already started',async()=>{
   const f=fixture(),t=await f.create();await f.confirm(t);f.advance(core.SUPPORT_DELETION_PROOF_TTL_MS+1);
   await denied(()=>core.reviewSupportDeletion(f.d,t.requestId),'expired');assert.equal(f.deletes(),0);
+});
+
+function manualFence(f,extra={}) {
+ const value={version:1,uid:f.uid,status:'manual_review',lease:null,dueAt:null,attempt:12,
+  paidConfirmed:true,billingStopped:false,requestedAt:f.now()-1000,updatedAt:f.now()-1,reason:'retryable',...extra};
+ f.db.documents.set(accountDeletionRef(f.db,f.uid).path,value);return value;
+}
+test('manual resume: exhausted verified request gets one bounded attempt through existing Stripe stop and cleanup',async()=>{
+ const f=fixture({paid:true}),t=await f.create();await f.confirm(t);manualFence(f);
+ let r=await core.reviewSupportDeletion(f.d,t.requestId);
+ assert.equal(r.manualResumeAllowed,true);assert.equal(r.deletionAttempt,12);assert.equal(r.manualResumeCount,0);
+ assert.equal((await core.executeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest})).status,'manual_review');
+ assert.equal(f.apiCalls(),0);assert.equal(f.deletes(),0);
+ r=await core.reviewSupportDeletion(f.d,t.requestId);
+ const out=await core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest});
+ assert.deepEqual(out,{status:'completed',completionConfirmed:true});assert.equal(f.apiCalls(),1);assert.equal(f.deletes(),1);
+ assert.ok(f.users.has(f.other));assert.equal((await f.ticketRef(t).get()).get('manualResumeAt'),f.now());
+ await denied(()=>core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),'stale_review');
+ assert.equal(f.apiCalls(),1);assert.equal(f.deletes(),1);
+});
+test('manual resume: a failed extra attempt preserves cumulative history and does not reopen retry budget',async()=>{
+ const f=fixture({paid:true}),t=await f.create();await f.confirm(t);manualFence(f);f.stripeFails(true);
+ const r=await core.reviewSupportDeletion(f.d,t.requestId);
+ assert.deepEqual(await core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),{status:'manual_review',completionConfirmed:false});
+ const after=(await accountDeletionRef(f.db,f.uid).get()).data();
+ assert.equal(after.attempt,13);assert.equal(after.operatorResumeCount,1);assert.equal(after.billingStopped,false);
+ assert.equal(after.status,'manual_review');assert.equal(after.operatorResumePreviousReason,'retryable');
+ assert.equal(after.operatorResumeRequestHash,key(t.requestId));assert.equal(after.dueAt,null);assert.ok(f.users.has(f.uid));assert.equal(f.deletes(),0);
+ f.deletion.stripe=assert.fail;f.deletion.deleteData=assert.fail;f.advance(86400000);
+ assert.deepEqual(await runAccountDeletion(f.deletion,f.uid,{kind:'retry'}),{ok:false,reason:'manual_review'});
+ assert.deepEqual(await runAccountDeletion(f.deletion,f.uid,{kind:'request',stopBillingConfirmed:true}),{ok:false,reason:'manual_review'});
+ const next=await core.reviewSupportDeletion(f.d,t.requestId);assert.equal(next.manualResumeAllowed,false);
+ const writes=f.db.writes.length;await denied(()=>core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:next.reviewDigest}),'invalid_request');
+ assert.equal(f.db.writes.length,writes);
+});
+test('manual resume: already stopped billing is preserved and cleanup failure remains manual',async()=>{
+ const f=fixture(),t=await f.create();await f.confirm(t);manualFence(f,{billingStopped:true,attempt:4});f.cleanupFails(true);
+ f.deletion.stripe=assert.fail;let r=await core.reviewSupportDeletion(f.d,t.requestId);
+ assert.deepEqual(await core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),{status:'manual_review',completionConfirmed:false});
+ const after=(await accountDeletionRef(f.db,f.uid).get()).data();assert.equal(after.billingStopped,true);
+ assert.equal(after.attempt,5);assert.equal(after.operatorResumeCount,1);assert.equal(after.status,'manual_review');assert.equal(f.deletes(),1);
+ f.cleanupFails(false);r=await core.reviewSupportDeletion(f.d,t.requestId);
+ await denied(()=>core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),'invalid_request');assert.equal(f.deletes(),1);
+});
+test('manual resume: an interrupted extra attempt cannot be retried by worker or normal app',async()=>{
+ for(const kind of ['retry','request']) {
+  const f=fixture(),t=await f.create();await f.confirm(t);
+  manualFence(f,{status:'running',attempt:13,operatorResumeCount:1,billingStopped:true,lease:'interrupted',dueAt:f.now()-1});
+  f.deletion.stripe=assert.fail;f.deletion.deleteData=assert.fail;
+  assert.deepEqual(await runAccountDeletion(f.deletion,f.uid,kind==='retry'?{kind}:{kind,stopBillingConfirmed:true}),{ok:false,reason:'manual_review'});
+  const after=(await accountDeletionRef(f.db,f.uid).get()).data();assert.equal(after.status,'manual_review');
+  assert.equal(after.attempt,13);assert.equal(after.operatorResumeInterrupted,true);assert.equal(after.billingStopped,true);
+ }
+});
+test('manual resume: an unverified ticket and a different ticket review cannot grant an attempt',async()=>{
+ const f=fixture(),a=await f.create(),b=await f.create();manualFence(f);
+ const digest='v1.'+f.now()+'.'+'0'.repeat(64);
+ await denied(()=>core.resumeSupportDeletion(f.d,{requestId:a.requestId,reviewDigest:digest}),'unverified');
+ await f.confirm(a);await f.confirm(b);const r=await core.reviewSupportDeletion(f.d,a.requestId);
+ await denied(()=>core.resumeSupportDeletion(f.d,{requestId:b.requestId,reviewDigest:r.reviewDigest}),'stale_review');
+ assert.equal(f.deletes(),0);assert.equal((await accountDeletionRef(f.db,f.uid).get()).get('attempt'),12);
+});
+test('manual resume: stale review and deleted/recreated Auth are rejected before mutation',async()=>{
+ for(const mode of ['expired','recreated']) {
+  const f=fixture(),t=await f.create();await f.confirm(t);manualFence(f);const r=await core.reviewSupportDeletion(f.d,t.requestId);
+  if(mode==='expired')f.advance(301000);else f.users.get(f.uid).metadata.creationTime=new Date(f.now()).toISOString();
+  await denied(()=>core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),mode==='expired'?'stale_review':'wrong_account');
+  assert.equal(f.deletes(),0);assert.equal((await accountDeletionRef(f.db,f.uid).get()).get('attempt'),12);
+ }
+});
+test('manual resume: concurrent fence change between review validation and claim is refused atomically',async()=>{
+ const f=fixture(),t=await f.create();await f.confirm(t);manualFence(f);const r=await core.reviewSupportDeletion(f.d,t.requestId);
+ f.d.resumeDeletion=async(uid,input)=>{const path=accountDeletionRef(f.db,uid).path;f.db.documents.set(path,{...f.db.documents.get(path),updatedAt:f.now()});
+  return runAccountDeletion(f.deletion,uid,{kind:'operator_resume',stopBillingConfirmed:true,...input});};
+ await assert.rejects(core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),e=>e.reason==='manual_review');
+ assert.equal(f.deletes(),0);assert.equal((await accountDeletionRef(f.db,f.uid).get()).get('attempt'),12);
+});
+test('manual resume: double execution and direct reused fence grant do not delete twice',async()=>{
+ const f=fixture(),t=await f.create();await f.confirm(t);const fence=manualFence(f);const r=await core.reviewSupportDeletion(f.d,t.requestId);
+ const results=await Promise.allSettled([core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest})]);
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1);assert.equal(f.deletes(),1);
+ await assert.rejects(runAccountDeletion(f.deletion,f.uid,{kind:'operator_resume',stopBillingConfirmed:true,requestId:t.requestId,fenceDigest:accountDeletionFenceDigest(fence)}),e=>e.reason==='manual_review');
+ assert.equal(f.deletes(),1);
+});
+test('manual resume: malformed, foreign and already resumed fences have no available grant',async()=>{
+ for(const extra of [{uid:'other_account'},{attempt:13},{attempt:0},{operatorResumeCount:1},{lease:'held'},{dueAt:1},{billingStopped:'true'},{reason:'unknown_reason'},{requestedAt:undefined}]) {
+  const f=fixture(),t=await f.create();await f.confirm(t);manualFence(f,extra);const r=await core.reviewSupportDeletion(f.d,t.requestId);
+  assert.equal(r.manualResumeAllowed,false);await denied(()=>core.resumeSupportDeletion(f.d,{requestId:t.requestId,reviewDigest:r.reviewDigest}),'invalid_request');assert.equal(f.deletes(),0);
+ }
 });
