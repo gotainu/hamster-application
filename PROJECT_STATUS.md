@@ -1,5 +1,13 @@
 # Hamster Care プロジェクト状況
 
+## 2026-11-28 ②Play製品版アクセス承認・③Android code6正式審査送信済み・⑥運用確定
+
+- **②アクセス取得完了**：本人がGmailの正式承認通知（**2026-11-28 01:49 JST**、件名「Google Play の本番環境へのアクセスが承認されました」、Ham Care/com.gotainu.hamster）を受領したと報告。同日Consoleを再読込し「Google Play の製品版へのアクセスが承認されました」を確認。テスト条件達成/アクセス申請/アクセス承認/製品版リリース審査を分離し、②は完了とする。
+- **③審査提出**：**2026-11-28 09:25 JST**に既存Android **1.0.1/versionCode6**を製品版の審査へ送信。**送信ID7・2変更・Console実表示「審査中」**を履歴/詳細で確認。[送信詳細](https://play.google.com/console/u/0/developers/7040110575286467511/app/4976014731630589144/publishing/submission-activity/7/details)。既存libraryの11/27 upload済みcode6/min24/target36を再利用し、AAB再作成/再upload/再テスト/画像撮り直しなし。リリース名`6 (1.0.1)`、Alpha code6ノートをそのままコピー。掲載情報/Data Safety/Privacy・削除URL/既存審査用ログインは準備済みの保存内容を再利用し、書換えない。
+- **公開保留**：本人の条件付き承認に従い、Consoleで管理対象の公開を**off→on**へ変更、再読込で保存と「承認済み変更の公開準備完了」欄を確認後に審査送信した。送信後もonで、「変更を公開」等は押していない。製品版の最初の国未選択errorは日本1国を追加して解消、対象はcode6と日本の2変更だけ。国別設定を共有するinactiveオープンテストへの反映表示はあるが、新オープンrelease/参加拡大はせずAlphaは対象外。**2026年12月末までは一般公開しない**。承認後の実公開は別承認まで保留する。
+- **⑥実画面と運用3点を完了**：**09:18:34 JST**、Chromeで本番`/account-deletion/confirm/`の見出しとJS後の正規リンクなし案内を確認し、Macロックの未確認を解消。proof/ログイン/入力/送信/削除なし、HTTP/CSP再検査なし。正規リンクの本人確認・実削除の新E2Eを行った証拠へ置き換えない。本人は①開示原本と提供手順を準備済み、②Goがスマホで毎営業日確認/継続不能時は新規購入停止・既存管理/同期維持、③一般問い合わせ/開示完了90日後最小化・週初営業日手動・法定/課金/紛争/未完了/他案件に必要な記録を除外、を回答/採用した。原本の実値/私有保管場所は取得せず、実開示配送/実整理/TTL開始とは区別する。既存削除窓口の90日/未確認失効30日、再試行/復活防止/会計の別管理は維持。
+- **維持・次工程**：Apple承認/手動公開・Android Alpha code6/テスター・一般購入privatefalseclosed・一般メールfalseclosed/PAUSED・正規Webhookを維持。今回の変更はPlayの管理対象公開/製品版候補/日本対象/審査送信と文書だけで、Functions/Hosting/IAM/Stripe/Flutter/契約/体験/利用権限/実メール/実削除変更0。12月3日19:05 JSTの自然体験終了後、本人1アカウント・550円1回・通知1件を別承認で確認する計画を維持。Googleの承認待ちと両ストアの一般公開判断、本人限定実決済/配送が残る。根拠はGit外`/Users/gota/hamcare-deploy-staging/android-production-submission-20261128/`、表示確認は既存support rolloutのsafe JSON。既存dirty/素材を保持し、今回の文書差分だけ記録commitにまとめる。
+
 ## 2026-11-27 ⑥削除後段の本番反映完了・⑦GitHub main統合/push済み
 
 - **承認と維持状態**：本人が削除申請後段2API/確認ページ・manual_review追加1回と直接IAM/Hostingの反映、および準備済み68commit/286fileのmain統合/pushを承認。実アカウント削除/実メール/Stripe操作/体験・権限変更0。一般購入private/masterfalse/closed、contact送信false/statusfalse、一般通知false/closed/PAUSED、正規Webhook processを維持。12/3 19:05 JST後の本人1UID・550円1回・通知1件は別承認待ち。

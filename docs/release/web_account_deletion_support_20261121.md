@@ -1,5 +1,11 @@
 # Webアカウント削除申請・本人確認の運用（2026-11-27本番接続更新）
 
+## 2026-11-28 本番確認ページの実画面・運用判断を完了
+
+09:18:34 JSTにChromeで`https://hamster-breeding-app.web.app/account-deletion/confirm/`をproofなしで開き、見出し「削除申請の本人確認」とJS後の「申請用リンクを確認できませんでした。運営から届いたリンクを開き直すか、申請メールへご返信ください。」を実画面で確認。初期準備中/公開前停止ではなく、11/27のMacロックによる未確認は解消した。新タブは閉じ、他のタブを変更せず、HTTP/CSP再検査・ログイン/入力/送信/削除/Apple失効0。実申請の本人確認保存や実削除の新E2EをPASSにしたものではない。根拠は既存Git外`support-deletion-rollout-20261127/confirmation-page-browser-safe-20261128.json`。
+
+本人は同日、非公開開示原本と提供手順の準備済み、Go一人のスマホ毎営業日窓口確認・継続不能時購入停止、一般問い合わせ/開示完了履歴の90日後最小化と週初営業日手動確認を回答/採用した。削除申請の3営業日/7暦日/7日ごとの進捗/完了90日/未確認失効30日は既存どおり。一般窓口方針を削除中要求/再試行/復活防止フェンス/会計へ一括適用せず、法令/課金/紛争/未完了等の除外・保留を維持する。実履歴整理/TTL/開示メールは未実施。具体的な原本/不在時/一般窓口の手順は既存の[開示運用](commercial_disclosure_operations_20261121.md)へ集約する。
+
 ## 2026-11-27 本番後段の接続・無害限定確認完了
 
 - 現在はメール受付→既存Web認証/同UIDの本人確認・削除意思→専用private operator dry-run→既存Stripe停止/削除へ接続済み。confirm **confirmsupportaccountdeletion-00003-der**/operator **supportaccountdeletionoperator-00003-zun**のsupport flag true、確認URLは`https://hamster-breeding-app.web.app/account-deletion/confirm/`。公開申請と後段のログインを区別し、メール未設定/Relay/プロフィールなしも対象。ログインできない人には下段の復旧・個別対応を使い、未確認の削除経路を作らない。
